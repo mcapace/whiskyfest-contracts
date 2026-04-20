@@ -64,7 +64,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
         </div>
         <div className="text-right">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Grand Total</p>
-          <p className="font-serif text-3xl font-semibold tabular-nums text-whisky-900">
+          <p className="font-serif text-3xl font-semibold tabular-nums text-fest-900">
             {formatCurrency(contract.grand_total_cents)}
           </p>
         </div>
@@ -114,7 +114,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
             <div className="border-t border-border/50 pt-3">
               <div className="flex items-baseline justify-between">
                 <span className="font-serif text-base font-semibold">Grand Total</span>
-                <span className="font-mono text-lg font-semibold tabular-nums text-whisky-900">
+                <span className="font-mono text-lg font-semibold tabular-nums text-fest-900">
                   {formatCurrency(contract.grand_total_cents)}
                 </span>
               </div>

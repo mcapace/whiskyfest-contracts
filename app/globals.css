@@ -4,7 +4,7 @@
 
 /* ------------------------------------------------------------------
    Theme — Whisky Advocate–inspired: warm paper, burgundy primary,
-   brass gold accents (editorial / masthead feel).
+   brass gold accents, WhiskyFest blue (#182d6d) for focus + highlights.
    ------------------------------------------------------------------ */
 
 @layer base {
@@ -40,7 +40,8 @@
 
     --border: 30 18% 88%;
     --input: 30 18% 88%;
-    --ring: 40 42% 44%;
+    /* Focus ring — WhiskyFest blue */
+    --ring: 226 58% 26%;
 
     --radius: 0.5rem;
   }
@@ -64,7 +65,7 @@
     --destructive-foreground: 0 0% 98%;
     --border: 350 10% 20%;
     --input: 350 10% 20%;
-    --ring: 40 42% 50%;
+    --ring: 226 55% 55%;
   }
 }
 

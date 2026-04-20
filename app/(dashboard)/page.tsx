@@ -69,12 +69,12 @@ export default async function DashboardPage() {
         <StatCard icon={CheckCircle2} label="Executed" value={formatCurrency(totalExecutedCents)} sub={`${executedCount} contracts`} accent="emerald" />
         <StatCard icon={Clock}        label="In Flight" value={formatCurrency(totalInFlightCents)} sub="Sent + Approved + In Review" accent="amber" />
         <StatCard icon={FileText}     label="Drafts"    value={String(draftCount)}                  sub="Awaiting review" accent="whisky" />
-        <StatCard icon={DollarSign}   label="Total Pipeline" value={formatCurrency(totalExecutedCents + totalInFlightCents)} sub="All active contract value" accent="whisky" />
+        <StatCard icon={DollarSign}   label="Total Pipeline" value={formatCurrency(totalExecutedCents + totalInFlightCents)} sub="All active contract value" accent="fest" />
       </div>
 
       {/* Contracts table */}
       <Card>
-        <div className="flex items-center justify-between border-b border-border/50 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-fest-600/10 px-6 py-4">
           <div>
             <h2 className="font-serif text-lg font-semibold">Recent Contracts</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">Most recent 50 contracts across all statuses</p>
@@ -102,7 +102,7 @@ export default async function DashboardPage() {
                 {contracts.map(c => (
                   <TableRow key={c.id} className="group">
                     <TableCell>
-                      <Link href={`/contracts/${c.id}`} className="block hover:text-whisky-800">
+                      <Link href={`/contracts/${c.id}`} className="block hover:text-fest-800">
                         <div className="font-medium">{c.exhibitor_company_name}</div>
                         {c.brands_poured && (
                           <div className="mt-0.5 text-xs text-muted-foreground">{c.brands_poured}</div>
@@ -122,7 +122,7 @@ export default async function DashboardPage() {
                     <TableCell>
                       <Link
                         href={`/contracts/${c.id}`}
-                        className="text-whisky-800 opacity-0 transition-opacity group-hover:opacity-100"
+                        className="text-fest-700 opacity-0 transition-opacity group-hover:opacity-100"
                       >
                         →
                       </Link>
@@ -143,10 +143,11 @@ function StatCard({
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string; value: string; sub: string;
-  accent: 'whisky' | 'amber' | 'emerald';
+  accent: 'whisky' | 'fest' | 'amber' | 'emerald';
 }) {
   const accentClass = {
     whisky:  'text-whisky-800 bg-whisky-100/60',
+    fest:    'text-fest-800 bg-fest-100/90',
     amber:   'text-amber-700 bg-amber-100/60',
     emerald: 'text-emerald-700 bg-emerald-100/60',
   }[accent];
@@ -170,7 +171,7 @@ function StatCard({
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-whisky-100 text-whisky-800">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-fest-100 text-fest-800">
         <FileText className="h-6 w-6" />
       </div>
       <h3 className="font-serif text-lg font-semibold">No contracts yet</h3>

@@ -110,7 +110,7 @@ export default async function ContractsListPage({
                 {contracts.map(c => (
                   <TableRow key={c.id} className="group">
                     <TableCell>
-                      <Link href={`/contracts/${c.id}`} className="block hover:text-whisky-800">
+                      <Link href={`/contracts/${c.id}`} className="block hover:text-fest-800">
                         <div className="font-medium">{c.exhibitor_company_name}</div>
                         {c.brands_poured && (
                           <div className="mt-0.5 text-xs text-muted-foreground">{c.brands_poured}</div>

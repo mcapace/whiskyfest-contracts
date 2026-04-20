@@ -8,7 +8,7 @@ export default async function LoginPage() {
   if (session?.user) redirect('/');
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-brass-50/90 via-background to-background px-6">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-brass-50/90 via-fest-600/[0.04] to-background px-6">
       <div className="w-full max-w-md">
         {/* Brand */}
         <div className="mb-8 text-center">
@@ -34,7 +34,7 @@ export default async function LoginPage() {
         </div>
 
         {/* Card */}
-        <div className="rounded-lg border border-border/60 bg-card p-8 shadow-sm">
+        <div className="rounded-lg border border-border/60 border-t-4 border-t-fest-600 bg-card p-8 shadow-md shadow-fest-900/10">
           <form action={async () => {
             'use server';
             await signIn('google', { redirectTo: '/' });

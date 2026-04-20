@@ -20,9 +20,9 @@ export function Sidebar({ user }: { user: { email?: string | null; name?: string
   const isAdmin = user.role === 'admin';
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border/50 bg-card/40 backdrop-blur-sm lg:flex lg:flex-col">
+    <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-fest-600/15 bg-card/50 backdrop-blur-sm lg:flex lg:flex-col">
       {/* Brand lockup */}
-      <div className="flex h-20 items-center border-b border-border/50 px-4">
+      <div className="flex h-20 items-center border-b border-fest-600/15 px-4">
         <Link href="/" className="relative block h-12 w-[200px] shrink-0">
           <Image
             src="/images/whiskyfest-ny25-logo.png"
@@ -47,13 +47,13 @@ export function Sidebar({ user }: { user: { email?: string | null; name?: string
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
                   active
-                    ? 'bg-whisky-100/70 text-whisky-900'
-                    : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                    ? 'border-fest-600 bg-gradient-to-r from-fest-600/10 to-transparent text-whisky-900'
+                    : 'border-transparent text-muted-foreground hover:border-fest-600/25 hover:bg-accent hover:text-foreground'
                 )}
               >
-                <Icon className={cn('h-4 w-4', active ? 'text-whisky-800' : 'text-muted-foreground/70')} />
+                <Icon className={cn('h-4 w-4', active ? 'text-fest-700' : 'text-muted-foreground/70')} />
                 {item.label}
               </Link>
             );
@@ -61,9 +61,9 @@ export function Sidebar({ user }: { user: { email?: string | null; name?: string
       </nav>
 
       {/* User block */}
-      <div className="border-t border-border/50 p-4">
+      <div className="border-t border-fest-600/15 p-4">
         <div className="flex items-center gap-3 rounded-md p-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-whisky-200 font-serif text-sm font-semibold text-whisky-900">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-fest-100 font-serif text-sm font-semibold text-fest-800 ring-1 ring-fest-600/20">
             {user.name?.[0] ?? user.email?.[0]?.toUpperCase() ?? '?'}
           </div>
           <div className="min-w-0 flex-1">

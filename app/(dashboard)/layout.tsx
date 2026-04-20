@@ -7,7 +7,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!session?.user) redirect('/auth/login');
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-fest-600/[0.06] via-background to-background">
       <Sidebar user={{
         email: session.user.email,
         name:  session.user.name,

@@ -50,6 +50,20 @@ const config: Config = {
           900: '#3f3118',
           950: '#221a0c',
         },
+        // WhiskyFest brand blue (#182d6d + tints)
+        fest: {
+          50:  '#eef1f9',
+          100: '#dce2f0',
+          200: '#b9c5e0',
+          300: '#8a9ccc',
+          400: '#5a70a8',
+          500: '#3a5082',
+          600: '#182d6d',
+          700: '#14265c',
+          800: '#101e4a',
+          900: '#0c1638',
+          950: '#070c20',
+        },
         // Semantic tokens mapped to CSS vars (shadcn-style)
         border:      'hsl(var(--border))',
         input:       'hsl(var(--input))',

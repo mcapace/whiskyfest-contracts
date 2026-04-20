@@ -151,7 +151,7 @@ export function NewContractForm({ events }: Props) {
             </div>
 
             {/* Live total */}
-            <div className="mt-6 rounded-lg border border-whisky-200 bg-whisky-50/50 p-5">
+            <div className="mt-6 rounded-lg border border-fest-600/20 bg-gradient-to-br from-fest-600/[0.07] to-whisky-50/50 p-5">
               <div className="flex items-baseline justify-between text-sm">
                 <span className="text-muted-foreground">Booths ({form.booth_count} × {formatCurrency(boothRateCents)})</span>
                 <span className="font-mono tabular-nums">{formatCurrency(boothSubtotal)}</span>
@@ -162,9 +162,9 @@ export function NewContractForm({ events }: Props) {
                   <span className="font-mono tabular-nums">{formatCurrency(additionalFee)}</span>
                 </div>
               )}
-              <div className="mt-4 flex items-baseline justify-between border-t border-whisky-200 pt-3">
+              <div className="mt-4 flex items-baseline justify-between border-t border-fest-600/15 pt-3">
                 <span className="font-serif text-lg font-semibold">Grand Total</span>
-                <span className="font-serif text-2xl font-semibold tabular-nums text-whisky-900">
+                <span className="font-serif text-2xl font-semibold tabular-nums text-fest-900">
                   {formatCurrency(grandTotal)}
                 </span>
               </div>
