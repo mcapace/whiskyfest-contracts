@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import { auth, signIn } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -11,11 +12,21 @@ export default async function LoginPage() {
       <div className="w-full max-w-md">
         {/* Brand */}
         <div className="mb-8 text-center">
+          <div className="relative mx-auto mb-6 h-28 w-full max-w-sm">
+            <Image
+              src="/images/whiskyfest-ny25-logo.png"
+              alt="WhiskyFest New York"
+              fill
+              className="object-contain"
+              sizes="(max-width: 448px) 100vw, 448px"
+              priority
+            />
+          </div>
           <p className="mb-2 text-xs font-medium uppercase tracking-[0.2em] text-brass-700">
             M. Shanken Communications
           </p>
-          <h1 className="font-serif text-4xl font-semibold tracking-tight">
-            WhiskyFest Contracts
+          <h1 className="font-serif text-2xl font-semibold tracking-tight">
+            Participation contracts
           </h1>
           <p className="mt-3 text-sm text-muted-foreground">
             Sign in with your @mshanken.com Google account

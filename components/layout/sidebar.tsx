@@ -1,8 +1,10 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { FileText, LayoutDashboard, Plus, CalendarDays, Users } from 'lucide-react';
+import { signOutAction } from '@/app/actions/auth';
 import { cn } from '@/lib/utils';
 
 const nav = [
@@ -20,14 +22,16 @@ export function Sidebar({ user }: { user: { email?: string | null; name?: string
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border/50 bg-card/40 backdrop-blur-sm lg:flex lg:flex-col">
       {/* Brand lockup */}
-      <div className="flex h-20 items-center border-b border-border/50 px-6">
-        <Link href="/" className="group flex flex-col leading-none">
-          <span className="font-serif text-xl font-semibold tracking-tight text-foreground">
-            WhiskyFest
-          </span>
-          <span className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-brass-600">
-            Contract Flow
-          </span>
+      <div className="flex h-20 items-center border-b border-border/50 px-4">
+        <Link href="/" className="relative block h-12 w-[200px] shrink-0">
+          <Image
+            src="/images/whiskyfest-ny25-logo.png"
+            alt="WhiskyFest"
+            fill
+            className="object-contain object-left"
+            sizes="200px"
+            priority
+          />
         </Link>
       </div>
 
@@ -67,7 +71,7 @@ export function Sidebar({ user }: { user: { email?: string | null; name?: string
             <p className="truncate text-[11px] uppercase tracking-wider text-muted-foreground">{user.role ?? 'viewer'}</p>
           </div>
         </div>
-        <form action="/api/auth/signout" method="POST" className="mt-2">
+        <form action={signOutAction} className="mt-2">
           <button
             type="submit"
             className="w-full rounded-md px-3 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
