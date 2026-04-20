@@ -8,8 +8,14 @@ import { google } from 'googleapis';
  * 2. Enable Google Drive API + Google Docs API
  * 3. Create a service account, download the JSON key
  * 4. Base64-encode the entire JSON and set as GOOGLE_SERVICE_ACCOUNT_KEY env var
- * 5. Share the template Doc + Drafts folder + Signed folder with the service account's email
- *    (the service account email is in the JSON's client_email field)
+ * 5. Add the service account as a member of the Shared Drive containing the
+ *    template Doc and Drafts/Signed folders (role: Content manager)
+ *    - Service accounts have no personal Drive quota, so files MUST live in a Shared Drive
+ *    - Service account email is in the JSON's `client_email` field
+ *
+ * IMPORTANT: All Drive API calls below pass `supportsAllDrives: true` because
+ * service accounts cannot see Shared Drive files without this flag (the API
+ * defaults to searching only personal "My Drive" otherwise).
  */
 
 function getAuth() {
@@ -38,15 +44,16 @@ export async function mergeAndExportPdf(
   const drive = google.drive({ version: 'v3', auth });
   const docs  = google.docs({ version: 'v1', auth });
 
-  // 1. Copy the template
+  // 1. Copy the template (must support Shared Drives)
   const copy = await drive.files.copy({
     fileId: templateDocId,
     requestBody: { name: `TEMP_${outputFileName}` },
+    supportsAllDrives: true,
   });
   const tempDocId = copy.data.id!;
 
   try {
-    // 2. Build batch replace requests
+    // 2. Build batch replace requests (Docs API natively supports Shared Drives)
     const requests = Object.entries(mergeMap).map(([token, value]) => ({
       replaceAllText: {
         containsText: { text: token, matchCase: true },
@@ -61,7 +68,7 @@ export async function mergeAndExportPdf(
       });
     }
 
-    // 3. Export as PDF
+    // 3. Export as PDF (export uses fileId only; temp file already lives in the Shared Drive from copy)
     const pdfResp = await drive.files.export(
       { fileId: tempDocId, mimeType: 'application/pdf' },
       { responseType: 'arraybuffer' }
@@ -69,7 +76,7 @@ export async function mergeAndExportPdf(
 
     const pdfBytes = Buffer.from(pdfResp.data as ArrayBuffer);
 
-    // 4. Upload the PDF to the destination folder
+    // 4. Upload the PDF to the destination folder (Shared Drive support required)
     const uploaded = await drive.files.create({
       requestBody: {
         name:     `${outputFileName}.pdf`,
@@ -81,6 +88,7 @@ export async function mergeAndExportPdf(
         body:     require('stream').Readable.from(pdfBytes),
       },
       fields: 'id, webViewLink',
+      supportsAllDrives: true,
     });
 
     return {
@@ -89,7 +97,10 @@ export async function mergeAndExportPdf(
     };
   } finally {
     // 5. Clean up the temporary doc copy
-    await drive.files.delete({ fileId: tempDocId }).catch(err => {
+    await drive.files.delete({
+      fileId: tempDocId,
+      supportsAllDrives: true,
+    }).catch(err => {
       console.warn('Failed to clean up temp doc:', err.message);
     });
   }
