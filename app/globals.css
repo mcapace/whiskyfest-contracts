@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 /* ------------------------------------------------------------------
-   Theme — Whisky Advocate–inspired: warm paper, burgundy primary,
-   brass gold accents, WhiskyFest blue (#182d6d) for focus + highlights.
+   Theme — warm paper, brass accents; primary actions = WhiskyFest blue
+   (#182d6d). Burgundy tones live in the `whisky` Tailwind scale.
    ------------------------------------------------------------------ */
 
 @layer base {
@@ -19,8 +19,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 18 18% 12%;
 
-    /* Primary — Whisky Advocate burgundy */
-    --primary: 350 42% 34%;
+    /* Primary — WhiskyFest blue (buttons, links, key CTAs) */
+    --primary: 222 64% 26%;
     --primary-foreground: 40 42% 98%;
 
     /* Secondary — warm stone */
@@ -33,7 +33,7 @@
 
     /* Accent — light brass wash on hover */
     --accent: 38 32% 93%;
-    --accent-foreground: 350 40% 28%;
+    --accent-foreground: 222 55% 28%;
 
     --destructive: 0 72% 42%;
     --destructive-foreground: 0 0% 98%;
@@ -53,8 +53,8 @@
     --card-foreground: 38 28% 96%;
     --popover: 350 14% 11%;
     --popover-foreground: 38 28% 96%;
-    --primary: 38 42% 58%;
-    --primary-foreground: 350 20% 8%;
+    --primary: 222 58% 52%;
+    --primary-foreground: 40 40% 98%;
     --secondary: 350 10% 18%;
     --secondary-foreground: 38 28% 96%;
     --muted: 350 10% 18%;
