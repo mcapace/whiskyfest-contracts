@@ -5,6 +5,8 @@ import { mergeAndExportPdf } from '@/lib/google';
 import { formatCurrency } from '@/lib/utils';
 import type { ContractWithTotals, Event } from '@/types/db';
 
+export const runtime = 'nodejs';
+
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

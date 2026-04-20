@@ -13,7 +13,8 @@ import { google } from 'googleapis';
  */
 
 function getAuth() {
-  const keyB64 = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+  // Bracket access so the bundler does not inline a stale/empty value from an older build.
+  const keyB64 = process.env['GOOGLE_SERVICE_ACCOUNT_KEY']?.trim();
   if (!keyB64) throw new Error('Missing GOOGLE_SERVICE_ACCOUNT_KEY env var');
 
   const credentials = JSON.parse(Buffer.from(keyB64, 'base64').toString('utf-8'));
