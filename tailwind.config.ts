@@ -14,7 +14,7 @@ const config: Config = {
     },
     extend: {
       fontFamily: {
-        // Editorial serif for headlines, matches Whisky Advocate brand feel
+        // Editorial serif for headlines (Whisky Advocate–style typography)
         serif: ['"Source Serif 4"', 'Georgia', 'serif'],
         // Clean sans for body + UI
         sans: ['"Inter"', 'system-ui', 'sans-serif'],
@@ -22,19 +22,33 @@ const config: Config = {
         mono: ['"JetBrains Mono"', 'Menlo', 'monospace'],
       },
       colors: {
-        // Whisky-inspired palette
+        // Whisky Advocate–aligned: burgundy editorial + warm neutrals
         whisky: {
-          50:  '#fdf8f3',
-          100: '#faeede',
-          200: '#f4dcbd',
-          300: '#ecc28e',
-          400: '#e0a05d',
-          500: '#d58437',
-          600: '#c46b2c',
-          700: '#a35327',
-          800: '#834325',
-          900: '#6b3822',
-          950: '#3a1c10',
+          50:  '#faf7f6',
+          100: '#f3e9e8',
+          200: '#e5d2d0',
+          300: '#d0b2ae',
+          400: '#b88682',
+          500: '#965d58',
+          600: '#7a3e3e',
+          700: '#663033',
+          800: '#54292c',
+          900: '#3d1e20',
+          950: '#211011',
+        },
+        // Brass / gold accent (masthead, eyebrow labels)
+        brass: {
+          50:  '#fcfbf7',
+          100: '#f5efd9',
+          200: '#eaddb8',
+          300: '#dcc68a',
+          400: '#c9a85c',
+          500: '#b8923f',
+          600: '#9a752f',
+          700: '#7a5e28',
+          800: '#624a22',
+          900: '#3f3118',
+          950: '#221a0c',
         },
         // Semantic tokens mapped to CSS vars (shadcn-style)
         border:      'hsl(var(--border))',

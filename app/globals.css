@@ -3,69 +3,68 @@
 @tailwind utilities;
 
 /* ------------------------------------------------------------------
-   Theme — editorial, whisky-inspired. Warm neutrals + amber accent.
+   Theme — Whisky Advocate–inspired: warm paper, burgundy primary,
+   brass gold accents (editorial / masthead feel).
    ------------------------------------------------------------------ */
 
 @layer base {
   :root {
-    /* Neutrals — warm off-white / cream */
-    --background: 36 33% 97%;
-    --foreground: 24 10% 10%;
+    /* Neutrals — warm editorial paper */
+    --background: 38 32% 97%;
+    --foreground: 18 18% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 24 10% 10%;
+    --card-foreground: 18 18% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 24 10% 10%;
+    --popover-foreground: 18 18% 12%;
 
-    /* Primary — deep whisky amber */
-    --primary: 28 62% 39%;
-    --primary-foreground: 36 33% 97%;
+    /* Primary — Whisky Advocate burgundy */
+    --primary: 350 42% 34%;
+    --primary-foreground: 40 42% 98%;
 
-    /* Secondary — subtle warm gray */
-    --secondary: 30 15% 94%;
-    --secondary-foreground: 24 10% 20%;
+    /* Secondary — warm stone */
+    --secondary: 32 20% 93%;
+    --secondary-foreground: 18 22% 18%;
 
-    /* Muted — for less prominent UI */
-    --muted: 30 15% 94%;
-    --muted-foreground: 24 6% 45%;
+    /* Muted */
+    --muted: 30 16% 93%;
+    --muted-foreground: 20 10% 42%;
 
-    /* Accent — soft amber for hover states */
-    --accent: 32 40% 92%;
-    --accent-foreground: 28 62% 30%;
+    /* Accent — light brass wash on hover */
+    --accent: 38 32% 93%;
+    --accent-foreground: 350 40% 28%;
 
-    /* Destructive */
-    --destructive: 0 70% 45%;
+    --destructive: 0 72% 42%;
     --destructive-foreground: 0 0% 98%;
 
-    /* Borders + rings */
-    --border: 30 15% 88%;
-    --input: 30 15% 88%;
-    --ring: 28 62% 39%;
+    --border: 30 18% 88%;
+    --input: 30 18% 88%;
+    --ring: 40 42% 44%;
 
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 24 15% 8%;
-    --foreground: 36 33% 95%;
-    --card: 24 15% 11%;
-    --card-foreground: 36 33% 95%;
-    --popover: 24 15% 11%;
-    --popover-foreground: 36 33% 95%;
-    --primary: 28 70% 55%;
-    --primary-foreground: 24 15% 8%;
-    --secondary: 24 10% 18%;
-    --secondary-foreground: 36 33% 95%;
-    --muted: 24 10% 18%;
-    --muted-foreground: 30 10% 65%;
-    --accent: 24 10% 20%;
-    --accent-foreground: 28 70% 55%;
-    --destructive: 0 60% 45%;
+    --background: 350 12% 8%;
+    --foreground: 38 28% 96%;
+    --card: 350 14% 11%;
+    --card-foreground: 38 28% 96%;
+    --popover: 350 14% 11%;
+    --popover-foreground: 38 28% 96%;
+    --primary: 38 42% 58%;
+    --primary-foreground: 350 20% 8%;
+    --secondary: 350 10% 18%;
+    --secondary-foreground: 38 28% 96%;
+    --muted: 350 10% 18%;
+    --muted-foreground: 30 12% 65%;
+    --accent: 350 12% 20%;
+    --accent-foreground: 38 45% 70%;
+    --destructive: 0 60% 42%;
     --destructive-foreground: 0 0% 98%;
-    --border: 24 10% 20%;
-    --input: 24 10% 20%;
-    --ring: 28 70% 55%;
+    --border: 350 10% 20%;
+    --input: 350 10% 20%;
+    --ring: 40 42% 50%;
   }
 }
 
@@ -75,13 +74,11 @@
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
   }
-  /* Editorial flourish — underline links in prose */
   .prose-editorial a {
     text-decoration: underline;
-    text-decoration-color: hsl(var(--primary) / 0.4);
+    text-decoration-color: hsl(var(--primary) / 0.35);
     text-underline-offset: 2px;
   }
 }
 
-/* Numeric tabular alignment for amounts in tables */
 .tabular-nums { font-variant-numeric: tabular-nums; }

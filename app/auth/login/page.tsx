@@ -7,11 +7,11 @@ export default async function LoginPage() {
   if (session?.user) redirect('/');
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-whisky-50 to-background px-6">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-brass-50/90 via-background to-background px-6">
       <div className="w-full max-w-md">
         {/* Brand */}
         <div className="mb-8 text-center">
-          <p className="mb-2 text-xs font-medium uppercase tracking-[0.2em] text-whisky-700">
+          <p className="mb-2 text-xs font-medium uppercase tracking-[0.2em] text-brass-700">
             M. Shanken Communications
           </p>
           <h1 className="font-serif text-4xl font-semibold tracking-tight">

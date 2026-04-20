@@ -47,7 +47,7 @@ export default async function DashboardPage() {
       {/* Header */}
       <div className="flex items-end justify-between">
         <div>
-          <p className="mb-2 text-xs font-medium uppercase tracking-[0.2em] text-whisky-700">
+          <p className="mb-2 text-xs font-medium uppercase tracking-[0.2em] text-brass-700">
             M. Shanken Communications
           </p>
           <h1 className="font-serif text-4xl font-semibold leading-tight tracking-tight">
@@ -102,7 +102,7 @@ export default async function DashboardPage() {
                 {contracts.map(c => (
                   <TableRow key={c.id} className="group">
                     <TableCell>
-                      <Link href={`/contracts/${c.id}`} className="block hover:text-whisky-700">
+                      <Link href={`/contracts/${c.id}`} className="block hover:text-whisky-800">
                         <div className="font-medium">{c.exhibitor_company_name}</div>
                         {c.brands_poured && (
                           <div className="mt-0.5 text-xs text-muted-foreground">{c.brands_poured}</div>
@@ -122,7 +122,7 @@ export default async function DashboardPage() {
                     <TableCell>
                       <Link
                         href={`/contracts/${c.id}`}
-                        className="text-whisky-700 opacity-0 transition-opacity group-hover:opacity-100"
+                        className="text-whisky-800 opacity-0 transition-opacity group-hover:opacity-100"
                       >
                         →
                       </Link>
@@ -146,7 +146,7 @@ function StatCard({
   accent: 'whisky' | 'amber' | 'emerald';
 }) {
   const accentClass = {
-    whisky:  'text-whisky-700 bg-whisky-100/60',
+    whisky:  'text-whisky-800 bg-whisky-100/60',
     amber:   'text-amber-700 bg-amber-100/60',
     emerald: 'text-emerald-700 bg-emerald-100/60',
   }[accent];
@@ -170,7 +170,7 @@ function StatCard({
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-whisky-100 text-whisky-700">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-whisky-100 text-whisky-800">
         <FileText className="h-6 w-6" />
       </div>
       <h3 className="font-serif text-lg font-semibold">No contracts yet</h3>

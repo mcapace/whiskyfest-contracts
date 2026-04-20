@@ -62,7 +62,7 @@ export default async function ContractsListPage({
     <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="mb-2 text-xs font-medium uppercase tracking-[0.2em] text-whisky-700">
+          <p className="mb-2 text-xs font-medium uppercase tracking-[0.2em] text-brass-700">
             Pipeline
           </p>
           <h1 className="font-serif text-4xl font-semibold leading-tight tracking-tight">
@@ -110,7 +110,7 @@ export default async function ContractsListPage({
                 {contracts.map(c => (
                   <TableRow key={c.id} className="group">
                     <TableCell>
-                      <Link href={`/contracts/${c.id}`} className="block hover:text-whisky-700">
+                      <Link href={`/contracts/${c.id}`} className="block hover:text-whisky-800">
                         <div className="font-medium">{c.exhibitor_company_name}</div>
                         {c.brands_poured && (
                           <div className="mt-0.5 text-xs text-muted-foreground">{c.brands_poured}</div>

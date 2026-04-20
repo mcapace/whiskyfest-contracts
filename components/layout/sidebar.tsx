@@ -25,7 +25,7 @@ export function Sidebar({ user }: { user: { email?: string | null; name?: string
           <span className="font-serif text-xl font-semibold tracking-tight text-foreground">
             WhiskyFest
           </span>
-          <span className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-whisky-700">
+          <span className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-brass-600">
             Contract Flow
           </span>
         </Link>
@@ -45,11 +45,11 @@ export function Sidebar({ user }: { user: { email?: string | null; name?: string
                 className={cn(
                   'group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                   active
-                    ? 'bg-whisky-100/60 text-whisky-900'
+                    ? 'bg-whisky-100/70 text-whisky-900'
                     : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                 )}
               >
-                <Icon className={cn('h-4 w-4', active ? 'text-whisky-700' : 'text-muted-foreground/70')} />
+                <Icon className={cn('h-4 w-4', active ? 'text-whisky-800' : 'text-muted-foreground/70')} />
                 {item.label}
               </Link>
             );
