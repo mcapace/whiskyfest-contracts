@@ -14,7 +14,7 @@ export default async function LoginPage() {
         <div className="mb-8 text-center">
           <div className="relative mx-auto mb-6 h-28 w-full max-w-sm">
             <Image
-              src="/images/wf-logo-alt.png"
+              src="/images/whiskyfest-ny25-logo.png"
               alt="WhiskyFest New York"
               fill
               className="object-contain mix-blend-multiply"
