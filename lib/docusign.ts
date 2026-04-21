@@ -17,9 +17,14 @@ function authHostFromUrl(url: string): string {
   return url.replace(/^https?:\/\//, '').replace(/\/$/, '');
 }
 
-function restBase(): string {
+/** REST API base URL (no trailing slash). Exported for diagnostics (e.g. envelope list). */
+export function restBase(): string {
   const base = process.env['DOCUSIGN_BASE_URL'] ?? 'https://demo.docusign.net/restapi';
   return base.replace(/\/$/, '');
+}
+
+export function getDocuSignAccountId(): string {
+  return requireEnv('DOCUSIGN_ACCOUNT_ID');
 }
 
 /**
@@ -87,7 +92,7 @@ export interface SendEnvelopeParams {
 }
 
 export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelopeId: string }> {
-  const accountId = requireEnv('DOCUSIGN_ACCOUNT_ID');
+  const accountId = getDocuSignAccountId();
   const accessToken = await getAccessToken();
 
   const signHere1 = anchorOnly(DOCUSIGN_ANCHORS.sig1);
@@ -155,7 +160,7 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
 }
 
 export async function downloadCompletedPdf(envelopeId: string): Promise<Buffer> {
-  const accountId = requireEnv('DOCUSIGN_ACCOUNT_ID');
+  const accountId = getDocuSignAccountId();
   const accessToken = await getAccessToken();
 
   const q = new URLSearchParams({ certificate: 'true' });
