@@ -6,14 +6,20 @@ export const runtime = 'nodejs';
 
 /**
  * GET /api/debug/envelopes
+ * GET /api/debug/envelopes?id=<envelopeId>
  *
- * Diagnostic: same JWT as production code, lists envelopes in `DOCUSIGN_ACCOUNT_ID`
- * for the last 7 days. Requires an app login session.
+ * Diagnostic: same JWT as production. List mode: last 7 days. By-id mode: single envelope.
+ * Requires an app login session.
  */
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.email) {
     return NextResponse.json({ error: 'Must be logged in' }, { status: 401 });
+  }
+
+  const envelopeIdParam = new URL(req.url).searchParams.get('id')?.trim();
+  if (envelopeIdParam) {
+    return lookupEnvelopeById(envelopeIdParam);
   }
 
   try {
@@ -94,6 +100,86 @@ export async function GET() {
         step: 'caught exception',
         error: message,
         stack: err instanceof Error ? err.stack?.split('\n').slice(0, 5) : undefined,
+      },
+      { status: 200 },
+    );
+  }
+}
+
+async function lookupEnvelopeById(envelopeId: string) {
+  let accountId: string;
+  let baseUrl: string;
+  try {
+    accountId = getDocuSignAccountId();
+    baseUrl = restBase();
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json(
+      {
+        lookup_mode: 'by_id',
+        envelope_id: envelopeId,
+        error: message,
+        docusign_status: 500,
+      },
+      { status: 200 },
+    );
+  }
+
+  try {
+    const accessToken = await getAccessToken();
+    const singleUrl = new URL(
+      `${baseUrl}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}`,
+    );
+    singleUrl.searchParams.set('include', 'recipients,custom_fields,documents');
+
+    const envResp = await fetch(singleUrl.toString(), {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/json',
+      },
+    });
+
+    const text = await envResp.text();
+
+    if (!envResp.ok) {
+      return NextResponse.json(
+        {
+          lookup_mode: 'by_id',
+          envelope_id: envelopeId,
+          account_id: accountId,
+          error: text,
+          docusign_status: envResp.status,
+        },
+        { status: 200 },
+      );
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text) as unknown;
+    } catch {
+      parsed = { _nonJsonBody: text };
+    }
+
+    return NextResponse.json(
+      {
+        lookup_mode: 'by_id',
+        envelope_id: envelopeId,
+        account_id: accountId,
+        docusign_response: parsed,
+        docusign_status: envResp.status,
+      },
+      { status: 200 },
+    );
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json(
+      {
+        lookup_mode: 'by_id',
+        envelope_id: envelopeId,
+        account_id: accountId,
+        error: message,
+        docusign_status: 500,
       },
       { status: 200 },
     );
