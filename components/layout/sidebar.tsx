@@ -21,15 +21,15 @@ export function Sidebar({ user }: { user: { email?: string | null; name?: string
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-fest-600/15 bg-card/50 backdrop-blur-sm lg:flex lg:flex-col">
-      {/* Brand lockup — centered with a soft plate so the mark doesn’t disappear on the panel */}
+      {/* Brand lockup — centered with subtle gradient backdrop */}
       <div className="shrink-0 border-b border-fest-600/15 bg-gradient-to-b from-fest-100/90 via-brass-50/50 to-fest-50/40 px-3 py-4">
-        <div className="mx-auto max-w-[220px] rounded-lg bg-white/75 px-3 py-2.5 shadow-sm ring-1 ring-fest-600/10 backdrop-blur-[2px]">
+        <div className="mx-auto max-w-[220px] px-3 py-2">
           <Link href="/" className="relative mx-auto block h-12 w-full max-w-[200px]">
             <Image
               src="/images/whiskyfest_logo_transparent_black_advocates.png"
               alt="WhiskyFest"
               fill
-              className="object-contain object-center"
+              className="object-contain object-center mix-blend-multiply"
               sizes="200px"
               priority
             />

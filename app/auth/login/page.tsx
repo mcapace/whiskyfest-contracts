@@ -17,7 +17,7 @@ export default async function LoginPage() {
               src="/images/whiskyfest_logo_transparent_black_advocates.png"
               alt="WhiskyFest New York"
               fill
-              className="object-contain"
+              className="object-contain mix-blend-multiply"
               sizes="(max-width: 448px) 100vw, 448px"
               priority
             />
