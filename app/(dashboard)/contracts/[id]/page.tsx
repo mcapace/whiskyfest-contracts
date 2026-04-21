@@ -82,29 +82,6 @@ export default async function ContractDetailPage({ params }: { params: { id: str
         </div>
       )}
 
-      {/* Actions */}
-      {contract.status === 'approved' && (
-        <div className="rounded-lg border border-fest-600/25 bg-fest-50/40 px-4 py-3 text-sm text-foreground/90">
-          <p className="font-medium text-fest-950">DocuSign will email the exhibitor signer</p>
-          <p className="mt-2 text-muted-foreground">
-            The signing invitation is sent to{' '}
-            <strong className="font-mono text-foreground">{contract.signer_1_email ?? '—'}</strong>
-            {' '}— the <strong>Signatory → Email</strong> field on this contract (exhibitor side). That is DocuSign recipient 1.
-          </p>
-          <ul className="mt-3 list-inside list-disc space-y-1 text-muted-foreground">
-            <li>
-              If <code className="rounded bg-white/80 px-1 text-xs">DOCUSIGN_PARALLEL_SIGNERS</code> is off, only that address is emailed until they sign; then Shanken gets the countersign invite.
-            </li>
-            <li>
-              If parallel signing is on, Shanken also gets an invite at send time — the exhibitor still receives theirs at{' '}
-              <span className="font-mono text-xs">{contract.signer_1_email}</span>.
-            </li>
-            <li>Accounting (SendGrid) emails only after the envelope is fully signed.</li>
-            <li>Check spam; demo mail can be delayed.</li>
-          </ul>
-        </div>
-      )}
-
       <Card>
         <CardContent className="p-4">
           <ContractActions

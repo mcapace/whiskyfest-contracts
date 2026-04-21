@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { renderContractPdfFromTemplate } from '@/lib/google';
-import { isDocuSignParallelSigners, sendEnvelope } from '@/lib/docusign';
+import { sendEnvelope } from '@/lib/docusign';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import type { ContractWithTotals, Event } from '@/types/db';
 
@@ -168,7 +168,6 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     return NextResponse.json({
       ok: true,
       envelope_id: envelopeId,
-      parallel_signers: isDocuSignParallelSigners(),
       exhibitor_signer_email: signerEmail,
     });
   } catch (err: unknown) {

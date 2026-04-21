@@ -86,12 +86,6 @@ export interface SendEnvelopeParams {
   signer2: { email: string; name: string };
 }
 
-/** When true, both signers receive DocuSign invite emails immediately (routing order 1 for both). */
-export function isDocuSignParallelSigners(): boolean {
-  const v = process.env['DOCUSIGN_PARALLEL_SIGNERS']?.trim().toLowerCase();
-  return v === '1' || v === 'true' || v === 'yes';
-}
-
 export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelopeId: string }> {
   const accountId = requireEnv('DOCUSIGN_ACCOUNT_ID');
   const accessToken = await getAccessToken();
@@ -100,10 +94,6 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
   const date1 = anchorOnly(DOCUSIGN_ANCHORS.date1);
   const signHere2 = anchorOnly(DOCUSIGN_ANCHORS.sig2);
   const date2 = anchorOnly(DOCUSIGN_ANCHORS.date2);
-
-  /** Sequential (1→2): only signer 1 gets an email until they sign; signer 2 is queued. Parallel (both 1): both get “sign now” at send. */
-  const parallel = isDocuSignParallelSigners();
-  const order2 = parallel ? '1' : '2';
 
   const envelopeDefinition = {
     emailSubject: params.emailSubject,
@@ -118,6 +108,7 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
       },
     ],
     recipients: {
+      // Sequential: order 1 = exhibitor first; order 2 = Shanken countersign after exhibitor completes.
       signers: [
         {
           email: params.signer1.email,
@@ -133,7 +124,7 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
           email: params.signer2.email,
           name: params.signer2.name,
           recipientId: '2',
-          routingOrder: order2,
+          routingOrder: '2',
           tabs: {
             signHereTabs: [signHere2],
             dateSignedTabs: [date2],
