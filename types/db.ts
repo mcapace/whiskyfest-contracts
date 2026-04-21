@@ -6,6 +6,7 @@ export type ContractStatus =
   | 'ready_for_review'
   | 'approved'
   | 'sent'
+  | 'partially_signed'
   | 'signed'
   | 'executed'
   | 'cancelled'
@@ -55,6 +56,9 @@ export interface Contract {
   sent_at: string | null;
   signed_at: string | null;
   executed_at: string | null;
+  cancelled_reason: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
   accounting_notified_at: string | null;
   created_by: string | null;
   created_at: string;
@@ -97,6 +101,7 @@ export const STATUS_META: Record<ContractStatus, { label: string; tone: string; 
   ready_for_review:  { label: 'Ready for Review', tone: 'bg-amber-100 text-amber-900 border-amber-300',    order: 2 },
   approved:          { label: 'Approved',         tone: 'bg-blue-100 text-blue-900 border-blue-300',       order: 3 },
   sent:              { label: 'Sent',             tone: 'bg-indigo-100 text-indigo-900 border-indigo-300', order: 4 },
+  partially_signed:  { label: 'Partially Signed', tone: 'bg-violet-100 text-violet-900 border-violet-300', order: 4.5 },
   signed:            { label: 'Signed',           tone: 'bg-emerald-50 text-emerald-800 border-emerald-300', order: 5 },
   executed:          { label: 'Executed',         tone: 'bg-emerald-600 text-white border-emerald-700',    order: 6 },
   cancelled:         { label: 'Cancelled',        tone: 'bg-stone-200 text-stone-700 border-stone-300',    order: 7 },

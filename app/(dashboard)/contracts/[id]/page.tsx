@@ -70,11 +70,23 @@ export default async function ContractDetailPage({ params }: { params: { id: str
         </div>
       </div>
 
+      {contract.status === 'cancelled' && contract.cancelled_reason && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4">
+          <p className="text-sm font-medium text-destructive">Contract cancelled</p>
+          <p className="mt-1 text-sm text-foreground/80">{contract.cancelled_reason}</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Cancelled {formatTimestamp(contract.cancelled_at)}
+            {contract.cancelled_by && ` by ${contract.cancelled_by}`}
+          </p>
+        </div>
+      )}
+
       {/* Actions */}
       <Card>
         <CardContent className="p-4">
           <ContractActions
             contractId={contract.id}
+            exhibitorName={contract.exhibitor_company_name}
             status={contract.status}
             draftPdfUrl={contract.draft_pdf_url}
             signedPdfUrl={contract.signed_pdf_url}
@@ -182,6 +194,7 @@ function describeAction(entry: AuditLogEntry): string {
     case 'pdf_sent':       return 'Contract sent via DocuSign';
     case 'signed':         return 'Signed by exhibitor';
     case 'executed':       return 'Fully executed';
+    case 'cancelled':      return `Contract cancelled${entry.metadata?.reason ? ': ' + String(entry.metadata.reason) : ''}`;
     default:               return entry.action;
   }
 }

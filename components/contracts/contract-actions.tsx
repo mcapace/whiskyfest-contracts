@@ -4,16 +4,18 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { FileText, Send, CheckCircle2, ExternalLink, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { CancelContractDialog } from '@/components/contracts/cancel-contract-dialog';
 import type { ContractStatus } from '@/types/db';
 
 interface Props {
-  contractId: string;
-  status: ContractStatus;
-  draftPdfUrl: string | null;
-  signedPdfUrl: string | null;
+  contractId:    string;
+  exhibitorName: string;
+  status:        ContractStatus;
+  draftPdfUrl:   string | null;
+  signedPdfUrl:  string | null;
 }
 
-export function ContractActions({ contractId, status, draftPdfUrl, signedPdfUrl }: Props) {
+export function ContractActions({ contractId, exhibitorName, status, draftPdfUrl, signedPdfUrl }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [action, setAction] = useState<string | null>(null);
@@ -31,6 +33,10 @@ export function ContractActions({ contractId, status, draftPdfUrl, signedPdfUrl 
       setAction(null);
     });
   }
+
+  // Cancelled and executed contracts only show view links
+  const isTerminal = status === 'cancelled' || status === 'executed';
+  const canCancel  = !isTerminal;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -58,7 +64,7 @@ export function ContractActions({ contractId, status, draftPdfUrl, signedPdfUrl 
         </Button>
       )}
 
-      {/* Send — disabled in Phase 1 */}
+      {/* Send — Phase 2 */}
       {status === 'approved' && (
         <Button onClick={() => runAction('send', 'send')} disabled={pending || true} title="DocuSign integration coming in Phase 2">
           <Send className="h-4 w-4" />
@@ -80,6 +86,13 @@ export function ContractActions({ contractId, status, draftPdfUrl, signedPdfUrl 
             <ExternalLink className="h-4 w-4" /> View Signed PDF
           </a>
         </Button>
+      )}
+
+      {/* Cancel — available from any non-terminal status */}
+      {canCancel && (
+        <div className="ml-auto">
+          <CancelContractDialog contractId={contractId} exhibitorName={exhibitorName} />
+        </div>
       )}
     </div>
   );
