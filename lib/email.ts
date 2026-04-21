@@ -25,6 +25,8 @@ export interface AccountingEmailPayload {
   signedPdfBytes: Buffer;
   contractId: string;
   dashboardUrl: string;
+  /** Sales rep who created the contract in the app — CC’d on the executed-contract handoff (same content as accounting). */
+  salesRepEmail?: string | null;
 }
 
 function formatCents(n: number): string {
@@ -117,10 +119,16 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
   `;
 
   const recipients = toAddress.split(',').map((s) => s.trim());
+  const sales = p.salesRepEmail?.trim();
+  const cc =
+    sales && !recipients.map((r) => r.toLowerCase()).includes(sales.toLowerCase())
+      ? [sales]
+      : undefined;
 
   await sgMail.send({
     from: { email: fromAddress, name: fromName },
     to: recipients,
+    cc,
     subject,
     text,
     html,

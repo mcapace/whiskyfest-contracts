@@ -23,9 +23,10 @@ function parseConnectPayload(raw: unknown): {
   envelopeId: string | null;
   recipientId: string | null;
   envelopeStatus: string | null;
+  routingOrder: string | null;
 } {
   if (!raw || typeof raw !== 'object') {
-    return { eventType: '', envelopeId: null, recipientId: null, envelopeStatus: null };
+    return { eventType: '', envelopeId: null, recipientId: null, envelopeStatus: null, routingOrder: null };
   }
   const o = raw as Record<string, unknown>;
   const eventType = String(o['event'] ?? o['Event'] ?? '').toLowerCase();
@@ -33,6 +34,7 @@ function parseConnectPayload(raw: unknown): {
   let envelopeId: string | null = null;
   let recipientId: string | null = null;
   let envelopeStatus: string | null = null;
+  let routingOrder: string | null = null;
 
   const data = o['data'] ?? o['Data'];
   if (data && typeof data === 'object') {
@@ -41,19 +43,34 @@ function parseConnectPayload(raw: unknown): {
       (d['envelopeId'] as string | undefined) ||
       ((d['envelopeSummary'] as Record<string, unknown> | undefined)?.['envelopeId'] as string | undefined) ||
       null;
-    recipientId = (d['recipientId'] as string | undefined) ?? null;
+    const rid = d['recipientId'] ?? d['RecipientId'];
+    recipientId = rid != null && rid !== '' ? String(rid) : null;
     const summary = d['envelopeSummary'] as Record<string, unknown> | undefined;
     envelopeStatus =
       (summary?.['status'] as string | undefined) ||
       (d['status'] as string | undefined) ||
       null;
+    const ro = d['routingOrder'] ?? d['RoutingOrder'];
+    if (ro != null && ro !== '') routingOrder = String(ro);
+    const rec = d['recipient'] ?? d['Recipient'];
+    if (rec && typeof rec === 'object') {
+      const r = rec as Record<string, unknown>;
+      if (!recipientId) {
+        const rid2 = r['recipientId'] ?? r['RecipientId'];
+        if (rid2 != null && rid2 !== '') recipientId = String(rid2);
+      }
+      if (!routingOrder) {
+        const ro2 = r['routingOrder'] ?? r['RoutingOrder'];
+        if (ro2 != null && ro2 !== '') routingOrder = String(ro2);
+      }
+    }
   }
 
   if (!envelopeId) {
     envelopeId = (o['envelopeId'] as string | undefined) ?? (o['EnvelopeId'] as string | undefined) ?? null;
   }
 
-  return { eventType, envelopeId, recipientId, envelopeStatus };
+  return { eventType, envelopeId, recipientId, envelopeStatus, routingOrder };
 }
 
 function verifyHmac(rawBody: string, signatureHeader: string | null, secret: string): boolean {
@@ -88,7 +105,7 @@ export async function POST(req: Request) {
     return new NextResponse(null, { status: 200 });
   }
 
-  const { eventType, envelopeId, recipientId, envelopeStatus } = parseConnectPayload(parsed);
+  const { eventType, envelopeId, recipientId, envelopeStatus, routingOrder } = parseConnectPayload(parsed);
   if (!envelopeId) {
     return new NextResponse(null, { status: 200 });
   }
@@ -129,10 +146,12 @@ export async function POST(req: Request) {
     return new NextResponse(null, { status: 200 });
   }
 
-  // --- First signer finished ---
+  // --- Exhibitor (routing order 1) finished → Liz gets countersign invite (sequential in DocuSign) ---
+  const firstSigner =
+    recipientId === '1' || routingOrder === '1';
   if (
     eventType.includes('recipient-completed') &&
-    recipientId === '1' &&
+    firstSigner &&
     contract.status === 'sent'
   ) {
     await supabase.from('contracts').update({ status: 'partially_signed' }).eq('id', contract.id);
@@ -196,6 +215,7 @@ export async function POST(req: Request) {
           signedPdfBytes: pdfBytes,
           contractId: contract.id,
           dashboardUrl: `${appBaseUrl()}/contracts/${contract.id}`,
+          salesRepEmail: contract.created_by,
         });
 
         await supabase.from('contracts').update({ accounting_notified_at: now }).eq('id', contract.id);

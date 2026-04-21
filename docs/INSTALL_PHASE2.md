@@ -76,8 +76,8 @@ These must exist in the master Google Doc as merge tokens (same as Phase 1).
 1. DocuSign Admin → **Connect** → add configuration (JSON).
 2. **URL:** `https://<your-domain>/api/webhooks/docusign`
 3. Subscribe at minimum to:
-   - **Envelope recipient completed** (first signer → `partially_signed`)
-   - **Envelope completed** (both signed → download PDF, Drive upload, accounting email)
+   - **Envelope recipient completed** (exhibitor / routing order 1 → app sets `partially_signed`; Liz then receives the countersign invite from DocuSign)
+   - **Envelope completed** (Liz + exhibitor done → `executed`, signed PDF to Drive, **accounting** + **sales rep** email — sales rep is the contract `created_by` user, CC’d if not already in `ACCOUNTING_EMAIL`)
 4. Use **JSON** payload format (not XML), or the route will return 200 without updating data.
 5. Optional: enable **HMAC** and set `DOCUSIGN_CONNECT_HMAC_SECRET` in Vercel to the same value.
 
@@ -96,7 +96,7 @@ Redeploy after changing env vars.
 1. Create contract → Generate draft PDF (blank-line anchors).
 2. Approve → **Send via DocuSign** (PDF regenerated with `\s1\` … anchors).
 3. Sign as exhibitor → status **Partially Signed** (webhook).
-4. Sign as Shanken → **Executed**, signed PDF in Drive, accounting email (if SendGrid configured).
+4. Sign as Shanken (event signatory, e.g. Liz) → **Executed**, signed PDF in Drive, accounting email + **CC to sales rep** (`created_by`) if SendGrid is configured.
 5. Temporarily point Shanken signatory email at your own inbox to test both roles.
 
 ## 8. Troubleshooting
@@ -108,4 +108,4 @@ Redeploy after changing env vars.
 | **No DocuSign “please sign” email** | Sequential routing: **only signer 1** (exhibitor) is emailed first; the countersigner is invited after exhibitor signs. Check spam, wrong email on contract/event, demo delays. |
 | Webhook does nothing | Connect URL, JSON format, envelope tied to `docusign_envelope_id` |
 | HMAC 401 | Secret mismatch or wrong header algorithm — verify against [DocuSign HMAC docs](https://developers.docusign.com/platform/webhooks/connect/validate/) |
-| No **accounting** email (SendGrid) | That sends only on **envelope completed**, not on Send. Needs `SENDGRID_API_KEY`, verified `ACCOUNTING_FROM_EMAIL`, SendGrid Activity Feed |
+| No **accounting** / **sales** email (SendGrid) | Sends only on **envelope completed** (both signers). Needs `SENDGRID_API_KEY`, verified `ACCOUNTING_FROM_EMAIL`. Sales rep CC uses `created_by` on the contract. |
