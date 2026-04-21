@@ -37,16 +37,28 @@ export default async function DashboardPage() {
   // Stats
   const totalExecutedCents  = contracts.filter(c => c.status === 'executed').reduce((a, c) => a + c.grand_total_cents, 0);
   const totalInFlightCents  = contracts.filter(c => ['sent', 'signed', 'approved', 'ready_for_review'].includes(c.status)).reduce((a, c) => a + c.grand_total_cents, 0);
+  const totalPipelineCents  = totalExecutedCents + totalInFlightCents;
   const draftCount          = contracts.filter(c => c.status === 'draft').length;
   const executedCount       = contracts.filter(c => c.status === 'executed').length;
 
   const eventMap = new Map(events.map(e => [e.id, e]));
+  const contractsCount = contracts.length;
+  const progressPct = totalPipelineCents > 0 ? Math.round((totalExecutedCents / totalPipelineCents) * 100) : 0;
+
+  const statusCounts: Array<{ label: string; count: number; tone: string; href: string }> = [
+    { label: 'Draft', count: contracts.filter(c => c.status === 'draft').length, tone: 'bg-whisky-100 text-whisky-900 border-whisky-200', href: '/contracts?status=draft' },
+    { label: 'In Review', count: contracts.filter(c => c.status === 'ready_for_review').length, tone: 'bg-amber-100 text-amber-900 border-amber-200', href: '/contracts?status=ready_for_review' },
+    { label: 'Approved', count: contracts.filter(c => c.status === 'approved').length, tone: 'bg-fest-100 text-fest-900 border-fest-200', href: '/contracts?status=approved' },
+    { label: 'Executed', count: contracts.filter(c => c.status === 'executed').length, tone: 'bg-emerald-100 text-emerald-900 border-emerald-200', href: '/contracts?status=executed' },
+  ];
 
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-end justify-between">
-        <div>
+      <Card className="overflow-hidden border-fest-600/15">
+        <div className="bg-gradient-to-r from-fest-600/10 via-brass-100/35 to-background px-6 py-6">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
           <p className="mb-2 text-xs font-medium uppercase tracking-[0.2em] text-brass-700">
             M. Shanken Communications
           </p>
@@ -54,26 +66,55 @@ export default async function DashboardPage() {
             Contract Pipeline
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            {contracts.length} total contracts · {events.length} active event{events.length !== 1 && 's'}
+            {contractsCount} total contracts · {events.length} active event{events.length !== 1 && 's'}
           </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" asChild>
+                <Link href="/contracts">View all</Link>
+              </Button>
+              <Button asChild>
+                <Link href="/contracts/new">
+                  <Plus className="h-4 w-4" /> New Contract
+                </Link>
+              </Button>
+            </div>
+          </div>
+          <div className="mt-5">
+            <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+              <span>Pipeline completion</span>
+              <span>{progressPct}% executed value</span>
+            </div>
+            <div className="h-2.5 overflow-hidden rounded-full bg-fest-100/70">
+              <div className="h-full rounded-full bg-gradient-to-r from-fest-600 to-fest-400" style={{ width: `${progressPct}%` }} />
+            </div>
+          </div>
         </div>
-        <Button asChild>
-          <Link href="/contracts/new">
-            <Plus className="h-4 w-4" /> New Contract
-          </Link>
-        </Button>
-      </div>
+      </Card>
 
       {/* Stats row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={CheckCircle2} label="Executed" value={formatCurrency(totalExecutedCents)} sub={`${executedCount} contracts`} accent="emerald" />
         <StatCard icon={Clock}        label="In Flight" value={formatCurrency(totalInFlightCents)} sub="Sent + Approved + In Review" accent="amber" />
         <StatCard icon={FileText}     label="Drafts"    value={String(draftCount)}                  sub="Awaiting review" accent="whisky" />
-        <StatCard icon={DollarSign}   label="Total Pipeline" value={formatCurrency(totalExecutedCents + totalInFlightCents)} sub="All active contract value" accent="fest" />
+        <StatCard icon={DollarSign}   label="Total Pipeline" value={formatCurrency(totalPipelineCents)} sub="All active contract value" accent="fest" />
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {statusCounts.map(s => (
+          <Link
+            key={s.label}
+            href={s.href}
+            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all hover:-translate-y-0.5 hover:shadow-sm ${s.tone}`}
+          >
+            <span>{s.label}</span>
+            <span className="font-mono tabular-nums">{s.count}</span>
+          </Link>
+        ))}
       </div>
 
       {/* Contracts table */}
-      <Card>
+      <Card className="overflow-hidden border-fest-600/15">
         <div className="flex items-center justify-between border-b border-fest-600/10 px-6 py-4">
           <div>
             <h2 className="font-serif text-lg font-semibold">Recent Contracts</h2>
@@ -87,7 +128,7 @@ export default async function DashboardPage() {
           {contracts.length === 0 ? (
             <EmptyState />
           ) : (
-            <Table>
+            <Table className="[&_tbody_tr:hover]:bg-fest-50/50">
               <TableHeader>
                 <TableRow>
                   <TableHead>Exhibitor</TableHead>
@@ -146,16 +187,16 @@ function StatCard({
   accent: 'whisky' | 'fest' | 'amber' | 'emerald';
 }) {
   const accentClass = {
-    whisky:  'text-whisky-800 bg-whisky-100/60',
-    fest:    'text-fest-800 bg-fest-100/90',
-    amber:   'text-amber-700 bg-amber-100/60',
-    emerald: 'text-emerald-700 bg-emerald-100/60',
+    whisky:  'text-whisky-800 bg-whisky-100/60 ring-whisky-300/30',
+    fest:    'text-fest-800 bg-fest-100/90 ring-fest-300/30',
+    amber:   'text-amber-700 bg-amber-100/60 ring-amber-300/30',
+    emerald: 'text-emerald-700 bg-emerald-100/60 ring-emerald-300/30',
   }[accent];
 
   return (
-    <Card>
+    <Card className="border-fest-600/10 transition-all hover:-translate-y-0.5 hover:shadow-md">
       <CardContent className="flex items-start gap-4 p-5">
-        <div className={`flex h-10 w-10 items-center justify-center rounded-md ${accentClass}`}>
+        <div className={`flex h-10 w-10 items-center justify-center rounded-md ring-1 ${accentClass}`}>
           <Icon className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">

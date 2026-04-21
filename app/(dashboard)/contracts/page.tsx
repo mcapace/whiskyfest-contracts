@@ -57,6 +57,10 @@ export default async function ContractsListPage({
 
   const { contracts, events } = await loadContracts({ status, q });
   const eventMap = new Map(events.map(e => [e.id, e]));
+  const executedCount = contracts.filter(c => c.status === 'executed').length;
+  const inFlightCount = contracts.filter(c => ['ready_for_review', 'approved', 'sent', 'signed'].includes(c.status)).length;
+  const draftCount = contracts.filter(c => c.status === 'draft').length;
+  const pipelineValue = contracts.reduce((acc, c) => acc + c.grand_total_cents, 0);
 
   return (
     <div className="space-y-8">
@@ -86,8 +90,15 @@ export default async function ContractsListPage({
         </div>
       </div>
 
-      <Card>
-        <div className="border-b border-border/50 px-6 py-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <MiniMetric label="Executed" value={String(executedCount)} tone="text-emerald-800 bg-emerald-100/70 border-emerald-200/80" />
+        <MiniMetric label="In Flight" value={String(inFlightCount)} tone="text-amber-800 bg-amber-100/70 border-amber-200/80" />
+        <MiniMetric label="Draft" value={String(draftCount)} tone="text-whisky-900 bg-whisky-100/70 border-whisky-200/80" />
+        <MiniMetric label="Total Value" value={formatCurrency(pipelineValue)} tone="text-fest-900 bg-fest-100/80 border-fest-200/80" />
+      </div>
+
+      <Card className="overflow-hidden border-fest-600/15">
+        <div className="border-b border-fest-600/10 bg-gradient-to-r from-fest-50/70 to-transparent px-6 py-4">
           <ContractsFilters />
         </div>
         <CardContent className="p-0">
@@ -96,7 +107,7 @@ export default async function ContractsListPage({
               No contracts match these filters.
             </div>
           ) : (
-            <Table>
+            <Table className="[&_tbody_tr:hover]:bg-fest-50/50">
               <TableHeader>
                 <TableRow>
                   <TableHead>Exhibitor</TableHead>
@@ -136,6 +147,15 @@ export default async function ContractsListPage({
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function MiniMetric({ label, value, tone }: { label: string; value: string; tone: string }) {
+  return (
+    <div className={`rounded-lg border px-3 py-3 ${tone}`}>
+      <p className="text-[11px] font-medium uppercase tracking-wider opacity-80">{label}</p>
+      <p className="mt-1 font-serif text-xl font-semibold leading-none tabular-nums">{value}</p>
     </div>
   );
 }
