@@ -139,6 +139,21 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
     },
   };
 
+  // Diagnosis: log everything DocuSign receives except PDF bytes (base64 would blow Vercel log limits).
+  console.log(
+    '[docusign] envelope definition:',
+    JSON.stringify(
+      envelopeDefinition,
+      (key, value) => {
+        if (key === 'documentBase64' && typeof value === 'string') {
+          return `[base64 omitted, ${value.length} chars]`;
+        }
+        return value;
+      },
+      2,
+    ),
+  );
+
   const url = `${restBase()}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes`;
   const res = await fetch(url, {
     method: 'POST',
