@@ -26,7 +26,7 @@ export function Sidebar({ user }: { user: { email?: string | null; name?: string
         <div className="mx-auto max-w-[220px] px-3 py-2">
           <Link href="/" className="relative mx-auto block h-12 w-full max-w-[200px]">
             <Image
-              src="/images/whiskyfest_logo_transparent_black_advocates.png"
+              src="/images/whiskyfest_logo_transparent_black_advocates_clean.png"
               alt="WhiskyFest"
               fill
               className="object-contain object-center mix-blend-multiply"
