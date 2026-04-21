@@ -16,6 +16,7 @@ const VALID: Set<string> = new Set([
   'ready_for_review',
   'approved',
   'sent',
+  'partially_signed',
   'signed',
   'executed',
   'cancelled',
@@ -58,7 +59,9 @@ export default async function ContractsListPage({
   const { contracts, events } = await loadContracts({ status, q });
   const eventMap = new Map(events.map(e => [e.id, e]));
   const executedCount = contracts.filter(c => c.status === 'executed').length;
-  const inFlightCount = contracts.filter(c => ['ready_for_review', 'approved', 'sent', 'signed'].includes(c.status)).length;
+  const inFlightCount = contracts.filter(c =>
+    ['ready_for_review', 'approved', 'sent', 'partially_signed', 'signed'].includes(c.status),
+  ).length;
   const draftCount = contracts.filter(c => c.status === 'draft').length;
   const pipelineValue = contracts.reduce((acc, c) => acc + c.grand_total_cents, 0);
 

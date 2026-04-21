@@ -121,7 +121,7 @@ Open [http://localhost:3000](http://localhost:3000). Sign in with your `@mshanke
 5. Click **Generate Draft PDF** → waits a few seconds → reloads with `Ready for Review` status + draft PDF link
 6. Open the PDF → verify all merge tokens replaced, math correct, Liz Mott's block present
 7. Click **Approve for Sending** → status moves to `Approved`
-8. The `Send via DocuSign` button is disabled — that's Phase 2
+8. With Phase 2 env vars configured, click **Send via DocuSign** (see `docs/INSTALL_PHASE2.md`)
 
 ## Deploy to Vercel
 
@@ -140,17 +140,16 @@ Then in [Vercel](https://vercel.com):
 4. Deploy
 5. After first deploy, add the production redirect URI to Google OAuth (step 3 above)
 
-## Phase 2 additions (DocuSign)
+## Phase 2 additions (DocuSign + SendGrid)
 
-When ready to wire DocuSign:
+**Setup guide:** [`docs/INSTALL_PHASE2.md`](docs/INSTALL_PHASE2.md) (Connect webhook URL, env vars, Supabase migration). **SendGrid only:** [`SENDGRID_SETUP.md`](SENDGRID_SETUP.md) (replaces any Resend section from older zips).
 
-1. Create a DocuSign Integration Key + RSA keypair (JWT Grant auth)
-2. Add the four DocuSign env vars to `.env.local` and Vercel
-3. Implement `app/api/contracts/[id]/send/route.ts` using the scaffold in `docs/docusign-phase2.md`
-4. Implement `app/api/webhooks/docusign/route.ts` for the Connect completion webhook
-5. Configure DocuSign Connect → URL: `https://whiskyfest-contracts.vercel.app/api/webhooks/docusign` → Event: Envelope Completed
+Summary:
 
-Detailed Phase 2 plan lives in the project brief I built for you separately.
+1. DocuSign Integration Key + RSA keypair (JWT Grant) + consent
+2. All DocuSign + SendGrid env vars in `.env.local` and Vercel
+3. Run `supabase/migrations/002_phase2_docusign.sql` if needed
+4. DocuSign Connect → `https://whiskyfest-contracts.vercel.app/api/webhooks/docusign` (JSON payload)
 
 ## Project structure
 
@@ -249,8 +248,8 @@ Soft-cancel preferred over delete — preserves the audit trail.
 - [ ] Reminder cadence for unsigned contracts
 - [ ] Export pipeline data to CSV for reporting
 - [ ] Dashboard filters (by status, event, date range)
-- [ ] Phase 2: DocuSign integration
-- [ ] Phase 2: Accounting handoff email with billing details
+- [x] Phase 2: DocuSign integration (`send` route + REST JWT, webhook)
+- [x] Phase 2: Accounting handoff email (SendGrid)
 - [ ] Phase 2: Slack webhook for executed contracts
 
 ## License

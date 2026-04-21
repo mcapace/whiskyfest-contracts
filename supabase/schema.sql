@@ -14,6 +14,7 @@ do $$ begin
     'ready_for_review',
     'approved',
     'sent',
+    'partially_signed',
     'signed',
     'executed',
     'cancelled',
@@ -87,6 +88,10 @@ create table if not exists contracts (
   signed_at               timestamptz,
   executed_at             timestamptz,
   accounting_notified_at  timestamptz,
+
+  cancelled_reason        text,
+  cancelled_at            timestamptz,
+  cancelled_by            text,
 
   -- Audit
   created_by              text,        -- email of creator

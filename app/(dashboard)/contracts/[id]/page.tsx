@@ -190,8 +190,10 @@ function describeAction(entry: AuditLogEntry): string {
   switch (entry.action) {
     case 'created':        return 'Contract created';
     case 'status_changed': return `Status changed from ${entry.from_status} to ${entry.to_status}`;
-    case 'pdf_generated':  return 'Draft PDF generated';
-    case 'pdf_sent':       return 'Contract sent via DocuSign';
+    case 'pdf_generated':   return 'Draft PDF generated';
+    case 'docusign_sent':   return 'Sent via DocuSign';
+    case 'docusign_completed': return 'DocuSign envelope completed — signed PDF stored';
+    case 'pdf_sent':        return 'Contract sent via DocuSign';
     case 'signed':         return 'Signed by exhibitor';
     case 'executed':       return 'Fully executed';
     case 'cancelled':      return `Contract cancelled${entry.metadata?.reason ? ': ' + String(entry.metadata.reason) : ''}`;

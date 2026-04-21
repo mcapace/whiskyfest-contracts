@@ -12,6 +12,7 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: 'ready_for_review', label: 'Ready for Review' },
   { value: 'approved', label: 'Approved' },
   { value: 'sent', label: 'Sent' },
+  { value: 'partially_signed', label: 'Partially Signed' },
   { value: 'signed', label: 'Signed' },
   { value: 'executed', label: 'Executed' },
   { value: 'cancelled', label: 'Cancelled' },

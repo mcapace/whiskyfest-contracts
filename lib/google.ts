@@ -19,7 +19,6 @@ import { google } from 'googleapis';
  */
 
 function getAuth() {
-  // Bracket access so the bundler does not inline a stale/empty value from an older build.
   const keyB64 = process.env['GOOGLE_SERVICE_ACCOUNT_KEY']?.trim();
   if (!keyB64) throw new Error('Missing GOOGLE_SERVICE_ACCOUNT_KEY env var');
 
@@ -34,30 +33,31 @@ function getAuth() {
   });
 }
 
-export async function mergeAndExportPdf(
+/**
+ * Merge template tokens and return PDF bytes (no Drive upload).
+ * Used for DocuSign: same merge as draft, but merge map uses anchor strings instead of blank lines.
+ */
+export async function renderContractPdfFromTemplate(
   templateDocId: string,
   mergeMap: Record<string, string>,
-  outputFileName: string,
-  destinationFolderId: string,
-): Promise<{ fileId: string; webViewLink: string }> {
+  tempDocLabel: string,
+): Promise<Buffer> {
   const auth = getAuth();
   const drive = google.drive({ version: 'v3', auth });
-  const docs  = google.docs({ version: 'v1', auth });
+  const docs = google.docs({ version: 'v1', auth });
 
-  // 1. Copy the template (must support Shared Drives)
   const copy = await drive.files.copy({
     fileId: templateDocId,
-    requestBody: { name: `TEMP_${outputFileName}` },
+    requestBody: { name: `TEMP_${tempDocLabel}` },
     supportsAllDrives: true,
   });
   const tempDocId = copy.data.id!;
 
   try {
-    // 2. Build batch replace requests (Docs API natively supports Shared Drives)
     const requests = Object.entries(mergeMap).map(([token, value]) => ({
       replaceAllText: {
         containsText: { text: token, matchCase: true },
-        replaceText:  value ?? '',
+        replaceText: value ?? '',
       },
     }));
 
@@ -68,40 +68,59 @@ export async function mergeAndExportPdf(
       });
     }
 
-    // 3. Export as PDF (export uses fileId only; temp file already lives in the Shared Drive from copy)
     const pdfResp = await drive.files.export(
       { fileId: tempDocId, mimeType: 'application/pdf' },
-      { responseType: 'arraybuffer' }
+      { responseType: 'arraybuffer' },
     );
 
-    const pdfBytes = Buffer.from(pdfResp.data as ArrayBuffer);
-
-    // 4. Upload the PDF to the destination folder (Shared Drive support required)
-    const uploaded = await drive.files.create({
-      requestBody: {
-        name:     `${outputFileName}.pdf`,
-        parents:  [destinationFolderId],
-        mimeType: 'application/pdf',
-      },
-      media: {
-        mimeType: 'application/pdf',
-        body:     require('stream').Readable.from(pdfBytes),
-      },
-      fields: 'id, webViewLink',
-      supportsAllDrives: true,
-    });
-
-    return {
-      fileId:      uploaded.data.id!,
-      webViewLink: uploaded.data.webViewLink!,
-    };
+    return Buffer.from(pdfResp.data as ArrayBuffer);
   } finally {
-    // 5. Clean up the temporary doc copy
-    await drive.files.delete({
-      fileId: tempDocId,
-      supportsAllDrives: true,
-    }).catch(err => {
-      console.warn('Failed to clean up temp doc:', err.message);
-    });
+    await drive.files
+      .delete({
+        fileId: tempDocId,
+        supportsAllDrives: true,
+      })
+      .catch((err: Error) => {
+        console.warn('Failed to clean up temp doc:', err.message);
+      });
   }
+}
+
+/** Upload an existing PDF buffer to Drive (e.g. signed file from DocuSign). */
+export async function uploadPdfBufferToFolder(
+  pdfBytes: Buffer,
+  outputFileName: string,
+  destinationFolderId: string,
+): Promise<{ fileId: string; webViewLink: string }> {
+  const auth = getAuth();
+  const drive = google.drive({ version: 'v3', auth });
+
+  const uploaded = await drive.files.create({
+    requestBody: {
+      name: `${outputFileName}.pdf`,
+      parents: [destinationFolderId],
+      mimeType: 'application/pdf',
+    },
+    media: {
+      mimeType: 'application/pdf',
+      body: require('stream').Readable.from(pdfBytes),
+    },
+    fields: 'id, webViewLink',
+    supportsAllDrives: true,
+  });
+
+  return {
+    fileId: uploaded.data.id!,
+    webViewLink: uploaded.data.webViewLink!,
+  };
+}
+
+export async function mergeAndExportPdf(
+  templateDocId: string,
+  mergeMap: Record<string, string>,
+  outputFileName: string,
+  destinationFolderId: string,
+): Promise<{ fileId: string; webViewLink: string }> {
+  const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, outputFileName);
+  return uploadPdfBufferToFolder(pdfBytes, outputFileName, destinationFolderId);
 }

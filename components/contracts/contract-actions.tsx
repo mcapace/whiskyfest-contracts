@@ -64,11 +64,11 @@ export function ContractActions({ contractId, exhibitorName, status, draftPdfUrl
         </Button>
       )}
 
-      {/* Send — Phase 2 */}
+      {/* Send via DocuSign */}
       {status === 'approved' && (
-        <Button onClick={() => runAction('send', 'send')} disabled={pending || true} title="DocuSign integration coming in Phase 2">
-          <Send className="h-4 w-4" />
-          Send via DocuSign (Phase 2)
+        <Button onClick={() => runAction('send', 'send')} disabled={pending}>
+          {pending && action === 'send' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          Send via DocuSign
         </Button>
       )}
 
