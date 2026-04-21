@@ -1,17 +1,24 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { buildContractMergeMap } from '@/lib/merge-map';
 import { renderContractPdfFromTemplate } from '@/lib/google';
 import { isDocuSignParallelSigners, sendEnvelope } from '@/lib/docusign';
+import { buildContractMergeMap } from '@/lib/merge-map';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
 
 /**
- * INSTRUMENTED — each step logs with `[send <traceId>]` so Vercel runtime logs show the full flow.
+ * POST /api/contracts/[id]/send
+ *
+ * INSTRUMENTED VERSION — logs each step clearly so we can see where
+ * things succeed or fail in Vercel runtime logs. Safe to leave in place;
+ * the logs just help observability.
+ *
+ * Note: Step 1 uses `renderContractPdfFromTemplate` + `buildContractMergeMap(..., 'docusign')`
+ * (this repo’s PDF path). The wf-debug snapshot used older helper names; behavior matches
+ * “regenerate PDF with DocuSign anchors” below.
  */
-
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
   const traceId = Math.random().toString(36).substring(2, 8);
   const log = (msg: string, extra?: unknown) => {
@@ -36,7 +43,6 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     .select('*')
     .eq('id', params.id)
     .single<ContractWithTotals>();
-
   if (!contract) {
     log('FAIL contract not found');
     return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
@@ -50,14 +56,21 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
   if (contract.status !== 'approved') {
     log('FAIL bad status', { status: contract.status });
-    return NextResponse.json({ error: 'Contract must be approved before sending' }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: `Only approved contracts can be sent. Current status: ${contract.status}`,
+      },
+      { status: 409 },
+    );
   }
-
-  const signerEmail = contract.signer_1_email?.trim();
-  const signerName = contract.signer_1_name?.trim() || 'Exhibitor signer';
-  if (!signerEmail) {
-    log('FAIL missing signer email');
-    return NextResponse.json({ error: 'Exhibitor signer email is required before sending' }, { status: 400 });
+  if (!contract.signer_1_email || !contract.signer_1_name) {
+    log('FAIL missing signer info');
+    return NextResponse.json(
+      {
+        error: 'Exhibitor signer name and email are required.',
+      },
+      { status: 400 },
+    );
   }
 
   const { data: event } = await supabase
@@ -65,7 +78,6 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     .select('*')
     .eq('id', contract.event_id)
     .single<Event>();
-
   if (!event) {
     log('FAIL event not found');
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
@@ -82,17 +94,25 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: 'Event is missing Shanken signatory email' }, { status: 400 });
   }
 
-  const templateDocId = process.env.GOOGLE_TEMPLATE_DOC_ID!;
-  const mergeMap = buildContractMergeMap(contract, event, 'docusign');
+  const signerEmail = contract.signer_1_email.trim();
+  const signerName = contract.signer_1_name.trim();
   const safeCompany = contract.exhibitor_company_name.replace(/[^\w\s-]/g, '');
-  const fileLabel = `${safeCompany} — WhiskyFest ${event.year} Contract (DocuSign)`;
+  const templateDocId = process.env.GOOGLE_TEMPLATE_DOC_ID!;
 
   try {
-    log('step 1: render PDF from template');
-    const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileLabel);
-    const pdfBase64 = pdfBytes.toString('base64');
-    log('step 1 ok', { bytes: pdfBytes.length, base64_chars: pdfBase64.length });
+    // Step 1 — Regenerate PDF with DocuSign anchor strings
+    log('step 1: regenerating PDF with docusign anchors');
+    const mergeMap = buildContractMergeMap(contract, event, 'docusign');
+    const fileName = `${contract.exhibitor_company_name.replace(/[^\w\s-]/g, '')} — WhiskyFest ${event.year} Contract (DocuSign)`;
 
+    const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileName);
+    log('step 1 ok', {
+      bytes_size: pdfBytes.length,
+    });
+
+    const pdfBase64 = pdfBytes.toString('base64');
+
+    // Step 2 — Send envelope via DocuSign
     log('step 2: calling DocuSign sendEnvelope');
     log('step 2 env check', {
       has_integration_key: Boolean(process.env.DOCUSIGN_INTEGRATION_KEY),
@@ -103,46 +123,48 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       has_private_key: Boolean(process.env.DOCUSIGN_RSA_PRIVATE_KEY),
       account_id_prefix: process.env.DOCUSIGN_ACCOUNT_ID?.slice(0, 8),
       base_url: process.env.DOCUSIGN_BASE_URL,
-      parallel_signers: isDocuSignParallelSigners(),
     });
 
     const { envelopeId } = await sendEnvelope({
       pdfBase64,
       documentName: `${safeCompany} — WhiskyFest ${event.year} Contract.pdf`,
-      emailSubject: `Please sign: ${contract.exhibitor_company_name} — WhiskyFest ${event.year}`,
-      emailBlurb: `Please review and sign the participation contract for ${event.name}. Thank you.`,
-      signer1: { email: signerEmail, name: signerName },
-      signer2: { email: shankenEmail, name: shankenName },
+      emailSubject: `Please sign: ${event.name} ${event.year} participation contract — ${contract.exhibitor_company_name}`,
+      emailBlurb: `Attached is the WhiskyFest ${event.year} participation contract for ${contract.exhibitor_company_name}. Please review and sign.`,
+      signer1: { name: signerName, email: signerEmail },
+      signer2: { name: shankenName, email: shankenEmail },
     });
 
-    log('step 2 SUCCESS', { envelope_id: envelopeId });
+    log('step 2 SUCCESS', {
+      envelope_id: envelopeId,
+      envelope_status: 'sent',
+    });
 
-    log('step 3: updating contract + audit');
-    const sentAt = new Date().toISOString();
-
+    // Step 3 — Update the contract
+    log('step 3: updating contract record');
     await supabase
       .from('contracts')
       .update({
         status: 'sent',
         docusign_envelope_id: envelopeId,
-        sent_at: sentAt,
+        sent_at: new Date().toISOString(),
       })
       .eq('id', contract.id);
+    log('step 3 ok');
 
     await supabase.from('audit_log').insert({
       contract_id: contract.id,
       actor_email: session.user.email,
-      action: 'docusign_sent',
+      action: 'pdf_sent',
       metadata: {
         envelope_id: envelopeId,
-        exhibitor_signer_email: signerEmail,
-        shanken_signatory_email: shankenEmail,
+        envelope_status: 'sent',
+        exhibitor_signer: contract.signer_1_email,
+        shanken_signer: event.shanken_signatory_email,
+        docusign_pdf_file: null,
       },
     });
 
-    log('step 3 ok');
     log('COMPLETE', { envelope_id: envelopeId });
-
     return NextResponse.json({
       ok: true,
       envelope_id: envelopeId,
@@ -153,15 +175,26 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     const message = err instanceof Error ? err.message : String(err);
     log('ERROR', {
       message,
-      stack: err instanceof Error ? err.stack?.split('\n').slice(0, 6).join(' | ') : undefined,
+      stack: err instanceof Error ? err.stack?.split('\n').slice(0, 5).join(' | ') : undefined,
     });
-    console.error('DocuSign send failed:', err);
 
     await supabase
       .from('contracts')
-      .update({ notes: `DocuSign send error: ${message}` })
+      .update({
+        status: 'error',
+        notes: `DocuSign send error: ${message.slice(0, 500)}`,
+      })
       .eq('id', contract.id);
 
-    return NextResponse.json({ error: message }, { status: 500 });
+    await supabase.from('audit_log').insert({
+      contract_id: contract.id,
+      actor_email: session.user.email,
+      action: 'pdf_send_failed',
+      metadata: { error: message.slice(0, 500) },
+    });
+
+    return NextResponse.json({
+      error: message || 'DocuSign send failed',
+    }, { status: 500 });
   }
 }
