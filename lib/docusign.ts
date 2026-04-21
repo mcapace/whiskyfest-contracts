@@ -139,21 +139,6 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
     },
   };
 
-  // Diagnosis: log everything DocuSign receives except PDF bytes (base64 would blow Vercel log limits).
-  console.log(
-    '[docusign] envelope definition:',
-    JSON.stringify(
-      envelopeDefinition,
-      (key, value) => {
-        if (key === 'documentBase64' && typeof value === 'string') {
-          return `[base64 omitted, ${value.length} chars]`;
-        }
-        return value;
-      },
-      2,
-    ),
-  );
-
   const url = `${restBase()}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes`;
   const res = await fetch(url, {
     method: 'POST',
@@ -173,8 +158,62 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
   }
   const summary = JSON.parse(text) as { envelopeId?: string; status?: string };
   if (!summary.envelopeId) throw new Error('DocuSign createEnvelope: missing envelopeId');
-  console.log('[docusign] createEnvelope response:', { envelopeId: summary.envelopeId, status: summary.status });
   return { envelopeId: summary.envelopeId };
+}
+
+/** Void an in-flight envelope so recipients can no longer sign; use before correcting email and re-sending from the app. */
+export async function voidEnvelope(envelopeId: string, voidedReason: string): Promise<void> {
+  const accountId = getDocuSignAccountId();
+  const accessToken = await getAccessToken();
+  const url = `${restBase()}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}`;
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      status: 'voided',
+      voidedReason: voidedReason.slice(0, 1000),
+    }),
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`DocuSign voidEnvelope ${res.status}: ${errText}`);
+  }
+}
+
+/**
+ * Ask DocuSign to resend notification emails to recipients who have not completed signing.
+ * Same recipient emails as the live envelope — use Recall if you need to change the address.
+ */
+export async function resendEnvelopeNotifications(envelopeId: string): Promise<void> {
+  const accountId = getDocuSignAccountId();
+  const accessToken = await getAccessToken();
+  const base = `${restBase()}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}/recipients`;
+  const getRes = await fetch(base, {
+    headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+  });
+  if (!getRes.ok) {
+    const t = await getRes.text();
+    throw new Error(`DocuSign getRecipients ${getRes.status}: ${t}`);
+  }
+  const recipients = await getRes.json();
+  const putUrl = `${base}?resend_envelope=true`;
+  const putRes = await fetch(putUrl, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(recipients),
+  });
+  if (!putRes.ok) {
+    const t = await putRes.text();
+    throw new Error(`DocuSign resendEnvelope ${putRes.status}: ${t}`);
+  }
 }
 
 export async function downloadCompletedPdf(envelopeId: string): Promise<Buffer> {

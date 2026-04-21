@@ -2,9 +2,10 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { FileText, Send, CheckCircle2, ExternalLink, Loader2 } from 'lucide-react';
+import { FileText, Send, CheckCircle2, ExternalLink, Loader2, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CancelContractDialog } from '@/components/contracts/cancel-contract-dialog';
+import { RecallDocusignDialog } from '@/components/contracts/recall-docusign-dialog';
 import type { ContractStatus } from '@/types/db';
 
 interface Props {
@@ -13,9 +14,18 @@ interface Props {
   status:        ContractStatus;
   draftPdfUrl:   string | null;
   signedPdfUrl:  string | null;
+  /** Set when a DocuSign envelope exists (sent / partially signed). */
+  docusignEnvelopeId?: string | null;
 }
 
-export function ContractActions({ contractId, exhibitorName, status, draftPdfUrl, signedPdfUrl }: Props) {
+export function ContractActions({
+  contractId,
+  exhibitorName,
+  status,
+  draftPdfUrl,
+  signedPdfUrl,
+  docusignEnvelopeId,
+}: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [action, setAction] = useState<string | null>(null);
@@ -70,6 +80,22 @@ export function ContractActions({ contractId, exhibitorName, status, draftPdfUrl
           {pending && action === 'send' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           Send via DocuSign
         </Button>
+      )}
+
+      {/* DocuSign in flight — resend notification or recall to fix email */}
+      {(status === 'sent' || status === 'partially_signed') && docusignEnvelopeId && (
+        <>
+          <Button
+            variant="outline"
+            onClick={() => runAction('resend-docusign', 'resend')}
+            disabled={pending}
+            title="Resend DocuSign emails to signers who have not finished (same email addresses)."
+          >
+            {pending && action === 'resend' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+            Resend signing email
+          </Button>
+          <RecallDocusignDialog contractId={contractId} exhibitorName={exhibitorName} />
+        </>
       )}
 
       {/* View PDFs */}

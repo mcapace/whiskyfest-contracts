@@ -7,6 +7,7 @@ import { cn, formatCurrency, formatLongDate, formatTimestamp } from '@/lib/utils
 import { Card, CardContent } from '@/components/ui/card';
 import { StatusBadge } from '@/components/contracts/status-badge';
 import { ContractActions } from '@/components/contracts/contract-actions';
+import { SignerContactEdit } from '@/components/contracts/signer-contact-edit';
 import type { ContractWithTotals, Event, AuditLogEntry } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
@@ -90,6 +91,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
             status={contract.status}
             draftPdfUrl={contract.draft_pdf_url}
             signedPdfUrl={contract.signed_pdf_url}
+            docusignEnvelopeId={contract.docusign_envelope_id}
           />
         </CardContent>
       </Card>
@@ -98,8 +100,16 @@ export default async function ContractDetailPage({ params }: { params: { id: str
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Exhibitor */}
         <Card>
-          <div className="border-b border-border/50 px-6 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 px-6 py-4">
             <h2 className="font-serif text-lg font-semibold">Exhibitor</h2>
+            {(contract.status === 'approved' || contract.status === 'ready_for_review') && (
+              <SignerContactEdit
+                contractId={contract.id}
+                initialName={contract.signer_1_name}
+                initialTitle={contract.signer_1_title}
+                initialEmail={contract.signer_1_email}
+              />
+            )}
           </div>
           <CardContent className="space-y-3 p-6 text-sm">
             <Detail label="Legal Name"   value={contract.exhibitor_legal_name} />
@@ -211,6 +221,9 @@ function describeAction(entry: AuditLogEntry): string {
     case 'docusign_sent':   return 'Sent via DocuSign';
     case 'docusign_completed': return 'DocuSign envelope completed — signed PDF stored';
     case 'pdf_sent':        return 'Contract sent via DocuSign';
+    case 'docusign_recalled': return 'DocuSign envelope recalled — contract unlocked for edit';
+    case 'docusign_resend_notification': return 'DocuSign signing email resent';
+    case 'signer_contact_updated': return 'Exhibitor signer contact updated';
     case 'signed':         return 'Signed by exhibitor';
     case 'executed':       return 'Fully executed';
     case 'cancelled':      return `Contract cancelled${entry.metadata?.reason ? ': ' + String(entry.metadata.reason) : ''}`;
