@@ -26,7 +26,7 @@ export function Sidebar({ user }: { user: { email?: string | null; name?: string
         <div className="mx-auto max-w-[220px] rounded-lg bg-white/75 px-3 py-2.5 shadow-sm ring-1 ring-fest-600/10 backdrop-blur-[2px]">
           <Link href="/" className="relative mx-auto block h-12 w-full max-w-[200px]">
             <Image
-              src="/images/whiskyfest-ny25-logo.png"
+              src="/images/wf-logo-primary.png"
               alt="WhiskyFest"
               fill
               className="object-contain object-center"
