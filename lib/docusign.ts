@@ -162,15 +162,18 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    body: JSON.stringify({ envelopeDefinition }),
+    // Body must be the EnvelopeDefinition object at the JSON root — not `{ envelopeDefinition: {...} }`.
+    // Nesting was ignored by the API, leaving `status: 'sent'` ineffective (draft / no recipient emails).
+    body: JSON.stringify(envelopeDefinition),
   });
 
   const text = await res.text();
   if (!res.ok) {
     throw new Error(`DocuSign createEnvelope ${res.status}: ${text}`);
   }
-  const summary = JSON.parse(text) as { envelopeId?: string };
+  const summary = JSON.parse(text) as { envelopeId?: string; status?: string };
   if (!summary.envelopeId) throw new Error('DocuSign createEnvelope: missing envelopeId');
+  console.log('[docusign] createEnvelope response:', { envelopeId: summary.envelopeId, status: summary.status });
   return { envelopeId: summary.envelopeId };
 }
 
