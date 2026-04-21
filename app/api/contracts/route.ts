@@ -2,12 +2,19 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { canonicalExhibitorAddress } from '@/lib/exhibitor-address';
+import type { Contract } from '@/types/db';
 
 const schema = z.object({
   event_id:               z.string().uuid(),
   exhibitor_legal_name:   z.string().min(1),
   exhibitor_company_name: z.string().min(1),
   exhibitor_address:      z.string().optional().nullable(),
+  exhibitor_address_line1: z.string().optional().nullable(),
+  exhibitor_address_line2: z.string().optional().nullable(),
+  exhibitor_city:          z.string().optional().nullable(),
+  exhibitor_state:         z.string().max(3).optional().nullable(),
+  exhibitor_zip:           z.string().max(12).optional().nullable(),
   exhibitor_telephone:    z.string().optional().nullable(),
   brands_poured:          z.string().optional().nullable(),
   booth_count:            z.number().int().min(1),
@@ -29,11 +36,46 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 400 });
   }
 
+  const p = parsed.data;
+  const addrSlice: Pick<
+    Contract,
+    | 'exhibitor_address'
+    | 'exhibitor_address_line1'
+    | 'exhibitor_address_line2'
+    | 'exhibitor_city'
+    | 'exhibitor_state'
+    | 'exhibitor_zip'
+  > = {
+    exhibitor_address:       p.exhibitor_address ?? null,
+    exhibitor_address_line1: p.exhibitor_address_line1 ?? null,
+    exhibitor_address_line2: p.exhibitor_address_line2 ?? null,
+    exhibitor_city:          p.exhibitor_city ?? null,
+    exhibitor_state:         p.exhibitor_state ?? null,
+    exhibitor_zip:           p.exhibitor_zip ?? null,
+  };
+
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from('contracts')
     .insert({
-      ...parsed.data,
+      event_id:               p.event_id,
+      exhibitor_legal_name:   p.exhibitor_legal_name,
+      exhibitor_company_name: p.exhibitor_company_name,
+      exhibitor_address:      canonicalExhibitorAddress(addrSlice),
+      exhibitor_address_line1: addrSlice.exhibitor_address_line1,
+      exhibitor_address_line2: addrSlice.exhibitor_address_line2,
+      exhibitor_city:          addrSlice.exhibitor_city,
+      exhibitor_state:         addrSlice.exhibitor_state,
+      exhibitor_zip:           addrSlice.exhibitor_zip,
+      exhibitor_telephone:     p.exhibitor_telephone ?? null,
+      brands_poured:           p.brands_poured ?? null,
+      booth_count:             p.booth_count,
+      booth_rate_cents:        p.booth_rate_cents,
+      additional_brand_count:  p.additional_brand_count,
+      signer_1_name:           p.signer_1_name ?? null,
+      signer_1_title:          p.signer_1_title ?? null,
+      signer_1_email:          p.signer_1_email ?? null,
+      notes:                   p.notes ?? null,
       created_by: session.user.email,
       status:     'draft',
     })

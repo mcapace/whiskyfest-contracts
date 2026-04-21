@@ -61,6 +61,11 @@ create table if not exists contracts (
   exhibitor_legal_name    text not null,
   exhibitor_company_name  text not null,
   exhibitor_address       text,
+  exhibitor_address_line1 text,
+  exhibitor_address_line2 text,
+  exhibitor_city          text,
+  exhibitor_state         text,
+  exhibitor_zip           text,
   exhibitor_telephone     text,
   brands_poured           text,
 

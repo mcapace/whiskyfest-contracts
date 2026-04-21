@@ -1,4 +1,6 @@
+import { formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { formatCurrency } from '@/lib/utils';
+import { formatEventDateForMerge, getAgreementDatePartsInDisplayZone } from '@/lib/datetime';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 /** Draft PDFs use blank lines; DocuSign send uses literal anchor strings in the PDF. */
@@ -25,12 +27,7 @@ export function buildContractMergeMap(
   event: Event,
   mode: MergePlaceholderMode,
 ): Record<string, string> {
-  const today = new Date();
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
-  ];
-  const eventDate = new Date(event.event_date);
+  const agreement = getAgreementDatePartsInDisplayZone();
 
   const anchors =
     mode === 'draft'
@@ -51,18 +48,14 @@ export function buildContractMergeMap(
     '{{event_year}}': String(event.year),
     '{{event_tagline}}': event.tagline ?? '',
     '{{event_location}}': event.location ?? '',
-    '{{event_date}}': eventDate.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    }),
+    '{{event_date}}': formatEventDateForMerge(event.event_date),
     '{{event_venue}}': event.venue ?? '',
-    '{{agreement_day}}': String(today.getDate()),
-    '{{agreement_month}}': months[today.getMonth()] ?? '',
-    '{{agreement_year}}': String(today.getFullYear()),
+    '{{agreement_day}}': agreement.day,
+    '{{agreement_month}}': agreement.monthName,
+    '{{agreement_year}}': agreement.year,
     '{{exhibitor_legal_name}}': contract.exhibitor_legal_name,
     '{{exhibitor_company_name}}': contract.exhibitor_company_name,
-    '{{exhibitor_address}}': contract.exhibitor_address ?? '',
+    '{{exhibitor_address}}': formatExhibitorAddressBlock(contract),
     '{{exhibitor_telephone}}': contract.exhibitor_telephone ?? '',
     '{{brands_poured}}': contract.brands_poured ?? '',
     '{{booth_count}}': String(contract.booth_count),

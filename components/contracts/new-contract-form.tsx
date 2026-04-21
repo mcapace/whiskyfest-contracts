@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useCallback, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatLongDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input, Label, Textarea } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { ExhibitorAddressFields } from '@/components/contracts/exhibitor-address-fields';
 import type { Event } from '@/types/db';
 
 interface Props { events: Event[] }
@@ -24,7 +25,11 @@ export function NewContractForm({ events }: Props) {
     event_id:               defaultEvent?.id ?? '',
     exhibitor_legal_name:   '',
     exhibitor_company_name: '',
-    exhibitor_address:      '',
+    exhibitor_address_line1: '',
+    exhibitor_address_line2: '',
+    exhibitor_city:          '',
+    exhibitor_state:         '',
+    exhibitor_zip:           '',
     exhibitor_telephone:    '',
     brands_poured:          '',
     booth_count:            1,
@@ -44,6 +49,16 @@ export function NewContractForm({ events }: Props) {
   function set<K extends keyof typeof form>(k: K, v: typeof form[K]) {
     setForm(f => ({ ...f, [k]: v }));
   }
+
+  const patchAddress = useCallback((patch: Partial<Pick<typeof form,
+    | 'exhibitor_address_line1'
+    | 'exhibitor_address_line2'
+    | 'exhibitor_city'
+    | 'exhibitor_state'
+    | 'exhibitor_zip'
+  >>) => {
+    setForm((f) => ({ ...f, ...patch }));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -97,7 +112,7 @@ export function NewContractForm({ events }: Props) {
               <SelectContent>
                 {events.map(e => (
                   <SelectItem key={e.id} value={e.id}>
-                    {e.name} — {new Date(e.event_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                    {e.name} — {formatLongDate(e.event_date)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -118,14 +133,22 @@ export function NewContractForm({ events }: Props) {
             <Field label="Legal Name" hint="Full legal entity name as it will appear in the agreement line">
               <Input value={form.exhibitor_legal_name} onChange={e => set('exhibitor_legal_name', e.target.value)} placeholder="Sample Distillery Inc." required />
             </Field>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Address">
-                <Input value={form.exhibitor_address} onChange={e => set('exhibitor_address', e.target.value)} placeholder="123 Distiller Lane, Louisville, KY 40202" />
-              </Field>
-              <Field label="Telephone">
-                <Input value={form.exhibitor_telephone} onChange={e => set('exhibitor_telephone', e.target.value)} placeholder="(502) 555-0100" />
-              </Field>
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+              <p className="mb-3 text-sm font-medium">Mailing address</p>
+              <ExhibitorAddressFields
+                value={{
+                  exhibitor_address_line1: form.exhibitor_address_line1,
+                  exhibitor_address_line2: form.exhibitor_address_line2,
+                  exhibitor_city: form.exhibitor_city,
+                  exhibitor_state: form.exhibitor_state,
+                  exhibitor_zip: form.exhibitor_zip,
+                }}
+                onChange={patchAddress}
+              />
             </div>
+            <Field label="Telephone">
+              <Input value={form.exhibitor_telephone} onChange={e => set('exhibitor_telephone', e.target.value)} placeholder="(502) 555-0100" />
+            </Field>
             <Field label="Brands Poured" hint="Comma-separated list; printed on the 'List brand(s) here' line">
               <Input value={form.brands_poured} onChange={e => set('brands_poured', e.target.value)} placeholder="Sample Bourbon, Sample Rye" />
             </Field>
@@ -183,7 +206,7 @@ export function NewContractForm({ events }: Props) {
               <Field label="Name"><Input value={form.signer_1_name} onChange={e => set('signer_1_name', e.target.value)} placeholder="Jane Sampleson" /></Field>
               <Field label="Title"><Input value={form.signer_1_title} onChange={e => set('signer_1_title', e.target.value)} placeholder="VP Marketing" /></Field>
             </div>
-            <Field label="Email" hint="Contract will be sent here via DocuSign in Phase 2">
+            <Field label="Email" hint="DocuSign sends the signing request to this address (exhibitor signer).">
               <Input type="email" value={form.signer_1_email} onChange={e => set('signer_1_email', e.target.value)} placeholder="jane@sampledistillery.com" />
             </Field>
           </CardContent>

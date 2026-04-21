@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import { renderContractPdfFromTemplate } from '@/lib/google';
-import { sendEnvelope } from '@/lib/docusign';
+import { isDocuSignParallelSigners, sendEnvelope } from '@/lib/docusign';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
@@ -79,10 +79,19 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       contract_id: contract.id,
       actor_email: session.user.email,
       action: 'docusign_sent',
-      metadata: { envelope_id: envelopeId },
+      metadata: {
+        envelope_id: envelopeId,
+        exhibitor_signer_email: signerEmail,
+        shanken_signatory_email: shankenEmail,
+      },
     });
 
-    return NextResponse.json({ ok: true, envelope_id: envelopeId });
+    return NextResponse.json({
+      ok: true,
+      envelope_id: envelopeId,
+      parallel_signers: isDocuSignParallelSigners(),
+      exhibitor_signer_email: signerEmail,
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('DocuSign send failed:', err);

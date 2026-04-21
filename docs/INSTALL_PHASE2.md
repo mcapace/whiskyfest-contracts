@@ -24,6 +24,7 @@ npm install
 | `DOCUSIGN_BASE_URL` | Demo: `https://demo.docusign.net/restapi` — Production: `https://www.docusign.net/restapi` |
 | `DOCUSIGN_AUTH_URL` | Demo: `https://account-d.docusign.com` — Production: `https://account.docusign.com` |
 | `DOCUSIGN_RSA_PRIVATE_KEY` | Base64 of `docusign-private-key.pem` (one line, no newlines) |
+| `DOCUSIGN_PARALLEL_SIGNERS` | Optional. Set `true` or `1` so **both** signers get DocuSign invite emails when you send. If unset, **sequential** routing applies: only signer 1 (exhibitor) is emailed until they sign; signer 2 is queued. |
 
 ### Webhook HMAC (optional but recommended)
 
@@ -51,9 +52,12 @@ SendGrid-only steps (patch order vs. Resend zips, API key, verified sender): **`
 |----------|---------|
 | `NEXTAUTH_URL` | e.g. `https://whiskyfest-contracts.vercel.app` |
 
-## 3. Supabase: `partially_signed` status
+## 3. Supabase migrations
 
-Run **`supabase/migrations/002_phase2_docusign.sql`** in the Supabase SQL Editor (adds enum value + cancel columns if missing).
+Run in order in the Supabase SQL Editor:
+
+1. **`supabase/migrations/002_phase2_docusign.sql`** — `partially_signed` enum + cancel columns (if missing).
+2. **`supabase/migrations/003_exhibitor_structured_address.sql`** — street / apt / city / state / ZIP columns for exhibitor mailing address.
 
 If the enum already has `partially_signed`, the `DO` block is a no-op.
 
@@ -102,6 +106,7 @@ Redeploy after changing env vars.
 |--------|--------|
 | OAuth / JWT errors | `DOCUSIGN_*` values, RSA base64, consent granted |
 | Send returns 400 | Exhibitor `signer_1_email` and event `shanken_signatory_email` set |
+| **No DocuSign “please sign” email** | Sequential routing: **only signer 1** is emailed first. If you’re waiting on **countersigner’s** inbox, they won’t get mail until signer 1 finishes — or set `DOCUSIGN_PARALLEL_SIGNERS=true`. Spam folder, wrong email on contract/event, demo delays. |
 | Webhook does nothing | Connect URL, JSON format, envelope tied to `docusign_envelope_id` |
 | HMAC 401 | Secret mismatch or wrong header algorithm — verify against [DocuSign HMAC docs](https://developers.docusign.com/platform/webhooks/connect/validate/) |
-| No accounting email | `SENDGRID_API_KEY`, verified `ACCOUNTING_FROM_EMAIL`, SendGrid Activity Feed |
+| No **accounting** email (SendGrid) | That sends only on **envelope completed**, not on Send. Needs `SENDGRID_API_KEY`, verified `ACCOUNTING_FROM_EMAIL`, SendGrid Activity Feed |

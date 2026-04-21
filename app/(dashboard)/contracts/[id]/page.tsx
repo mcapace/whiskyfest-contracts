@@ -2,7 +2,8 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { formatCurrency, formatTimestamp } from '@/lib/utils';
+import { formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
+import { cn, formatCurrency, formatLongDate, formatTimestamp } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { StatusBadge } from '@/components/contracts/status-badge';
 import { ContractActions } from '@/components/contracts/contract-actions';
@@ -59,7 +60,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
             {contract.exhibitor_company_name}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {event?.name} — {event && new Date(event.event_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+            {event?.name} — {event && formatLongDate(event.event_date)}
           </p>
         </div>
         <div className="text-right">
@@ -82,6 +83,28 @@ export default async function ContractDetailPage({ params }: { params: { id: str
       )}
 
       {/* Actions */}
+      {contract.status === 'approved' && (
+        <div className="rounded-lg border border-fest-600/25 bg-fest-50/40 px-4 py-3 text-sm text-foreground/90">
+          <p className="font-medium text-fest-950">DocuSign will email the exhibitor signer</p>
+          <p className="mt-2 text-muted-foreground">
+            The signing invitation is sent to{' '}
+            <strong className="font-mono text-foreground">{contract.signer_1_email ?? '—'}</strong>
+            {' '}— the <strong>Signatory → Email</strong> field on this contract (exhibitor side). That is DocuSign recipient 1.
+          </p>
+          <ul className="mt-3 list-inside list-disc space-y-1 text-muted-foreground">
+            <li>
+              If <code className="rounded bg-white/80 px-1 text-xs">DOCUSIGN_PARALLEL_SIGNERS</code> is off, only that address is emailed until they sign; then Shanken gets the countersign invite.
+            </li>
+            <li>
+              If parallel signing is on, Shanken also gets an invite at send time — the exhibitor still receives theirs at{' '}
+              <span className="font-mono text-xs">{contract.signer_1_email}</span>.
+            </li>
+            <li>Accounting (SendGrid) emails only after the envelope is fully signed.</li>
+            <li>Check spam; demo mail can be delayed.</li>
+          </ul>
+        </div>
+      )}
+
       <Card>
         <CardContent className="p-4">
           <ContractActions
@@ -104,11 +127,11 @@ export default async function ContractDetailPage({ params }: { params: { id: str
           <CardContent className="space-y-3 p-6 text-sm">
             <Detail label="Legal Name"   value={contract.exhibitor_legal_name} />
             <Detail label="Display Name" value={contract.exhibitor_company_name} />
-            <Detail label="Address"      value={contract.exhibitor_address} />
+            <Detail label="Address"      value={formatExhibitorAddressBlock(contract)} multiline />
             <Detail label="Telephone"    value={contract.exhibitor_telephone} />
             <Detail label="Brands"       value={contract.brands_poured} />
             <Detail label="Signer"       value={[contract.signer_1_name, contract.signer_1_title].filter(Boolean).join(', ') || '—'} />
-            <Detail label="Email"        value={contract.signer_1_email} />
+            <Detail label="Email (DocuSign to exhibitor)" value={contract.signer_1_email} mono />
           </CardContent>
         </Card>
 
@@ -177,11 +200,28 @@ export default async function ContractDetailPage({ params }: { params: { id: str
   );
 }
 
-function Detail({ label, value, mono }: { label: string; value: string | null; mono?: boolean }) {
+function Detail({
+  label,
+  value,
+  mono,
+  multiline,
+}: {
+  label: string;
+  value: string | null;
+  mono?: boolean;
+  multiline?: boolean;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-4">
       <span className="text-muted-foreground">{label}</span>
-      <span className={mono ? 'font-mono tabular-nums' : ''}>{value || '—'}</span>
+      <span
+        className={cn(
+          mono && 'font-mono tabular-nums',
+          multiline && 'max-w-[min(100%,20rem)] whitespace-pre-wrap text-right text-sm leading-snug',
+        )}
+      >
+        {value || '—'}
+      </span>
     </div>
   );
 }

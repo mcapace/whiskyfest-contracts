@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { downloadCompletedPdf } from '@/lib/docusign';
 import { uploadPdfBufferToFolder } from '@/lib/google';
 import { sendAccountingEmail } from '@/lib/email';
+import { formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { formatLongDate } from '@/lib/utils';
 import type { ContractWithTotals, Event } from '@/types/db';
 
@@ -190,7 +191,7 @@ export async function POST(req: Request) {
           signerTitle: contract.signer_1_title,
           signerEmail: contract.signer_1_email,
           exhibitorTelephone: contract.exhibitor_telephone,
-          exhibitorAddress: contract.exhibitor_address,
+          exhibitorAddress: formatExhibitorAddressBlock(contract),
           signedPdfUrl: webViewLink,
           signedPdfBytes: pdfBytes,
           contractId: contract.id,
