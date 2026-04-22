@@ -54,6 +54,7 @@ export async function renderContractPdfFromTemplate(
   const tempDocId = copy.data.id!;
 
   try {
+    // Merge values may include `\u000b` (vertical tab) for soft line breaks inside cells (see merge-map).
     const requests = Object.entries(mergeMap).map(([token, value]) => ({
       replaceAllText: {
         containsText: { text: token, matchCase: true },

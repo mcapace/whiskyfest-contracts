@@ -24,6 +24,46 @@ export const DOCUSIGN_ANCHORS = {
 } as const;
 
 /**
+ * Soft line break inside merged table cells when exporting Google Docs → PDF.
+ * `\n` is sometimes unreliable in replaceAllText; `\u000b` (vertical tab) is preferred by Docs API.
+ */
+const GOOGLE_DOCS_CELL_LINE_BREAK = '\u000b';
+
+function formatMoney(cents: number): string {
+  return formatCurrency(cents);
+}
+
+/**
+ * Single-order-row pricing copy for the CONTRACT ORDER table (tokens may embed line breaks).
+ */
+export function buildPricingComposition(contract: ContractWithTotals): {
+  pricing_description: string;
+  pricing_qty: string;
+  pricing_amount: string;
+} {
+  const lb = GOOGLE_DOCS_CELL_LINE_BREAK;
+  const boothCount = contract.booth_count;
+  const isDiscounted = isDiscountedRate(contract.booth_rate_cents);
+
+  if (!isDiscounted) {
+    return {
+      pricing_description: `Booths @ ${formatMoney(STANDARD_BOOTH_RATE_CENTS)}/booth`,
+      pricing_qty: String(boothCount),
+      pricing_amount: formatMoney(boothCount * contract.booth_rate_cents),
+    };
+  }
+
+  const listSubtotalCents = calculateListSubtotalCents(boothCount);
+  const discountCents = calculateDiscountCents(boothCount, contract.booth_rate_cents);
+
+  return {
+    pricing_description: `Booths @ ${formatMoney(STANDARD_BOOTH_RATE_CENTS)}/booth (list)${lb}Negotiated discount`,
+    pricing_qty: `${boothCount}${lb}`,
+    pricing_amount: `${formatMoney(listSubtotalCents)}${lb}-${formatMoney(discountCents)}`,
+  };
+}
+
+/**
  * Build Google Docs merge tokens for the contract template.
  * Phase 1 (draft): anchors render as blank lines for humans.
  * Phase 2 (docusign): same tokens become \\s1\\, \\d1\\, etc. for tab placement.
@@ -34,6 +74,8 @@ export function buildContractMergeMap(
   mode: MergePlaceholderMode,
 ): Record<string, string> {
   const agreement = getAgreementDatePartsInDisplayZone();
+
+  const pricing = buildPricingComposition(contract);
 
   const discounted = isDiscountedRate(contract.booth_rate_cents);
   const listBoothRateDisplay = formatCurrency(STANDARD_BOOTH_RATE_CENTS);
@@ -79,6 +121,10 @@ export function buildContractMergeMap(
     '{{booth_count}}': String(contract.booth_count),
     '{{booth_rate}}': formatCurrency(contract.booth_rate_cents).replace('$', '').trim(),
     '{{booth_subtotal}}': formatCurrency(contract.booth_subtotal_cents).replace('$', '').trim(),
+    '{{booth_total}}': formatCurrency(contract.booth_subtotal_cents).replace('$', '').trim(),
+    '{{pricing_description}}': pricing.pricing_description,
+    '{{pricing_qty}}': pricing.pricing_qty,
+    '{{pricing_amount}}': pricing.pricing_amount,
     '{{additional_brand_count}}': String(contract.additional_brand_count),
     '{{additional_brand_fee}}': formatCurrency(contract.additional_brand_fee_cents).replace('$', '').trim(),
     '{{grand_total}}': formatCurrency(contract.grand_total_cents).replace('$', '').trim(),
