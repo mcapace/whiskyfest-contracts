@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { Input, Label } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { US_STATE_CODES } from '@/lib/exhibitor-address';
+import { COUNTRIES } from '@/lib/countries';
 
 const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
@@ -203,14 +204,28 @@ export function ExhibitorAddressFields({ value, onChange }: Props) {
       </div>
 
       <div className="space-y-1.5 sm:max-w-sm">
-        <Label htmlFor="addr-country">Country</Label>
-        <Input
-          id="addr-country"
-          autoComplete="country-name"
-          value={value.exhibitor_country}
-          onChange={(e) => set({ exhibitor_country: e.target.value })}
-          placeholder="United States"
-        />
+        <Label>Country</Label>
+        <Select
+          value={value.exhibitor_country || '__'}
+          onValueChange={(v) => set({ exhibitor_country: v === '__' ? '' : v })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select country" />
+          </SelectTrigger>
+          <SelectContent className="max-h-60">
+            <SelectItem value="__">—</SelectItem>
+            {COUNTRIES.map((c) => (
+              <SelectItem key={c.code} value={c.name}>
+                {c.name}
+              </SelectItem>
+            ))}
+            {value.exhibitor_country && !COUNTRIES.some((c) => c.name === value.exhibitor_country) && (
+              <SelectItem value={value.exhibitor_country}>
+                {value.exhibitor_country} (legacy)
+              </SelectItem>
+            )}
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );

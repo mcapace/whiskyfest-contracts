@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { cn, formatCurrency, formatLongDate, formatTimestamp } from '@/lib/utils';
@@ -33,9 +34,12 @@ async function getContract(id: string) {
 }
 
 export default async function ContractDetailPage({ params }: { params: { id: string } }) {
+  const session = await auth();
+  const isAdmin = (session?.user as { role?: string } | undefined)?.role === 'admin';
   const data = await getContract(params.id);
   if (!data) notFound();
   const { contract, event, audit } = data;
+  const releaseAudit = audit.find((entry) => entry.action === 'released_to_accounting' || entry.action === 'executed');
 
   return (
     <div className="space-y-6">
@@ -52,14 +56,14 @@ export default async function ContractDetailPage({ params }: { params: { id: str
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="mb-2 flex items-center gap-3">
+            <h1 className="font-serif text-3xl font-semibold tracking-tight">
+              {contract.exhibitor_company_name}
+            </h1>
             <StatusBadge status={contract.status} />
             <span className="font-mono text-xs text-muted-foreground">
               {contract.id.slice(0, 8)}
             </span>
           </div>
-          <h1 className="font-serif text-3xl font-semibold tracking-tight">
-            {contract.exhibitor_company_name}
-          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {event?.name} — {event && formatLongDate(event.event_date)}
           </p>
@@ -88,10 +92,20 @@ export default async function ContractDetailPage({ params }: { params: { id: str
           <ContractActions
             contractId={contract.id}
             exhibitorName={contract.exhibitor_company_name}
+            signerEmail={contract.signer_1_email}
+            signerName={contract.signer_1_name}
             status={contract.status}
             draftPdfUrl={contract.draft_pdf_url}
             signedPdfUrl={contract.signed_pdf_url}
             docusignEnvelopeId={contract.docusign_envelope_id}
+            sentAt={contract.sent_at}
+            executedAt={contract.executed_at}
+            cancelledReason={contract.cancelled_reason}
+            cancelledAt={contract.cancelled_at}
+            cancelledBy={contract.cancelled_by}
+            isAdmin={isAdmin}
+            releasedBy={releaseAudit?.actor_email ?? null}
+            releasedAt={releaseAudit?.occurred_at ?? null}
           />
         </CardContent>
       </Card>
@@ -224,6 +238,9 @@ function describeAction(entry: AuditLogEntry): string {
     case 'pdf_sent':        return 'Contract sent via DocuSign';
     case 'docusign_recalled': return 'DocuSign contract recalled — contract unlocked for edit';
     case 'docusign_resend_notification': return 'DocuSign signing email resent';
+    case 'docusign_send_reminder': return 'DocuSign reminder sent';
+    case 'docusign_resent_with_changes': return 'DocuSign contract voided and resent with changes';
+    case 'released_to_accounting': return 'Released to accounting';
     case 'signer_contact_updated': return 'Exhibitor signer contact updated';
     case 'signed':         return 'Signed by exhibitor';
     case 'executed':       return 'Fully executed';

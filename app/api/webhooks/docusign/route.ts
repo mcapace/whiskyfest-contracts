@@ -3,19 +3,9 @@ import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { downloadCompletedPdf } from '@/lib/docusign';
 import { uploadPdfBufferToFolder } from '@/lib/google';
-import { sendAccountingEmail } from '@/lib/email';
-import { formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
-import { formatLongDate } from '@/lib/utils';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
-
-function appBaseUrl(): string {
-  const explicit = process.env['NEXTAUTH_URL']?.replace(/\/$/, '');
-  if (explicit) return explicit;
-  if (process.env['VERCEL_URL']) return `https://${process.env['VERCEL_URL']}`;
-  return 'http://localhost:3000';
-}
 
 /** DocuSign Connect JSON shapes vary; extract what we need defensively. */
 function parseConnectPayload(raw: unknown): {
@@ -168,7 +158,7 @@ export async function POST(req: Request) {
     return new NextResponse(null, { status: 200 });
   }
 
-  if (contract.status === 'executed' && contract.accounting_notified_at) {
+  if (contract.status === 'signed' || contract.status === 'executed') {
     return new NextResponse(null, { status: 200 });
   }
 
@@ -186,49 +176,18 @@ export async function POST(req: Request) {
     await supabase
       .from('contracts')
       .update({
-        status: 'executed',
+        status: 'signed',
         signed_pdf_drive_id: fileId,
         signed_pdf_url: webViewLink,
         signed_at: now,
-        executed_at: now,
       })
       .eq('id', contract.id);
-
-    if (event && process.env['SENDGRID_API_KEY']) {
-      try {
-        await sendAccountingEmail({
-          exhibitorCompanyName: contract.exhibitor_company_name,
-          exhibitorLegalName: contract.exhibitor_legal_name,
-          eventName: event.name,
-          eventDate: formatLongDate(event.event_date),
-          eventYear: event.year,
-          boothCount: contract.booth_count,
-          boothRateCents: contract.booth_rate_cents,
-          additionalBrandCount: contract.additional_brand_count,
-          grandTotalCents: contract.grand_total_cents,
-          signerName: contract.signer_1_name,
-          signerTitle: contract.signer_1_title,
-          signerEmail: contract.signer_1_email,
-          exhibitorTelephone: contract.exhibitor_telephone,
-          exhibitorAddress: formatExhibitorAddressBlock(contract),
-          signedPdfUrl: webViewLink,
-          signedPdfBytes: pdfBytes,
-          contractId: contract.id,
-          dashboardUrl: `${appBaseUrl()}/contracts/${contract.id}`,
-          salesRepEmail: contract.sales_rep_email ?? contract.created_by,
-        });
-
-        await supabase.from('contracts').update({ accounting_notified_at: now }).eq('id', contract.id);
-      } catch (emailErr) {
-        console.error('Accounting email failed:', emailErr);
-      }
-    }
 
     await supabase.from('audit_log').insert({
       contract_id: contract.id,
       actor_email: null,
       action: 'docusign_completed',
-      metadata: { envelope_id: envelopeId, signed_pdf_url: webViewLink },
+      metadata: { envelope_id: envelopeId, signed_pdf_url: webViewLink, release_required: true },
     });
   } catch (err) {
     console.error('DocuSign completion handling failed:', err);

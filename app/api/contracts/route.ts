@@ -15,7 +15,7 @@ const schema = z.object({
   exhibitor_city:          z.string().optional().nullable(),
   exhibitor_state:         z.string().max(3).optional().nullable(),
   exhibitor_zip:           z.string().max(12).optional().nullable(),
-  exhibitor_country:       z.string().max(120).optional().nullable(),
+  exhibitor_country:       z.string().min(2).max(120),
   exhibitor_telephone:    z.string().optional().nullable(),
   brands_poured:          z.string().optional().nullable(),
   booth_count:            z.number().int().min(1),

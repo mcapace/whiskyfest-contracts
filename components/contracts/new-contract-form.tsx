@@ -34,7 +34,7 @@ export function NewContractForm({ events, currentUserEmail }: Props) {
     exhibitor_city:          '',
     exhibitor_state:         '',
     exhibitor_zip:           '',
-    exhibitor_country:       '',
+    exhibitor_country:       'United States',
     exhibitor_telephone:    '',
     brands_poured:          '',
     booth_count:            1,
@@ -74,6 +74,7 @@ export function NewContractForm({ events, currentUserEmail }: Props) {
     if (!form.event_id) { setErr('Please select an event'); return; }
     if (!form.exhibitor_company_name) { setErr('Company name required'); return; }
     if (!form.exhibitor_legal_name)   { setErr('Legal name required'); return; }
+    if (!form.exhibitor_country) { setErr('Country is required'); return; }
     if (!form.sales_rep_id) { setErr('Sales rep is required'); return; }
 
     startTransition(async () => {

@@ -122,7 +122,7 @@ export const STATUS_META: Record<ContractStatus, { label: string; tone: string; 
   approved:          { label: 'Approved',         tone: 'bg-blue-100 text-blue-900 border-blue-300',       order: 3 },
   sent:              { label: 'Sent',             tone: 'bg-indigo-100 text-indigo-900 border-indigo-300', order: 4 },
   partially_signed:  { label: 'Partially Signed', tone: 'bg-violet-100 text-violet-900 border-violet-300', order: 4.5 },
-  signed:            { label: 'Signed',           tone: 'bg-emerald-50 text-emerald-800 border-emerald-300', order: 5 },
+  signed:            { label: 'Fully Signed',     tone: 'bg-emerald-50 text-emerald-800 border-emerald-300', order: 5 },
   executed:          { label: 'Executed',         tone: 'bg-emerald-600 text-white border-emerald-700',    order: 6 },
   cancelled:         { label: 'Cancelled',        tone: 'bg-stone-200 text-stone-700 border-stone-300',    order: 7 },
   error:             { label: 'Error',            tone: 'bg-red-100 text-red-900 border-red-300',          order: 8 },
