@@ -52,6 +52,7 @@ export interface Contract {
   signer_1_name: string | null;
   signer_1_title: string | null;
   signer_1_email: string | null;
+  sales_rep_id: string | null;
   draft_pdf_drive_id: string | null;
   draft_pdf_url: string | null;
   docusign_envelope_id: string | null;
@@ -76,6 +77,8 @@ export interface ContractWithTotals extends Contract {
   booth_subtotal_cents: number;
   additional_brand_fee_cents: number;
   grand_total_cents: number;
+  sales_rep_name: string | null;
+  sales_rep_email: string | null;
   event?: Event;
 }
 
@@ -96,6 +99,16 @@ export interface AppUser {
   role: UserRole;
   is_active: boolean;
   created_at: string;
+}
+
+export interface SalesRep {
+  id: string;
+  name: string;
+  email: string;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
 }
 
 // ---------------------------------------------------------------------------

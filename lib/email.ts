@@ -25,7 +25,7 @@ export interface AccountingEmailPayload {
   signedPdfBytes: Buffer;
   contractId: string;
   dashboardUrl: string;
-  /** Sales rep who created the contract in the app — CC’d on the executed-contract handoff (same content as accounting). */
+  /** Sales rep email (or fallback creator email) CC’d on executed-contract handoff. */
   salesRepEmail?: string | null;
 }
 

@@ -215,7 +215,7 @@ export async function POST(req: Request) {
           signedPdfBytes: pdfBytes,
           contractId: contract.id,
           dashboardUrl: `${appBaseUrl()}/contracts/${contract.id}`,
-          salesRepEmail: contract.created_by,
+          salesRepEmail: contract.sales_rep_email ?? contract.created_by,
         });
 
         await supabase.from('contracts').update({ accounting_notified_at: now }).eq('id', contract.id);

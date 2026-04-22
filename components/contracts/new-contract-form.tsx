@@ -10,11 +10,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input, Label, Textarea } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { ExhibitorAddressFields } from '@/components/contracts/exhibitor-address-fields';
+import { SalesRepSelect } from '@/components/contracts/sales-rep-select';
 import type { Event } from '@/types/db';
 
-interface Props { events: Event[] }
+interface Props {
+  events: Event[];
+  currentUserEmail: string | null;
+}
 
-export function NewContractForm({ events }: Props) {
+export function NewContractForm({ events, currentUserEmail }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
@@ -37,6 +41,7 @@ export function NewContractForm({ events }: Props) {
     signer_1_name:          '',
     signer_1_title:         '',
     signer_1_email:         '',
+    sales_rep_id:           '',
     notes:                  '',
   });
 
@@ -67,6 +72,7 @@ export function NewContractForm({ events }: Props) {
     if (!form.event_id) { setErr('Please select an event'); return; }
     if (!form.exhibitor_company_name) { setErr('Company name required'); return; }
     if (!form.exhibitor_legal_name)   { setErr('Legal name required'); return; }
+    if (!form.sales_rep_id) { setErr('Sales rep is required'); return; }
 
     startTransition(async () => {
       const res = await fetch('/api/contracts', {
@@ -209,6 +215,12 @@ export function NewContractForm({ events }: Props) {
             <Field label="Email" hint="DocuSign sends the signing request to this address (exhibitor signer).">
               <Input type="email" value={form.signer_1_email} onChange={e => set('signer_1_email', e.target.value)} placeholder="jane@sampledistillery.com" />
             </Field>
+            <SalesRepSelect
+              currentUserEmail={currentUserEmail}
+              value={form.sales_rep_id}
+              onChange={(v) => set('sales_rep_id', v)}
+              required
+            />
           </CardContent>
         </Card>
 

@@ -23,6 +23,7 @@ const schema = z.object({
   signer_1_name:          z.string().optional().nullable(),
   signer_1_title:         z.string().optional().nullable(),
   signer_1_email:         z.string().email().optional().or(z.literal('')).nullable(),
+  sales_rep_id:           z.string().uuid({ message: 'Sales Rep is required' }),
   notes:                  z.string().optional().nullable(),
 });
 
@@ -75,6 +76,7 @@ export async function POST(req: Request) {
       signer_1_name:           p.signer_1_name ?? null,
       signer_1_title:          p.signer_1_title ?? null,
       signer_1_email:          p.signer_1_email ?? null,
+      sales_rep_id:            p.sales_rep_id,
       notes:                   p.notes ?? null,
       created_by: session.user.email,
       status:     'draft',

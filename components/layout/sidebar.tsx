@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { FileText, LayoutDashboard, Plus, CalendarDays, Users } from 'lucide-react';
+import { FileText, LayoutDashboard, Plus, CalendarDays, Users, UserRound } from 'lucide-react';
 import { signOutAction } from '@/app/actions/auth';
 import { cn } from '@/lib/utils';
 
@@ -11,6 +11,7 @@ const nav = [
   { href: '/',                 label: 'Dashboard',     icon: LayoutDashboard },
   { href: '/contracts/new',    label: 'New Contract',  icon: Plus },
   { href: '/contracts',        label: 'All Contracts', icon: FileText },
+  { href: '/sales-reps',       label: 'Sales Reps',    icon: UserRound,    adminOnly: true },
   { href: '/events',           label: 'Events',        icon: CalendarDays,  adminOnly: true },
   { href: '/users',            label: 'Users',         icon: Users,         adminOnly: true },
 ];
