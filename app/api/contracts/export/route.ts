@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { resolveContractActor } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { formatStatus } from '@/lib/status-display';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
@@ -21,7 +22,8 @@ export async function GET() {
 
   let rowQuery = supabase.from('contracts_with_totals').select('*').order('updated_at', { ascending: false }).limit(500);
 
-  if (!gate.actor.isAdmin && gate.actor.accessibleSalesRepIds.length > 0) {
+  const scopeAll = gate.actor.isAdmin || gate.actor.isEventsTeam;
+  if (!scopeAll && gate.actor.accessibleSalesRepIds.length > 0) {
     rowQuery = rowQuery.in('sales_rep_id', gate.actor.accessibleSalesRepIds);
   }
 
@@ -52,7 +54,7 @@ export async function GET() {
     lines.push(
       [
         csvEscape(c.id),
-        csvEscape(c.status),
+        csvEscape(formatStatus(c.status)),
         csvEscape(c.exhibitor_company_name),
         csvEscape(c.exhibitor_legal_name),
         csvEscape(ev?.name ?? ''),

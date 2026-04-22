@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { getContractWithTotalsForViewer } from '@/lib/auth-contract';
 import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { requiresDiscountApproval, STANDARD_BOOTH_RATE_CENTS } from '@/lib/contracts';
+import { formatStatus } from '@/lib/status-display';
 import { cn, formatCurrency, formatLongDate, formatTimestamp } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { StatusBadge } from '@/components/contracts/status-badge';
@@ -347,7 +348,11 @@ function describeAction(entry: AuditLogEntry): { title: string; detail?: string 
       const ob = meta?.on_behalf_of ? ' (on behalf of sales rep)' : '';
       return { title: `Contract created${ob}`, detail: rep ? `Sales rep: ${rep}` : undefined };
     }
-    case 'status_changed': return { title: `Status changed from ${entry.from_status} to ${entry.to_status}` };
+    case 'status_changed': {
+      const fromLabel = entry.from_status ? formatStatus(entry.from_status) : 'Unknown';
+      const toLabel = entry.to_status ? formatStatus(entry.to_status) : 'Unknown';
+      return { title: `Status changed from ${fromLabel} to ${toLabel}` };
+    }
     case 'pdf_generated': return { title: 'Draft PDF generated' };
     case 'docusign_sent': return { title: 'Sent via DocuSign' };
     case 'docusign_completed': return { title: 'DocuSign contract completed — signed PDF stored' };

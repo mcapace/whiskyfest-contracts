@@ -37,12 +37,17 @@ export async function GET(req: Request) {
   const supabase = getSupabaseAdmin();
   let query = supabase.from('contracts_with_totals').select('*').order('created_at', { ascending: false }).limit(200);
 
-  if (!gate.actor.isAdmin && gate.actor.accessibleSalesRepIds.length > 0) {
+  const scopeAll = gate.actor.isAdmin || gate.actor.isEventsTeam;
+  if (!scopeAll && gate.actor.accessibleSalesRepIds.length > 0) {
     query = query.in('sales_rep_id', gate.actor.accessibleSalesRepIds);
   }
 
-  if (statusFilter && statusFilter !== 'all' && VALID.includes(statusFilter as ContractStatus)) {
-    query = query.eq('status', statusFilter as ContractStatus);
+  if (statusFilter && statusFilter !== 'all') {
+    if (statusFilter === 'draft') {
+      query = query.or('status.eq.draft,status.eq.ready_for_review');
+    } else if (VALID.includes(statusFilter as ContractStatus)) {
+      query = query.eq('status', statusFilter as ContractStatus);
+    }
   }
 
   if (q) {

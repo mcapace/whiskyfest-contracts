@@ -19,6 +19,7 @@ export interface ContractActorContext {
   email: string;
   appUser: AppUserRow;
   isAdmin: boolean;
+  isEventsTeam: boolean;
   salesRepId: string | null;
   /** Own rep id plus any reps this user assists (unique). */
   accessibleSalesRepIds: string[];
@@ -70,6 +71,7 @@ export async function resolveContractActor(session: Session | null): Promise<
   if (!appUser.is_active) return jsonErr(401, 'Unauthorized');
 
   const isAdmin = appUser.role === 'admin';
+  const isEventsTeam = Boolean((appUser as { is_events_team?: boolean }).is_events_team);
 
   let salesRepId: string | null = null;
   const { data: sr } = await supabase
@@ -83,7 +85,7 @@ export async function resolveContractActor(session: Session | null): Promise<
 
   const accessibleSalesRepIds = await getAccessibleSalesRepIds(email, supabase);
 
-  if (!isAdmin && accessibleSalesRepIds.length === 0) {
+  if (!isAdmin && !isEventsTeam && accessibleSalesRepIds.length === 0) {
     return jsonErr(403, 'Not a registered rep or assistant');
   }
 
@@ -93,9 +95,10 @@ export async function resolveContractActor(session: Session | null): Promise<
       email,
       appUser: {
         ...(appUser as object),
-        is_events_team: Boolean((appUser as { is_events_team?: boolean }).is_events_team),
+        is_events_team: isEventsTeam,
       } as AppUserRow,
       isAdmin,
+      isEventsTeam,
       salesRepId,
       accessibleSalesRepIds,
     },
@@ -189,7 +192,9 @@ export async function requireContractActorForPage(): Promise<PageContractActor> 
 
   const accessibleSalesRepIds = await getAccessibleSalesRepIds(email, supabase);
 
-  if (!isAdmin && accessibleSalesRepIds.length === 0) {
+  const isEventsTeam = Boolean(appUser.is_events_team);
+
+  if (!isAdmin && !isEventsTeam && accessibleSalesRepIds.length === 0) {
     redirect('/auth/login');
   }
 
@@ -199,7 +204,7 @@ export async function requireContractActorForPage(): Promise<PageContractActor> 
     salesRepId,
     accessibleSalesRepIds,
     role: appUser.role,
-    isEventsTeam: Boolean(appUser.is_events_team),
+    isEventsTeam,
   };
 }
 
@@ -219,7 +224,8 @@ export async function getContractWithTotalsForViewer(
 
   const row = contract as ContractWithTotals;
   const sid = row.sales_rep_id;
-  if (!actor.isAdmin && (!sid || !actor.accessibleSalesRepIds.includes(sid))) return null;
+  const canViewAll = actor.isAdmin || actor.isEventsTeam;
+  if (!canViewAll && (!sid || !actor.accessibleSalesRepIds.includes(sid))) return null;
 
   return { actor, contract: row };
 }

@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input, Label, Textarea } from '@/components/ui/input';
 import { formatCurrency, formatRelative } from '@/lib/utils';
+import { formatStatus } from '@/lib/status-display';
 import type { ContractStatus } from '@/types/db';
 
 interface Props {
@@ -596,36 +597,36 @@ export function ContractActions({
   );
 }
 
-const STAGES: Array<{ key: Exclude<ContractStatus, 'cancelled' | 'error'>; label: string }> = [
-  { key: 'draft', label: 'Draft' },
-  { key: 'ready_for_review', label: 'Ready' },
-  { key: 'pending_events_review', label: 'Review' },
-  { key: 'approved', label: 'Approved' },
-  { key: 'sent', label: 'Sent' },
-  { key: 'partially_signed', label: 'Partially Signed' },
-  { key: 'signed', label: 'Fully Signed' },
-  { key: 'executed', label: 'Executed' },
+const STAGE_KEYS: Exclude<ContractStatus, 'cancelled' | 'error'>[] = [
+  'draft',
+  'ready_for_review',
+  'pending_events_review',
+  'approved',
+  'sent',
+  'partially_signed',
+  'signed',
+  'executed',
 ];
 
 function getProgress(status: ContractStatus): { special: string | null; currentIdx: number } {
   if (status === 'cancelled') return { special: 'cancelled', currentIdx: -1 };
   if (status === 'error') return { special: 'error', currentIdx: -1 };
-  const idx = STAGES.findIndex((s) => s.key === status);
+  const idx = STAGE_KEYS.findIndex((k) => k === status);
   return { special: null, currentIdx: Math.max(idx, 0) };
 }
 
 function ProgressState({ progress }: { progress: { special: string | null; currentIdx: number } }) {
   if (progress.special === 'cancelled') {
-    return <p className="text-sm font-medium text-red-600">✗ Cancelled</p>;
+    return <p className="text-sm font-medium text-red-600">✗ {formatStatus('cancelled')}</p>;
   }
   if (progress.special === 'error') {
-    return <p className="text-sm font-medium text-red-600">⚠ Error</p>;
+    return <p className="text-sm font-medium text-red-600">⚠ {formatStatus('error')}</p>;
   }
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-8 gap-1">
-        {STAGES.map((stage, idx) => (
-          <div key={stage.key} className="flex items-center gap-1">
+        {STAGE_KEYS.map((stageKey, idx) => (
+          <div key={stageKey} className="flex items-center gap-1">
             <span
               className={`h-2.5 w-2.5 rounded-full border ${
                 idx === progress.currentIdx
@@ -635,7 +636,7 @@ function ProgressState({ progress }: { progress: { special: string | null; curre
                     : 'border-muted-foreground/40 bg-background'
               }`}
             />
-            {idx < STAGES.length - 1 && (
+            {idx < STAGE_KEYS.length - 1 && (
               <span
                 className={`h-px flex-1 border-t border-dotted ${idx < progress.currentIdx ? 'border-fest-700' : 'border-muted-foreground/40'}`}
               />
@@ -644,8 +645,10 @@ function ProgressState({ progress }: { progress: { special: string | null; curre
         ))}
       </div>
       <div className="grid grid-cols-8 gap-1 text-[11px] text-muted-foreground">
-        {STAGES.map((stage) => (
-          <span key={stage.key}>{stage.label}</span>
+        {STAGE_KEYS.map((stageKey) => (
+          <span key={stageKey} className="min-w-0 break-words hyphens-auto">
+            {formatStatus(stageKey)}
+          </span>
         ))}
       </div>
     </div>

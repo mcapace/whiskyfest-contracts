@@ -1,16 +1,37 @@
 import Link from 'next/link';
-import { Plus, FileText, DollarSign, Clock, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Plus, FileText, DollarSign, Clock, CheckCircle2, Users } from 'lucide-react';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { requireContractActorForPage } from '@/lib/auth-contract';
-import { STANDARD_BOOTH_RATE_CENTS } from '@/lib/contracts';
+import { requiresDiscountApproval } from '@/lib/contracts';
 import { formatCurrency, formatRelative } from '@/lib/utils';
+import { formatStatus, statusBadgeClassName } from '@/lib/status-display';
+import {
+  contractMatchesDashboardFilter,
+  isStaffDashboardPersona,
+  parseDashboardFilter,
+  type DashboardFilterKey,
+} from '@/lib/dashboard-filters';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StatusBadge } from '@/components/contracts/status-badge';
-import type { ContractWithTotals, Event, ContractStatus } from '@/types/db';
+import type { ContractWithTotals, Event } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
+
+const DASH_SCOPE_LIMIT = 2500;
+
+async function getSupportedRepNames(email: string): Promise<string[]> {
+  const supabase = getSupabaseAdmin();
+  const { data: rows } = await supabase
+    .from('rep_assistants')
+    .select('rep_id')
+    .eq('assistant_email', email.toLowerCase());
+  const ids = [...new Set((rows ?? []).map((r) => (r as { rep_id: string }).rep_id).filter(Boolean))];
+  if (ids.length === 0) return [];
+  const { data: reps } = await supabase.from('sales_reps').select('name').in('id', ids).order('name');
+  return (reps ?? []).map((r) => (r as { name: string }).name).filter(Boolean);
+}
 
 async function getDashboardData(actor: Awaited<ReturnType<typeof requireContractActorForPage>>) {
   const supabase = getSupabaseAdmin();
@@ -19,164 +40,150 @@ async function getDashboardData(actor: Awaited<ReturnType<typeof requireContract
     .from('contracts_with_totals')
     .select('*')
     .order('created_at', { ascending: false })
-    .limit(50);
+    .limit(DASH_SCOPE_LIMIT);
 
-  if (!actor.isAdmin && actor.accessibleSalesRepIds.length > 0) {
+  const scopeAll = actor.isAdmin || actor.isEventsTeam;
+  if (!scopeAll && actor.accessibleSalesRepIds.length > 0) {
     contractsQuery = contractsQuery.in('sales_rep_id', actor.accessibleSalesRepIds);
   }
 
-  let pendingQuery = supabase
-    .from('contracts_with_totals')
-    .select('*')
-    .lt('booth_rate_cents', STANDARD_BOOTH_RATE_CENTS)
-    .is('discount_approved_at', null)
-    .order('created_at', { ascending: false })
-    .limit(25);
-
-  if (!actor.isAdmin && actor.accessibleSalesRepIds.length > 0) {
-    pendingQuery = pendingQuery.in('sales_rep_id', actor.accessibleSalesRepIds);
-  }
-
-  const pendingEventsQuery = actor.isEventsTeam
-    ? supabase
-        .from('contracts_with_totals')
-        .select('*')
-        .eq('status', 'pending_events_review' as ContractStatus)
-        .order('events_submitted_at', { ascending: false })
-        .limit(25)
-    : null;
-
-  const [contractsRes, pendingDiscountsRes, pendingEventsRes, eventsRes] = await Promise.all([
+  const [contractsRes, eventsRes, supportedRepNames] = await Promise.all([
     contractsQuery,
-    pendingQuery,
-    pendingEventsQuery ?? Promise.resolve({ data: [] as ContractWithTotals[] }),
     supabase.from('events').select('*').eq('is_active', true),
+    getSupportedRepNames(actor.email),
   ]);
 
   return {
     contracts: (contractsRes.data ?? []) as ContractWithTotals[],
-    pendingDiscounts: (pendingDiscountsRes.data ?? []) as ContractWithTotals[],
-    pendingEventsReview: (pendingEventsRes.data ?? []) as ContractWithTotals[],
     events: (eventsRes.data ?? []) as Event[],
     actor,
+    supportedRepNames,
   };
 }
 
-export default async function DashboardPage() {
+function pillTone(filter: DashboardFilterKey, active: boolean): string {
+  if (filter === 'all') {
+    return active
+      ? 'border-fest-700 bg-fest-50 text-fest-950 ring-1 ring-fest-600/30'
+      : 'border-border bg-background text-foreground hover:bg-muted/50';
+  }
+  const map: Partial<Record<DashboardFilterKey, string>> = {
+    draft: statusBadgeClassName('draft'),
+    events_review: statusBadgeClassName('pending_events_review'),
+    approved: statusBadgeClassName('approved'),
+    sent: statusBadgeClassName('sent'),
+    exhibitor_signed: statusBadgeClassName('partially_signed'),
+    fully_signed: statusBadgeClassName('signed'),
+    executed: statusBadgeClassName('executed'),
+    cancelled: statusBadgeClassName('cancelled'),
+  };
+  const base = map[filter] ?? 'border-border bg-muted/40 text-foreground';
+  return active ? `${base} ring-1 ring-fest-600/40 ring-offset-1` : `${base} opacity-95 hover:opacity-100`;
+}
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
   const actor = await requireContractActorForPage();
-  const { contracts, pendingDiscounts, pendingEventsReview, events } = await getDashboardData(actor);
+  const { contracts: allScoped, events, supportedRepNames } = await getDashboardData(actor);
 
-  // Stats
-  const totalExecutedCents  = contracts.filter(c => c.status === 'executed').reduce((a, c) => a + c.grand_total_cents, 0);
-  const totalInFlightCents  = contracts.filter(c =>
-    ['sent', 'signed', 'approved', 'ready_for_review', 'pending_events_review', 'partially_signed'].includes(c.status),
-  ).reduce((a, c) => a + c.grand_total_cents, 0);
-  const totalPipelineCents  = totalExecutedCents + totalInFlightCents;
-  const draftCount          = contracts.filter(c => c.status === 'draft').length;
-  const executedCount       = contracts.filter(c => c.status === 'executed').length;
+  const rawFilter =
+    typeof searchParams?.filter === 'string' ? searchParams.filter : undefined;
+  let filter = parseDashboardFilter(rawFilter);
+  const staffPersonaEarly = isStaffDashboardPersona(actor.isAdmin, actor.isEventsTeam);
+  if (staffPersonaEarly && rawFilter?.startsWith('rep_')) filter = 'all';
+  if (!staffPersonaEarly && rawFilter?.startsWith('staff_')) filter = 'all';
 
-  const eventMap = new Map(events.map(e => [e.id, e]));
-  const contractsCount = contracts.length;
+  const scopeIds = actor.accessibleSalesRepIds;
+  const visibleContracts = allScoped
+    .filter((c) => contractMatchesDashboardFilter(c, filter, scopeIds))
+    .slice(0, 50);
+
+  const contractsCount = allScoped.length;
+  const staffPersona = staffPersonaEarly;
+
+  const totalExecutedCents = allScoped
+    .filter((c) => c.status === 'executed')
+    .reduce((a, c) => a + c.grand_total_cents, 0);
+  const totalInFlightCents = allScoped
+    .filter((c) =>
+      ['ready_for_review', 'approved', 'sent', 'partially_signed', 'signed', 'pending_events_review'].includes(
+        c.status,
+      ),
+    )
+    .reduce((a, c) => a + c.grand_total_cents, 0);
+  const totalPipelineCents = totalExecutedCents + totalInFlightCents;
+  const draftCount = allScoped.filter((c) => c.status === 'draft' || c.status === 'ready_for_review').length;
+  const executedCount = allScoped.filter((c) => c.status === 'executed').length;
   const progressPct = totalPipelineCents > 0 ? Math.round((totalExecutedCents / totalPipelineCents) * 100) : 0;
 
-  const statusCounts: Array<{ label: string; count: number; tone: string; href: string }> = [
-    { label: 'Draft', count: contracts.filter(c => c.status === 'draft').length, tone: 'bg-whisky-100 text-whisky-900 border-whisky-200', href: '/contracts?status=draft' },
-    { label: 'In Review', count: contracts.filter(c => c.status === 'ready_for_review').length, tone: 'bg-amber-100 text-amber-900 border-amber-200', href: '/contracts?status=ready_for_review' },
-    {
-      label: 'Events review',
-      count: contracts.filter(c => c.status === 'pending_events_review').length,
-      tone: 'bg-sky-100 text-sky-900 border-sky-200',
-      href: '/contracts?status=pending_events_review',
-    },
-    { label: 'Approved', count: contracts.filter(c => c.status === 'approved').length, tone: 'bg-fest-100 text-fest-900 border-fest-200', href: '/contracts?status=approved' },
-    { label: 'Executed', count: contracts.filter(c => c.status === 'executed').length, tone: 'bg-emerald-100 text-emerald-900 border-emerald-200', href: '/contracts?status=executed' },
+  const eventMap = new Map(events.map((e) => [e.id, e]));
+
+  const pillDefs: { key: DashboardFilterKey; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'draft', label: formatStatus('draft') },
+    { key: 'events_review', label: formatStatus('pending_events_review') },
+    { key: 'approved', label: formatStatus('approved') },
+    { key: 'sent', label: formatStatus('sent') },
+    { key: 'exhibitor_signed', label: formatStatus('partially_signed') },
+    { key: 'fully_signed', label: formatStatus('signed') },
+    { key: 'executed', label: formatStatus('executed') },
+    { key: 'cancelled', label: formatStatus('cancelled') },
   ];
 
-  const pendingHeading = actor.isAdmin
-    ? 'Pending Your Approval'
-    : actor.salesRepId
-      ? 'My Pending Approvals'
-      : 'Pending discount approvals';
+  const pillCounts = (k: DashboardFilterKey) =>
+    allScoped.filter((c) => contractMatchesDashboardFilter(c, k, scopeIds)).length;
+
+  const staffNeedsApprovalCount = allScoped.filter(
+    (c) => requiresDiscountApproval(c) || c.status === 'pending_events_review',
+  ).length;
+  const staffCountersignCount = allScoped.filter((c) => c.status === 'partially_signed').length;
+  const staffReadyReleaseCount = allScoped.filter((c) => c.status === 'signed').length;
+
+  const repAttentionCount = allScoped.filter((c) =>
+    contractMatchesDashboardFilter(c, 'rep_attention', scopeIds),
+  ).length;
+  const repEventsCount = allScoped.filter((c) =>
+    contractMatchesDashboardFilter(c, 'rep_events', scopeIds),
+  ).length;
+  const repReadySendCount = allScoped.filter((c) =>
+    contractMatchesDashboardFilter(c, 'rep_ready_send', scopeIds),
+  ).length;
+
+  const completionLabel = `${executedCount} of ${contractsCount} contracts executed · ${formatCurrency(totalExecutedCents)} of ${formatCurrency(totalPipelineCents)} executed value`;
+
+  const filterDescription = (() => {
+    if (filter === 'all') return 'Most recent 50 contracts matching your access';
+    if (filter.startsWith('staff_') || filter.startsWith('rep_')) {
+      return `Filtered by priority · showing up to 50 matches`;
+    }
+    return `Filtered by ${pillDefs.find((p) => p.key === filter)?.label ?? filter} · up to 50 shown`;
+  })();
 
   return (
     <div className="space-y-8">
-      {actor.isEventsTeam && pendingEventsReview.length > 0 && (
-        <Card className="overflow-hidden border-sky-400/40 bg-sky-50/50">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sky-400/25 px-6 py-4">
-            <h2 className="font-serif text-lg font-semibold text-sky-950">Pending Events Review</h2>
-            <p className="text-xs text-sky-900/80">Awaiting events team approval before DocuSign</p>
-          </div>
-          <CardContent className="grid gap-3 p-4 sm:grid-cols-2">
-            {pendingEventsReview.map((c) => (
-              <Link
-                key={c.id}
-                href={`/contracts/${c.id}`}
-                className="rounded-lg border border-sky-300/60 bg-background/80 p-4 transition-colors hover:border-sky-500 hover:bg-sky-50/80"
-              >
-                <p className="font-medium text-foreground">{c.exhibitor_company_name}</p>
-                <div className="mt-2 grid gap-1 text-xs text-muted-foreground">
-                  <p>
-                    Total <span className="font-mono tabular-nums">{formatCurrency(c.grand_total_cents)}</span>
-                    {' · '}
-                    Rep {c.sales_rep_name ?? c.sales_rep_email ?? '—'}
-                  </p>
-                  <p>Submitted {c.events_submitted_at ? formatRelative(c.events_submitted_at) : '—'}</p>
-                </div>
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {pendingDiscounts.length > 0 && (
-        <Card className="overflow-hidden border-amber-400/40 bg-amber-50/40">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-400/25 px-6 py-4">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-700" />
-              <h2 className="font-serif text-lg font-semibold text-amber-950">{pendingHeading}</h2>
-            </div>
-            <p className="text-xs text-amber-900/80">
-              Discounted booth rate — below {formatCurrency(STANDARD_BOOTH_RATE_CENTS)} — awaiting admin approval
-            </p>
-          </div>
-          <CardContent className="grid gap-3 p-4 sm:grid-cols-2">
-            {pendingDiscounts.map((c) => (
-              <Link
-                key={c.id}
-                href={`/contracts/${c.id}`}
-                className="rounded-lg border border-amber-300/60 bg-background/80 p-4 transition-colors hover:border-amber-500 hover:bg-amber-50/80"
-              >
-                <p className="font-medium text-foreground">{c.exhibitor_company_name}</p>
-                <div className="mt-2 grid gap-1 text-xs text-muted-foreground">
-                  <p>
-                    Booth rate <span className="font-mono tabular-nums">{formatCurrency(c.booth_rate_cents)}</span>
-                    {' · '}
-                    Total <span className="font-mono tabular-nums">{formatCurrency(c.grand_total_cents)}</span>
-                  </p>
-                  <p>
-                    Created by {c.created_by ?? '—'} · {formatRelative(c.created_at)}
-                  </p>
-                </div>
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
       {/* Header */}
       <Card className="overflow-hidden border-fest-600/15">
         <div className="bg-gradient-to-r from-fest-600/10 via-brass-100/35 to-background px-6 py-6">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-          <p className="mb-2 text-xs font-medium uppercase tracking-[0.2em] text-brass-700">
-            M. Shanken Communications
-          </p>
-          <h1 className="font-serif text-4xl font-semibold leading-tight tracking-tight">
-            Contract Pipeline
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {contractsCount} total contracts · {events.length} active event{events.length !== 1 && 's'}
-          </p>
+              <p className="mb-2 text-xs font-medium uppercase tracking-[0.2em] text-brass-700">
+                M. Shanken Communications
+              </p>
+              <h1 className="font-serif text-4xl font-semibold leading-tight tracking-tight">Contract Pipeline</h1>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {contractsCount} total contracts · {events.length} active event{events.length !== 1 && 's'}
+              </p>
+              {supportedRepNames.length > 0 && (
+                <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                  <Users className="h-4 w-4 shrink-0 text-fest-700" />
+                  <span>
+                    Supporting: <span className="font-medium text-foreground">{supportedRepNames.join(', ')}</span>
+                  </span>
+                </p>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" asChild>
@@ -190,34 +197,107 @@ export default async function DashboardPage() {
             </div>
           </div>
           <div className="mt-5">
-            <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+            <div className="mb-1 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
               <span>Pipeline completion</span>
-              <span>{progressPct}% executed value</span>
+              <span className="text-right font-mono tabular-nums">{completionLabel}</span>
             </div>
             <div className="h-2.5 overflow-hidden rounded-full bg-fest-100/70">
-              <div className="h-full rounded-full bg-gradient-to-r from-fest-600 to-fest-400" style={{ width: `${progressPct}%` }} />
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-fest-600 to-fest-400"
+                style={{ width: `${progressPct}%` }}
+              />
             </div>
           </div>
         </div>
       </Card>
 
+      {/* Priority */}
+      {staffPersona ? (
+        <div className="grid gap-4 md:grid-cols-3">
+          <PriorityCard
+            href="/?filter=staff_needs_approval"
+            active={filter === 'staff_needs_approval'}
+            title="Needs Your Approval"
+            description="Discount approval pending or events review queue"
+            count={staffNeedsApprovalCount}
+          />
+          <PriorityCard
+            href="/?filter=staff_countersign"
+            active={filter === 'staff_countersign'}
+            title="Awaiting Countersignature"
+            description={formatStatus('partially_signed')}
+            count={staffCountersignCount}
+          />
+          <PriorityCard
+            href="/?filter=staff_ready_release"
+            active={filter === 'staff_ready_release'}
+            title="Ready to Release"
+            description={`${formatStatus('signed')} — not yet released`}
+            count={staffReadyReleaseCount}
+          />
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-3">
+          <PriorityCard
+            href="/?filter=rep_attention"
+            active={filter === 'rep_attention'}
+            title="Needs Your Attention"
+            description="Sent back for changes or error state"
+            count={repAttentionCount}
+          />
+          <PriorityCard
+            href="/?filter=rep_events"
+            active={filter === 'rep_events'}
+            title="Awaiting Events Approval"
+            description={formatStatus('pending_events_review')}
+            count={repEventsCount}
+          />
+          <PriorityCard
+            href="/?filter=rep_ready_send"
+            active={filter === 'rep_ready_send'}
+            title="Ready to Send"
+            description={`${formatStatus('approved')} — awaiting DocuSign`}
+            count={repReadySendCount}
+          />
+        </div>
+      )}
+
       {/* Stats row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={CheckCircle2} label="Executed" value={formatCurrency(totalExecutedCents)} sub={`${executedCount} contracts`} accent="emerald" />
-        <StatCard icon={Clock}        label="In Flight" value={formatCurrency(totalInFlightCents)} sub="Sent + Approved + In Review" accent="amber" />
-        <StatCard icon={FileText}     label="Drafts"    value={String(draftCount)}                  sub="Awaiting review" accent="whisky" />
-        <StatCard icon={DollarSign}   label="Total Pipeline" value={formatCurrency(totalPipelineCents)} sub="All active contract value" accent="fest" />
+        <StatCard
+          icon={CheckCircle2}
+          label="Executed"
+          value={formatCurrency(totalExecutedCents)}
+          sub={`${executedCount} contracts`}
+          accent="emerald"
+        />
+        <StatCard
+          icon={Clock}
+          label="In Flight"
+          value={formatCurrency(totalInFlightCents)}
+          sub="Sent + Approved + Under Review"
+          accent="amber"
+        />
+        <StatCard icon={FileText} label="Drafts" value={String(draftCount)} sub="Awaiting review" accent="whisky" />
+        <StatCard
+          icon={DollarSign}
+          label="Total Pipeline"
+          value={formatCurrency(totalPipelineCents)}
+          sub="All active contract value"
+          accent="fest"
+        />
       </div>
 
+      {/* Status pills */}
       <div className="flex flex-wrap gap-2">
-        {statusCounts.map(s => (
+        {pillDefs.map((p) => (
           <Link
-            key={s.label}
-            href={s.href}
-            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all hover:-translate-y-0.5 hover:shadow-sm ${s.tone}`}
+            key={p.key}
+            href={p.key === 'all' ? '/' : `/?filter=${p.key}`}
+            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all hover:-translate-y-0.5 hover:shadow-sm ${pillTone(p.key, filter === p.key)}`}
           >
-            <span>{s.label}</span>
-            <span className="font-mono tabular-nums">{s.count}</span>
+            <span>{p.label}</span>
+            <span className="font-mono tabular-nums">{pillCounts(p.key)}</span>
           </Link>
         ))}
       </div>
@@ -227,15 +307,15 @@ export default async function DashboardPage() {
         <div className="flex items-center justify-between border-b border-fest-600/10 px-6 py-4">
           <div>
             <h2 className="font-serif text-lg font-semibold">Recent Contracts</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">Most recent 50 contracts across all statuses</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{filterDescription}</p>
           </div>
           <Button variant="ghost" size="sm" asChild>
             <Link href="/contracts">View all →</Link>
           </Button>
         </div>
         <CardContent className="p-0">
-          {contracts.length === 0 ? (
-            <EmptyState />
+          {visibleContracts.length === 0 ? (
+            <EmptyState hasContracts={allScoped.length > 0} />
           ) : (
             <Table className="[&_tbody_tr:hover]:bg-fest-50/50">
               <TableHeader>
@@ -249,7 +329,7 @@ export default async function DashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {contracts.map(c => (
+                {visibleContracts.map((c) => (
                   <TableRow key={c.id} className="group">
                     <TableCell>
                       <Link href={`/contracts/${c.id}`} className="block hover:text-fest-800">
@@ -262,7 +342,9 @@ export default async function DashboardPage() {
                     <TableCell className="text-sm text-muted-foreground">
                       {eventMap.get(c.event_id)?.name ?? '—'}
                     </TableCell>
-                    <TableCell><StatusBadge status={c.status} /></TableCell>
+                    <TableCell>
+                      <StatusBadge status={c.status} />
+                    </TableCell>
                     <TableCell className="text-right font-mono tabular-nums">
                       {formatCurrency(c.grand_total_cents)}
                     </TableCell>
@@ -288,17 +370,55 @@ export default async function DashboardPage() {
   );
 }
 
+function PriorityCard({
+  href,
+  active,
+  title,
+  description,
+  count,
+}: {
+  href: string;
+  active: boolean;
+  title: string;
+  description: string;
+  count: number;
+}) {
+  return (
+    <Link href={href}>
+      <Card
+        className={`h-full border-fest-600/15 transition-all hover:-translate-y-0.5 hover:shadow-md ${
+          active ? 'ring-2 ring-fest-600/35' : ''
+        }`}
+      >
+        <CardContent className="space-y-2 p-5">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="font-serif text-base font-semibold leading-snug">{title}</h3>
+            <span className="font-mono text-2xl font-semibold tabular-nums text-fest-800">{count}</span>
+          </div>
+          <p className="text-xs text-muted-foreground">{description}</p>
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
+
 function StatCard({
-  icon: Icon, label, value, sub, accent
+  icon: Icon,
+  label,
+  value,
+  sub,
+  accent,
 }: {
   icon: React.ComponentType<{ className?: string }>;
-  label: string; value: string; sub: string;
+  label: string;
+  value: string;
+  sub: string;
   accent: 'whisky' | 'fest' | 'amber' | 'emerald';
 }) {
   const accentClass = {
-    whisky:  'text-whisky-800 bg-whisky-100/60 ring-whisky-300/30',
-    fest:    'text-fest-800 bg-fest-100/90 ring-fest-300/30',
-    amber:   'text-amber-700 bg-amber-100/60 ring-amber-300/30',
+    whisky: 'text-whisky-800 bg-whisky-100/60 ring-whisky-300/30',
+    fest: 'text-fest-800 bg-fest-100/90 ring-fest-300/30',
+    amber: 'text-amber-700 bg-amber-100/60 ring-amber-300/30',
     emerald: 'text-emerald-700 bg-emerald-100/60 ring-emerald-300/30',
   }[accent];
 
@@ -311,28 +431,32 @@ function StatCard({
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
           <p className="mt-1 font-serif text-2xl font-semibold tabular-nums">{value}</p>
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">{sub}</p>
+          <p className="mt-0.5 break-words text-xs text-muted-foreground">{sub}</p>
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function EmptyState() {
+function EmptyState({ hasContracts }: { hasContracts: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
       <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-fest-100 text-fest-800">
         <FileText className="h-6 w-6" />
       </div>
-      <h3 className="font-serif text-lg font-semibold">No contracts yet</h3>
+      <h3 className="font-serif text-lg font-semibold">{hasContracts ? 'No matching contracts' : 'No contracts yet'}</h3>
       <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-        Once you create your first contract, it'll show up here with its full status history.
+        {hasContracts
+          ? 'Try another filter or clear filters from the status pills above.'
+          : "Once you create your first contract, it'll show up here with its full status history."}
       </p>
-      <Button className="mt-6" asChild>
-        <Link href="/contracts/new">
-          <Plus className="h-4 w-4" /> Create your first contract
-        </Link>
-      </Button>
+      {!hasContracts && (
+        <Button className="mt-6" asChild>
+          <Link href="/contracts/new">
+            <Plus className="h-4 w-4" /> Create your first contract
+          </Link>
+        </Button>
+      )}
     </div>
   );
 }

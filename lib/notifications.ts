@@ -1,5 +1,6 @@
 import sgMail from '@sendgrid/mail';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { formatStatus } from '@/lib/status-display';
 import type { Contract, Event } from '@/types/db';
 
 const WF_CONTRACTS_FROM_EMAIL = process.env['DISCOUNT_ALERT_FROM_EMAIL'] ?? 'wfcontracts@whiskyadvocate.com';
@@ -241,7 +242,7 @@ export async function notifyPartialSignature(
 
   const eventTitle = event ? `${event.name} ${event.year}`.trim() : 'WhiskyFest';
   const detailUrl = appContractUrl(contract.id);
-  const subject = `Exhibitor signed: ${contract.exhibitor_company_name} — countersignature needed (any events team member can sign)`;
+  const subject = `${formatStatus('partially_signed')}: ${contract.exhibitor_company_name} — countersignature needed (any events team member can sign)`;
 
   const bodySentence = `${contract.exhibitor_company_name} has signed the ${eventTitle} contract and it is now awaiting countersignature from any member of the events team. Please check your DocuSign inbox — whoever opens it first and signs will be the one recorded.`;
 

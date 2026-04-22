@@ -3,21 +3,23 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { Search } from 'lucide-react';
+import { formatStatus } from '@/lib/status-display';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-const STATUS_OPTIONS: { value: string; label: string }[] = [
-  { value: 'all', label: 'All statuses' },
-  { value: 'draft', label: 'Draft' },
-  { value: 'ready_for_review', label: 'Ready for Review' },
-  { value: 'pending_events_review', label: 'Events Review' },
-  { value: 'approved', label: 'Approved' },
-  { value: 'sent', label: 'Sent' },
-  { value: 'partially_signed', label: 'Partially Signed' },
-  { value: 'signed', label: 'Signed' },
-  { value: 'executed', label: 'Executed' },
-  { value: 'cancelled', label: 'Cancelled' },
-  { value: 'error', label: 'Error' },
+import type { ContractStatus } from '@/types/db';
+
+const STATUS_OPTIONS: { value: string; status?: ContractStatus }[] = [
+  { value: 'all' },
+  { value: 'draft', status: 'draft' },
+  { value: 'pending_events_review', status: 'pending_events_review' },
+  { value: 'approved', status: 'approved' },
+  { value: 'sent', status: 'sent' },
+  { value: 'partially_signed', status: 'partially_signed' },
+  { value: 'signed', status: 'signed' },
+  { value: 'executed', status: 'executed' },
+  { value: 'cancelled', status: 'cancelled' },
+  { value: 'error', status: 'error' },
 ];
 
 export function ContractsFilters() {
@@ -50,9 +52,9 @@ export function ContractsFilters() {
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            {STATUS_OPTIONS.map(o => (
+            {STATUS_OPTIONS.map((o) => (
               <SelectItem key={o.value} value={o.value}>
-                {o.label}
+                {!o.status ? 'All statuses' : formatStatus(o.status)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -66,7 +68,7 @@ export function ContractsFilters() {
             className="pl-9"
             placeholder="Company name…"
             value={q}
-            onChange={e => setQ(e.target.value)}
+            onChange={(e) => setQ(e.target.value)}
           />
         </div>
       </div>

@@ -32,13 +32,18 @@ async function loadContracts(
   const supabase = getSupabaseAdmin();
   let query = supabase.from('contracts_with_totals').select('*').order('created_at', { ascending: false }).limit(200);
 
-  if (!actor.isAdmin && actor.accessibleSalesRepIds.length > 0) {
+  const scopeAll = actor.isAdmin || actor.isEventsTeam;
+  if (!scopeAll && actor.accessibleSalesRepIds.length > 0) {
     query = query.in('sales_rep_id', actor.accessibleSalesRepIds);
   }
 
   const status = searchParams.status;
-  if (status && status !== 'all' && VALID.has(status)) {
-    query = query.eq('status', status as ContractStatus);
+  if (status && status !== 'all') {
+    if (status === 'draft') {
+      query = query.or('status.eq.draft,status.eq.ready_for_review');
+    } else if (VALID.has(status)) {
+      query = query.eq('status', status as ContractStatus);
+    }
   }
 
   const q = searchParams.q?.trim();
@@ -70,9 +75,9 @@ export default async function ContractsListPage({
   const eventMap = new Map(events.map(e => [e.id, e]));
   const executedCount = contracts.filter(c => c.status === 'executed').length;
   const inFlightCount = contracts.filter(c =>
-    ['ready_for_review', 'approved', 'sent', 'partially_signed', 'signed'].includes(c.status),
+    ['ready_for_review', 'approved', 'sent', 'partially_signed', 'signed', 'pending_events_review'].includes(c.status),
   ).length;
-  const draftCount = contracts.filter(c => c.status === 'draft').length;
+  const draftCount = contracts.filter(c => c.status === 'draft' || c.status === 'ready_for_review').length;
   const pipelineValue = contracts.reduce((acc, c) => acc + c.grand_total_cents, 0);
 
   return (
