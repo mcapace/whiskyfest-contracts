@@ -192,10 +192,10 @@ export function AddressAutocomplete({ value, onChange }: AddressAutocompleteProp
               value={value.exhibitor_state || '__none__'}
               onValueChange={(next) => onChange({ exhibitor_state: next === '__none__' ? '' : next })}
             >
-              <SelectTrigger>
+              <SelectTrigger className="bg-background text-foreground">
                 <SelectValue placeholder="Select state" />
               </SelectTrigger>
-              <SelectContent className="max-h-72 bg-popover border border-input shadow-lg">
+              <SelectContent className="max-h-72 border border-input bg-popover text-popover-foreground shadow-lg">
                 <SelectItem value="__none__">—</SelectItem>
                 {US_STATE_CODES.map((state) => (
                   <SelectItem key={state.code} value={state.code}>
@@ -240,10 +240,10 @@ export function AddressAutocomplete({ value, onChange }: AddressAutocompleteProp
             value={value.exhibitor_country || '__none__'}
             onValueChange={(next) => onChange({ exhibitor_country: next === '__none__' ? '' : next })}
           >
-            <SelectTrigger>
+            <SelectTrigger className="bg-background text-foreground">
               <SelectValue placeholder="Select country" />
             </SelectTrigger>
-            <SelectContent className="max-h-72 bg-popover border border-input shadow-lg">
+            <SelectContent className="max-h-72 border border-input bg-popover text-popover-foreground shadow-lg">
               <SelectItem value="__none__">—</SelectItem>
               {COUNTRIES.map((country, idx) => (
                 <Fragment key={country.code}>
