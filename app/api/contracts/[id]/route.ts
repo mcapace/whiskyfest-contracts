@@ -2,12 +2,25 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { COUNTRIES } from '@/lib/countries';
 import type { ContractStatus } from '@/types/db';
 
+const validCountries = new Set(COUNTRIES.map((c) => c.name));
+
 const patchSchema = z.object({
-  signer_1_name:  z.string().min(1),
+  signer_1_name: z.string().min(1),
   signer_1_title: z.string().optional().nullable(),
   signer_1_email: z.string().email(),
+  exhibitor_address_line_1: z.string().trim().min(3),
+  exhibitor_address_line_2: z.string().trim().optional().nullable(),
+  exhibitor_city: z.string().trim().min(1),
+  exhibitor_state: z.string().trim().min(1),
+  exhibitor_zip: z.string().trim().min(1),
+  exhibitor_country: z
+    .string()
+    .trim()
+    .min(1)
+    .refine((name) => validCountries.has(name), 'Country must be one of the supported countries'),
 });
 
 const editableStatuses: ContractStatus[] = ['approved', 'ready_for_review'];
@@ -49,6 +62,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       signer_1_name:  p.signer_1_name,
       signer_1_title: p.signer_1_title ?? null,
       signer_1_email: p.signer_1_email,
+      exhibitor_address_line_1: p.exhibitor_address_line_1,
+      exhibitor_address_line_2: p.exhibitor_address_line_2 ?? null,
+      exhibitor_city: p.exhibitor_city,
+      exhibitor_state: p.exhibitor_state,
+      exhibitor_zip: p.exhibitor_zip,
+      exhibitor_country: p.exhibitor_country,
     })
     .eq('id', params.id);
 
@@ -64,6 +83,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     metadata: {
       previous_email: contract.signer_1_email,
       new_email: p.signer_1_email,
+      address_updated: true,
     },
   });
 
