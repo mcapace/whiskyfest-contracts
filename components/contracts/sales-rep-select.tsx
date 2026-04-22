@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { Label } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface SalesRepOption {
   id: string;
@@ -55,18 +54,20 @@ export function SalesRepSelect({ currentUserEmail, value, onChange, required = t
       <Label htmlFor="sales_rep_id">
         Sales Rep {required && <span className="text-destructive">*</span>}
       </Label>
-      <Select value={value} onValueChange={onChange} disabled={disabled || !loaded}>
-        <SelectTrigger id="sales_rep_id">
-          <SelectValue placeholder="Select a sales rep" />
-        </SelectTrigger>
-        <SelectContent className="z-[80] border-border bg-card shadow-xl">
-          {reps.map((rep) => (
-            <SelectItem key={rep.id} value={rep.id} className="text-foreground focus:bg-muted focus:text-foreground">
-              {rep.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <select
+        id="sales_rep_id"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled || !loaded}
+        className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <option value="">Select a sales rep</option>
+        {reps.map((rep) => (
+          <option key={rep.id} value={rep.id}>
+            {rep.name}
+          </option>
+        ))}
+      </select>
       <p className="text-xs text-muted-foreground">
         Deal owner used for reporting and executed-contract notifications.
       </p>
