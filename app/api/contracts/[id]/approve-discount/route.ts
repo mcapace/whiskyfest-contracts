@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAdmin } from '@/lib/api-auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { isDiscountedRate } from '@/lib/contracts';
+import { notifySalesRepDiscountApproved } from '@/lib/notifications';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import type { Contract } from '@/types/db';
 
@@ -66,6 +67,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   });
 
   revalidateContractPaths(params.id);
+
+  void notifySalesRepDiscountApproved(
+    updated,
+    {
+      email: gate.session.user!.email!,
+      name: gate.session.user?.name ?? null,
+    },
+    reason,
+  ).catch((err) => console.error('[notifySalesRepDiscountApproved]', err));
 
   return NextResponse.json({ ok: true, contract: updated });
 }

@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { downloadCompletedPdf } from '@/lib/docusign';
 import { uploadPdfBufferToFolder } from '@/lib/google';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
+import { notifyPartialSignature } from '@/lib/notifications';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
@@ -148,6 +149,11 @@ export async function POST(req: Request) {
   ) {
     await supabase.from('contracts').update({ status: 'partially_signed' }).eq('id', contract.id);
     revalidateContractPaths(contract.id);
+
+    void notifyPartialSignature(contract, event ?? null).catch((err) =>
+      console.error('[notifyPartialSignature]', err),
+    );
+
     return new NextResponse(null, { status: 200 });
   }
 
