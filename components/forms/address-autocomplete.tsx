@@ -29,15 +29,31 @@ interface AddressAutocompleteProps {
 
 const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
+type PlaceAddressComponent = {
+  longText?: string;
+  shortText?: string;
+  types?: string[];
+};
+
+function getComponentText(
+  components: PlaceAddressComponent[],
+  type: string,
+  mode: 'short' | 'long' = 'long',
+): string {
+  const found = components.find((c) => Array.isArray(c.types) && c.types.includes(type));
+  if (!found) return '';
+  return mode === 'short' ? (found.shortText ?? found.longText ?? '') : (found.longText ?? found.shortText ?? '');
+}
+
 export function AddressAutocomplete({ value, onChange }: AddressAutocompleteProps) {
-  const line1Ref = useRef<HTMLInputElement>(null);
+  const autocompleteHostRef = useRef<HTMLDivElement>(null);
 
   const isUS = (value.exhibitor_country || '').trim() === 'United States';
   const zipLabel = isUS ? 'Zip' : 'Postal Code';
   const stateLabel = isUS ? 'State' : 'Province/Region';
 
   useEffect(() => {
-    if (!MAPS_KEY || typeof window === 'undefined' || !line1Ref.current) return;
+    if (!MAPS_KEY || typeof window === 'undefined' || !autocompleteHostRef.current) return;
 
     setOptions({
       key: MAPS_KEY,
@@ -45,51 +61,66 @@ export function AddressAutocomplete({ value, onChange }: AddressAutocompleteProp
       libraries: ['places'],
     });
 
-    let autocomplete: google.maps.places.Autocomplete | null = null;
-    let listener: google.maps.MapsEventListener | null = null;
+    const host = autocompleteHostRef.current;
+    host.innerHTML = '';
+
+    let disposed = false;
     let cancelled = false;
+
+    const handleSelect = async (evt: Event) => {
+      if (disposed) return;
+
+      const e = evt as Event & {
+        placePrediction?: { toPlace?: () => { fetchFields: (arg: { fields: string[] }) => Promise<void>; addressComponents?: PlaceAddressComponent[] } };
+      };
+
+      const prediction =
+        e.placePrediction ??
+        ((e as CustomEvent<{ placePrediction?: { toPlace?: () => { fetchFields: (arg: { fields: string[] }) => Promise<void>; addressComponents?: PlaceAddressComponent[] } } }>).detail?.placePrediction);
+      const place = prediction?.toPlace?.();
+      if (!place) return;
+
+      try {
+        await place.fetchFields({ fields: ['addressComponents'] });
+      } catch {
+        return;
+      }
+
+      const components = (place.addressComponents ?? []) as PlaceAddressComponent[];
+      const streetNumber = getComponentText(components, 'street_number', 'long');
+      const route = getComponentText(components, 'route', 'long');
+      const city =
+        getComponentText(components, 'locality', 'long') ||
+        getComponentText(components, 'postal_town', 'long') ||
+        getComponentText(components, 'administrative_area_level_2', 'long') ||
+        getComponentText(components, 'sublocality', 'long');
+      const countryCode = getComponentText(components, 'country', 'short').toUpperCase();
+      const countryName = parseGoogleCountry(countryCode) ?? '';
+      const isUsOrCa = countryCode === 'US' || countryCode === 'CA';
+      const state = isUsOrCa
+        ? getComponentText(components, 'administrative_area_level_1', 'short')
+        : getComponentText(components, 'administrative_area_level_1', 'long');
+
+      onChange({
+        exhibitor_address_line1: [streetNumber, route].filter(Boolean).join(' ').trim(),
+        exhibitor_city: city,
+        exhibitor_state: state,
+        exhibitor_zip: getComponentText(components, 'postal_code', 'long'),
+        exhibitor_country: countryName || value.exhibitor_country || 'United States',
+      });
+    };
 
     void importLibrary('places')
       .then(() => {
-        if (cancelled || !line1Ref.current || !window.google?.maps?.places) return;
-
-        autocomplete = new google.maps.places.Autocomplete(line1Ref.current, {
-          types: ['address'],
-          fields: ['address_components'],
-        });
-
-        listener = autocomplete.addListener('place_changed', () => {
-          const place = autocomplete?.getPlace();
-          const parts = place?.address_components ?? [];
-          const byType = (type: string) => parts.find((p) => p.types.includes(type));
-
-          const street = [byType('street_number')?.long_name, byType('route')?.long_name]
-            .filter(Boolean)
-            .join(' ')
-            .trim();
-
-          const city =
-            byType('locality')?.long_name ??
-            byType('postal_town')?.long_name ??
-            byType('administrative_area_level_2')?.long_name ??
-            byType('sublocality')?.long_name ??
-            '';
-
-          const countryCode = byType('country')?.short_name ?? '';
-          const mappedCountry = parseGoogleCountry(countryCode) ?? '';
-          const isUsOrCa = countryCode === 'US' || countryCode === 'CA';
-          const state = isUsOrCa
-            ? byType('administrative_area_level_1')?.short_name ?? ''
-            : byType('administrative_area_level_1')?.long_name ?? '';
-
-          onChange({
-            exhibitor_address_line1: street,
-            exhibitor_city: city,
-            exhibitor_state: state,
-            exhibitor_zip: byType('postal_code')?.long_name ?? '',
-            exhibitor_country: mappedCountry || value.exhibitor_country || 'United States',
-          });
-        });
+        if (cancelled || disposed) return;
+        const autocompleteEl = new (google.maps.places as unknown as {
+          PlaceAutocompleteElement: new () => HTMLElement;
+        }).PlaceAutocompleteElement();
+        autocompleteEl.setAttribute('style', 'display:block; width:100%;');
+        autocompleteEl.setAttribute('placeholder', 'Start typing an address');
+        host.appendChild(autocompleteEl);
+        autocompleteEl.addEventListener('gmp-select', handleSelect as EventListener);
+        (host as unknown as { __wfAutocompleteEl?: HTMLElement }).__wfAutocompleteEl = autocompleteEl;
       })
       .catch(() => {
         /* Allow manual entry if Google loader fails */
@@ -97,11 +128,12 @@ export function AddressAutocomplete({ value, onChange }: AddressAutocompleteProp
 
     return () => {
       cancelled = true;
-      if (listener && window.google?.maps?.event) {
-        window.google.maps.event.removeListener(listener);
-      }
+      disposed = true;
+      const el = (host as unknown as { __wfAutocompleteEl?: HTMLElement }).__wfAutocompleteEl;
+      if (el) el.removeEventListener('gmp-select', handleSelect as EventListener);
+      host.innerHTML = '';
     };
-  }, [onChange, value.exhibitor_country]);
+  }, [onChange, value.exhibitor_country, MAPS_KEY]);
 
   const hasLegacyCountry = useMemo(() => {
     const current = value.exhibitor_country?.trim();
@@ -111,10 +143,17 @@ export function AddressAutocomplete({ value, onChange }: AddressAutocompleteProp
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
+        <Label>Search Address</Label>
+        <div
+          ref={autocompleteHostRef}
+          className="min-h-9 rounded-md border border-input bg-background px-2 py-1"
+        />
+      </div>
+
+      <div className="space-y-1.5">
         <Label htmlFor="addr-line-1">Address Line 1</Label>
         <Input
           id="addr-line-1"
-          ref={line1Ref}
           autoComplete="address-line1"
           value={value.exhibitor_address_line1}
           onChange={(e) => onChange({ exhibitor_address_line1: e.target.value })}
