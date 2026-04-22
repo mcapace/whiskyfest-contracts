@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { mergeAndExportPdf } from '@/lib/google';
 import { buildContractMergeMap } from '@/lib/merge-map';
+import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
@@ -60,6 +61,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       metadata: { file_id: fileId, file_url: webViewLink },
     });
 
+    revalidateContractPaths(contract.id);
+
     return NextResponse.json({ ok: true, pdf_url: webViewLink });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
@@ -68,6 +71,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       .from('contracts')
       .update({ status: 'error', notes: `PDF generation error: ${message}` })
       .eq('id', contract.id);
+
+    revalidateContractPaths(contract.id);
 
     return NextResponse.json({ error: message }, { status: 500 });
   }

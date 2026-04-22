@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { resendEnvelopeNotifications } from '@/lib/docusign';
+import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 
 export const runtime = 'nodejs';
 
@@ -43,6 +44,8 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     action: 'docusign_send_reminder',
     metadata: { envelope_id: envelopeId },
   });
+
+  revalidateContractPaths(params.id);
 
   return NextResponse.json({ ok: true });
 }

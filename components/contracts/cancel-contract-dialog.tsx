@@ -49,6 +49,7 @@ export function CancelContractDialog({ contractId, exhibitorName }: Props) {
 
       setOpen(false);
       router.refresh();
+      queueMicrotask(() => router.refresh());
     });
   }
 

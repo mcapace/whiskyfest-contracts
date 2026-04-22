@@ -92,6 +92,7 @@ export function ContractActions({
       });
       if (res.ok) {
         router.refresh();
+        queueMicrotask(() => router.refresh());
       } else {
         const j = await res.json().catch(() => ({}));
         alert(`Action failed: ${j.error ?? res.status}`);

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import type { Contract } from '@/types/db';
 
 const schema = z.object({
@@ -86,6 +87,8 @@ export async function POST(req: Request) {
     console.error('Failed to create contract:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  revalidateContractPaths(data.id);
 
   return NextResponse.json({ id: data.id });
 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { requiresDiscountApproval } from '@/lib/contracts';
+import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
@@ -28,5 +29,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     .eq('status', 'ready_for_review'); // only approve from review
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  revalidateContractPaths(params.id);
+
   return NextResponse.json({ ok: true });
 }

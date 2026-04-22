@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 
 const schema = z.object({
   reason: z.string().min(3, 'Reason must be at least 3 characters').max(500),
@@ -57,6 +58,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     to_status:   'cancelled',
     metadata:    { reason: parsed.data.reason },
   });
+
+  revalidateContractPaths(params.id);
 
   return NextResponse.json({ ok: true });
 }

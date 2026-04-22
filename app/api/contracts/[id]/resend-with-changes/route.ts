@@ -6,6 +6,7 @@ import { renderContractPdfFromTemplate } from '@/lib/google';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { sendEnvelope, voidEnvelope } from '@/lib/docusign';
+import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
@@ -147,6 +148,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       new_signer_name: newSignerName,
     },
   });
+
+  revalidateContractPaths(contract.id);
 
   return NextResponse.json({ ok: true, envelope_id: newEnvelopeId });
 }

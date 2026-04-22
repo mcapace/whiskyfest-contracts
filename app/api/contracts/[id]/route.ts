@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { COUNTRIES } from '@/lib/countries';
 import { STANDARD_BOOTH_RATE_CENTS } from '@/lib/contracts';
+import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import type { ContractStatus } from '@/types/db';
 
 const validCountries = new Set(COUNTRIES.map((c) => c.name));
@@ -115,6 +116,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       },
     });
   }
+
+  revalidateContractPaths(params.id);
 
   return NextResponse.json({ ok: true });
 }

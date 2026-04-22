@@ -96,6 +96,7 @@ export function SignerContactEdit({
       }
       setOpen(false);
       router.refresh();
+      queueMicrotask(() => router.refresh());
     });
   }
 

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAdmin } from '@/lib/api-auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { voidEnvelope } from '@/lib/docusign';
+import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 
 export const runtime = 'nodejs';
 
@@ -70,6 +71,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     to_status: 'approved',
     metadata: { old_envelope_id: oldEnvelopeId, reason: parsed.data.reason },
   });
+
+  revalidateContractPaths(params.id);
 
   return NextResponse.json({ ok: true });
 }

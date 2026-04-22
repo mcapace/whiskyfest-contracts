@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAdmin } from '@/lib/api-auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { isDiscountedRate } from '@/lib/contracts';
+import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import type { Contract } from '@/types/db';
 
 const schema = z.object({
@@ -63,6 +64,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       reason,
     },
   });
+
+  revalidateContractPaths(params.id);
 
   return NextResponse.json({ ok: true, contract: updated });
 }

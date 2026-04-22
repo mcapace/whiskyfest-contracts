@@ -5,6 +5,7 @@ import { renderContractPdfFromTemplate } from '@/lib/google';
 import { sendEnvelope } from '@/lib/docusign';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import { requiresDiscountApproval } from '@/lib/contracts';
+import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
@@ -172,6 +173,8 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       },
     });
 
+    revalidateContractPaths(contract.id);
+
     log('COMPLETE', { envelope_id: envelopeId });
     return NextResponse.json({
       ok: true,
@@ -199,6 +202,8 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       action: 'pdf_send_failed',
       metadata: { error: message.slice(0, 500) },
     });
+
+    revalidateContractPaths(contract.id);
 
     return NextResponse.json({
       error: message || 'DocuSign send failed',

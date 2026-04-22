@@ -50,6 +50,7 @@ export function RecallDocusignDialog({ contractId, exhibitorName }: Props) {
 
       setOpen(false);
       router.refresh();
+      queueMicrotask(() => router.refresh());
     });
   }
 

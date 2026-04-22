@@ -6,6 +6,7 @@ import { formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { downloadCompletedPdf } from '@/lib/docusign';
 import { sendAccountingEmail } from '@/lib/email';
 import { requiresDiscountApproval } from '@/lib/contracts';
+import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
@@ -99,6 +100,8 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     from_status: 'signed',
     to_status: 'executed',
   });
+
+  revalidateContractPaths(contract.id);
 
   return NextResponse.json({ ok: true });
 }

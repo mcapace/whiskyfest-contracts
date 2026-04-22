@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { downloadCompletedPdf } from '@/lib/docusign';
 import { uploadPdfBufferToFolder } from '@/lib/google';
+import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
@@ -133,6 +134,7 @@ export async function POST(req: Request) {
         notes: `DocuSign: envelope ${envelopeStatus ?? eventType}`,
       })
       .eq('id', contract.id);
+    revalidateContractPaths(contract.id);
     return new NextResponse(null, { status: 200 });
   }
 
@@ -145,6 +147,7 @@ export async function POST(req: Request) {
     contract.status === 'sent'
   ) {
     await supabase.from('contracts').update({ status: 'partially_signed' }).eq('id', contract.id);
+    revalidateContractPaths(contract.id);
     return new NextResponse(null, { status: 200 });
   }
 
@@ -189,6 +192,8 @@ export async function POST(req: Request) {
       action: 'docusign_completed',
       metadata: { envelope_id: envelopeId, signed_pdf_url: webViewLink, release_required: true },
     });
+
+    revalidateContractPaths(contract.id);
   } catch (err) {
     console.error('DocuSign completion handling failed:', err);
     await supabase
@@ -198,6 +203,7 @@ export async function POST(req: Request) {
         notes: `DocuSign webhook error: ${err instanceof Error ? err.message : String(err)}`,
       })
       .eq('id', contract.id);
+    revalidateContractPaths(contract.id);
     return new NextResponse(null, { status: 500 });
   }
 
