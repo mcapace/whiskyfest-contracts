@@ -27,6 +27,10 @@ export function getDocuSignAccountId(): string {
   return requireEnv('DOCUSIGN_ACCOUNT_ID');
 }
 
+export function getCountersignerGroupId(): string {
+  return requireEnv('DOCUSIGN_COUNTERSIGNER_GROUP_ID');
+}
+
 /**
  * JWT Grant — same claims as the official DocuSign Node SDK.
  * Implemented with fetch so we avoid bundling `docusign-esign` (incompatible with Next.js webpack).
@@ -88,7 +92,10 @@ export interface SendEnvelopeParams {
   emailSubject: string;
   emailBlurb: string;
   signer1: { email: string; name: string };
-  signer2: { email: string; name: string };
+  /** DocuSign signing group ID for Shanken countersignature (routing order 2). */
+  countersignerSigningGroupId: string;
+  /** Optional display name for the signing group in DocuSign. */
+  countersignerSigningGroupName?: string;
 }
 
 export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelopeId: string }> {
@@ -99,6 +106,11 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
   const date1 = anchorOnly(DOCUSIGN_ANCHORS.date1);
   const signHere2 = anchorOnly(DOCUSIGN_ANCHORS.sig2);
   const date2 = anchorOnly(DOCUSIGN_ANCHORS.date2);
+
+  const groupName =
+    params.countersignerSigningGroupName?.trim() ||
+    process.env['DOCUSIGN_COUNTERSIGNER_GROUP_NAME']?.trim() ||
+    'WhiskyFest Countersignatories';
 
   const envelopeDefinition = {
     emailSubject: params.emailSubject,
@@ -113,7 +125,6 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
       },
     ],
     recipients: {
-      // Sequential: order 1 = exhibitor first; order 2 = Shanken countersign after exhibitor completes.
       signers: [
         {
           email: params.signer1.email,
@@ -126,10 +137,11 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
           },
         },
         {
-          email: params.signer2.email,
-          name: params.signer2.name,
           recipientId: '2',
           routingOrder: '2',
+          signingGroupId: params.countersignerSigningGroupId,
+          signingGroupName: groupName,
+          roleName: 'Countersigner',
           tabs: {
             signHereTabs: [signHere2],
             dateSignedTabs: [date2],
@@ -147,8 +159,6 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    // Body must be the EnvelopeDefinition object at the JSON root — not `{ envelopeDefinition: {...} }`.
-    // Nesting was ignored by the API, leaving `status: 'sent'` ineffective (draft / no recipient emails).
     body: JSON.stringify(envelopeDefinition),
   });
 
@@ -159,6 +169,64 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
   const summary = JSON.parse(text) as { envelopeId?: string; status?: string };
   if (!summary.envelopeId) throw new Error('DocuSign createEnvelope: missing envelopeId');
   return { envelopeId: summary.envelopeId };
+}
+
+export interface DocuSignSignerRow {
+  email?: string;
+  name?: string;
+  routingOrder?: string;
+  status?: string;
+  signedDateTime?: string;
+  recipientId?: string;
+}
+
+/** Load envelope recipients (signers) for webhook / audit (actual countersigner identity after signing group completes). */
+export async function fetchEnvelopeSigners(envelopeId: string): Promise<DocuSignSignerRow[]> {
+  const accountId = getDocuSignAccountId();
+  const accessToken = await getAccessToken();
+  const url = `${restBase()}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}/recipients`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/json',
+    },
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`DocuSign getRecipients ${res.status}: ${text}`);
+  }
+  const data = JSON.parse(text) as { signers?: Record<string, unknown>[] };
+  const signers = data.signers ?? [];
+  return signers.map((s) => ({
+    email: typeof s['email'] === 'string' ? s['email'] : undefined,
+    name: typeof s['name'] === 'string' ? s['name'] : undefined,
+    routingOrder: s['routingOrder'] != null ? String(s['routingOrder']) : undefined,
+    status: typeof s['status'] === 'string' ? s['status'] : undefined,
+    signedDateTime:
+      (typeof s['signedDateTime'] === 'string' ? s['signedDateTime'] : undefined) ??
+      (typeof s['SignedDateTime'] === 'string' ? (s['SignedDateTime'] as string) : undefined),
+    recipientId: s['recipientId'] != null ? String(s['recipientId']) : undefined,
+  }));
+}
+
+/** Identify the Shanken countersigner (routing order 2) once they have signed. */
+export function extractCountersignerFromSigners(signers: DocuSignSignerRow[]): {
+  email: string;
+  name: string;
+  signedDateTime: string;
+} | null {
+  const second = signers.filter((s) => s.routingOrder === '2');
+  const completed = second.find((s) => {
+    const st = (s.status ?? '').toLowerCase();
+    return (st === 'completed' || st === 'signed') && s.email && s.signedDateTime;
+  });
+  const pick = completed ?? second.find((s) => s.email && s.signedDateTime);
+  if (!pick?.email || !pick.signedDateTime) return null;
+  return {
+    email: pick.email.trim(),
+    name: (pick.name ?? pick.email).trim(),
+    signedDateTime: pick.signedDateTime,
+  };
 }
 
 /** Void an in-flight envelope so recipients can no longer sign; use before correcting email and re-sending from the app. */

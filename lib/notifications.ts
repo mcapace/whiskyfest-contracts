@@ -208,14 +208,14 @@ export async function notifyPartialSignature(
 
   const supabase = getSupabaseAdmin();
 
-  const { data: admins } = await supabase
+  const { data: eventsTeam } = await supabase
     .from('app_users')
     .select('email')
-    .eq('role', 'admin')
+    .eq('is_events_team', true)
     .eq('is_active', true);
 
-  const adminSet = new Set<string>(
-    (admins ?? []).map((a) => String((a as { email: string }).email ?? '').trim().toLowerCase()).filter(Boolean),
+  const recipientSet = new Set<string>(
+    (eventsTeam ?? []).map((u) => String((u as { email: string }).email ?? '').trim().toLowerCase()).filter(Boolean),
   );
 
   let repEmail = contract.sales_rep_email?.trim().toLowerCase() ?? null;
@@ -224,14 +224,14 @@ export async function notifyPartialSignature(
     repEmail = repRow?.email?.trim().toLowerCase() ?? null;
   }
 
-  if (repEmail) adminSet.add(repEmail);
+  if (repEmail) recipientSet.add(repEmail);
 
   if (contract.sales_rep_id) {
     const assistants = await getAssistantEmailsForRep(contract.sales_rep_id);
-    for (const a of assistants) adminSet.add(a);
+    for (const a of assistants) recipientSet.add(a);
   }
 
-  const recipients = [...adminSet];
+  const recipients = [...recipientSet];
   if (recipients.length === 0) {
     console.warn('[notifyPartialSignature] No recipients — skipping');
     return;
@@ -241,9 +241,9 @@ export async function notifyPartialSignature(
 
   const eventTitle = event ? `${event.name} ${event.year}`.trim() : 'WhiskyFest';
   const detailUrl = appContractUrl(contract.id);
-  const subject = `Exhibitor signed: ${contract.exhibitor_company_name} — awaiting countersignature`;
+  const subject = `Exhibitor signed: ${contract.exhibitor_company_name} — countersignature needed (any events team member can sign)`;
 
-  const bodySentence = `${contract.exhibitor_company_name} has signed the ${eventTitle} contract. It's now awaiting M. Shanken countersignature from Liz Mott.`;
+  const bodySentence = `${contract.exhibitor_company_name} has signed the ${eventTitle} contract and it is now awaiting countersignature from any member of the events team. Please check your DocuSign inbox — whoever opens it first and signs will be the one recorded.`;
 
   const text = [
     bodySentence,

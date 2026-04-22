@@ -62,6 +62,9 @@ export interface Contract {
   approved_at: string | null;
   sent_at: string | null;
   signed_at: string | null;
+  countersigned_by_email: string | null;
+  countersigned_by_name: string | null;
+  countersigned_at: string | null;
   executed_at: string | null;
   cancelled_reason: string | null;
   cancelled_at: string | null;

@@ -5,7 +5,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { renderContractPdfFromTemplate } from '@/lib/google';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import { requiresDiscountApproval } from '@/lib/contracts';
-import { sendEnvelope, voidEnvelope } from '@/lib/docusign';
+import { sendEnvelope, voidEnvelope, getCountersignerGroupId } from '@/lib/docusign';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import type { ContractWithTotals, Event } from '@/types/db';
 
@@ -101,12 +101,14 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   let newEnvelopeId: string;
   try {
-    const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileName);
-    const shankenName = event.shanken_signatory_name?.trim() || 'M. Shanken Communications';
-    const shankenEmail = event.shanken_signatory_email?.trim();
-    if (!shankenEmail) {
-      return NextResponse.json({ error: 'Event is missing Shanken signatory email.' }, { status: 400 });
+    let groupId: string;
+    try {
+      groupId = getCountersignerGroupId();
+    } catch {
+      return NextResponse.json({ error: 'DOCUSIGN_COUNTERSIGNER_GROUP_ID is not configured.' }, { status: 500 });
     }
+
+    const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileName);
 
     const sent = await sendEnvelope({
       pdfBase64: pdfBytes.toString('base64'),
@@ -114,7 +116,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       emailSubject: `Please sign: ${event.name} ${event.year} participation contract — ${contract.exhibitor_company_name}`,
       emailBlurb: `Attached is the WhiskyFest ${event.year} participation contract for ${contract.exhibitor_company_name}. Please review and sign.`,
       signer1: { name: newSignerName, email: newSignerEmail },
-      signer2: { name: shankenName, email: shankenEmail },
+      countersignerSigningGroupId: groupId,
     });
     newEnvelopeId = sent.envelopeId;
   } catch (e: unknown) {

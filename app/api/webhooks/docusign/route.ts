@@ -1,7 +1,11 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { downloadCompletedPdf } from '@/lib/docusign';
+import {
+  downloadCompletedPdf,
+  extractCountersignerFromSigners,
+  fetchEnvelopeSigners,
+} from '@/lib/docusign';
 import { uploadPdfBufferToFolder } from '@/lib/google';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { notifyPartialSignature } from '@/lib/notifications';
@@ -93,7 +97,6 @@ export async function POST(req: Request) {
   try {
     parsed = JSON.parse(rawBody);
   } catch {
-    // Connect can be configured for XML; acknowledge without processing.
     return new NextResponse(null, { status: 200 });
   }
 
@@ -139,9 +142,8 @@ export async function POST(req: Request) {
     return new NextResponse(null, { status: 200 });
   }
 
-  // --- Exhibitor (routing order 1) finished → Liz gets countersign invite (sequential in DocuSign) ---
-  const firstSigner =
-    recipientId === '1' || routingOrder === '1';
+  // --- Exhibitor (routing order 1) completed → partially_signed; countersign invite goes to signing group ---
+  const firstSigner = recipientId === '1' || routingOrder === '1';
   if (
     eventType.includes('recipient-completed') &&
     firstSigner &&
@@ -172,6 +174,14 @@ export async function POST(req: Request) {
   }
 
   try {
+    let countersigner = null as ReturnType<typeof extractCountersignerFromSigners>;
+    try {
+      const signers = await fetchEnvelopeSigners(envelopeId);
+      countersigner = extractCountersignerFromSigners(signers);
+    } catch (recErr) {
+      console.error('DocuSign webhook: fetchEnvelopeSigners failed', recErr);
+    }
+
     const pdfBytes = await downloadCompletedPdf(envelopeId);
     const signedFolderId = process.env.GOOGLE_SIGNED_FOLDER_ID!;
     const safeName = contract.exhibitor_company_name.replace(/[^\w\s-]/g, '');
@@ -189,6 +199,9 @@ export async function POST(req: Request) {
         signed_pdf_drive_id: fileId,
         signed_pdf_url: webViewLink,
         signed_at: now,
+        countersigned_by_email: countersigner?.email ?? null,
+        countersigned_by_name: countersigner?.name ?? null,
+        countersigned_at: countersigner?.signedDateTime ?? null,
       })
       .eq('id', contract.id);
 
@@ -196,7 +209,13 @@ export async function POST(req: Request) {
       contract_id: contract.id,
       actor_email: null,
       action: 'docusign_completed',
-      metadata: { envelope_id: envelopeId, signed_pdf_url: webViewLink, release_required: true },
+      metadata: {
+        envelope_id: envelopeId,
+        signed_pdf_url: webViewLink,
+        release_required: true,
+        countersigned_by_email: countersigner?.email ?? null,
+        countersigned_by_name: countersigner?.name ?? null,
+      },
     });
 
     revalidateContractPaths(contract.id);

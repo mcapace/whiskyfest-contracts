@@ -222,6 +222,14 @@ export default async function ContractDetailPage({ params }: { params: { id: str
             <Detail label="Sales Rep"    value={contract.sales_rep_name ?? contract.sales_rep_email ?? '—'} />
             <Detail label="Signer"       value={[contract.signer_1_name, contract.signer_1_title].filter(Boolean).join(', ') || '—'} />
             <Detail label="Email (DocuSign to exhibitor)" value={contract.signer_1_email} mono />
+            {(contract.status === 'signed' || contract.status === 'executed') &&
+              contract.countersigned_at &&
+              (contract.countersigned_by_name || contract.countersigned_by_email) && (
+                <Detail
+                  label="Countersigned (Shanken)"
+                  value={`Countersigned by ${contract.countersigned_by_name ?? contract.countersigned_by_email ?? '—'} on ${formatTimestamp(contract.countersigned_at)}`}
+                />
+              )}
           </CardContent>
         </Card>
 

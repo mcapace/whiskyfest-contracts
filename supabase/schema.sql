@@ -92,6 +92,9 @@ create table if not exists contracts (
   approved_at             timestamptz,
   sent_at                 timestamptz,
   signed_at               timestamptz,
+  countersigned_by_email  text,
+  countersigned_by_name   text,
+  countersigned_at        timestamptz,
   executed_at             timestamptz,
   accounting_notified_at  timestamptz,
 
@@ -124,6 +127,10 @@ alter table contracts add column if not exists billing_city text;
 alter table contracts add column if not exists billing_state text;
 alter table contracts add column if not exists billing_zip text;
 alter table contracts add column if not exists billing_country text;
+
+alter table contracts add column if not exists countersigned_by_email text;
+alter table contracts add column if not exists countersigned_by_name text;
+alter table contracts add column if not exists countersigned_at timestamptz;
 
 create index if not exists contracts_pending_events_review_idx
   on contracts (id)
