@@ -1,16 +1,8 @@
 'use client';
 
-import { Fragment, useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { importLibrary, setOptions } from '@googlemaps/js-api-loader';
 import { Input, Label } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { COUNTRIES, PINNED_COUNTRIES_COUNT, parseGoogleCountry } from '@/lib/countries';
 import { US_STATE_CODES } from '@/lib/exhibitor-address';
 
@@ -48,6 +40,8 @@ function getComponentText(
 
 export function AddressAutocomplete({ value, onChange }: AddressAutocompleteProps) {
   const autocompleteHostRef = useRef<HTMLDivElement>(null);
+  const pinnedCountries = COUNTRIES.slice(0, PINNED_COUNTRIES_COUNT);
+  const remainingCountries = COUNTRIES.slice(PINNED_COUNTRIES_COUNT);
 
   const isUS = (value.exhibitor_country || '').trim() === 'United States';
   const zipLabel = isUS ? 'Zip' : 'Postal Code';
@@ -186,30 +180,24 @@ export function AddressAutocomplete({ value, onChange }: AddressAutocompleteProp
           />
         </div>
         <div className="space-y-1.5">
-          <Label>{stateLabel}</Label>
+          <Label htmlFor="addr-state">{stateLabel}</Label>
           {isUS ? (
-            <Select
-              value={value.exhibitor_state || '__none__'}
-              onValueChange={(next) => onChange({ exhibitor_state: next === '__none__' ? '' : next })}
+            <select
+              id="addr-state"
+              value={value.exhibitor_state || ''}
+              onChange={(e) => onChange({ exhibitor_state: e.target.value })}
+              className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
             >
-              <SelectTrigger className="bg-background text-foreground">
-                <SelectValue placeholder="Select state" />
-              </SelectTrigger>
-              <SelectContent className="max-h-72 border border-input bg-popover text-popover-foreground shadow-lg">
-                <SelectItem value="__none__">—</SelectItem>
-                {US_STATE_CODES.map((state) => (
-                  <SelectItem key={state.code} value={state.code}>
-                    {state.code} — {state.name}
-                  </SelectItem>
-                ))}
-                {value.exhibitor_state && !US_STATE_CODES.some((s) => s.code === value.exhibitor_state) && (
-                  <>
-                    <SelectSeparator />
-                    <SelectItem value={value.exhibitor_state}>{value.exhibitor_state} (legacy)</SelectItem>
-                  </>
-                )}
-              </SelectContent>
-            </Select>
+              <option value="">Select state</option>
+              {US_STATE_CODES.map((state) => (
+                <option key={state.code} value={state.code}>
+                  {state.code} — {state.name}
+                </option>
+              ))}
+              {value.exhibitor_state && !US_STATE_CODES.some((s) => s.code === value.exhibitor_state) && (
+                <option value={value.exhibitor_state}>{value.exhibitor_state} (legacy)</option>
+              )}
+            </select>
           ) : (
             <Input
               id="addr-state"
@@ -235,30 +223,31 @@ export function AddressAutocomplete({ value, onChange }: AddressAutocompleteProp
         </div>
 
         <div className="space-y-1.5">
-          <Label>Country</Label>
-          <Select
-            value={value.exhibitor_country || '__none__'}
-            onValueChange={(next) => onChange({ exhibitor_country: next === '__none__' ? '' : next })}
+          <Label htmlFor="addr-country">Country</Label>
+          <select
+            id="addr-country"
+            value={value.exhibitor_country || ''}
+            onChange={(e) => onChange({ exhibitor_country: e.target.value })}
+            className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
           >
-            <SelectTrigger className="bg-background text-foreground">
-              <SelectValue placeholder="Select country" />
-            </SelectTrigger>
-            <SelectContent className="max-h-72 border border-input bg-popover text-popover-foreground shadow-lg">
-              <SelectItem value="__none__">—</SelectItem>
-              {COUNTRIES.map((country, idx) => (
-                <Fragment key={country.code}>
-                  {idx === PINNED_COUNTRIES_COUNT && <SelectSeparator />}
-                  <SelectItem value={country.name}>{country.name}</SelectItem>
-                </Fragment>
-              ))}
-              {hasLegacyCountry && (
-                <>
-                  <SelectSeparator />
-                  <SelectItem value={value.exhibitor_country}>{value.exhibitor_country} (legacy)</SelectItem>
-                </>
-              )}
-            </SelectContent>
-          </Select>
+            <option value="">Select country</option>
+            {pinnedCountries.map((country) => (
+              <option key={country.code} value={country.name}>
+                {country.name}
+              </option>
+            ))}
+            <option value="" disabled>
+              ----------------
+            </option>
+            {remainingCountries.map((country) => (
+              <option key={country.code} value={country.name}>
+                {country.name}
+              </option>
+            ))}
+            {hasLegacyCountry && (
+              <option value={value.exhibitor_country}>{value.exhibitor_country} (legacy)</option>
+            )}
+          </select>
         </div>
       </div>
     </div>
