@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { COUNTRIES, PINNED_COUNTRIES_COUNT, parseGoogleCountry } from '@/lib/countries';
+import { US_STATE_CODES } from '@/lib/exhibitor-address';
 
 export interface AddressValue {
   exhibitor_address_line1: string;
@@ -185,14 +186,39 @@ export function AddressAutocomplete({ value, onChange }: AddressAutocompleteProp
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="addr-state">{stateLabel}</Label>
-          <Input
-            id="addr-state"
-            autoComplete="address-level1"
-            value={value.exhibitor_state}
-            onChange={(e) => onChange({ exhibitor_state: e.target.value })}
-            placeholder={isUS ? 'NY' : 'Ontario'}
-          />
+          <Label>{stateLabel}</Label>
+          {isUS ? (
+            <Select
+              value={value.exhibitor_state || '__none__'}
+              onValueChange={(next) => onChange({ exhibitor_state: next === '__none__' ? '' : next })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select state" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72 bg-popover border border-input shadow-lg">
+                <SelectItem value="__none__">—</SelectItem>
+                {US_STATE_CODES.map((state) => (
+                  <SelectItem key={state.code} value={state.code}>
+                    {state.code} — {state.name}
+                  </SelectItem>
+                ))}
+                {value.exhibitor_state && !US_STATE_CODES.some((s) => s.code === value.exhibitor_state) && (
+                  <>
+                    <SelectSeparator />
+                    <SelectItem value={value.exhibitor_state}>{value.exhibitor_state} (legacy)</SelectItem>
+                  </>
+                )}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input
+              id="addr-state"
+              autoComplete="address-level1"
+              value={value.exhibitor_state}
+              onChange={(e) => onChange({ exhibitor_state: e.target.value })}
+              placeholder="Province / Region"
+            />
+          )}
         </div>
       </div>
 
@@ -217,7 +243,7 @@ export function AddressAutocomplete({ value, onChange }: AddressAutocompleteProp
             <SelectTrigger>
               <SelectValue placeholder="Select country" />
             </SelectTrigger>
-            <SelectContent className="max-h-72">
+            <SelectContent className="max-h-72 bg-popover border border-input shadow-lg">
               <SelectItem value="__none__">—</SelectItem>
               {COUNTRIES.map((country, idx) => (
                 <Fragment key={country.code}>
