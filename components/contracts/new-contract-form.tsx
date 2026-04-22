@@ -25,6 +25,7 @@ export function NewContractForm({ events, currentUserEmail }: Props) {
   const [err, setErr] = useState<string | null>(null);
 
   const defaultEvent = events[0];
+  const defaultBoothRateCents = defaultEvent?.booth_rate_cents ?? 1500000;
 
   const [form, setForm] = useState({
     event_id:               defaultEvent?.id ?? '',
@@ -39,7 +40,7 @@ export function NewContractForm({ events, currentUserEmail }: Props) {
     exhibitor_telephone:    '',
     brands_poured:          '',
     booth_count:            1,
-    booth_rate_cents:       defaultEvent?.booth_rate_cents ?? 1500000,
+    booth_rate_cents:       defaultBoothRateCents,
     signer_1_name:          '',
     signer_1_title:         '',
     signer_1_email:         '',
@@ -47,13 +48,18 @@ export function NewContractForm({ events, currentUserEmail }: Props) {
     notes:                  '',
   });
 
+  /** Separate from `booth_rate_cents` so typing isn't overwritten every render by .toFixed(2). */
+  const [boothRateInput, setBoothRateInput] = useState(() => (defaultBoothRateCents / 100).toFixed(2));
+
   const selectedEvent = events.find(e => e.id === form.event_id);
   const boothSubtotal = form.booth_count * form.booth_rate_cents;
   const grandTotal = boothSubtotal;
 
   useEffect(() => {
     if (!selectedEvent) return;
-    setForm((f) => ({ ...f, booth_rate_cents: selectedEvent.booth_rate_cents ?? 1500000 }));
+    const cents = selectedEvent.booth_rate_cents ?? 1500000;
+    setForm((f) => ({ ...f, booth_rate_cents: cents }));
+    setBoothRateInput((cents / 100).toFixed(2));
   }, [selectedEvent?.id]);
 
   function set<K extends keyof typeof form>(k: K, v: typeof form[K]) {
@@ -183,13 +189,29 @@ export function NewContractForm({ events, currentUserEmail }: Props) {
               </Field>
               <Field label="Booth Rate (USD)" hint="Editable for custom booth pricing">
                 <Input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={(form.booth_rate_cents / 100).toFixed(2)}
-                  onChange={e => {
-                    const dollars = Math.max(0, parseFloat(e.target.value || '0') || 0);
-                    set('booth_rate_cents', Math.round(dollars * 100));
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  value={boothRateInput}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw !== '' && !/^\d*\.?\d*$/.test(raw)) return;
+                    setBoothRateInput(raw);
+                    if (raw === '' || raw === '.') return;
+                    const dollars = parseFloat(raw);
+                    if (!Number.isFinite(dollars)) return;
+                    set('booth_rate_cents', Math.round(Math.max(0, dollars) * 100));
+                  }}
+                  onBlur={() => {
+                    const raw = boothRateInput.trim();
+                    if (raw === '' || raw === '.') {
+                      setBoothRateInput(((form.booth_rate_cents) / 100).toFixed(2));
+                      return;
+                    }
+                    const dollars = Math.max(0, parseFloat(raw) || 0);
+                    const cents = Math.round(dollars * 100);
+                    setForm((f) => ({ ...f, booth_rate_cents: cents }));
+                    setBoothRateInput((cents / 100).toFixed(2));
                   }}
                 />
                 {isDiscountedRate(form.booth_rate_cents) && (
