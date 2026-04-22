@@ -65,6 +65,9 @@ export interface Contract {
   cancelled_reason: string | null;
   cancelled_at: string | null;
   cancelled_by: string | null;
+  discount_approved_at: string | null;
+  discount_approved_by: string | null;
+  discount_approval_reason: string | null;
   accounting_notified_at: string | null;
   created_by: string | null;
   created_at: string;

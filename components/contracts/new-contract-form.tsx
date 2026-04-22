@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCurrency, formatLongDate } from '@/lib/utils';
+import { isDiscountedRate, STANDARD_BOOTH_RATE_CENTS } from '@/lib/contracts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input, Label, Textarea } from '@/components/ui/input';
@@ -191,6 +192,11 @@ export function NewContractForm({ events, currentUserEmail }: Props) {
                     set('booth_rate_cents', Math.round(dollars * 100));
                   }}
                 />
+                {isDiscountedRate(form.booth_rate_cents) && (
+                  <p className="mt-2 text-xs text-amber-700">
+                    ⚠ Rates below {formatCurrency(STANDARD_BOOTH_RATE_CENTS)} require admin approval before this contract can be approved for sending or sent to DocuSign.
+                  </p>
+                )}
               </Field>
             </div>
 

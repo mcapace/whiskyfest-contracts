@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { formatRelative } from '@/lib/utils';
+import { formatCurrency, formatRelative } from '@/lib/utils';
 import type { ContractStatus } from '@/types/db';
 
 interface Props {
@@ -35,6 +35,12 @@ interface Props {
   isAdmin: boolean;
   releasedBy: string | null;
   releasedAt: string | null;
+  boothCount: number;
+  boothRateCents: number;
+  grandTotalCents: number;
+  salesRep: string | null;
+  createdBy: string | null;
+  discountApprovalPending: boolean;
 }
 
 export function ContractActions({
@@ -56,6 +62,12 @@ export function ContractActions({
   isAdmin,
   releasedBy,
   releasedAt,
+  boothCount,
+  boothRateCents,
+  grandTotalCents,
+  salesRep,
+  createdBy,
+  discountApprovalPending,
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -63,8 +75,10 @@ export function ContractActions({
   const [openRecall, setOpenRecall] = useState(false);
   const [openResendWithChanges, setOpenResendWithChanges] = useState(false);
   const [openCancel, setOpenCancel] = useState(false);
+  const [openApproveDiscount, setOpenApproveDiscount] = useState(false);
   const [recallReason, setRecallReason] = useState('');
   const [cancelReason, setCancelReason] = useState('');
+  const [discountReason, setDiscountReason] = useState('');
   const [nextSignerName, setNextSignerName] = useState(signerName ?? '');
   const [nextSignerEmail, setNextSignerEmail] = useState(signerEmail ?? '');
 
@@ -90,8 +104,9 @@ export function ContractActions({
   const canCancel = !isTerminal && isAdmin;
   const canReminder = isAdmin && (status === 'sent' || status === 'partially_signed') && Boolean(docusignEnvelopeId);
   const canRecall = canReminder;
-  const canResendWithChanges = canReminder;
+  const canResendWithChanges = canReminder && !discountApprovalPending;
   const canRelease = status === 'signed' && isAdmin;
+  const canApproveDiscount = isAdmin && discountApprovalPending;
 
   const progress = useMemo(() => getProgress(status), [status]);
 
@@ -102,6 +117,10 @@ export function ContractActions({
     if (canRelease) return { label: 'Release to Accounting', path: 'release', key: 'release', icon: CheckCircle2 };
     return null;
   }, [status, canRelease]);
+  const primaryBlockedForDiscount =
+    discountApprovalPending &&
+    !!primaryAction &&
+    (primaryAction.key === 'approve' || primaryAction.key === 'send' || primaryAction.key === 'release');
 
   return (
     <>
@@ -149,6 +168,11 @@ export function ContractActions({
                   Resend with Changes
                 </DropdownMenuItem>
               )}
+              {canApproveDiscount && (
+                <DropdownMenuItem onClick={() => setOpenApproveDiscount(true)}>
+                  Approve Discount...
+                </DropdownMenuItem>
+              )}
               {canRecall && (
                 <DropdownMenuItem onClick={() => setOpenRecall(true)}>Recall</DropdownMenuItem>
               )}
@@ -166,14 +190,22 @@ export function ContractActions({
         <div className="min-h-[2.5rem]">
           {primaryAction ? (
             <div className="space-y-2">
-              <Button onClick={() => runAction(primaryAction.path, primaryAction.key)} disabled={pending}>
-                {pending && action === primaryAction.key ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <primaryAction.icon className="h-4 w-4" />
-                )}
-                {primaryAction.label}
-              </Button>
+              <div title={primaryBlockedForDiscount ? 'Discount approval required' : undefined} className="inline-block">
+                <Button
+                  onClick={() => runAction(primaryAction.path, primaryAction.key)}
+                  disabled={pending || primaryBlockedForDiscount}
+                >
+                  {pending && action === primaryAction.key ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <primaryAction.icon className="h-4 w-4" />
+                  )}
+                  {primaryAction.label}
+                </Button>
+              </div>
+              {primaryBlockedForDiscount && (
+                <p className="text-xs text-amber-700">Discount approval required before this action is available.</p>
+              )}
               {status === 'ready_for_review' && (
                 <button
                   type="button"
@@ -232,6 +264,49 @@ export function ContractActions({
             >
               {pending && action === 'recall' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Recall Contract
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={openApproveDiscount} onOpenChange={setOpenApproveDiscount}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Approve Discounted Rate</DialogTitle>
+            <DialogDescription>
+              Confirm this discounted pricing exception so the contract can continue.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p><span className="text-muted-foreground">Exhibitor:</span> {exhibitorName}</p>
+            <p><span className="text-muted-foreground">Booth rate:</span> {formatCurrency(boothRateCents)}</p>
+            <p><span className="text-muted-foreground">Booth count:</span> {boothCount}</p>
+            <p><span className="text-muted-foreground">Grand total:</span> {formatCurrency(grandTotalCents)}</p>
+            <p><span className="text-muted-foreground">Sales rep:</span> {salesRep ?? '—'}</p>
+            <p><span className="text-muted-foreground">Created by:</span> {createdBy ?? '—'}</p>
+            <div className="space-y-2">
+              <Label htmlFor="discount-reason">Reason (optional)</Label>
+              <Textarea
+                id="discount-reason"
+                value={discountReason}
+                onChange={(e) => setDiscountReason(e.target.value)}
+                placeholder="e.g., agency comp, multi-year renewal, special relationship..."
+                rows={3}
+                maxLength={1000}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenApproveDiscount(false)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                runAction('approve-discount', 'approve-discount', { reason: discountReason.trim() || undefined });
+                setOpenApproveDiscount(false);
+              }}
+              disabled={pending}
+            >
+              {pending && action === 'approve-discount' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Approve Discount
             </Button>
           </DialogFooter>
         </DialogContent>

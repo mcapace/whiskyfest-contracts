@@ -5,6 +5,7 @@ import { formatLongDate } from '@/lib/utils';
 import { formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { downloadCompletedPdf } from '@/lib/docusign';
 import { sendAccountingEmail } from '@/lib/email';
+import { requiresDiscountApproval } from '@/lib/contracts';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
@@ -28,6 +29,12 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     .eq('id', params.id)
     .single<ContractWithTotals>();
   if (!contract) return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
+  if (requiresDiscountApproval(contract)) {
+    return NextResponse.json(
+      { error: 'Discount approval required before contract can be released.' },
+      { status: 403 },
+    );
+  }
   if (contract.status !== 'signed') {
     return NextResponse.json({ error: 'Release to Accounting is only available for fully signed contracts.' }, { status: 409 });
   }

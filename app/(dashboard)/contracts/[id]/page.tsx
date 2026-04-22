@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
+import { requiresDiscountApproval, STANDARD_BOOTH_RATE_CENTS } from '@/lib/contracts';
 import { cn, formatCurrency, formatLongDate, formatTimestamp } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { StatusBadge } from '@/components/contracts/status-badge';
@@ -40,6 +41,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
   if (!data) notFound();
   const { contract, event, audit } = data;
   const releaseAudit = audit.find((entry) => entry.action === 'released_to_accounting' || entry.action === 'executed');
+  const discountPending = requiresDiscountApproval(contract);
 
   return (
     <div className="space-y-6">
@@ -87,6 +89,19 @@ export default async function ContractDetailPage({ params }: { params: { id: str
         </div>
       )}
 
+      {discountPending && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-amber-900">
+          <p className="text-sm font-semibold">⚠ Discounted rate pending admin approval</p>
+          <p className="mt-1 text-sm">
+            Booth rate: {formatCurrency(contract.booth_rate_cents)} is below the {formatCurrency(STANDARD_BOOTH_RATE_CENTS)} standard.
+            This contract is paused until an admin approves the discount.
+          </p>
+          {!isAdmin && (
+            <p className="mt-2 text-xs text-amber-800">Contact an admin to approve this discount.</p>
+          )}
+        </div>
+      )}
+
       <Card>
         <CardContent className="p-4">
           <ContractActions
@@ -108,6 +123,12 @@ export default async function ContractDetailPage({ params }: { params: { id: str
             isAdmin={isAdmin}
             releasedBy={releaseAudit?.actor_email ?? null}
             releasedAt={releaseAudit?.occurred_at ?? null}
+            boothCount={contract.booth_count}
+            boothRateCents={contract.booth_rate_cents}
+            grandTotalCents={contract.grand_total_cents}
+            salesRep={contract.sales_rep_name ?? contract.sales_rep_email ?? null}
+            createdBy={contract.created_by}
+            discountApprovalPending={discountPending}
           />
         </CardContent>
       </Card>
@@ -186,20 +207,24 @@ export default async function ContractDetailPage({ params }: { params: { id: str
             {audit.length === 0 ? (
               <li className="p-6 text-sm text-muted-foreground">No activity yet</li>
             ) : (
-              audit.map(entry => (
-                <li key={entry.id} className="flex items-start gap-4 px-6 py-3 text-sm">
-                  <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-whisky-500 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="font-medium">
-                      {describeAction(entry)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatTimestamp(entry.occurred_at)}
-                      {entry.actor_email && ` · ${entry.actor_email}`}
-                    </p>
-                  </div>
-                </li>
-              ))
+              audit.map(entry => {
+                const actionText = describeAction(entry);
+                return (
+                  <li key={entry.id} className="flex items-start gap-4 px-6 py-3 text-sm">
+                    <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-whisky-500 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="font-medium">{actionText.title}</p>
+                      {actionText.detail && (
+                        <p className="text-xs text-muted-foreground">{actionText.detail}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {formatTimestamp(entry.occurred_at)}
+                        {entry.actor_email && ` · ${entry.actor_email}`}
+                      </p>
+                    </div>
+                  </li>
+                );
+              })
             )}
           </ol>
         </CardContent>
@@ -234,23 +259,41 @@ function Detail({
   );
 }
 
-function describeAction(entry: AuditLogEntry): string {
+function describeAction(entry: AuditLogEntry): { title: string; detail?: string } {
+  const money = (v: unknown) => {
+    const n = typeof v === 'number' ? v : Number(v);
+    return Number.isFinite(n) ? formatCurrency(n) : '$0.00';
+  };
+
   switch (entry.action) {
-    case 'created':        return 'Contract created';
-    case 'status_changed': return `Status changed from ${entry.from_status} to ${entry.to_status}`;
-    case 'pdf_generated':   return 'Draft PDF generated';
-    case 'docusign_sent':   return 'Sent via DocuSign';
-    case 'docusign_completed': return 'DocuSign contract completed — signed PDF stored';
-    case 'pdf_sent':        return 'Contract sent via DocuSign';
-    case 'docusign_recalled': return 'DocuSign contract recalled — contract unlocked for edit';
-    case 'docusign_resend_notification': return 'DocuSign signing email resent';
-    case 'docusign_send_reminder': return 'DocuSign reminder sent';
-    case 'docusign_resent_with_changes': return 'DocuSign contract voided and resent with changes';
-    case 'released_to_accounting': return 'Released to accounting';
-    case 'signer_contact_updated': return 'Exhibitor signer contact updated';
-    case 'signed':         return 'Signed by exhibitor';
-    case 'executed':       return 'Fully executed';
-    case 'cancelled':      return `Contract cancelled${entry.metadata?.reason ? ': ' + String(entry.metadata.reason) : ''}`;
-    default:               return entry.action;
+    case 'created': return { title: 'Contract created' };
+    case 'status_changed': return { title: `Status changed from ${entry.from_status} to ${entry.to_status}` };
+    case 'pdf_generated': return { title: 'Draft PDF generated' };
+    case 'docusign_sent': return { title: 'Sent via DocuSign' };
+    case 'docusign_completed': return { title: 'DocuSign contract completed — signed PDF stored' };
+    case 'pdf_sent': return { title: 'Contract sent via DocuSign' };
+    case 'docusign_recalled': return { title: 'DocuSign contract recalled — contract unlocked for edit' };
+    case 'docusign_resend_notification': return { title: 'DocuSign signing email resent' };
+    case 'docusign_send_reminder': return { title: 'DocuSign reminder sent' };
+    case 'docusign_resent_with_changes': return { title: 'DocuSign contract voided and resent with changes' };
+    case 'released_to_accounting': return { title: 'Released to accounting' };
+    case 'signer_contact_updated': return { title: 'Exhibitor signer contact updated' };
+    case 'discount_approved': {
+      const approver = entry.metadata?.approver_email ? String(entry.metadata.approver_email) : 'admin';
+      const reason = entry.metadata?.reason ? String(entry.metadata.reason) : '';
+      return {
+        title: `Discounted rate approved by ${approver}`,
+        detail: reason || undefined,
+      };
+    }
+    case 'discount_approval_reset':
+      return {
+        title: `Discount approval reset — booth rate changed from ${money(entry.metadata?.old_rate)} to ${money(entry.metadata?.new_rate)}`,
+      };
+    case 'signed': return { title: 'Signed by exhibitor' };
+    case 'executed': return { title: 'Fully executed' };
+    case 'cancelled':
+      return { title: `Contract cancelled${entry.metadata?.reason ? ': ' + String(entry.metadata.reason) : ''}` };
+    default: return { title: entry.action };
   }
 }

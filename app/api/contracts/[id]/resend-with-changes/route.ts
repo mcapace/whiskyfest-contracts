@@ -4,6 +4,7 @@ import { requireAdmin } from '@/lib/api-auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { renderContractPdfFromTemplate } from '@/lib/google';
 import { buildContractMergeMap } from '@/lib/merge-map';
+import { requiresDiscountApproval } from '@/lib/contracts';
 import { sendEnvelope, voidEnvelope } from '@/lib/docusign';
 import type { ContractWithTotals, Event } from '@/types/db';
 
@@ -35,6 +36,12 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     .single<ContractWithTotals>();
 
   if (!contract) return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
+  if (requiresDiscountApproval(contract)) {
+    return NextResponse.json(
+      { error: 'Discount approval required before contract can be sent to DocuSign.' },
+      { status: 403 },
+    );
+  }
   if (contract.status !== 'sent' && contract.status !== 'partially_signed') {
     return NextResponse.json(
       { error: 'Resend with Changes is only available while the DocuSign contract is sent or partially signed.' },

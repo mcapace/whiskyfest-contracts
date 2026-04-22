@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { renderContractPdfFromTemplate } from '@/lib/google';
 import { sendEnvelope } from '@/lib/docusign';
 import { buildContractMergeMap } from '@/lib/merge-map';
+import { requiresDiscountApproval } from '@/lib/contracts';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
@@ -46,6 +47,13 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   if (!contract) {
     log('FAIL contract not found');
     return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
+  }
+  if (requiresDiscountApproval(contract)) {
+    log('FAIL discount approval required', { booth_rate_cents: contract.booth_rate_cents });
+    return NextResponse.json(
+      { error: 'Discount approval required before contract can be sent to DocuSign.' },
+      { status: 403 },
+    );
   }
   log('contract loaded', {
     status: contract.status,
