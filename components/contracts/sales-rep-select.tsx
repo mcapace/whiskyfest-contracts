@@ -59,9 +59,9 @@ export function SalesRepSelect({ currentUserEmail, value, onChange, required = t
         <SelectTrigger id="sales_rep_id">
           <SelectValue placeholder="Select a sales rep" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="z-[80] border-border bg-card shadow-xl">
           {reps.map((rep) => (
-            <SelectItem key={rep.id} value={rep.id}>
+            <SelectItem key={rep.id} value={rep.id} className="text-foreground focus:bg-muted focus:text-foreground">
               {rep.name}
             </SelectItem>
           ))}
