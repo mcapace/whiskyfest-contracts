@@ -65,7 +65,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
             </span>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            {event?.name} — {event && formatLongDate(event.event_date)}
+            {event?.name} · {event && formatLongDate(event.event_date)}
           </p>
         </div>
         <div className="text-right">
@@ -99,10 +99,12 @@ export default async function ContractDetailPage({ params }: { params: { id: str
             signedPdfUrl={contract.signed_pdf_url}
             docusignEnvelopeId={contract.docusign_envelope_id}
             sentAt={contract.sent_at}
+            updatedAt={contract.updated_at}
             executedAt={contract.executed_at}
             cancelledReason={contract.cancelled_reason}
             cancelledAt={contract.cancelled_at}
             cancelledBy={contract.cancelled_by}
+            errorDetails={contract.notes}
             isAdmin={isAdmin}
             releasedBy={releaseAudit?.actor_email ?? null}
             releasedAt={releaseAudit?.occurred_at ?? null}

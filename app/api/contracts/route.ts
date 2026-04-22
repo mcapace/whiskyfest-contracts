@@ -2,19 +2,17 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { canonicalExhibitorAddress } from '@/lib/exhibitor-address';
 import type { Contract } from '@/types/db';
 
 const schema = z.object({
   event_id:               z.string().uuid(),
   exhibitor_legal_name:   z.string().min(1),
   exhibitor_company_name: z.string().min(1),
-  exhibitor_address:      z.string().optional().nullable(),
-  exhibitor_address_line1: z.string().optional().nullable(),
-  exhibitor_address_line2: z.string().optional().nullable(),
+  exhibitor_address_line_1: z.string().optional().nullable(),
+  exhibitor_address_line_2: z.string().optional().nullable(),
   exhibitor_city:          z.string().optional().nullable(),
-  exhibitor_state:         z.string().max(3).optional().nullable(),
-  exhibitor_zip:           z.string().max(12).optional().nullable(),
+  exhibitor_state:         z.string().max(120).optional().nullable(),
+  exhibitor_zip:           z.string().max(24).optional().nullable(),
   exhibitor_country:       z.string().min(2).max(120),
   exhibitor_telephone:    z.string().optional().nullable(),
   brands_poured:          z.string().optional().nullable(),
@@ -41,17 +39,15 @@ export async function POST(req: Request) {
   const p = parsed.data;
   const addrSlice: Pick<
     Contract,
-    | 'exhibitor_address'
-    | 'exhibitor_address_line1'
-    | 'exhibitor_address_line2'
+    | 'exhibitor_address_line_1'
+    | 'exhibitor_address_line_2'
     | 'exhibitor_city'
     | 'exhibitor_state'
     | 'exhibitor_zip'
     | 'exhibitor_country'
   > = {
-    exhibitor_address:       p.exhibitor_address ?? null,
-    exhibitor_address_line1: p.exhibitor_address_line1 ?? null,
-    exhibitor_address_line2: p.exhibitor_address_line2 ?? null,
+    exhibitor_address_line_1: p.exhibitor_address_line_1 ?? null,
+    exhibitor_address_line_2: p.exhibitor_address_line_2 ?? null,
     exhibitor_city:          p.exhibitor_city ?? null,
     exhibitor_state:         p.exhibitor_state ?? null,
     exhibitor_zip:           p.exhibitor_zip ?? null,
@@ -65,9 +61,8 @@ export async function POST(req: Request) {
       event_id:               p.event_id,
       exhibitor_legal_name:   p.exhibitor_legal_name,
       exhibitor_company_name: p.exhibitor_company_name,
-      exhibitor_address:      canonicalExhibitorAddress(addrSlice),
-      exhibitor_address_line1: addrSlice.exhibitor_address_line1,
-      exhibitor_address_line2: addrSlice.exhibitor_address_line2,
+      exhibitor_address_line_1: addrSlice.exhibitor_address_line_1,
+      exhibitor_address_line_2: addrSlice.exhibitor_address_line_2,
       exhibitor_city:          addrSlice.exhibitor_city,
       exhibitor_state:         addrSlice.exhibitor_state,
       exhibitor_zip:           addrSlice.exhibitor_zip,

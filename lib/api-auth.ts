@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import type { Session } from 'next-auth';
 
 export async function requireAuth(): Promise<
@@ -17,8 +18,18 @@ export async function requireAdmin(): Promise<
 > {
   const r = await requireAuth();
   if (!r.ok) return r;
-  const role = (r.session.user as { role?: string }).role ?? 'sales';
-  if (role !== 'admin') {
+
+  const email = r.session.user.email?.toLowerCase();
+  if (!email) return { ok: false, res: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
+
+  const supabase = getSupabaseAdmin();
+  const { data: appUser } = await supabase
+    .from('app_users')
+    .select('role')
+    .eq('email', email)
+    .single();
+
+  if (appUser?.role !== 'admin') {
     return { ok: false, res: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
   return { ok: true, session: r.session };

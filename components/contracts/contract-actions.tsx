@@ -26,10 +26,12 @@ interface Props {
   signedPdfUrl:  string | null;
   docusignEnvelopeId: string | null;
   sentAt: string | null;
+  updatedAt: string | null;
   executedAt: string | null;
   cancelledReason: string | null;
   cancelledAt: string | null;
   cancelledBy: string | null;
+  errorDetails: string | null;
   isAdmin: boolean;
   releasedBy: string | null;
   releasedAt: string | null;
@@ -45,10 +47,12 @@ export function ContractActions({
   signedPdfUrl,
   docusignEnvelopeId,
   sentAt,
+  updatedAt,
   executedAt,
   cancelledReason,
   cancelledAt,
   cancelledBy,
+  errorDetails,
   isAdmin,
   releasedBy,
   releasedAt,
@@ -161,19 +165,32 @@ export function ContractActions({
         </div>
         <div className="min-h-[2.5rem]">
           {primaryAction ? (
-            <Button onClick={() => runAction(primaryAction.path, primaryAction.key)} disabled={pending}>
-              {pending && action === primaryAction.key ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <primaryAction.icon className="h-4 w-4" />
+            <div className="space-y-2">
+              <Button onClick={() => runAction(primaryAction.path, primaryAction.key)} disabled={pending}>
+                {pending && action === primaryAction.key ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <primaryAction.icon className="h-4 w-4" />
+                )}
+                {primaryAction.label}
+              </Button>
+              {status === 'ready_for_review' && (
+                <button
+                  type="button"
+                  className="block text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+                  onClick={() => runAction('generate', 'regenerate')}
+                  disabled={pending}
+                >
+                  Re-generate PDF
+                </button>
               )}
-              {primaryAction.label}
-            </Button>
+            </div>
           ) : (
             <StatusLine
               status={status}
               signerEmail={signerEmail}
               sentAt={sentAt}
+              updatedAt={updatedAt}
               executedAt={executedAt}
               releasedBy={releasedBy}
               releasedAt={releasedAt}
@@ -181,6 +198,7 @@ export function ContractActions({
               cancelledReason={cancelledReason}
               cancelledAt={cancelledAt}
               cancelledBy={cancelledBy}
+              errorDetails={errorDetails}
             />
           )}
         </div>
@@ -331,8 +349,10 @@ function ProgressState({ progress }: { progress: { special: string | null; curre
           <div key={stage.key} className="flex items-center gap-1">
             <span
               className={`h-2.5 w-2.5 rounded-full border ${
-                idx <= progress.currentIdx
+                idx === progress.currentIdx
                   ? 'border-fest-700 bg-fest-700'
+                  : idx < progress.currentIdx
+                  ? 'border-fest-700 bg-fest-100'
                   : 'border-muted-foreground/40 bg-background'
               }`}
             />
@@ -355,6 +375,7 @@ function StatusLine({
   status,
   signerEmail,
   sentAt,
+  updatedAt,
   executedAt,
   releasedBy,
   releasedAt,
@@ -362,10 +383,12 @@ function StatusLine({
   cancelledReason,
   cancelledAt,
   cancelledBy,
+  errorDetails,
 }: {
   status: ContractStatus;
   signerEmail: string | null;
   sentAt: string | null;
+  updatedAt: string | null;
   executedAt: string | null;
   releasedBy: string | null;
   releasedAt: string | null;
@@ -373,16 +396,21 @@ function StatusLine({
   cancelledReason: string | null;
   cancelledAt: string | null;
   cancelledBy: string | null;
+  errorDetails: string | null;
 }) {
   if (status === 'sent') {
     return (
-      <p className="text-sm text-muted-foreground">
-        Waiting for {signerEmail ?? 'signer'}{sentAt ? ` — sent ${formatRelative(sentAt)}` : ''}
+      <p className="text-sm italic text-muted-foreground">
+        {sentAt ? `Sent ${formatRelative(sentAt)}` : 'Sent'} · Waiting for {signerEmail ?? 'signer'} to sign
       </p>
     );
   }
   if (status === 'partially_signed') {
-    return <p className="text-sm text-muted-foreground">Exhibitor signed. Awaiting Shanken countersignature.</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        Exhibitor signed {updatedAt ? formatRelative(updatedAt) : 'recently'} · Awaiting Shanken countersignature
+      </p>
+    );
   }
   if (status === 'signed' && !isAdmin) {
     return <p className="text-sm text-muted-foreground">Awaiting admin release to accounting.</p>;
@@ -390,19 +418,28 @@ function StatusLine({
   if (status === 'executed') {
     return (
       <p className="text-sm text-emerald-700">
-        ✓ Released to accounting {formatRelative(releasedAt ?? executedAt)}{releasedBy ? ` by ${releasedBy}` : ''}
+        ✓ Released {formatRelative(releasedAt ?? executedAt)}{releasedBy ? ` by ${releasedBy}` : ''}
       </p>
     );
   }
   if (status === 'cancelled') {
     return (
-      <p className="text-sm text-red-600">
-        Contract cancelled{cancelledReason ? `: ${cancelledReason}` : ''}{cancelledAt ? ` (${formatRelative(cancelledAt)})` : ''}{cancelledBy ? ` by ${cancelledBy}` : ''}
-      </p>
+      <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p className="font-medium">Contract cancelled</p>
+        {cancelledReason && <p>{cancelledReason}</p>}
+        <p className="text-xs text-red-700/80">
+          {cancelledAt ? formatRelative(cancelledAt) : 'recently'}{cancelledBy ? ` by ${cancelledBy}` : ''}
+        </p>
+      </div>
     );
   }
   if (status === 'error') {
-    return <p className="text-sm text-red-600">Contract is in an error state. Check activity for details.</p>;
+    return (
+      <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p className="font-medium">Error sending contract</p>
+        <p>{errorDetails ?? 'Contract is in an error state. Check activity for details.'}</p>
+      </div>
+    );
   }
   return null;
 }

@@ -23,25 +23,23 @@ interface Props {
 export function RecallDocusignDialog({ contractId, exhibitorName }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [voidedReason, setVoidedReason] = useState(
-    'Recalled from WhiskyFest to update recipient details and resend.',
-  );
+  const [voidedReason, setVoidedReason] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   async function handleConfirm() {
     const reason = voidedReason.trim();
-    if (reason.length < 3) {
-      setErr('Please enter a short reason (at least 3 characters) for DocuSign.');
+    if (reason.length < 10) {
+      setErr('Please enter a reason of at least 10 characters for DocuSign.');
       return;
     }
     setErr(null);
 
     startTransition(async () => {
-      const res = await fetch(`/api/contracts/${contractId}/recall-docusign`, {
+      const res = await fetch(`/api/contracts/${contractId}/recall`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ voidedReason: reason }),
+        body: JSON.stringify({ reason }),
       });
 
       if (!res.ok) {

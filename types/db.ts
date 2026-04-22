@@ -37,10 +37,8 @@ export interface Contract {
   status: ContractStatus;
   exhibitor_legal_name: string;
   exhibitor_company_name: string;
-  /** Legacy single-line / denormalized full block; kept in sync when structured fields are used */
-  exhibitor_address: string | null;
-  exhibitor_address_line1: string | null;
-  exhibitor_address_line2: string | null;
+  exhibitor_address_line_1: string | null;
+  exhibitor_address_line_2: string | null;
   exhibitor_city: string | null;
   exhibitor_state: string | null;
   exhibitor_zip: string | null;

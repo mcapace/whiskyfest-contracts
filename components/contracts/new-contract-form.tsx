@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input, Label, Textarea } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { ExhibitorAddressFields } from '@/components/contracts/exhibitor-address-fields';
+import { AddressAutocomplete } from '@/components/forms/address-autocomplete';
 import { SalesRepSelect } from '@/components/contracts/sales-rep-select';
 import type { Event } from '@/types/db';
 
@@ -29,8 +29,8 @@ export function NewContractForm({ events, currentUserEmail }: Props) {
     event_id:               defaultEvent?.id ?? '',
     exhibitor_legal_name:   '',
     exhibitor_company_name: '',
-    exhibitor_address_line1: '',
-    exhibitor_address_line2: '',
+    exhibitor_address_line_1: '',
+    exhibitor_address_line_2: '',
     exhibitor_city:          '',
     exhibitor_state:         '',
     exhibitor_zip:           '',
@@ -57,8 +57,8 @@ export function NewContractForm({ events, currentUserEmail }: Props) {
   }
 
   const patchAddress = useCallback((patch: Partial<Pick<typeof form,
-    | 'exhibitor_address_line1'
-    | 'exhibitor_address_line2'
+    | 'exhibitor_address_line_1'
+    | 'exhibitor_address_line_2'
     | 'exhibitor_city'
     | 'exhibitor_state'
     | 'exhibitor_zip'
@@ -144,10 +144,10 @@ export function NewContractForm({ events, currentUserEmail }: Props) {
             </Field>
             <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
               <p className="mb-3 text-sm font-medium">Mailing address</p>
-              <ExhibitorAddressFields
+              <AddressAutocomplete
                 value={{
-                  exhibitor_address_line1: form.exhibitor_address_line1,
-                  exhibitor_address_line2: form.exhibitor_address_line2,
+                  exhibitor_address_line_1: form.exhibitor_address_line_1,
+                  exhibitor_address_line_2: form.exhibitor_address_line_2,
                   exhibitor_city: form.exhibitor_city,
                   exhibitor_state: form.exhibitor_state,
                   exhibitor_zip: form.exhibitor_zip,

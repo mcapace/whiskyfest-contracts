@@ -301,3 +301,12 @@ const rest = parsed
   .sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
 
 export const COUNTRIES: CountryOption[] = [...pinned, ...rest];
+export const PINNED_COUNTRIES_COUNT = pinned.length;
+
+const COUNTRY_CODE_TO_NAME = new Map(COUNTRIES.map((c) => [c.code.toUpperCase(), c.name]));
+
+/** Map Google country short codes to our display label. */
+export function parseGoogleCountry(shortCode: string): string | null {
+  if (!shortCode) return null;
+  return COUNTRY_CODE_TO_NAME.get(shortCode.trim().toUpperCase()) ?? null;
+}

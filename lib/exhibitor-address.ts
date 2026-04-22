@@ -2,9 +2,8 @@ import type { Contract } from '@/types/db';
 
 type Addr = Pick<
   Contract,
-  | 'exhibitor_address'
-  | 'exhibitor_address_line1'
-  | 'exhibitor_address_line2'
+  | 'exhibitor_address_line_1'
+  | 'exhibitor_address_line_2'
   | 'exhibitor_city'
   | 'exhibitor_state'
   | 'exhibitor_zip'
@@ -12,30 +11,37 @@ type Addr = Pick<
 >;
 
 /**
- * Single block for Google Doc merge token {{exhibitor_address}} and emails.
- * Prefers structured fields; falls back to legacy exhibitor_address text.
+ * Build multi-line address for merge/email consumption.
+ * Format:
+ *  line 1
+ *  City, ST ZIP
+ *  Country (only when non-US)
  */
 export function formatExhibitorAddressBlock(c: Addr): string {
-  const l1 = c.exhibitor_address_line1?.trim();
-  const hasStructured = Boolean(l1 || c.exhibitor_city?.trim());
-  if (hasStructured) {
-    const lines: string[] = [];
-    if (l1) lines.push(l1);
-    const l2 = c.exhibitor_address_line2?.trim();
-    if (l2) lines.push(l2);
-    const city = c.exhibitor_city?.trim();
-    const st = c.exhibitor_state?.trim();
-    const z = c.exhibitor_zip?.trim();
-    const tail = [city, [st, z].filter(Boolean).join(' ')].filter(Boolean).join(', ');
-    if (tail) lines.push(tail);
-    const country = c.exhibitor_country?.trim();
-    if (country) lines.push(country);
-    return lines.join('\n');
-  }
-  return (c.exhibitor_address ?? '').trim();
+  const lines: string[] = [];
+
+  const l1 = c.exhibitor_address_line_1?.trim();
+  if (l1) lines.push(l1);
+
+  const l2 = c.exhibitor_address_line_2?.trim();
+  if (l2) lines.push(l2);
+
+  const city = c.exhibitor_city?.trim();
+  const st = c.exhibitor_state?.trim();
+  const z = c.exhibitor_zip?.trim();
+  const cityStateZip = [
+    city,
+    [st, z].filter(Boolean).join(' ').trim() || null,
+  ].filter(Boolean).join(', ');
+  if (cityStateZip) lines.push(cityStateZip);
+
+  const country = c.exhibitor_country?.trim();
+  if (country && country !== 'United States') lines.push(country);
+
+  return lines.join('\n').trim();
 }
 
-/** Store legacy single column alongside structured rows (search, exports). */
+/** Canonical formatted address string for display and merges. */
 export function canonicalExhibitorAddress(c: Addr): string {
   return formatExhibitorAddressBlock(c);
 }
