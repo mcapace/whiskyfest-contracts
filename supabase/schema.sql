@@ -12,6 +12,7 @@ do $$ begin
   create type contract_status as enum (
     'draft',
     'ready_for_review',
+    'pending_events_review',
     'approved',
     'sent',
     'partially_signed',
@@ -108,6 +109,18 @@ create table if not exists contracts (
   notes                   text
 );
 
+alter table contracts add column if not exists events_submitted_at timestamptz;
+alter table contracts add column if not exists events_approved_at timestamptz;
+alter table contracts add column if not exists events_approved_by text;
+alter table contracts add column if not exists events_approval_reason text;
+alter table contracts add column if not exists events_sent_back_at timestamptz;
+alter table contracts add column if not exists events_sent_back_by text;
+alter table contracts add column if not exists events_sent_back_reason text;
+
+create index if not exists contracts_pending_events_review_idx
+  on contracts (id)
+  where status = 'pending_events_review';
+
 create table if not exists sales_reps (
   id          uuid primary key default gen_random_uuid(),
   name        text not null,
@@ -167,12 +180,25 @@ create table if not exists app_users (
   created_at  timestamptz not null default now()
 );
 
+alter table app_users add column if not exists is_events_team boolean not null default false;
+
 -- Seed admin accounts (idempotent)
 insert into app_users (email, name, role) values
   ('mcapace@mshanken.com',   'Michael Capace', 'admin'),
   ('lmott@mshanken.com',     'Liz Mott',       'admin'),
   ('ssenatore@mshanken.com', 'Stephen Senatore','admin')
 on conflict (email) do nothing;
+
+update app_users
+set is_events_team = true
+where email in (
+  'lmott@mshanken.com',
+  'snolan@mshanken.com',
+  'nmazza@mshanken.com',
+  'talper@mshanken.com',
+  'mcapace@mshanken.com',
+  'jarcella@mshanken.com'
+);
 
 insert into sales_reps (name, email, sort_order) values
   ('Stephen Senatore',   'ssenatore@mshanken.com',    10),

@@ -15,6 +15,7 @@ export const dynamic = 'force-dynamic';
 const VALID: Set<string> = new Set([
   'draft',
   'ready_for_review',
+  'pending_events_review',
   'approved',
   'sent',
   'partially_signed',

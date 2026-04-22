@@ -37,27 +37,40 @@ async function getDashboardData(actor: Awaited<ReturnType<typeof requireContract
     pendingQuery = pendingQuery.eq('sales_rep_id', actor.salesRepId);
   }
 
-  const [{ data: contracts }, { data: pendingDiscounts }, { data: events }] = await Promise.all([
+  const pendingEventsQuery = actor.isEventsTeam
+    ? supabase
+        .from('contracts_with_totals')
+        .select('*')
+        .eq('status', 'pending_events_review' as ContractStatus)
+        .order('events_submitted_at', { ascending: false })
+        .limit(25)
+    : null;
+
+  const [contractsRes, pendingDiscountsRes, pendingEventsRes, eventsRes] = await Promise.all([
     contractsQuery,
     pendingQuery,
+    pendingEventsQuery ?? Promise.resolve({ data: [] as ContractWithTotals[] }),
     supabase.from('events').select('*').eq('is_active', true),
   ]);
 
   return {
-    contracts: (contracts ?? []) as ContractWithTotals[],
-    pendingDiscounts: (pendingDiscounts ?? []) as ContractWithTotals[],
-    events: (events ?? []) as Event[],
+    contracts: (contractsRes.data ?? []) as ContractWithTotals[],
+    pendingDiscounts: (pendingDiscountsRes.data ?? []) as ContractWithTotals[],
+    pendingEventsReview: (pendingEventsRes.data ?? []) as ContractWithTotals[],
+    events: (eventsRes.data ?? []) as Event[],
     actor,
   };
 }
 
 export default async function DashboardPage() {
   const actor = await requireContractActorForPage();
-  const { contracts, pendingDiscounts, events } = await getDashboardData(actor);
+  const { contracts, pendingDiscounts, pendingEventsReview, events } = await getDashboardData(actor);
 
   // Stats
   const totalExecutedCents  = contracts.filter(c => c.status === 'executed').reduce((a, c) => a + c.grand_total_cents, 0);
-  const totalInFlightCents  = contracts.filter(c => ['sent', 'signed', 'approved', 'ready_for_review'].includes(c.status)).reduce((a, c) => a + c.grand_total_cents, 0);
+  const totalInFlightCents  = contracts.filter(c =>
+    ['sent', 'signed', 'approved', 'ready_for_review', 'pending_events_review', 'partially_signed'].includes(c.status),
+  ).reduce((a, c) => a + c.grand_total_cents, 0);
   const totalPipelineCents  = totalExecutedCents + totalInFlightCents;
   const draftCount          = contracts.filter(c => c.status === 'draft').length;
   const executedCount       = contracts.filter(c => c.status === 'executed').length;
@@ -69,6 +82,12 @@ export default async function DashboardPage() {
   const statusCounts: Array<{ label: string; count: number; tone: string; href: string }> = [
     { label: 'Draft', count: contracts.filter(c => c.status === 'draft').length, tone: 'bg-whisky-100 text-whisky-900 border-whisky-200', href: '/contracts?status=draft' },
     { label: 'In Review', count: contracts.filter(c => c.status === 'ready_for_review').length, tone: 'bg-amber-100 text-amber-900 border-amber-200', href: '/contracts?status=ready_for_review' },
+    {
+      label: 'Events review',
+      count: contracts.filter(c => c.status === 'pending_events_review').length,
+      tone: 'bg-sky-100 text-sky-900 border-sky-200',
+      href: '/contracts?status=pending_events_review',
+    },
     { label: 'Approved', count: contracts.filter(c => c.status === 'approved').length, tone: 'bg-fest-100 text-fest-900 border-fest-200', href: '/contracts?status=approved' },
     { label: 'Executed', count: contracts.filter(c => c.status === 'executed').length, tone: 'bg-emerald-100 text-emerald-900 border-emerald-200', href: '/contracts?status=executed' },
   ];
@@ -77,6 +96,34 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      {actor.isEventsTeam && pendingEventsReview.length > 0 && (
+        <Card className="overflow-hidden border-sky-400/40 bg-sky-50/50">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sky-400/25 px-6 py-4">
+            <h2 className="font-serif text-lg font-semibold text-sky-950">Pending Events Review</h2>
+            <p className="text-xs text-sky-900/80">Awaiting events team approval before DocuSign</p>
+          </div>
+          <CardContent className="grid gap-3 p-4 sm:grid-cols-2">
+            {pendingEventsReview.map((c) => (
+              <Link
+                key={c.id}
+                href={`/contracts/${c.id}`}
+                className="rounded-lg border border-sky-300/60 bg-background/80 p-4 transition-colors hover:border-sky-500 hover:bg-sky-50/80"
+              >
+                <p className="font-medium text-foreground">{c.exhibitor_company_name}</p>
+                <div className="mt-2 grid gap-1 text-xs text-muted-foreground">
+                  <p>
+                    Total <span className="font-mono tabular-nums">{formatCurrency(c.grand_total_cents)}</span>
+                    {' · '}
+                    Rep {c.sales_rep_name ?? c.sales_rep_email ?? '—'}
+                  </p>
+                  <p>Submitted {c.events_submitted_at ? formatRelative(c.events_submitted_at) : '—'}</p>
+                </div>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {pendingDiscounts.length > 0 && (
         <Card className="overflow-hidden border-amber-400/40 bg-amber-50/40">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-400/25 px-6 py-4">

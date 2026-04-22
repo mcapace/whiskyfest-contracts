@@ -52,6 +52,7 @@ interface Props {
   salesRep: string | null;
   createdBy: string | null;
   discountApprovalPending: boolean;
+  isEventsTeam: boolean;
 }
 
 export function ContractActions({
@@ -79,6 +80,7 @@ export function ContractActions({
   salesRep,
   createdBy,
   discountApprovalPending,
+  isEventsTeam,
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -88,6 +90,8 @@ export function ContractActions({
   const [openCancel, setOpenCancel] = useState(false);
   const [openApproveDiscount, setOpenApproveDiscount] = useState(false);
   const [openErrorDetails, setOpenErrorDetails] = useState(false);
+  const [openSendBack, setOpenSendBack] = useState(false);
+  const [sendBackReason, setSendBackReason] = useState('');
   const [recallReason, setRecallReason] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const [discountReason, setDiscountReason] = useState('');
@@ -157,7 +161,9 @@ export function ContractActions({
             </>
           )}
 
-          {status === 'ready_for_review' && discountApprovalPending && isAdmin && (
+          {(status === 'ready_for_review' || status === 'pending_events_review') &&
+            discountApprovalPending &&
+            isAdmin && (
             <>
               <Button
                 className="min-h-10 flex-1 basis-[min(100%,11rem)] border-amber-600 bg-amber-600 text-white hover:bg-amber-700"
@@ -189,7 +195,9 @@ export function ContractActions({
             </>
           )}
 
-          {status === 'ready_for_review' && discountApprovalPending && !isAdmin && (
+          {(status === 'ready_for_review' || status === 'pending_events_review') &&
+            discountApprovalPending &&
+            !isAdmin && (
             <>
               <Button
                 variant="secondary"
@@ -218,25 +226,13 @@ export function ContractActions({
           {status === 'ready_for_review' && !discountApprovalPending && (
             <>
               <Button
-                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
-                onClick={() => runAction('approve', 'approve')}
-                disabled={pending}
-              >
-                {pending && action === 'approve' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4" />
-                )}
-                Approve for Sending
-              </Button>
-              <Button
                 variant="secondary"
                 className="min-h-10 flex-1 basis-[min(100%,11rem)]"
                 onClick={() => runAction('generate', 'regenerate')}
                 disabled={pending}
               >
                 <RefreshCw className="h-4 w-4" />
-                Re-generate PDF
+                Re-generate PDF (submit for events review)
               </Button>
               {isAdmin && (
                 <Button
@@ -248,6 +244,47 @@ export function ContractActions({
                 </Button>
               )}
             </>
+          )}
+
+          {status === 'pending_events_review' && !discountApprovalPending && isEventsTeam && (
+            <>
+              <Button
+                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                onClick={() => runAction('events-approve', 'events-approve', {})}
+                disabled={pending}
+              >
+                {pending && action === 'events-approve' ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4" />
+                )}
+                Approve Contract
+              </Button>
+              <Button
+                variant="secondary"
+                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                onClick={() => setOpenSendBack(true)}
+              >
+                Send Back for Changes
+              </Button>
+              {draftPdfUrl && (
+                <Button variant="outline" className="min-h-10 flex-1 basis-[min(100%,11rem)]" asChild>
+                  <a href={draftPdfUrl} target="_blank" rel="noreferrer">
+                    <ExternalLink className="h-4 w-4" />
+                    View Draft PDF
+                  </a>
+                </Button>
+              )}
+            </>
+          )}
+
+          {status === 'pending_events_review' && !discountApprovalPending && !isEventsTeam && isAdmin && draftPdfUrl && (
+            <Button variant="outline" className="min-h-10 flex-1 basis-[min(100%,11rem)]" asChild>
+              <a href={draftPdfUrl} target="_blank" rel="noreferrer">
+                <ExternalLink className="h-4 w-4" />
+                View Draft PDF
+              </a>
+            </Button>
           )}
 
           {status === 'approved' && (
@@ -509,6 +546,38 @@ export function ContractActions({
         </DialogContent>
       </Dialog>
 
+      <Dialog open={openSendBack} onOpenChange={setOpenSendBack}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send back for changes</DialogTitle>
+            <DialogDescription>The contract returns to draft for the sales rep. They will receive your notes by email.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="send-back-reason">Reason (required, min 10 characters)</Label>
+            <Textarea
+              id="send-back-reason"
+              value={sendBackReason}
+              onChange={(e) => setSendBackReason(e.target.value)}
+              rows={5}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenSendBack(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                runAction('events-send-back', 'events-send-back', { reason: sendBackReason.trim() });
+                setOpenSendBack(false);
+              }}
+              disabled={pending || sendBackReason.trim().length < 10}
+            >
+              Send back
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={openErrorDetails} onOpenChange={setOpenErrorDetails}>
         <DialogContent>
           <DialogHeader>
@@ -530,6 +599,7 @@ export function ContractActions({
 const STAGES: Array<{ key: Exclude<ContractStatus, 'cancelled' | 'error'>; label: string }> = [
   { key: 'draft', label: 'Draft' },
   { key: 'ready_for_review', label: 'Ready' },
+  { key: 'pending_events_review', label: 'Review' },
   { key: 'approved', label: 'Approved' },
   { key: 'sent', label: 'Sent' },
   { key: 'partially_signed', label: 'Partially Signed' },
@@ -553,7 +623,7 @@ function ProgressState({ progress }: { progress: { special: string | null; curre
   }
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-8 gap-1">
         {STAGES.map((stage, idx) => (
           <div key={stage.key} className="flex items-center gap-1">
             <span
@@ -573,7 +643,7 @@ function ProgressState({ progress }: { progress: { special: string | null; curre
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-7 gap-1 text-[11px] text-muted-foreground">
+      <div className="grid grid-cols-8 gap-1 text-[11px] text-muted-foreground">
         {STAGES.map((stage) => (
           <span key={stage.key}>{stage.label}</span>
         ))}

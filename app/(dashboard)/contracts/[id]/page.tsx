@@ -36,6 +36,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
   ]);
 
   const isAdmin = actor.isAdmin;
+  const isEventsTeam = actor.isEventsTeam;
   const releaseAudit = audit.find((entry) => entry.action === 'released_to_accounting' || entry.action === 'executed');
   const discountPending = requiresDiscountApproval(contract);
 
@@ -98,6 +99,61 @@ export default async function ContractDetailPage({ params }: { params: { id: str
         </div>
       )}
 
+      {contract.status === 'draft' && contract.events_sent_back_at && (
+        <div className="rounded-md border border-destructive/35 bg-destructive/5 p-4 text-sm">
+          <p className="font-semibold text-destructive">⚠ Sent back for changes</p>
+          <p className="mt-1 text-foreground/90">
+            By {contract.events_sent_back_by ?? 'events team'}{' '}
+            {contract.events_sent_back_at ? `· ${formatTimestamp(contract.events_sent_back_at)}` : ''}
+          </p>
+          {contract.events_sent_back_reason && (
+            <p className="mt-2 whitespace-pre-wrap text-foreground/85">{contract.events_sent_back_reason}</p>
+          )}
+        </div>
+      )}
+
+      {contract.status === 'pending_events_review' && (
+        <div className="rounded-md border border-sky-300 bg-sky-50 p-4 text-sky-950">
+          {isEventsTeam ? (
+            <>
+              <p className="text-sm font-semibold">Pending your team&apos;s review</p>
+              <p className="mt-1 text-sm">
+                Submitted by {contract.created_by ?? '—'}.
+                {contract.events_submitted_at && (
+                  <>
+                    {' '}
+                    · Submitted {formatTimestamp(contract.events_submitted_at)}
+                  </>
+                )}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-semibold">⏳ Submitted for events review</p>
+              <p className="mt-1 text-sm">
+                {contract.events_submitted_at
+                  ? `${formatTimestamp(contract.events_submitted_at)} — awaiting approval from the events team.`
+                  : 'Awaiting approval from the events team.'}
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
+      {contract.status === 'approved' && contract.events_approved_at && (
+        <div className="rounded-md border border-emerald-300 bg-emerald-50 p-4 text-emerald-950">
+          <p className="text-sm font-semibold">✓ Approved by events team</p>
+          <p className="mt-1 text-sm">
+            {contract.events_approved_by && <>By {contract.events_approved_by} · </>}
+            {formatTimestamp(contract.events_approved_at)}
+          </p>
+          {contract.events_approval_reason && (
+            <p className="mt-2 text-sm opacity-90">{contract.events_approval_reason}</p>
+          )}
+          <p className="mt-2 text-xs text-emerald-900/80">Ready to send via DocuSign.</p>
+        </div>
+      )}
+
       <Card>
         <CardContent className="p-4">
           <ContractActions
@@ -125,6 +181,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
             salesRep={contract.sales_rep_name ?? contract.sales_rep_email ?? null}
             createdBy={contract.created_by}
             discountApprovalPending={discountPending}
+            isEventsTeam={isEventsTeam}
           />
         </CardContent>
       </Card>
@@ -135,7 +192,10 @@ export default async function ContractDetailPage({ params }: { params: { id: str
         <Card>
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 px-6 py-4">
             <h2 className="font-serif text-lg font-semibold">Exhibitor</h2>
-            {isAdmin && (contract.status === 'approved' || contract.status === 'ready_for_review') && (
+            {isAdmin &&
+              (contract.status === 'approved' ||
+                contract.status === 'ready_for_review' ||
+                contract.status === 'pending_events_review') && (
               <SignerContactEdit
                 contractId={contract.id}
                 initialName={contract.signer_1_name}
@@ -293,6 +353,37 @@ function describeAction(entry: AuditLogEntry): { title: string; detail?: string 
       return {
         title: `Discount approval reset — booth rate changed from ${money(entry.metadata?.old_rate)} to ${money(entry.metadata?.new_rate)}`,
       };
+    case 'events_submitted':
+      return { title: 'Submitted for events team review' };
+    case 'events_approved': {
+      const meta = entry.metadata as Record<string, unknown> | null;
+      const approver = meta?.approver ? String(meta.approver) : '';
+      const reason = meta?.reason ? String(meta.reason) : '';
+      return {
+        title: approver ? `Events approval granted by ${approver}` : 'Events approval granted',
+        detail: reason || undefined,
+      };
+    }
+    case 'events_sent_back': {
+      const meta = entry.metadata as Record<string, unknown> | null;
+      const sender = meta?.sender ? String(meta.sender) : '';
+      const reason = meta?.reason ? String(meta.reason) : '';
+      return {
+        title: sender ? `Sent back for changes by ${sender}` : 'Sent back for changes',
+        detail: reason || undefined,
+      };
+    }
+    case 'events_approval_reset': {
+      const meta = entry.metadata as Record<string, unknown> | null;
+      const oldApprover = meta?.old_approver ? String(meta.old_approver) : '';
+      const reason = meta?.reason ? String(meta.reason) : '';
+      return {
+        title: oldApprover
+          ? `Events approval cleared after PDF regeneration (was ${oldApprover})`
+          : 'Events approval cleared after PDF regeneration',
+        detail: reason || undefined,
+      };
+    }
     case 'signed': return { title: 'Signed by exhibitor' };
     case 'executed': return { title: 'Fully executed' };
     case 'cancelled':

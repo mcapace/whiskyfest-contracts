@@ -7,7 +7,7 @@ import { assertContractAccess } from '@/lib/auth-contract';
 import { newContractBodySchema, signerContactPatchSchema } from '@/lib/contract-schemas';
 import type { ContractStatus } from '@/types/db';
 
-const signerEditableStatuses: ContractStatus[] = ['approved', 'ready_for_review'];
+const signerEditableStatuses: ContractStatus[] = ['approved', 'ready_for_review', 'pending_events_review'];
 
 /** Signer/contact updates (pre-send) OR full draft edit. */
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {

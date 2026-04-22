@@ -10,6 +10,7 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: 'all', label: 'All statuses' },
   { value: 'draft', label: 'Draft' },
   { value: 'ready_for_review', label: 'Ready for Review' },
+  { value: 'pending_events_review', label: 'Events Review' },
   { value: 'approved', label: 'Approved' },
   { value: 'sent', label: 'Sent' },
   { value: 'partially_signed', label: 'Partially Signed' },

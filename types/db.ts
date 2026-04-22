@@ -4,6 +4,7 @@
 export type ContractStatus =
   | 'draft'
   | 'ready_for_review'
+  | 'pending_events_review'
   | 'approved'
   | 'sent'
   | 'partially_signed'
@@ -68,6 +69,13 @@ export interface Contract {
   discount_approved_at: string | null;
   discount_approved_by: string | null;
   discount_approval_reason: string | null;
+  events_submitted_at: string | null;
+  events_approved_at: string | null;
+  events_approved_by: string | null;
+  events_approval_reason: string | null;
+  events_sent_back_at: string | null;
+  events_sent_back_by: string | null;
+  events_sent_back_reason: string | null;
   accounting_notified_at: string | null;
   created_by: string | null;
   created_at: string;
@@ -100,6 +108,7 @@ export interface AppUser {
   name: string | null;
   role: UserRole;
   is_active: boolean;
+  is_events_team?: boolean;
   created_at: string;
 }
 
@@ -120,6 +129,11 @@ export interface SalesRep {
 export const STATUS_META: Record<ContractStatus, { label: string; tone: string; order: number }> = {
   draft:             { label: 'Draft',            tone: 'bg-whisky-100 text-whisky-900 border-whisky-300', order: 1 },
   ready_for_review:  { label: 'Ready for Review', tone: 'bg-amber-100 text-amber-900 border-amber-300',    order: 2 },
+  pending_events_review: {
+    label: 'Events Review',
+    tone: 'bg-sky-100 text-sky-900 border-sky-300',
+    order: 2.5,
+  },
   approved:          { label: 'Approved',         tone: 'bg-blue-100 text-blue-900 border-blue-300',       order: 3 },
   sent:              { label: 'Sent',             tone: 'bg-indigo-100 text-indigo-900 border-indigo-300', order: 4 },
   partially_signed:  { label: 'Partially Signed', tone: 'bg-violet-100 text-violet-900 border-violet-300', order: 4.5 },

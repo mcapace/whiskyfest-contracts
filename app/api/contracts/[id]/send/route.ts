@@ -60,6 +60,14 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       { status: 403 },
     );
   }
+
+  if (!contract.events_approved_at) {
+    log('FAIL events approval required');
+    return NextResponse.json(
+      { error: 'Events team approval is required before this contract can be sent to DocuSign.' },
+      { status: 403 },
+    );
+  }
   log('contract loaded', {
     status: contract.status,
     exhibitor: contract.exhibitor_company_name,

@@ -4,4 +4,5 @@ import { revalidatePath } from 'next/cache';
 export function revalidateContractPaths(contractId: string) {
   revalidatePath(`/contracts/${contractId}`);
   revalidatePath('/contracts');
+  revalidatePath('/');
 }

@@ -10,6 +10,7 @@ export interface AppUserRow {
   role: string;
   is_active: boolean;
   name: string | null;
+  is_events_team: boolean;
 }
 
 /** Admins trump sales rep; non-admins must have an active sales_reps row for contract access. */
@@ -34,7 +35,7 @@ export async function resolveContractActor(session: Session | null): Promise<
   const supabase = getSupabaseAdmin();
   const { data: appUser, error } = await supabase
     .from('app_users')
-    .select('email, role, is_active, name')
+    .select('email, role, is_active, name, is_events_team')
     .eq('email', email)
     .single();
 
@@ -61,7 +62,10 @@ export async function resolveContractActor(session: Session | null): Promise<
     ok: true,
     actor: {
       email,
-      appUser: appUser as AppUserRow,
+      appUser: {
+        ...(appUser as object),
+        is_events_team: Boolean((appUser as { is_events_team?: boolean }).is_events_team),
+      } as AppUserRow,
       isAdmin,
       salesRepId,
     },
@@ -120,6 +124,7 @@ export interface PageContractActor {
   isAdmin: boolean;
   salesRepId: string | null;
   role: string;
+  isEventsTeam: boolean;
 }
 
 export async function requireContractActorForPage(): Promise<PageContractActor> {
@@ -130,7 +135,7 @@ export async function requireContractActorForPage(): Promise<PageContractActor> 
   const supabase = getSupabaseAdmin();
   const { data: appUser } = await supabase
     .from('app_users')
-    .select('role, is_active')
+    .select('role, is_active, is_events_team')
     .eq('email', email)
     .single();
 
@@ -152,7 +157,13 @@ export async function requireContractActorForPage(): Promise<PageContractActor> 
     redirect('/auth/login');
   }
 
-  return { email, isAdmin, salesRepId, role: appUser.role };
+  return {
+    email,
+    isAdmin,
+    salesRepId,
+    role: appUser.role,
+    isEventsTeam: Boolean(appUser.is_events_team),
+  };
 }
 
 export async function getContractWithTotalsForViewer(
