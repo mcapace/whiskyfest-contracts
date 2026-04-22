@@ -1,17 +1,4 @@
--- Events team approval gate + pending_events_review status
-
-do $$
-begin
-  if not exists (
-    select 1
-    from pg_enum e
-    join pg_type t on e.enumtypid = t.oid
-    where t.typname = 'contract_status'
-      and e.enumlabel = 'pending_events_review'
-  ) then
-    alter type contract_status add value 'pending_events_review';
-  end if;
-end $$;
+-- Events team approval gate (columns, seed, index uses pending_events_review — runs after 013a)
 
 alter table app_users
   add column if not exists is_events_team boolean not null default false;
