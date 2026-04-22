@@ -11,3 +11,13 @@ export function isDiscountedRate(boothCents: number): boolean {
 export function requiresDiscountApproval(contract: Pick<Contract, 'booth_rate_cents' | 'discount_approved_at'>): boolean {
   return isDiscountedRate(contract.booth_rate_cents) && !contract.discount_approved_at;
 }
+
+export function calculateListSubtotalCents(boothCount: number): number {
+  return boothCount * STANDARD_BOOTH_RATE_CENTS;
+}
+
+export function calculateDiscountCents(boothCount: number, actualRateCents: number): number {
+  const listTotal = boothCount * STANDARD_BOOTH_RATE_CENTS;
+  const actualTotal = boothCount * actualRateCents;
+  return Math.max(0, listTotal - actualTotal);
+}

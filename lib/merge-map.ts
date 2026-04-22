@@ -1,4 +1,10 @@
 import { formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
+import {
+  calculateDiscountCents,
+  calculateListSubtotalCents,
+  isDiscountedRate,
+  STANDARD_BOOTH_RATE_CENTS,
+} from '@/lib/contracts';
 import { formatCurrency } from '@/lib/utils';
 import { formatEventDateForMerge, getAgreementDatePartsInDisplayZone } from '@/lib/datetime';
 import type { ContractWithTotals, Event } from '@/types/db';
@@ -28,6 +34,18 @@ export function buildContractMergeMap(
   mode: MergePlaceholderMode,
 ): Record<string, string> {
   const agreement = getAgreementDatePartsInDisplayZone();
+
+  const discounted = isDiscountedRate(contract.booth_rate_cents);
+  const listBoothRateDisplay = formatCurrency(STANDARD_BOOTH_RATE_CENTS);
+  let discountDescription = '';
+  let discountAmountDisplay = '';
+  let listSubtotalDisplay = '';
+  if (discounted) {
+    discountDescription = 'Negotiated discount';
+    const discountCents = calculateDiscountCents(contract.booth_count, contract.booth_rate_cents);
+    discountAmountDisplay = `-${formatCurrency(discountCents)}`;
+    listSubtotalDisplay = formatCurrency(calculateListSubtotalCents(contract.booth_count));
+  }
 
   const anchors =
     mode === 'draft'
@@ -64,6 +82,10 @@ export function buildContractMergeMap(
     '{{additional_brand_count}}': String(contract.additional_brand_count),
     '{{additional_brand_fee}}': formatCurrency(contract.additional_brand_fee_cents).replace('$', '').trim(),
     '{{grand_total}}': formatCurrency(contract.grand_total_cents).replace('$', '').trim(),
+    '{{list_booth_rate}}': listBoothRateDisplay,
+    '{{discount_description}}': discountDescription,
+    '{{discount_amount}}': discountAmountDisplay,
+    '{{list_subtotal}}': listSubtotalDisplay,
     '{{signer_1_name}}': contract.signer_1_name ?? '',
     '{{signer_1_title}}': contract.signer_1_title ?? '',
     '{{shanken_signatory_name}}': event.shanken_signatory_name,
