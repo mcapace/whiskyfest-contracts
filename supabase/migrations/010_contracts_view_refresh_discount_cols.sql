@@ -1,8 +1,13 @@
 -- Re-expand contracts_with_totals so `c.*` includes columns added after the view was last
--- replaced (e.g. discount_approved_* from 009_discount_approval.sql).
+-- created (e.g. discount_approved_* from 009_discount_approval.sql).
 -- Postgres does not automatically add new base-table columns to an existing view.
+--
+-- `CREATE OR REPLACE VIEW` fails when `c.*` gains columns: output column order/names at
+-- each position no longer match the old view (error 42P16). Must drop and recreate.
 
-create or replace view contracts_with_totals as
+drop view if exists contracts_with_totals;
+
+create view contracts_with_totals as
 select
   c.*,
   (c.booth_count * c.booth_rate_cents) as booth_subtotal_cents,
