@@ -329,7 +329,13 @@ function describeAction(entry: AuditLogEntry): { title: string; detail?: string 
       return { title: 'Contract created' };
     case 'contract_created': {
       const meta = entry.metadata as Record<string, unknown> | null;
-      const rep = meta?.sales_rep_name ? String(meta.sales_rep_name) : '';
+      const rep = String(meta?.rep_name ?? meta?.sales_rep_name ?? '');
+      const creatorName = meta?.created_by_name ? String(meta.created_by_name) : '';
+      if (meta?.on_behalf_of && creatorName && rep) {
+        return {
+          title: `Contract created by ${creatorName} on behalf of ${rep}`,
+        };
+      }
       const ob = meta?.on_behalf_of ? ' (on behalf of sales rep)' : '';
       return { title: `Contract created${ob}`, detail: rep ? `Sales rep: ${rep}` : undefined };
     }

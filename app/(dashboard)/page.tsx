@@ -21,8 +21,8 @@ async function getDashboardData(actor: Awaited<ReturnType<typeof requireContract
     .order('created_at', { ascending: false })
     .limit(50);
 
-  if (!actor.isAdmin && actor.salesRepId) {
-    contractsQuery = contractsQuery.eq('sales_rep_id', actor.salesRepId);
+  if (!actor.isAdmin && actor.accessibleSalesRepIds.length > 0) {
+    contractsQuery = contractsQuery.in('sales_rep_id', actor.accessibleSalesRepIds);
   }
 
   let pendingQuery = supabase
@@ -33,8 +33,8 @@ async function getDashboardData(actor: Awaited<ReturnType<typeof requireContract
     .order('created_at', { ascending: false })
     .limit(25);
 
-  if (!actor.isAdmin && actor.salesRepId) {
-    pendingQuery = pendingQuery.eq('sales_rep_id', actor.salesRepId);
+  if (!actor.isAdmin && actor.accessibleSalesRepIds.length > 0) {
+    pendingQuery = pendingQuery.in('sales_rep_id', actor.accessibleSalesRepIds);
   }
 
   const pendingEventsQuery = actor.isEventsTeam
@@ -92,7 +92,11 @@ export default async function DashboardPage() {
     { label: 'Executed', count: contracts.filter(c => c.status === 'executed').length, tone: 'bg-emerald-100 text-emerald-900 border-emerald-200', href: '/contracts?status=executed' },
   ];
 
-  const pendingHeading = actor.isAdmin ? 'Pending Your Approval' : 'My Pending Approvals';
+  const pendingHeading = actor.isAdmin
+    ? 'Pending Your Approval'
+    : actor.salesRepId
+      ? 'My Pending Approvals'
+      : 'Pending discount approvals';
 
   return (
     <div className="space-y-8">

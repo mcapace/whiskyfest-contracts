@@ -32,8 +32,8 @@ async function loadContracts(
   const supabase = getSupabaseAdmin();
   let query = supabase.from('contracts_with_totals').select('*').order('created_at', { ascending: false }).limit(200);
 
-  if (!actor.isAdmin && actor.salesRepId) {
-    query = query.eq('sales_rep_id', actor.salesRepId);
+  if (!actor.isAdmin && actor.accessibleSalesRepIds.length > 0) {
+    query = query.in('sales_rep_id', actor.accessibleSalesRepIds);
   }
 
   const status = searchParams.status;

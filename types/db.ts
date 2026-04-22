@@ -129,6 +129,13 @@ export interface SalesRep {
   updated_at: string;
 }
 
+export interface RepAssistant {
+  id: string;
+  assistant_email: string;
+  rep_id: string;
+  created_at: string;
+}
+
 // ---------------------------------------------------------------------------
 // UI-facing status metadata (labels, colors, ordering)
 // ---------------------------------------------------------------------------

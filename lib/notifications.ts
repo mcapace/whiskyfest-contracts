@@ -9,6 +9,23 @@ function formatCents(n: number): string {
   return `$${(n / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/** Active app_users assistant emails mapped to support this rep's contracts. */
+export async function getAssistantEmailsForRep(repId: string): Promise<string[]> {
+  const supabase = getSupabaseAdmin();
+  const { data: rows } = await supabase.from('rep_assistants').select('assistant_email').eq('rep_id', repId);
+
+  const assistantEmails = [...new Set((rows ?? []).map((r) => String((r as { assistant_email: string }).assistant_email).toLowerCase()))];
+  if (assistantEmails.length === 0) return [];
+
+  const { data: activeUsers } = await supabase
+    .from('app_users')
+    .select('email')
+    .eq('is_active', true)
+    .in('email', assistantEmails);
+
+  return [...new Set((activeUsers ?? []).map((u) => String((u as { email: string }).email).toLowerCase()))];
+}
+
 function appContractUrl(contractId: string): string {
   const explicit = process.env['NEXTAUTH_URL']?.replace(/\/$/, '');
   if (explicit) return `${explicit}/contracts/${contractId}`;
@@ -160,9 +177,14 @@ export async function notifySalesRepDiscountApproved(
     </div>
   `;
 
+  const ccAssistants = (await getAssistantEmailsForRep(contract.sales_rep_id)).filter(
+    (a) => a.toLowerCase() !== toAddress.toLowerCase(),
+  );
+
   await sgMail.send({
     from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
     to: toAddress,
+    ...(ccAssistants.length > 0 ? { cc: ccAssistants } : {}),
     subject,
     text,
     html,
@@ -203,6 +225,11 @@ export async function notifyPartialSignature(
   }
 
   if (repEmail) adminSet.add(repEmail);
+
+  if (contract.sales_rep_id) {
+    const assistants = await getAssistantEmailsForRep(contract.sales_rep_id);
+    for (const a of assistants) adminSet.add(a);
+  }
 
   const recipients = [...adminSet];
   if (recipients.length === 0) {
@@ -357,9 +384,14 @@ export async function notifySalesRepEventsApproved(
     </div>
   `;
 
+  const ccAssistants = (await getAssistantEmailsForRep(contract.sales_rep_id)).filter(
+    (a) => a.toLowerCase() !== toAddress.toLowerCase(),
+  );
+
   await sgMail.send({
     from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
     to: toAddress,
+    ...(ccAssistants.length > 0 ? { cc: ccAssistants } : {}),
     subject,
     text,
     html,
@@ -409,9 +441,14 @@ export async function notifySalesRepContractSentBack(
     </div>
   `;
 
+  const ccAssistants = (await getAssistantEmailsForRep(contract.sales_rep_id)).filter(
+    (a) => a.toLowerCase() !== toAddress.toLowerCase(),
+  );
+
   await sgMail.send({
     from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
     to: toAddress,
+    ...(ccAssistants.length > 0 ? { cc: ccAssistants } : {}),
     subject,
     text,
     html,

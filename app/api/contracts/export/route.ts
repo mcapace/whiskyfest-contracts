@@ -21,8 +21,8 @@ export async function GET() {
 
   let rowQuery = supabase.from('contracts_with_totals').select('*').order('updated_at', { ascending: false }).limit(500);
 
-  if (!gate.actor.isAdmin && gate.actor.salesRepId) {
-    rowQuery = rowQuery.eq('sales_rep_id', gate.actor.salesRepId);
+  if (!gate.actor.isAdmin && gate.actor.accessibleSalesRepIds.length > 0) {
+    rowQuery = rowQuery.in('sales_rep_id', gate.actor.accessibleSalesRepIds);
   }
 
   const [{ data: rows }, { data: events }] = await Promise.all([

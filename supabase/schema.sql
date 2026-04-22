@@ -217,6 +217,21 @@ insert into sales_reps (name, email, sort_order) values
 on conflict (email) do nothing;
 
 -- -----------------------------------------------------------------------------
+-- REP ASSISTANTS — assistants may manage contracts for assigned dept heads
+-- -----------------------------------------------------------------------------
+
+create table if not exists rep_assistants (
+  id uuid primary key default gen_random_uuid(),
+  assistant_email text not null,
+  rep_id uuid not null references sales_reps(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (assistant_email, rep_id)
+);
+
+create index if not exists rep_assistants_assistant_email_idx on rep_assistants(lower(assistant_email));
+create index if not exists rep_assistants_rep_id_idx on rep_assistants(rep_id);
+
+-- -----------------------------------------------------------------------------
 -- TRIGGERS — updated_at + audit logging
 -- -----------------------------------------------------------------------------
 
@@ -268,6 +283,7 @@ alter table events    enable row level security;
 alter table sales_reps enable row level security;
 alter table audit_log enable row level security;
 alter table app_users enable row level security;
+alter table rep_assistants enable row level security;
 
 -- Service role bypasses RLS; these permissive policies are for anon safety.
 drop policy if exists deny_anon_contracts on contracts;
@@ -286,6 +302,9 @@ create policy deny_anon_audit on audit_log for all to anon using (false);
 
 drop policy if exists deny_anon_users on app_users;
 create policy deny_anon_users on app_users for all to anon using (false);
+
+drop policy if exists deny_anon_rep_assistants on rep_assistants;
+create policy deny_anon_rep_assistants on rep_assistants for all to anon using (false);
 
 -- -----------------------------------------------------------------------------
 -- SEED — WhiskyFest NYC 2026 event + a test contract

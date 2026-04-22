@@ -26,7 +26,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       return NextResponse.json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 400 });
     }
 
-    if (!actor.isAdmin && contract.sales_rep_id !== actor.salesRepId) {
+    const contractRepId = contract.sales_rep_id;
+    if (
+      !actor.isAdmin &&
+      (!contractRepId || !actor.accessibleSalesRepIds.includes(contractRepId))
+    ) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -37,10 +41,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       const { data: repExists } = await supabase.from('sales_reps').select('id').eq('id', p.sales_rep_id).maybeSingle();
       if (!repExists) return NextResponse.json({ error: 'Invalid sales rep' }, { status: 400 });
     } else {
-      if (p.sales_rep_id !== actor.salesRepId) {
+      if (!actor.accessibleSalesRepIds.includes(p.sales_rep_id)) {
         return NextResponse.json({ error: 'Cannot reassign sales rep' }, { status: 400 });
       }
-      effectiveSalesRepId = actor.salesRepId!;
+      effectiveSalesRepId = p.sales_rep_id;
     }
 
     const incomingBoothRate = p.booth_rate_cents;

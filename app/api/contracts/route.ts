@@ -37,8 +37,8 @@ export async function GET(req: Request) {
   const supabase = getSupabaseAdmin();
   let query = supabase.from('contracts_with_totals').select('*').order('created_at', { ascending: false }).limit(200);
 
-  if (!gate.actor.isAdmin && gate.actor.salesRepId) {
-    query = query.eq('sales_rep_id', gate.actor.salesRepId);
+  if (!gate.actor.isAdmin && gate.actor.accessibleSalesRepIds.length > 0) {
+    query = query.in('sales_rep_id', gate.actor.accessibleSalesRepIds);
   }
 
   if (statusFilter && statusFilter !== 'all' && VALID.includes(statusFilter as ContractStatus)) {
@@ -82,10 +82,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid sales rep' }, { status: 400 });
     }
   } else {
-    if (!actor.salesRepId || p.sales_rep_id !== actor.salesRepId) {
-      return NextResponse.json({ error: 'Cannot assign contract to another sales rep' }, { status: 400 });
+    if (!actor.accessibleSalesRepIds.includes(p.sales_rep_id)) {
+      return NextResponse.json({ error: 'Cannot assign contract to that sales rep' }, { status: 400 });
     }
-    effectiveSalesRepId = actor.salesRepId;
+    effectiveSalesRepId = p.sales_rep_id;
   }
 
   const addrSlice = {
@@ -99,7 +99,15 @@ export async function POST(req: Request) {
 
   const bill = normalizedBillingColumns(p);
 
-  const onBehalfOf = actor.isAdmin && actor.salesRepId !== effectiveSalesRepId;
+  const { data: assignedRepLookup } = await supabase
+    .from('sales_reps')
+    .select('name, email')
+    .eq('id', effectiveSalesRepId)
+    .single();
+
+  const assignedRepEmailNorm = assignedRepLookup?.email?.trim().toLowerCase() ?? '';
+  const creatorIsAssignedRep = assignedRepEmailNorm === actor.email.toLowerCase();
+  const onBehalfMetadata = !creatorIsAssignedRep;
 
   const { data, error } = await supabase
     .from('contracts')
@@ -136,12 +144,6 @@ export async function POST(req: Request) {
 
   const row = data as Contract;
 
-  const { data: salesRepRow } = await supabase
-    .from('sales_reps')
-    .select('name, email')
-    .eq('id', effectiveSalesRepId)
-    .single();
-
   await supabase.from('audit_log').insert({
     contract_id: row.id,
     actor_email: actor.email,
@@ -149,9 +151,15 @@ export async function POST(req: Request) {
     to_status: 'draft',
     metadata: {
       created_by: actor.email,
-      sales_rep_name: salesRepRow?.name ?? null,
-      sales_rep_email: salesRepRow?.email ?? null,
-      ...(onBehalfOf ? { on_behalf_of: true } : {}),
+      sales_rep_name: assignedRepLookup?.name ?? null,
+      sales_rep_email: assignedRepLookup?.email ?? null,
+      ...(onBehalfMetadata
+        ? {
+            on_behalf_of: true,
+            created_by_name: actor.appUser.name ?? actor.email,
+            rep_name: assignedRepLookup?.name ?? null,
+          }
+        : {}),
     },
   });
 

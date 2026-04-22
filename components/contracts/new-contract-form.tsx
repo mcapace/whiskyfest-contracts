@@ -411,7 +411,7 @@ export function NewContractForm({
               value={form.sales_rep_id}
               onChange={(v) => set('sales_rep_id', v)}
               required
-              disabled={!isAdmin}
+              isAdmin={isAdmin}
             />
           </CardContent>
         </Card>
