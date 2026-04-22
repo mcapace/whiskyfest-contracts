@@ -45,6 +45,13 @@ export default async function EditDraftContractPage({ params }: { params: { id: 
           signer_1_email: c.signer_1_email ?? '',
           sales_rep_id: c.sales_rep_id ?? '',
           notes: c.notes ?? '',
+          billing_same_as_corporate: c.billing_same_as_corporate ?? true,
+          billing_address_line1: c.billing_address_line1 ?? '',
+          billing_address_line2: c.billing_address_line2 ?? '',
+          billing_city: c.billing_city ?? '',
+          billing_state: c.billing_state ?? '',
+          billing_zip: c.billing_zip ?? '',
+          billing_country: c.billing_country ?? 'United States',
         }}
       />
     </div>

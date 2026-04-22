@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { formatLongDate } from '@/lib/utils';
-import { formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
+import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { downloadCompletedPdf } from '@/lib/docusign';
 import { sendAccountingEmail } from '@/lib/email';
 import { requiresDiscountApproval } from '@/lib/contracts';
@@ -65,6 +65,8 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     );
   }
 
+  const billingSame = contract.billing_same_as_corporate ?? true;
+
   await sendAccountingEmail({
     exhibitorCompanyName: contract.exhibitor_company_name,
     exhibitorLegalName: contract.exhibitor_legal_name,
@@ -79,7 +81,9 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     signerTitle: contract.signer_1_title,
     signerEmail: contract.signer_1_email,
     exhibitorTelephone: contract.exhibitor_telephone,
-    exhibitorAddress: formatExhibitorAddressBlock(contract),
+    corporateAddressFormatted: formatExhibitorAddressBlock(contract),
+    billingSameAsCorporate: billingSame,
+    billingAddressFormatted: billingSame ? null : formatBillingAddressBlock(contract),
     signedPdfUrl: contract.signed_pdf_url,
     signedPdfBytes,
     contractId: contract.id,

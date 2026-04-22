@@ -4,7 +4,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { STANDARD_BOOTH_RATE_CENTS } from '@/lib/contracts';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { assertContractAccess } from '@/lib/auth-contract';
-import { newContractBodySchema, signerContactPatchSchema } from '@/lib/contract-schemas';
+import { newContractBodySchema, normalizedBillingColumns, signerContactPatchSchema } from '@/lib/contract-schemas';
 import type { ContractStatus } from '@/types/db';
 
 const signerEditableStatuses: ContractStatus[] = ['approved', 'ready_for_review', 'pending_events_review'];
@@ -58,6 +58,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       exhibitor_country: p.exhibitor_country ?? null,
     };
 
+    const bill = normalizedBillingColumns(p);
+
     const { error } = await supabase
       .from('contracts')
       .update({
@@ -79,6 +81,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         signer_1_email: p.signer_1_email ?? null,
         sales_rep_id: effectiveSalesRepId,
         notes: p.notes ?? null,
+        ...bill,
         ...(shouldResetDiscountApproval
           ? {
               discount_approved_at: null,

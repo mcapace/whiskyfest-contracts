@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { resolveContractActor } from '@/lib/auth-contract';
-import { newContractBodySchema } from '@/lib/contract-schemas';
+import { newContractBodySchema, normalizedBillingColumns } from '@/lib/contract-schemas';
 import { isDiscountedRate } from '@/lib/contracts';
 import { notifyAdminsOfDiscountRequest } from '@/lib/notifications';
 import type { Contract } from '@/types/db';
@@ -97,6 +97,8 @@ export async function POST(req: Request) {
     exhibitor_country: p.exhibitor_country ?? null,
   };
 
+  const bill = normalizedBillingColumns(p);
+
   const onBehalfOf = actor.isAdmin && actor.salesRepId !== effectiveSalesRepId;
 
   const { data, error } = await supabase
@@ -122,6 +124,7 @@ export async function POST(req: Request) {
       notes: p.notes ?? null,
       created_by: actor.email,
       status: 'draft',
+      ...bill,
     })
     .select()
     .single();

@@ -20,7 +20,11 @@ export interface AccountingEmailPayload {
   signerTitle: string | null;
   signerEmail: string | null;
   exhibitorTelephone: string | null;
-  exhibitorAddress: string | null;
+  /** Corporate / mailing address from contract (PDF legal address). */
+  corporateAddressFormatted: string | null;
+  /** When billing differs — use for invoice mailing. */
+  billingSameAsCorporate: boolean;
+  billingAddressFormatted: string | null;
   signedPdfUrl: string;
   signedPdfBytes: Buffer;
   contractId: string;
@@ -71,7 +75,22 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
     `Billing contact:   ${p.signerName ?? '—'}${p.signerTitle ? ', ' + p.signerTitle : ''}`,
     `                   ${p.signerEmail ?? '—'}`,
     `                   ${p.exhibitorTelephone ?? '—'}`,
-    `Billing address:   ${p.exhibitorAddress ?? '—'}`,
+    ...(p.billingSameAsCorporate
+      ? [`Contact address:   ${p.corporateAddressFormatted ?? '—'}`]
+      : [
+          ``,
+          `Billing address differs from corporate — use billing for invoice mailing.`,
+          ``,
+          `Corporate address:`,
+          ...(p.corporateAddressFormatted ?? '')
+            .split('\n')
+            .map((line) => `  ${line}`),
+          ``,
+          `Billing address:`,
+          ...(p.billingAddressFormatted ?? '')
+            .split('\n')
+            .map((line) => `  ${line}`),
+        ]),
     ``,
     `Signed PDF:        ${p.signedPdfUrl}`,
     `Contract record:   ${p.dashboardUrl}`,
@@ -107,9 +126,21 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
       <p style="margin: 4px 0; font-size: 14px;">
         ${escape(p.signerName ?? '—')}${p.signerTitle ? ', ' + escape(p.signerTitle) : ''}<br>
         ${p.signerEmail ? `<a href="mailto:${escape(p.signerEmail)}">${escape(p.signerEmail)}</a>` : '—'}<br>
-        ${escape(p.exhibitorTelephone ?? '—')}<br>
-        ${escape(p.exhibitorAddress ?? '—')}
+        ${escape(p.exhibitorTelephone ?? '—')}
       </p>
+
+      ${
+        p.billingSameAsCorporate
+          ? `<h3 style="margin-top: 24px; font-family: Georgia, serif; color: #6b3822;">Contact address</h3>
+      <p style="margin: 4px 0; font-size: 14px; white-space: pre-line;">${escape(p.corporateAddressFormatted ?? '—')}</p>`
+          : `<p style="margin-top: 20px; padding: 12px; background: #fff8e6; border-left: 4px solid #c9a227; font-size: 13px;">
+        Billing address differs from corporate — use billing for invoice mailing.
+      </p>
+      <h3 style="margin-top: 24px; font-family: Georgia, serif; color: #6b3822;">Corporate address</h3>
+      <p style="margin: 4px 0; font-size: 14px; white-space: pre-line;">${escape(p.corporateAddressFormatted ?? '—')}</p>
+      <h3 style="margin-top: 24px; font-family: Georgia, serif; color: #6b3822;">Billing address</h3>
+      <p style="margin: 4px 0; font-size: 14px; white-space: pre-line;">${escape(p.billingAddressFormatted ?? '—')}</p>`
+      }
 
       <p style="margin-top: 32px; font-size: 13px; color: #666;">
         <a href="${escape(p.signedPdfUrl)}">View signed PDF in Drive</a> ·

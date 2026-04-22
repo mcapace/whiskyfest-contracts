@@ -117,6 +117,14 @@ alter table contracts add column if not exists events_sent_back_at timestamptz;
 alter table contracts add column if not exists events_sent_back_by text;
 alter table contracts add column if not exists events_sent_back_reason text;
 
+alter table contracts add column if not exists billing_same_as_corporate boolean not null default true;
+alter table contracts add column if not exists billing_address_line1 text;
+alter table contracts add column if not exists billing_address_line2 text;
+alter table contracts add column if not exists billing_city text;
+alter table contracts add column if not exists billing_state text;
+alter table contracts add column if not exists billing_zip text;
+alter table contracts add column if not exists billing_country text;
+
 create index if not exists contracts_pending_events_review_idx
   on contracts (id)
   where status = 'pending_events_review';

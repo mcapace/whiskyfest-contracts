@@ -10,6 +10,16 @@ type Addr = Pick<
   | 'exhibitor_country'
 >;
 
+type BillingAddr = Pick<
+  Contract,
+  | 'billing_address_line1'
+  | 'billing_address_line2'
+  | 'billing_city'
+  | 'billing_state'
+  | 'billing_zip'
+  | 'billing_country'
+>;
+
 /**
  * Build multi-line address for merge/email consumption.
  * Format:
@@ -17,6 +27,31 @@ type Addr = Pick<
  *  City, ST ZIP
  *  Country (only when non-US)
  */
+/** Invoice / AP mailing — same formatting rules as corporate mailing address. */
+export function formatBillingAddressBlock(c: BillingAddr): string {
+  const lines: string[] = [];
+
+  const l1 = c.billing_address_line1?.trim();
+  if (l1) lines.push(l1);
+
+  const l2 = c.billing_address_line2?.trim();
+  if (l2) lines.push(l2);
+
+  const city = c.billing_city?.trim();
+  const st = c.billing_state?.trim();
+  const z = c.billing_zip?.trim();
+  const cityStateZip = [
+    city,
+    [st, z].filter(Boolean).join(' ').trim() || null,
+  ].filter(Boolean).join(', ');
+  if (cityStateZip) lines.push(cityStateZip);
+
+  const country = c.billing_country?.trim();
+  if (country && country !== 'United States') lines.push(country);
+
+  return lines.join('\n').trim();
+}
+
 export function formatExhibitorAddressBlock(c: Addr): string {
   const lines: string[] = [];
 

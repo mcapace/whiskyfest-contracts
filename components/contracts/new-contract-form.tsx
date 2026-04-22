@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input, Label, Textarea } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { AddressAutocomplete } from '@/components/forms/address-autocomplete';
+import { AddressAutocomplete, type BillingAddressValue } from '@/components/forms/address-autocomplete';
 import { SalesRepSelect } from '@/components/contracts/sales-rep-select';
 import type { Event } from '@/types/db';
 
@@ -34,6 +34,13 @@ export type ContractFormValues = {
   signer_1_email: string;
   sales_rep_id: string;
   notes: string;
+  billing_same_as_corporate: boolean;
+  billing_address_line1: string;
+  billing_address_line2: string;
+  billing_city: string;
+  billing_state: string;
+  billing_zip: string;
+  billing_country: string;
 };
 
 interface Props {
@@ -78,6 +85,13 @@ export function NewContractForm({
     signer_1_email:         initialValues?.signer_1_email ?? '',
     sales_rep_id:           initialValues?.sales_rep_id ?? '',
     notes:                  initialValues?.notes ?? '',
+    billing_same_as_corporate: initialValues?.billing_same_as_corporate ?? true,
+    billing_address_line1: initialValues?.billing_address_line1 ?? '',
+    billing_address_line2: initialValues?.billing_address_line2 ?? '',
+    billing_city:           initialValues?.billing_city ?? '',
+    billing_state:          initialValues?.billing_state ?? '',
+    billing_zip:            initialValues?.billing_zip ?? '',
+    billing_country:       initialValues?.billing_country ?? 'United States',
   }));
 
   /** Separate from `booth_rate_cents` so typing isn't overwritten every render by .toFixed(2). */
@@ -131,6 +145,10 @@ export function NewContractForm({
     setForm((f) => ({ ...f, ...patch }));
   }, []);
 
+  const patchBillingAddress = useCallback((patch: Partial<BillingAddressValue>) => {
+    setForm((f) => ({ ...f, ...patch }));
+  }, []);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
@@ -145,10 +163,24 @@ export function NewContractForm({
       const url = editContractId ? `/api/contracts/${editContractId}` : '/api/contracts';
       const method = editContractId ? 'PATCH' : 'POST';
 
+      const payload =
+        form.billing_same_as_corporate
+          ? {
+              ...form,
+              billing_same_as_corporate: true,
+              billing_address_line1: null,
+              billing_address_line2: null,
+              billing_city: null,
+              billing_state: null,
+              billing_zip: null,
+              billing_country: null,
+            }
+          : form;
+
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -234,6 +266,56 @@ export function NewContractForm({
                 onChange={patchAddress}
               />
             </div>
+
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+              <p className="mb-3 text-sm font-medium">Billing address</p>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Invoice mailing may differ from your corporate mailing address. The signed PDF still shows only the corporate address (legal clarity).
+              </p>
+              <label className="flex cursor-pointer items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4 rounded border-input"
+                  checked={form.billing_same_as_corporate}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setForm((f) => ({
+                      ...f,
+                      billing_same_as_corporate: checked,
+                      ...(checked
+                        ? {
+                            billing_address_line1: '',
+                            billing_address_line2: '',
+                            billing_city: '',
+                            billing_state: '',
+                            billing_zip: '',
+                            billing_country: 'United States',
+                          }
+                        : {}),
+                    }));
+                  }}
+                />
+                <span>Same as mailing address</span>
+              </label>
+
+              {!form.billing_same_as_corporate && (
+                <div className="mt-4">
+                  <AddressAutocomplete
+                    mode="billing"
+                    value={{
+                      billing_address_line1: form.billing_address_line1,
+                      billing_address_line2: form.billing_address_line2,
+                      billing_city: form.billing_city,
+                      billing_state: form.billing_state,
+                      billing_zip: form.billing_zip,
+                      billing_country: form.billing_country,
+                    }}
+                    onChange={patchBillingAddress}
+                  />
+                </div>
+              )}
+            </div>
+
             <Field label="Telephone">
               <Input value={form.exhibitor_telephone} onChange={e => set('exhibitor_telephone', e.target.value)} placeholder="(502) 555-0100" />
             </Field>

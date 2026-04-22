@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getContractWithTotalsForViewer } from '@/lib/auth-contract';
-import { formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
+import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { requiresDiscountApproval, STANDARD_BOOTH_RATE_CENTS } from '@/lib/contracts';
 import { cn, formatCurrency, formatLongDate, formatTimestamp } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -213,7 +213,10 @@ export default async function ContractDetailPage({ params }: { params: { id: str
           <CardContent className="space-y-3 p-6 text-sm">
             <Detail label="Legal Name"   value={contract.exhibitor_legal_name} />
             <Detail label="Display Name" value={contract.exhibitor_company_name} />
-            <Detail label="Address"      value={formatExhibitorAddressBlock(contract)} multiline />
+            <Detail label="Address" value={formatExhibitorAddressBlock(contract)} multiline />
+            {contract.billing_same_as_corporate === false && (
+              <Detail label="Billing Address" value={formatBillingAddressBlock(contract)} multiline />
+            )}
             <Detail label="Telephone"    value={contract.exhibitor_telephone} />
             <Detail label="Brands"       value={contract.brands_poured} />
             <Detail label="Sales Rep"    value={contract.sales_rep_name ?? contract.sales_rep_email ?? '—'} />

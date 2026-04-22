@@ -76,6 +76,13 @@ export interface Contract {
   events_sent_back_at: string | null;
   events_sent_back_by: string | null;
   events_sent_back_reason: string | null;
+  billing_same_as_corporate: boolean;
+  billing_address_line1: string | null;
+  billing_address_line2: string | null;
+  billing_city: string | null;
+  billing_state: string | null;
+  billing_zip: string | null;
+  billing_country: string | null;
   accounting_notified_at: string | null;
   created_by: string | null;
   created_at: string;
