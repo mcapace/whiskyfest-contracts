@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useTransition } from 'react';
+import { useCallback, useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import Link from 'next/link';
@@ -38,7 +38,7 @@ export function NewContractForm({ events, currentUserEmail }: Props) {
     exhibitor_telephone:    '',
     brands_poured:          '',
     booth_count:            1,
-    additional_brand_count: 0,
+    booth_rate_cents:       defaultEvent?.booth_rate_cents ?? 1500000,
     signer_1_name:          '',
     signer_1_title:         '',
     signer_1_email:         '',
@@ -46,11 +46,14 @@ export function NewContractForm({ events, currentUserEmail }: Props) {
     notes:                  '',
   });
 
-  const selectedEvent   = events.find(e => e.id === form.event_id);
-  const boothRateCents  = selectedEvent?.booth_rate_cents ?? 1500000;
-  const boothSubtotal   = form.booth_count * boothRateCents;
-  const additionalFee   = form.additional_brand_count * 30000;
-  const grandTotal      = boothSubtotal + additionalFee;
+  const selectedEvent = events.find(e => e.id === form.event_id);
+  const boothSubtotal = form.booth_count * form.booth_rate_cents;
+  const grandTotal = boothSubtotal;
+
+  useEffect(() => {
+    if (!selectedEvent) return;
+    setForm((f) => ({ ...f, booth_rate_cents: selectedEvent.booth_rate_cents ?? 1500000 }));
+  }, [selectedEvent?.id]);
 
   function set<K extends keyof typeof form>(k: K, v: typeof form[K]) {
     setForm(f => ({ ...f, [k]: v }));
@@ -81,7 +84,7 @@ export function NewContractForm({ events, currentUserEmail }: Props) {
       const res = await fetch('/api/contracts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, booth_rate_cents: boothRateCents }),
+        body: JSON.stringify(form),
       });
 
       if (!res.ok) {
@@ -169,32 +172,38 @@ export function NewContractForm({ events, currentUserEmail }: Props) {
         <Card>
           <CardHeader>
             <CardTitle>Pricing</CardTitle>
-            <CardDescription>Booth count and additional brands — grand total updates live.</CardDescription>
+            <CardDescription>Booth count and booth rate — grand total updates live.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Booth Count" hint={`@ ${formatCurrency(boothRateCents)} per booth`}>
+              <Field label="Booth Count">
                 <Input type="number" min={1} value={form.booth_count}
                   onChange={e => set('booth_count', Math.max(1, parseInt(e.target.value) || 1))} />
               </Field>
-              <Field label="Additional Brands" hint="@ $300 per additional brand beyond the first">
-                <Input type="number" min={0} value={form.additional_brand_count}
-                  onChange={e => set('additional_brand_count', Math.max(0, parseInt(e.target.value) || 0))} />
+              <Field label="Booth Rate (USD)" hint="Editable for custom booth pricing">
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={(form.booth_rate_cents / 100).toFixed(2)}
+                  onChange={e => {
+                    const dollars = Math.max(0, parseFloat(e.target.value || '0') || 0);
+                    set('booth_rate_cents', Math.round(dollars * 100));
+                  }}
+                />
               </Field>
             </div>
+
+            <p className="text-xs text-muted-foreground">
+              Misc add-ons can be captured in internal notes when applicable.
+            </p>
 
             {/* Live total */}
             <div className="mt-6 rounded-lg border border-fest-600/20 bg-gradient-to-br from-fest-600/[0.07] to-whisky-50/50 p-5">
               <div className="flex items-baseline justify-between text-sm">
-                <span className="text-muted-foreground">Booths ({form.booth_count} × {formatCurrency(boothRateCents)})</span>
+                <span className="text-muted-foreground">Booths ({form.booth_count} × {formatCurrency(form.booth_rate_cents)})</span>
                 <span className="font-mono tabular-nums">{formatCurrency(boothSubtotal)}</span>
               </div>
-              {form.additional_brand_count > 0 && (
-                <div className="mt-1.5 flex items-baseline justify-between text-sm">
-                  <span className="text-muted-foreground">Additional brands ({form.additional_brand_count} × $300)</span>
-                  <span className="font-mono tabular-nums">{formatCurrency(additionalFee)}</span>
-                </div>
-              )}
               <div className="mt-4 flex items-baseline justify-between border-t border-fest-600/15 pt-3">
                 <span className="font-serif text-lg font-semibold">Grand Total</span>
                 <span className="font-serif text-2xl font-semibold tabular-nums text-fest-900">

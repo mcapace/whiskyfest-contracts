@@ -153,9 +153,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
           <CardContent className="space-y-3 p-6 text-sm">
             <Detail label="Booth Count" value={String(contract.booth_count)} />
             <Detail label="Booth Rate"  value={formatCurrency(contract.booth_rate_cents)} mono />
-            <Detail label="Booth Subtotal" value={formatCurrency(contract.booth_subtotal_cents)} mono />
-            <Detail label="Additional Brands" value={String(contract.additional_brand_count)} />
-            <Detail label="Additional Fee"   value={formatCurrency(contract.additional_brand_fee_cents)} mono />
+            <Detail label="Booth Total" value={formatCurrency(contract.booth_subtotal_cents)} mono />
             <div className="border-t border-border/50 pt-3">
               <div className="flex items-baseline justify-between">
                 <span className="font-serif text-base font-semibold">Grand Total</span>

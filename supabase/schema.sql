@@ -124,8 +124,8 @@ create or replace view contracts_with_totals as
 select
   c.*,
   (c.booth_count * c.booth_rate_cents)                        as booth_subtotal_cents,
-  (c.additional_brand_count * 30000)                          as additional_brand_fee_cents,
-  (c.booth_count * c.booth_rate_cents) + (c.additional_brand_count * 30000) as grand_total_cents,
+  0::int                                                      as additional_brand_fee_cents,
+  (c.booth_count * c.booth_rate_cents)                        as grand_total_cents,
   sr.name as sales_rep_name,
   sr.email as sales_rep_email
 from contracts c
