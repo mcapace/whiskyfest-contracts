@@ -1,20 +1,19 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
+import { assertContractAccess } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
-  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const gate = await assertContractAccess(session, params.id, {
+    allowedStatuses: ['ready_for_review'],
+  });
+  if (!gate.ok) return gate.response;
 
   const supabase = getSupabaseAdmin();
-  const { data: contract } = await supabase
-    .from('contracts')
-    .select('id, booth_rate_cents, discount_approved_at')
-    .eq('id', params.id)
-    .single();
-  if (!contract) return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
+  const contract = gate.contract;
   if (requiresDiscountApproval(contract)) {
     return NextResponse.json(
       { error: 'Discount approval required before contract can be approved for sending.' },

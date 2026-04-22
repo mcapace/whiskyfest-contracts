@@ -23,7 +23,7 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 do $$ begin
-  create type user_role as enum ('admin', 'sales', 'viewer');
+  create type user_role as enum ('admin', 'sales', 'sales_rep', 'viewer');
 exception when duplicate_object then null; end $$;
 
 -- -----------------------------------------------------------------------------
@@ -213,9 +213,6 @@ begin
   if (tg_op = 'UPDATE' and old.status is distinct from new.status) then
     insert into audit_log (contract_id, actor_email, action, from_status, to_status, metadata)
     values (new.id, current_setting('app.current_user_email', true), 'status_changed', old.status, new.status, null);
-  elsif (tg_op = 'INSERT') then
-    insert into audit_log (contract_id, actor_email, action, to_status, metadata)
-    values (new.id, new.created_by, 'created', new.status, null);
   end if;
   return new;
 end $$ language plpgsql;

@@ -12,7 +12,7 @@ export type ContractStatus =
   | 'cancelled'
   | 'error';
 
-export type UserRole = 'admin' | 'sales' | 'viewer';
+export type UserRole = 'admin' | 'sales' | 'sales_rep' | 'viewer';
 
 export interface Event {
   id: string;

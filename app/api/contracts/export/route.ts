@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/api-auth';
+import { auth } from '@/lib/auth';
+import { resolveContractActor } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { ContractWithTotals, Event } from '@/types/db';
 
@@ -12,12 +13,20 @@ function csvEscape(value: string | number | null | undefined): string {
 }
 
 export async function GET() {
-  const gate = await requireAuth();
-  if (!gate.ok) return gate.res;
+  const session = await auth();
+  const gate = await resolveContractActor(session);
+  if (!gate.ok) return gate.response;
 
   const supabase = getSupabaseAdmin();
+
+  let rowQuery = supabase.from('contracts_with_totals').select('*').order('updated_at', { ascending: false }).limit(500);
+
+  if (!gate.actor.isAdmin && gate.actor.salesRepId) {
+    rowQuery = rowQuery.eq('sales_rep_id', gate.actor.salesRepId);
+  }
+
   const [{ data: rows }, { data: events }] = await Promise.all([
-    supabase.from('contracts_with_totals').select('*').order('updated_at', { ascending: false }).limit(500),
+    rowQuery,
     supabase.from('events').select('*'),
   ]);
 
@@ -51,7 +60,7 @@ export async function GET() {
         csvEscape(totalUsd),
         csvEscape(c.signer_1_email),
         csvEscape(c.updated_at),
-      ].join(',')
+      ].join(','),
     );
   }
 

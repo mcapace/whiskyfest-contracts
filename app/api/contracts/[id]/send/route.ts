@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
+import { assertContractAccess } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { renderContractPdfFromTemplate } from '@/lib/google';
 import { sendEnvelope } from '@/lib/docusign';
@@ -32,11 +33,14 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   log('START', { contractId: params.id });
 
   const session = await auth();
-  if (!session?.user?.email) {
-    log('FAIL unauthorized');
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  log('auth check');
+
+  const access = await assertContractAccess(session, params.id, { allowedStatuses: ['approved'] });
+  if (!access.ok) {
+    log('FAIL access denied');
+    return access.response;
   }
-  log('auth ok', { user: session.user.email });
+  log('auth ok', { user: session?.user?.email });
 
   const supabase = getSupabaseAdmin();
 
@@ -162,7 +166,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
     await supabase.from('audit_log').insert({
       contract_id: contract.id,
-      actor_email: session.user.email,
+      actor_email: access.actor.email,
       action: 'pdf_sent',
       metadata: {
         envelope_id: envelopeId,
@@ -198,7 +202,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
     await supabase.from('audit_log').insert({
       contract_id: contract.id,
-      actor_email: session.user.email,
+      actor_email: access.actor.email,
       action: 'pdf_send_failed',
       metadata: { error: message.slice(0, 500) },
     });

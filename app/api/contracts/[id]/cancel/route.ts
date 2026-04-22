@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
+import { assertContractAccess } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 
@@ -10,7 +11,8 @@ const schema = z.object({
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
-  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const gate = await assertContractAccess(session, params.id, { adminOnly: true, skipOwnership: true });
+  if (!gate.ok) return gate.response;
 
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
@@ -19,12 +21,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }
 
   const supabase = getSupabaseAdmin();
-
-  // Load current state so we can validate and log
-  const { data: current } = await supabase
-    .from('contracts').select('id, status').eq('id', params.id).single();
-
-  if (!current) return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
+  const current = { id: gate.contract.id, status: gate.contract.status };
 
   // Can cancel from any status EXCEPT executed/cancelled
   if (current.status === 'executed' || current.status === 'cancelled') {
@@ -40,7 +37,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       status:            'cancelled',
       cancelled_reason:  parsed.data.reason,
       cancelled_at:      new Date().toISOString(),
-      cancelled_by:      session.user.email,
+      cancelled_by:      gate.actor.email,
     })
     .eq('id', params.id);
 
@@ -52,7 +49,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   // Extra audit entry with the reason in metadata (status change is already logged by trigger)
   await supabase.from('audit_log').insert({
     contract_id: params.id,
-    actor_email: session.user.email,
+    actor_email: gate.actor.email,
     action:      'cancelled',
     from_status: current.status,
     to_status:   'cancelled',

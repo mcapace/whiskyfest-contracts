@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
+import { assertContractAccess } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { mergeAndExportPdf } from '@/lib/google';
 import { buildContractMergeMap } from '@/lib/merge-map';
@@ -10,7 +11,10 @@ export const runtime = 'nodejs';
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
-  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const gate = await assertContractAccess(session, params.id, {
+    allowedStatuses: ['draft', 'ready_for_review'],
+  });
+  if (!gate.ok) return gate.response;
 
   const supabase = getSupabaseAdmin();
 
@@ -56,7 +60,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     await supabase.from('audit_log').insert({
       contract_id: contract.id,
-      actor_email: session.user.email,
+      actor_email: gate.actor.email,
       action: 'pdf_generated',
       metadata: { file_id: fileId, file_url: webViewLink },
     });

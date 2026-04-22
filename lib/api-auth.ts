@@ -25,11 +25,11 @@ export async function requireAdmin(): Promise<
   const supabase = getSupabaseAdmin();
   const { data: appUser } = await supabase
     .from('app_users')
-    .select('role')
+    .select('role, is_active')
     .eq('email', email)
     .single();
 
-  if (appUser?.role !== 'admin') {
+  if (!appUser?.is_active || appUser.role !== 'admin') {
     return { ok: false, res: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
   return { ok: true, session: r.session };
