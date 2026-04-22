@@ -29,8 +29,8 @@ export function NewContractForm({ events, currentUserEmail }: Props) {
     event_id:               defaultEvent?.id ?? '',
     exhibitor_legal_name:   '',
     exhibitor_company_name: '',
-    exhibitor_address_line_1: '',
-    exhibitor_address_line_2: '',
+    exhibitor_address_line1: '',
+    exhibitor_address_line2: '',
     exhibitor_city:          '',
     exhibitor_state:         '',
     exhibitor_zip:           '',
@@ -57,8 +57,8 @@ export function NewContractForm({ events, currentUserEmail }: Props) {
   }
 
   const patchAddress = useCallback((patch: Partial<Pick<typeof form,
-    | 'exhibitor_address_line_1'
-    | 'exhibitor_address_line_2'
+    | 'exhibitor_address_line1'
+    | 'exhibitor_address_line2'
     | 'exhibitor_city'
     | 'exhibitor_state'
     | 'exhibitor_zip'
@@ -146,8 +146,8 @@ export function NewContractForm({ events, currentUserEmail }: Props) {
               <p className="mb-3 text-sm font-medium">Mailing address</p>
               <AddressAutocomplete
                 value={{
-                  exhibitor_address_line_1: form.exhibitor_address_line_1,
-                  exhibitor_address_line_2: form.exhibitor_address_line_2,
+                  exhibitor_address_line1: form.exhibitor_address_line1,
+                  exhibitor_address_line2: form.exhibitor_address_line2,
                   exhibitor_city: form.exhibitor_city,
                   exhibitor_state: form.exhibitor_state,
                   exhibitor_zip: form.exhibitor_zip,

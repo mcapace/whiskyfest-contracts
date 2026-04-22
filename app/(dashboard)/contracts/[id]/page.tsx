@@ -124,8 +124,8 @@ export default async function ContractDetailPage({ params }: { params: { id: str
                 initialName={contract.signer_1_name}
                 initialTitle={contract.signer_1_title}
                 initialEmail={contract.signer_1_email}
-                initialAddressLine1={contract.exhibitor_address_line_1}
-                initialAddressLine2={contract.exhibitor_address_line_2}
+                initialAddressLine1={contract.exhibitor_address_line1}
+                initialAddressLine2={contract.exhibitor_address_line2}
                 initialCity={contract.exhibitor_city}
                 initialState={contract.exhibitor_state}
                 initialZip={contract.exhibitor_zip}

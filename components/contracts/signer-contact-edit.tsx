@@ -47,8 +47,8 @@ export function SignerContactEdit({
   const [title, setTitle] = useState(initialTitle ?? '');
   const [email, setEmail] = useState(initialEmail ?? '');
   const [address, setAddress] = useState({
-    exhibitor_address_line_1: initialAddressLine1 ?? '',
-    exhibitor_address_line_2: initialAddressLine2 ?? '',
+    exhibitor_address_line1: initialAddressLine1 ?? '',
+    exhibitor_address_line2: initialAddressLine2 ?? '',
     exhibitor_city: initialCity ?? '',
     exhibitor_state: initialState ?? '',
     exhibitor_zip: initialZip ?? '',
@@ -62,8 +62,8 @@ export function SignerContactEdit({
     setTitle(initialTitle ?? '');
     setEmail(initialEmail ?? '');
     setAddress({
-      exhibitor_address_line_1: initialAddressLine1 ?? '',
-      exhibitor_address_line_2: initialAddressLine2 ?? '',
+      exhibitor_address_line1: initialAddressLine1 ?? '',
+      exhibitor_address_line2: initialAddressLine2 ?? '',
       exhibitor_city: initialCity ?? '',
       exhibitor_state: initialState ?? '',
       exhibitor_zip: initialZip ?? '',
@@ -81,8 +81,8 @@ export function SignerContactEdit({
           signer_1_name: name.trim(),
           signer_1_title: title.trim() || null,
           signer_1_email: email.trim(),
-          exhibitor_address_line_1: address.exhibitor_address_line_1.trim(),
-          exhibitor_address_line_2: address.exhibitor_address_line_2.trim() || null,
+          exhibitor_address_line1: address.exhibitor_address_line1.trim(),
+          exhibitor_address_line2: address.exhibitor_address_line2.trim() || null,
           exhibitor_city: address.exhibitor_city.trim(),
           exhibitor_state: address.exhibitor_state.trim(),
           exhibitor_zip: address.exhibitor_zip.trim(),
@@ -165,7 +165,7 @@ export function SignerContactEdit({
               pending ||
               !name.trim() ||
               !email.trim() ||
-              !address.exhibitor_address_line_1.trim() ||
+              !address.exhibitor_address_line1.trim() ||
               !address.exhibitor_city.trim() ||
               !address.exhibitor_state.trim() ||
               !address.exhibitor_zip.trim() ||

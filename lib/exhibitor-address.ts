@@ -2,8 +2,8 @@ import type { Contract } from '@/types/db';
 
 type Addr = Pick<
   Contract,
-  | 'exhibitor_address_line_1'
-  | 'exhibitor_address_line_2'
+  | 'exhibitor_address_line1'
+  | 'exhibitor_address_line2'
   | 'exhibitor_city'
   | 'exhibitor_state'
   | 'exhibitor_zip'
@@ -20,10 +20,10 @@ type Addr = Pick<
 export function formatExhibitorAddressBlock(c: Addr): string {
   const lines: string[] = [];
 
-  const l1 = c.exhibitor_address_line_1?.trim();
+  const l1 = c.exhibitor_address_line1?.trim();
   if (l1) lines.push(l1);
 
-  const l2 = c.exhibitor_address_line_2?.trim();
+  const l2 = c.exhibitor_address_line2?.trim();
   if (l2) lines.push(l2);
 
   const city = c.exhibitor_city?.trim();

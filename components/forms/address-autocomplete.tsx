@@ -14,8 +14,8 @@ import {
 import { COUNTRIES, PINNED_COUNTRIES_COUNT, parseGoogleCountry } from '@/lib/countries';
 
 export interface AddressValue {
-  exhibitor_address_line_1: string;
-  exhibitor_address_line_2: string;
+  exhibitor_address_line1: string;
+  exhibitor_address_line2: string;
   exhibitor_city: string;
   exhibitor_state: string;
   exhibitor_zip: string;
@@ -83,7 +83,7 @@ export function AddressAutocomplete({ value, onChange }: AddressAutocompleteProp
             : byType('administrative_area_level_1')?.long_name ?? '';
 
           onChange({
-            exhibitor_address_line_1: street,
+            exhibitor_address_line1: street,
             exhibitor_city: city,
             exhibitor_state: state,
             exhibitor_zip: byType('postal_code')?.long_name ?? '',
@@ -116,8 +116,8 @@ export function AddressAutocomplete({ value, onChange }: AddressAutocompleteProp
           id="addr-line-1"
           ref={line1Ref}
           autoComplete="address-line1"
-          value={value.exhibitor_address_line_1}
-          onChange={(e) => onChange({ exhibitor_address_line_1: e.target.value })}
+          value={value.exhibitor_address_line1}
+          onChange={(e) => onChange({ exhibitor_address_line1: e.target.value })}
           placeholder="123 Main Street"
           required
         />
@@ -128,8 +128,8 @@ export function AddressAutocomplete({ value, onChange }: AddressAutocompleteProp
         <Input
           id="addr-line-2"
           autoComplete="address-line2"
-          value={value.exhibitor_address_line_2}
-          onChange={(e) => onChange({ exhibitor_address_line_2: e.target.value })}
+          value={value.exhibitor_address_line2}
+          onChange={(e) => onChange({ exhibitor_address_line2: e.target.value })}
           placeholder="Suite / Floor / Unit"
         />
       </div>
