@@ -60,17 +60,17 @@ export function RecallDocusignDialog({ contractId, exhibitorName }: Props) {
       <DialogTrigger asChild>
         <Button variant="outline" className="border-amber-600/40 text-amber-950 hover:bg-amber-50">
           <Undo2 className="h-4 w-4" />
-          Recall DocuSign envelope
+          Recall DocuSign contract
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Recall envelope and unlock for edit?</DialogTitle>
+          <DialogTitle>Recall contract and unlock for edit?</DialogTitle>
           <DialogDescription>
-            This voids the DocuSign envelope for <strong className="text-foreground">{exhibitorName}</strong> and
+            This recalls the DocuSign contract for <strong className="text-foreground">{exhibitorName}</strong> and
             sets the contract back to <strong className="text-foreground">Approved</strong>. You can fix the exhibitor
             email (or other details), then use <strong className="text-foreground">Send via DocuSign</strong> again.
-            DocuSign emails recipients that the envelope was voided.
+            DocuSign emails recipients that the contract was voided.
           </DialogDescription>
         </DialogHeader>
 
@@ -96,7 +96,7 @@ export function RecallDocusignDialog({ contractId, exhibitorName }: Props) {
           </Button>
           <Button onClick={handleConfirm} disabled={pending}>
             {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-            Recall envelope
+            Recall contract
           </Button>
         </DialogFooter>
       </DialogContent>

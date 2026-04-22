@@ -44,6 +44,7 @@ export interface Contract {
   exhibitor_city: string | null;
   exhibitor_state: string | null;
   exhibitor_zip: string | null;
+  exhibitor_country: string | null;
   exhibitor_telephone: string | null;
   brands_poured: string | null;
   booth_count: number;

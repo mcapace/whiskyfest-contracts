@@ -80,7 +80,7 @@ export function SignerContactEdit({ contractId, initialName, initialTitle, initi
         <DialogHeader>
           <DialogTitle>Exhibitor signer (DocuSign)</DialogTitle>
           <DialogDescription>
-            Used as DocuSign recipient 1 (first to sign). Edit before sending, or after recalling an envelope.
+            Used as DocuSign recipient 1 (first to sign). Edit before sending, or after recalling a contract.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">

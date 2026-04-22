@@ -13,6 +13,7 @@ export interface ExhibitorAddressFormSlice {
   exhibitor_city: string;
   exhibitor_state: string;
   exhibitor_zip: string;
+  exhibitor_country: string;
 }
 
 interface Props {
@@ -92,6 +93,7 @@ export function ExhibitorAddressFields({ value, onChange }: Props) {
           let city = '';
           let state = '';
           let zip = '';
+          let country = '';
           for (const c of comp) {
             if (c.types.includes('street_number')) streetNumber = c.long_name;
             if (c.types.includes('route')) route = c.long_name;
@@ -100,6 +102,7 @@ export function ExhibitorAddressFields({ value, onChange }: Props) {
             if (c.types.includes('sublocality') && !city) city = c.long_name;
             if (c.types.includes('administrative_area_level_1')) state = c.short_name ?? '';
             if (c.types.includes('postal_code')) zip = c.long_name;
+            if (c.types.includes('country')) country = c.long_name;
           }
           const line1 = [streetNumber, route].filter(Boolean).join(' ').trim();
           onChange({
@@ -108,6 +111,7 @@ export function ExhibitorAddressFields({ value, onChange }: Props) {
             exhibitor_city: city,
             exhibitor_state: state,
             exhibitor_zip: zip,
+            exhibitor_country: country,
           });
         });
       })
@@ -195,6 +199,17 @@ export function ExhibitorAddressFields({ value, onChange }: Props) {
           value={value.exhibitor_zip}
           onChange={(e) => set({ exhibitor_zip: e.target.value })}
           placeholder="40202"
+        />
+      </div>
+
+      <div className="space-y-1.5 sm:max-w-sm">
+        <Label htmlFor="addr-country">Country</Label>
+        <Input
+          id="addr-country"
+          autoComplete="country-name"
+          value={value.exhibitor_country}
+          onChange={(e) => set({ exhibitor_country: e.target.value })}
+          placeholder="United States"
         />
       </div>
     </div>

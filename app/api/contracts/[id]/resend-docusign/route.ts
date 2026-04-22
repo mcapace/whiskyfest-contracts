@@ -21,14 +21,14 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
   if (contract.status !== 'sent' && contract.status !== 'partially_signed') {
     return NextResponse.json(
-      { error: 'Resend is only available while the envelope is sent or partially signed.' },
+      { error: 'Resend is only available while the DocuSign contract is sent or partially signed.' },
       { status: 409 },
     );
   }
 
   const envelopeId = contract.docusign_envelope_id?.trim();
   if (!envelopeId) {
-    return NextResponse.json({ error: 'No DocuSign envelope on this contract.' }, { status: 409 });
+    return NextResponse.json({ error: 'No DocuSign contract is linked to this record.' }, { status: 409 });
   }
 
   try {

@@ -36,7 +36,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return NextResponse.json(
       {
         error:
-          'Signer details can only be edited when status is Approved or Ready for Review. Recall the DocuSign envelope first if it was already sent.',
+          'Signer details can only be edited when status is Approved or Ready for Review. Recall the DocuSign contract first if it was already sent.',
       },
       { status: 409 },
     );

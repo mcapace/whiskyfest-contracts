@@ -8,6 +8,7 @@ type Addr = Pick<
   | 'exhibitor_city'
   | 'exhibitor_state'
   | 'exhibitor_zip'
+  | 'exhibitor_country'
 >;
 
 /**
@@ -27,6 +28,8 @@ export function formatExhibitorAddressBlock(c: Addr): string {
     const z = c.exhibitor_zip?.trim();
     const tail = [city, [st, z].filter(Boolean).join(' ')].filter(Boolean).join(', ');
     if (tail) lines.push(tail);
+    const country = c.exhibitor_country?.trim();
+    if (country) lines.push(country);
     return lines.join('\n');
   }
   return (c.exhibitor_address ?? '').trim();

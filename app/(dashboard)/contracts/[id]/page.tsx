@@ -220,9 +220,9 @@ function describeAction(entry: AuditLogEntry): string {
     case 'status_changed': return `Status changed from ${entry.from_status} to ${entry.to_status}`;
     case 'pdf_generated':   return 'Draft PDF generated';
     case 'docusign_sent':   return 'Sent via DocuSign';
-    case 'docusign_completed': return 'DocuSign envelope completed — signed PDF stored';
+    case 'docusign_completed': return 'DocuSign contract completed — signed PDF stored';
     case 'pdf_sent':        return 'Contract sent via DocuSign';
-    case 'docusign_recalled': return 'DocuSign envelope recalled — contract unlocked for edit';
+    case 'docusign_recalled': return 'DocuSign contract recalled — contract unlocked for edit';
     case 'docusign_resend_notification': return 'DocuSign signing email resent';
     case 'signer_contact_updated': return 'Exhibitor signer contact updated';
     case 'signed':         return 'Signed by exhibitor';

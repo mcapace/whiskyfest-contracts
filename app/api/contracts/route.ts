@@ -15,6 +15,7 @@ const schema = z.object({
   exhibitor_city:          z.string().optional().nullable(),
   exhibitor_state:         z.string().max(3).optional().nullable(),
   exhibitor_zip:           z.string().max(12).optional().nullable(),
+  exhibitor_country:       z.string().max(120).optional().nullable(),
   exhibitor_telephone:    z.string().optional().nullable(),
   brands_poured:          z.string().optional().nullable(),
   booth_count:            z.number().int().min(1),
@@ -46,6 +47,7 @@ export async function POST(req: Request) {
     | 'exhibitor_city'
     | 'exhibitor_state'
     | 'exhibitor_zip'
+    | 'exhibitor_country'
   > = {
     exhibitor_address:       p.exhibitor_address ?? null,
     exhibitor_address_line1: p.exhibitor_address_line1 ?? null,
@@ -53,6 +55,7 @@ export async function POST(req: Request) {
     exhibitor_city:          p.exhibitor_city ?? null,
     exhibitor_state:         p.exhibitor_state ?? null,
     exhibitor_zip:           p.exhibitor_zip ?? null,
+    exhibitor_country:       p.exhibitor_country ?? null,
   };
 
   const supabase = getSupabaseAdmin();
@@ -68,6 +71,7 @@ export async function POST(req: Request) {
       exhibitor_city:          addrSlice.exhibitor_city,
       exhibitor_state:         addrSlice.exhibitor_state,
       exhibitor_zip:           addrSlice.exhibitor_zip,
+      exhibitor_country:       addrSlice.exhibitor_country,
       exhibitor_telephone:     p.exhibitor_telephone ?? null,
       brands_poured:           p.brands_poured ?? null,
       booth_count:             p.booth_count,

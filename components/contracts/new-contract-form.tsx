@@ -34,6 +34,7 @@ export function NewContractForm({ events, currentUserEmail }: Props) {
     exhibitor_city:          '',
     exhibitor_state:         '',
     exhibitor_zip:           '',
+    exhibitor_country:       '',
     exhibitor_telephone:    '',
     brands_poured:          '',
     booth_count:            1,
@@ -61,6 +62,7 @@ export function NewContractForm({ events, currentUserEmail }: Props) {
     | 'exhibitor_city'
     | 'exhibitor_state'
     | 'exhibitor_zip'
+    | 'exhibitor_country'
   >>) => {
     setForm((f) => ({ ...f, ...patch }));
   }, []);
@@ -148,6 +150,7 @@ export function NewContractForm({ events, currentUserEmail }: Props) {
                   exhibitor_city: form.exhibitor_city,
                   exhibitor_state: form.exhibitor_state,
                   exhibitor_zip: form.exhibitor_zip,
+                  exhibitor_country: form.exhibitor_country,
                 }}
                 onChange={patchAddress}
               />

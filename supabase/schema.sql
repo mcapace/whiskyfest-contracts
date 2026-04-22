@@ -66,6 +66,7 @@ create table if not exists contracts (
   exhibitor_city          text,
   exhibitor_state         text,
   exhibitor_zip           text,
+  exhibitor_country       text,
   exhibitor_telephone     text,
   brands_poured           text,
 
