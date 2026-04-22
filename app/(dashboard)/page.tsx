@@ -1,6 +1,8 @@
 import Link from 'next/link';
-import { Plus, FileText, DollarSign, Clock, CheckCircle2 } from 'lucide-react';
+import { Plus, FileText, DollarSign, Clock, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { requireContractActorForPage } from '@/lib/auth-contract';
+import { STANDARD_BOOTH_RATE_CENTS } from '@/lib/contracts';
 import { formatCurrency, formatRelative } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,29 +12,48 @@ import type { ContractWithTotals, Event, ContractStatus } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
 
-async function getDashboardData() {
+async function getDashboardData(actor: Awaited<ReturnType<typeof requireContractActorForPage>>) {
   const supabase = getSupabaseAdmin();
 
-  const [{ data: contracts }, { data: events }] = await Promise.all([
-    supabase
-      .from('contracts_with_totals')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(50),
-    supabase
-      .from('events')
-      .select('*')
-      .eq('is_active', true),
+  let contractsQuery = supabase
+    .from('contracts_with_totals')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (!actor.isAdmin && actor.salesRepId) {
+    contractsQuery = contractsQuery.eq('sales_rep_id', actor.salesRepId);
+  }
+
+  let pendingQuery = supabase
+    .from('contracts_with_totals')
+    .select('*')
+    .lt('booth_rate_cents', STANDARD_BOOTH_RATE_CENTS)
+    .is('discount_approved_at', null)
+    .order('created_at', { ascending: false })
+    .limit(25);
+
+  if (!actor.isAdmin && actor.salesRepId) {
+    pendingQuery = pendingQuery.eq('sales_rep_id', actor.salesRepId);
+  }
+
+  const [{ data: contracts }, { data: pendingDiscounts }, { data: events }] = await Promise.all([
+    contractsQuery,
+    pendingQuery,
+    supabase.from('events').select('*').eq('is_active', true),
   ]);
 
   return {
     contracts: (contracts ?? []) as ContractWithTotals[],
+    pendingDiscounts: (pendingDiscounts ?? []) as ContractWithTotals[],
     events: (events ?? []) as Event[],
+    actor,
   };
 }
 
 export default async function DashboardPage() {
-  const { contracts, events } = await getDashboardData();
+  const actor = await requireContractActorForPage();
+  const { contracts, pendingDiscounts, events } = await getDashboardData(actor);
 
   // Stats
   const totalExecutedCents  = contracts.filter(c => c.status === 'executed').reduce((a, c) => a + c.grand_total_cents, 0);
@@ -52,8 +73,45 @@ export default async function DashboardPage() {
     { label: 'Executed', count: contracts.filter(c => c.status === 'executed').length, tone: 'bg-emerald-100 text-emerald-900 border-emerald-200', href: '/contracts?status=executed' },
   ];
 
+  const pendingHeading = actor.isAdmin ? 'Pending Your Approval' : 'My Pending Approvals';
+
   return (
     <div className="space-y-8">
+      {pendingDiscounts.length > 0 && (
+        <Card className="overflow-hidden border-amber-400/40 bg-amber-50/40">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-400/25 px-6 py-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-700" />
+              <h2 className="font-serif text-lg font-semibold text-amber-950">{pendingHeading}</h2>
+            </div>
+            <p className="text-xs text-amber-900/80">
+              Discounted booth rate — below {formatCurrency(STANDARD_BOOTH_RATE_CENTS)} — awaiting admin approval
+            </p>
+          </div>
+          <CardContent className="grid gap-3 p-4 sm:grid-cols-2">
+            {pendingDiscounts.map((c) => (
+              <Link
+                key={c.id}
+                href={`/contracts/${c.id}`}
+                className="rounded-lg border border-amber-300/60 bg-background/80 p-4 transition-colors hover:border-amber-500 hover:bg-amber-50/80"
+              >
+                <p className="font-medium text-foreground">{c.exhibitor_company_name}</p>
+                <div className="mt-2 grid gap-1 text-xs text-muted-foreground">
+                  <p>
+                    Booth rate <span className="font-mono tabular-nums">{formatCurrency(c.booth_rate_cents)}</span>
+                    {' · '}
+                    Total <span className="font-mono tabular-nums">{formatCurrency(c.grand_total_cents)}</span>
+                  </p>
+                  <p>
+                    Created by {c.created_by ?? '—'} · {formatRelative(c.created_at)}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header */}
       <Card className="overflow-hidden border-fest-600/15">
         <div className="bg-gradient-to-r from-fest-600/10 via-brass-100/35 to-background px-6 py-6">

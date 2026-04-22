@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { requireContractActorForPage } from '@/lib/auth-contract';
 import { formatCurrency, formatRelative } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -23,9 +24,16 @@ const VALID: Set<string> = new Set([
   'error',
 ]);
 
-async function loadContracts(searchParams: { status?: string; q?: string }) {
+async function loadContracts(
+  actor: Awaited<ReturnType<typeof requireContractActorForPage>>,
+  searchParams: { status?: string; q?: string },
+) {
   const supabase = getSupabaseAdmin();
   let query = supabase.from('contracts_with_totals').select('*').order('created_at', { ascending: false }).limit(200);
+
+  if (!actor.isAdmin && actor.salesRepId) {
+    query = query.eq('sales_rep_id', actor.salesRepId);
+  }
 
   const status = searchParams.status;
   if (status && status !== 'all' && VALID.has(status)) {
@@ -53,10 +61,11 @@ export default async function ContractsListPage({
 }: {
   searchParams: Record<string, string | string[] | undefined>;
 }) {
+  const actor = await requireContractActorForPage();
   const status = typeof searchParams.status === 'string' ? searchParams.status : undefined;
   const q = typeof searchParams.q === 'string' ? searchParams.q : undefined;
 
-  const { contracts, events } = await loadContracts({ status, q });
+  const { contracts, events } = await loadContracts(actor, { status, q });
   const eventMap = new Map(events.map(e => [e.id, e]));
   const executedCount = contracts.filter(c => c.status === 'executed').length;
   const inFlightCount = contracts.filter(c =>

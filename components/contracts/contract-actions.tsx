@@ -1,29 +1,40 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, ExternalLink, FileText, Loader2, Mail, MoreHorizontal, Send } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input, Label, Textarea } from '@/components/ui/input';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+  AlertTriangle,
+  CheckCircle2,
+  ExternalLink,
+  FileText,
+  Loader2,
+  Mail,
+  RefreshCw,
+  Send,
+  Undo2,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input, Label, Textarea } from '@/components/ui/input';
 import { formatCurrency, formatRelative } from '@/lib/utils';
 import type { ContractStatus } from '@/types/db';
 
 interface Props {
-  contractId:    string;
+  contractId: string;
   exhibitorName: string;
   signerEmail: string | null;
   signerName: string | null;
-  status:        ContractStatus;
-  draftPdfUrl:   string | null;
-  signedPdfUrl:  string | null;
+  status: ContractStatus;
+  draftPdfUrl: string | null;
+  signedPdfUrl: string | null;
   docusignEnvelopeId: string | null;
   sentAt: string | null;
   updatedAt: string | null;
@@ -76,6 +87,7 @@ export function ContractActions({
   const [openResendWithChanges, setOpenResendWithChanges] = useState(false);
   const [openCancel, setOpenCancel] = useState(false);
   const [openApproveDiscount, setOpenApproveDiscount] = useState(false);
+  const [openErrorDetails, setOpenErrorDetails] = useState(false);
   const [recallReason, setRecallReason] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const [discountReason, setDiscountReason] = useState('');
@@ -101,161 +113,267 @@ export function ContractActions({
     });
   }
 
-  const isTerminal = status === 'cancelled' || status === 'executed' || status === 'error';
-  const canCancel = !isTerminal && isAdmin;
   const canReminder = isAdmin && (status === 'sent' || status === 'partially_signed') && Boolean(docusignEnvelopeId);
   const canRecall = canReminder;
   const canResendWithChanges = canReminder && !discountApprovalPending;
   const canRelease = status === 'signed' && isAdmin;
-  const canApproveDiscount = isAdmin && discountApprovalPending;
-
   const progress = useMemo(() => getProgress(status), [status]);
 
-  const primaryAction = useMemo(() => {
-    if (status === 'draft') return { label: 'Generate Draft PDF', path: 'generate', key: 'generate', icon: FileText };
-    if (status === 'ready_for_review') return { label: 'Approve for Sending', path: 'approve', key: 'approve', icon: CheckCircle2 };
-    if (status === 'approved') return { label: 'Send via DocuSign', path: 'send', key: 'send', icon: Send };
-    if (canRelease) return { label: 'Release to Accounting', path: 'release', key: 'release', icon: CheckCircle2 };
-    return null;
-  }, [status, canRelease]);
-  const primaryBlockedForDiscount =
-    discountApprovalPending &&
-    !!primaryAction &&
-    (primaryAction.key === 'approve' || primaryAction.key === 'send' || primaryAction.key === 'release');
+  const signerWaitLabel = signerName?.trim() || signerEmail?.trim() || 'signer';
 
   return (
     <>
       <div className="space-y-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <ProgressState progress={progress} />
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="h-9 w-9">
-                <MoreHorizontal className="h-4 w-4" />
+        <ProgressState progress={progress} />
+
+        {/* Primary action row — equal-width buttons */}
+        <div className="flex flex-wrap gap-2">
+          {status === 'draft' && (
+            <>
+              <Button
+                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                onClick={() => runAction('generate', 'generate')}
+                disabled={pending}
+              >
+                {pending && action === 'generate' ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FileText className="h-4 w-4" />
+                )}
+                Generate Draft PDF
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {draftPdfUrl && (
-                <DropdownMenuItem asChild>
-                  <a href={draftPdfUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2">
-                    <ExternalLink className="h-4 w-4" /> View Draft PDF
-                  </a>
-                </DropdownMenuItem>
-              )}
-              {signedPdfUrl && (
-                <DropdownMenuItem asChild>
-                  <a href={signedPdfUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2">
-                    <ExternalLink className="h-4 w-4" /> View Signed PDF
-                  </a>
-                </DropdownMenuItem>
-              )}
-              {(draftPdfUrl || signedPdfUrl) && (canReminder || canResendWithChanges || canRecall || canCancel || status === 'ready_for_review') && (
-                <DropdownMenuSeparator />
-              )}
-              {status === 'ready_for_review' && (
-                <DropdownMenuItem onClick={() => runAction('generate', 'regenerate')}>
-                  <FileText className="mr-2 h-4 w-4" /> Re-generate PDF
-                </DropdownMenuItem>
-              )}
-              {canReminder && (
-                <DropdownMenuItem onClick={() => runAction('send-reminder', 'reminder')}>
-                  <Mail className="mr-2 h-4 w-4" /> Send Reminder
-                </DropdownMenuItem>
-              )}
-              {canResendWithChanges && (
-                <DropdownMenuItem onClick={() => setOpenResendWithChanges(true)}>
-                  Resend with Changes
-                </DropdownMenuItem>
-              )}
-              {canApproveDiscount && (
-                <DropdownMenuItem onClick={() => setOpenApproveDiscount(true)}>
-                  Approve Discount...
-                </DropdownMenuItem>
-              )}
-              {canRecall && (
-                <DropdownMenuItem onClick={() => setOpenRecall(true)}>Recall</DropdownMenuItem>
-              )}
-              {canCancel && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setOpenCancel(true)}>
-                    Cancel Contract
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-        <div className="min-h-[2.5rem]">
-          {primaryAction ? (
-            <div className="space-y-2">
-              <div title={primaryBlockedForDiscount ? 'Discount approval required' : undefined} className="inline-block">
+              <Button variant="secondary" className="min-h-10 flex-1 basis-[min(100%,11rem)]" asChild>
+                <Link href={`/contracts/${contractId}/edit`}>Edit Contract</Link>
+              </Button>
+              {isAdmin && (
                 <Button
-                  onClick={() => runAction(primaryAction.path, primaryAction.key)}
-                  disabled={pending || primaryBlockedForDiscount}
+                  variant="outline"
+                  className="min-h-10 flex-1 basis-[min(100%,11rem)] text-destructive hover:text-destructive"
+                  onClick={() => setOpenCancel(true)}
                 >
-                  {pending && action === primaryAction.key ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <primaryAction.icon className="h-4 w-4" />
-                  )}
-                  {primaryAction.label}
+                  Cancel Contract
                 </Button>
-              </div>
-              {primaryBlockedForDiscount && (
-                <p className="text-xs text-amber-700">Discount approval required before this action is available.</p>
               )}
-              {status === 'ready_for_review' && (
-                <button
-                  type="button"
-                  className="block text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
-                  onClick={() => runAction('generate', 'regenerate')}
-                  disabled={pending}
+            </>
+          )}
+
+          {status === 'ready_for_review' && discountApprovalPending && isAdmin && (
+            <>
+              <Button
+                className="min-h-10 flex-1 basis-[min(100%,11rem)] border-amber-600 bg-amber-600 text-white hover:bg-amber-700"
+                onClick={() => setOpenApproveDiscount(true)}
+              >
+                <AlertTriangle className="h-4 w-4" />
+                Approve Discount
+              </Button>
+              <Button
+                variant="secondary"
+                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                onClick={() => runAction('generate', 'regenerate')}
+                disabled={pending}
+              >
+                {pending && action === 'regenerate' ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Re-generate PDF
+              </Button>
+              <Button
+                variant="outline"
+                className="min-h-10 flex-1 basis-[min(100%,11rem)] text-destructive hover:text-destructive"
+                onClick={() => setOpenCancel(true)}
+              >
+                Cancel Contract
+              </Button>
+            </>
+          )}
+
+          {status === 'ready_for_review' && discountApprovalPending && !isAdmin && (
+            <>
+              <Button
+                variant="secondary"
+                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                onClick={() => runAction('generate', 'regenerate')}
+                disabled={pending}
+              >
+                {pending && action === 'regenerate' ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Re-generate PDF
+              </Button>
+              <Button
+                variant="secondary"
+                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                disabled
+                title="Awaiting discount approval"
+              >
+                Approve for Sending
+              </Button>
+            </>
+          )}
+
+          {status === 'ready_for_review' && !discountApprovalPending && (
+            <>
+              <Button
+                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                onClick={() => runAction('approve', 'approve')}
+                disabled={pending}
+              >
+                {pending && action === 'approve' ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4" />
+                )}
+                Approve for Sending
+              </Button>
+              <Button
+                variant="secondary"
+                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                onClick={() => runAction('generate', 'regenerate')}
+                disabled={pending}
+              >
+                <RefreshCw className="h-4 w-4" />
+                Re-generate PDF
+              </Button>
+              {isAdmin && (
+                <Button
+                  variant="outline"
+                  className="min-h-10 flex-1 basis-[min(100%,11rem)] text-destructive hover:text-destructive"
+                  onClick={() => setOpenCancel(true)}
                 >
-                  Re-generate PDF
-                </button>
+                  Cancel Contract
+                </Button>
               )}
-            </div>
-          ) : (
-            <StatusLine
-              status={status}
-              signerEmail={signerEmail}
-              sentAt={sentAt}
-              updatedAt={updatedAt}
-              executedAt={executedAt}
-              releasedBy={releasedBy}
-              releasedAt={releasedAt}
-              isAdmin={isAdmin}
-              cancelledReason={cancelledReason}
-              cancelledAt={cancelledAt}
-              cancelledBy={cancelledBy}
-              errorDetails={errorDetails}
-            />
+            </>
+          )}
+
+          {status === 'approved' && (
+            <>
+              <Button
+                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                onClick={() => runAction('send', 'send')}
+                disabled={pending}
+              >
+                {pending && action === 'send' ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                Send via DocuSign
+              </Button>
+              {isAdmin && (
+                <Button
+                  variant="outline"
+                  className="min-h-10 flex-1 basis-[min(100%,11rem)] text-destructive hover:text-destructive"
+                  onClick={() => setOpenCancel(true)}
+                >
+                  Cancel Contract
+                </Button>
+              )}
+            </>
+          )}
+
+          {canRelease && (
+            <Button
+              className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+              onClick={() => runAction('release', 'release')}
+              disabled={pending}
+            >
+              {pending && action === 'release' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4" />
+              )}
+              Release to Accounting
+            </Button>
+          )}
+
+          {status === 'executed' && signedPdfUrl && (
+            <Button variant="secondary" className="min-h-10 flex-1 basis-[min(100%,11rem)]" asChild>
+              <a href={signedPdfUrl} target="_blank" rel="noreferrer">
+                <ExternalLink className="h-4 w-4" />
+                View Signed PDF
+              </a>
+            </Button>
+          )}
+
+          {status === 'error' && isAdmin && (
+            <>
+              <Button variant="secondary" className="min-h-10 flex-1 basis-[min(100%,11rem)]" onClick={() => setOpenErrorDetails(true)}>
+                View Error Details
+              </Button>
+              <Button
+                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                onClick={() => {
+                  if (!window.confirm('Reset this contract to draft? Internal notes will be cleared.')) return;
+                  runAction('reset-error', 'reset-error');
+                }}
+                disabled={pending}
+              >
+                {pending && action === 'reset-error' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Undo2 className="h-4 w-4" />}
+                Reset to Draft
+              </Button>
+            </>
           )}
         </div>
+
+        {/* Secondary admin-only DocuSign controls */}
+        {(canReminder || canResendWithChanges || canRecall) && (
+          <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
+            {canReminder && (
+              <Button variant="outline" className="min-h-10 flex-1 basis-[min(100%,11rem)]" onClick={() => runAction('send-reminder', 'reminder')} disabled={pending}>
+                <Mail className="h-4 w-4" />
+                Send Reminder
+              </Button>
+            )}
+            {canResendWithChanges && (
+              <Button variant="outline" className="min-h-10 flex-1 basis-[min(100%,11rem)]" onClick={() => setOpenResendWithChanges(true)}>
+                Resend with Changes
+              </Button>
+            )}
+            {canRecall && (
+              <Button variant="outline" className="min-h-10 flex-1 basis-[min(100%,11rem)]" onClick={() => setOpenRecall(true)}>
+                Recall Contract
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Status messages when there are no primary row buttons */}
+        <StatusLine
+          status={status}
+          signerEmail={signerEmail}
+          signerWaitLabel={signerWaitLabel}
+          sentAt={sentAt}
+          updatedAt={updatedAt}
+          executedAt={executedAt}
+          releasedBy={releasedBy}
+          releasedAt={releasedAt}
+          isAdmin={isAdmin}
+          cancelledReason={cancelledReason}
+          cancelledAt={cancelledAt}
+          cancelledBy={cancelledBy}
+          errorDetails={errorDetails}
+        />
       </div>
 
       <Dialog open={openRecall} onOpenChange={setOpenRecall}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Recall DocuSign contract</DialogTitle>
-            <DialogDescription>
-              This voids the in-flight contract and moves this record back to Approved.
-            </DialogDescription>
+            <DialogDescription>This voids the in-flight contract and moves this record back to Approved.</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             <Label htmlFor="recall-reason">Reason (required, 10+ characters)</Label>
-            <Textarea
-              id="recall-reason"
-              value={recallReason}
-              onChange={(e) => setRecallReason(e.target.value)}
-              rows={4}
-            />
+            <Textarea id="recall-reason" value={recallReason} onChange={(e) => setRecallReason(e.target.value)} rows={4} />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenRecall(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setOpenRecall(false)}>
+              Cancel
+            </Button>
             <Button
               onClick={() => {
                 runAction('recall', 'recall', { reason: recallReason });
@@ -274,17 +392,27 @@ export function ContractActions({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Approve Discounted Rate</DialogTitle>
-            <DialogDescription>
-              Confirm this discounted pricing exception so the contract can continue.
-            </DialogDescription>
+            <DialogDescription>Confirm this discounted pricing exception so the contract can continue.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-sm">
-            <p><span className="text-muted-foreground">Exhibitor:</span> {exhibitorName}</p>
-            <p><span className="text-muted-foreground">Booth rate:</span> {formatCurrency(boothRateCents)}</p>
-            <p><span className="text-muted-foreground">Booth count:</span> {boothCount}</p>
-            <p><span className="text-muted-foreground">Grand total:</span> {formatCurrency(grandTotalCents)}</p>
-            <p><span className="text-muted-foreground">Sales rep:</span> {salesRep ?? '—'}</p>
-            <p><span className="text-muted-foreground">Created by:</span> {createdBy ?? '—'}</p>
+            <p>
+              <span className="text-muted-foreground">Exhibitor:</span> {exhibitorName}
+            </p>
+            <p>
+              <span className="text-muted-foreground">Booth rate:</span> {formatCurrency(boothRateCents)}
+            </p>
+            <p>
+              <span className="text-muted-foreground">Booth count:</span> {boothCount}
+            </p>
+            <p>
+              <span className="text-muted-foreground">Grand total:</span> {formatCurrency(grandTotalCents)}
+            </p>
+            <p>
+              <span className="text-muted-foreground">Sales rep:</span> {salesRep ?? '—'}
+            </p>
+            <p>
+              <span className="text-muted-foreground">Created by:</span> {createdBy ?? '—'}
+            </p>
             <div className="space-y-2">
               <Label htmlFor="discount-reason">Reason (optional)</Label>
               <Textarea
@@ -298,7 +426,9 @@ export function ContractActions({
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenApproveDiscount(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setOpenApproveDiscount(false)}>
+              Cancel
+            </Button>
             <Button
               onClick={() => {
                 runAction('approve-discount', 'approve-discount', { reason: discountReason.trim() || undefined });
@@ -317,31 +447,22 @@ export function ContractActions({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Resend with Changes</DialogTitle>
-            <DialogDescription>
-              The current DocuSign contract will be voided and a new one will be sent.
-            </DialogDescription>
+            <DialogDescription>The current DocuSign contract will be voided and a new one will be sent.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="resend-signer-name">Signer name</Label>
-              <Input
-                id="resend-signer-name"
-                value={nextSignerName}
-                onChange={(e) => setNextSignerName(e.target.value)}
-              />
+              <Input id="resend-signer-name" value={nextSignerName} onChange={(e) => setNextSignerName(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="resend-signer-email">Signer email</Label>
-              <Input
-                id="resend-signer-email"
-                type="email"
-                value={nextSignerEmail}
-                onChange={(e) => setNextSignerEmail(e.target.value)}
-              />
+              <Input id="resend-signer-email" type="email" value={nextSignerEmail} onChange={(e) => setNextSignerEmail(e.target.value)} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenResendWithChanges(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setOpenResendWithChanges(false)}>
+              Cancel
+            </Button>
             <Button
               onClick={() => {
                 runAction('resend-with-changes', 'resend-with-changes', {
@@ -367,15 +488,12 @@ export function ContractActions({
           </DialogHeader>
           <div className="space-y-2">
             <Label htmlFor="cancel-reason">Reason</Label>
-            <Textarea
-              id="cancel-reason"
-              value={cancelReason}
-              onChange={(e) => setCancelReason(e.target.value)}
-              rows={4}
-            />
+            <Textarea id="cancel-reason" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} rows={4} />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenCancel(false)}>Back</Button>
+            <Button variant="outline" onClick={() => setOpenCancel(false)}>
+              Back
+            </Button>
             <Button
               variant="destructive"
               onClick={() => {
@@ -386,6 +504,21 @@ export function ContractActions({
             >
               {pending && action === 'cancel' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Cancel {exhibitorName}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={openErrorDetails} onOpenChange={setOpenErrorDetails}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Error details</DialogTitle>
+            <DialogDescription>Stored on the contract record when send or PDF generation failed.</DialogDescription>
+          </DialogHeader>
+          <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-md border bg-muted/40 p-3 text-xs">{errorDetails ?? '—'}</pre>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenErrorDetails(false)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -428,12 +561,14 @@ function ProgressState({ progress }: { progress: { special: string | null; curre
                 idx === progress.currentIdx
                   ? 'border-fest-700 bg-fest-700'
                   : idx < progress.currentIdx
-                  ? 'border-fest-700 bg-fest-100'
-                  : 'border-muted-foreground/40 bg-background'
+                    ? 'border-fest-700 bg-fest-100'
+                    : 'border-muted-foreground/40 bg-background'
               }`}
             />
             {idx < STAGES.length - 1 && (
-              <span className={`h-px flex-1 border-t border-dotted ${idx < progress.currentIdx ? 'border-fest-700' : 'border-muted-foreground/40'}`} />
+              <span
+                className={`h-px flex-1 border-t border-dotted ${idx < progress.currentIdx ? 'border-fest-700' : 'border-muted-foreground/40'}`}
+              />
             )}
           </div>
         ))}
@@ -450,6 +585,7 @@ function ProgressState({ progress }: { progress: { special: string | null; curre
 function StatusLine({
   status,
   signerEmail,
+  signerWaitLabel,
   sentAt,
   updatedAt,
   executedAt,
@@ -463,6 +599,7 @@ function StatusLine({
 }: {
   status: ContractStatus;
   signerEmail: string | null;
+  signerWaitLabel: string;
   sentAt: string | null;
   updatedAt: string | null;
   executedAt: string | null;
@@ -475,6 +612,14 @@ function StatusLine({
   errorDetails: string | null;
 }) {
   if (status === 'sent') {
+    if (!isAdmin) {
+      return (
+        <p className="text-sm italic text-muted-foreground">
+          Waiting for {signerWaitLabel}
+          {sentAt ? ` · Sent ${formatRelative(sentAt)}` : ''}
+        </p>
+      );
+    }
     return (
       <p className="text-sm italic text-muted-foreground">
         {sentAt ? `Sent ${formatRelative(sentAt)}` : 'Sent'} · Waiting for {signerEmail ?? 'signer'} to sign
@@ -482,6 +627,13 @@ function StatusLine({
     );
   }
   if (status === 'partially_signed') {
+    if (!isAdmin) {
+      return (
+        <p className="text-sm text-muted-foreground">
+          Exhibitor signed · Waiting for Shanken countersignature.
+        </p>
+      );
+    }
     return (
       <p className="text-sm text-muted-foreground">
         Exhibitor signed {updatedAt ? formatRelative(updatedAt) : 'recently'} · Awaiting Shanken countersignature
@@ -494,7 +646,8 @@ function StatusLine({
   if (status === 'executed') {
     return (
       <p className="text-sm text-emerald-700">
-        ✓ Released {formatRelative(releasedAt ?? executedAt)}{releasedBy ? ` by ${releasedBy}` : ''}
+        ✓ Released {formatRelative(releasedAt ?? executedAt)}
+        {releasedBy ? ` by ${releasedBy}` : ''}
       </p>
     );
   }
@@ -504,7 +657,8 @@ function StatusLine({
         <p className="font-medium">Contract cancelled</p>
         {cancelledReason && <p>{cancelledReason}</p>}
         <p className="text-xs text-red-700/80">
-          {cancelledAt ? formatRelative(cancelledAt) : 'recently'}{cancelledBy ? ` by ${cancelledBy}` : ''}
+          {cancelledAt ? formatRelative(cancelledAt) : 'recently'}
+          {cancelledBy ? ` by ${cancelledBy}` : ''}
         </p>
       </div>
     );

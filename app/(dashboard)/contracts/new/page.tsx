@@ -1,12 +1,12 @@
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { auth } from '@/lib/auth';
 import { NewContractForm } from '@/components/contracts/new-contract-form';
 import type { Event } from '@/types/db';
+import { requireContractActorForPage } from '@/lib/auth-contract';
 
 export const dynamic = 'force-dynamic';
 
 export default async function NewContractPage() {
-  const session = await auth();
+  const actor = await requireContractActorForPage();
   const supabase = getSupabaseAdmin();
   const { data: events } = await supabase
     .from('events')
@@ -17,7 +17,8 @@ export default async function NewContractPage() {
   return (
     <NewContractForm
       events={(events ?? []) as Event[]}
-      currentUserEmail={session?.user?.email ?? null}
+      currentUserEmail={actor.email}
+      isAdmin={actor.isAdmin}
     />
   );
 }

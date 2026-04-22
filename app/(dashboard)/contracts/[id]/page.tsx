@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { getContractWithTotalsForViewer } from '@/lib/auth-contract';
 import { formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { requiresDiscountApproval, STANDARD_BOOTH_RATE_CENTS } from '@/lib/contracts';
 import { cn, formatCurrency, formatLongDate, formatTimestamp } from '@/lib/utils';
@@ -14,32 +14,28 @@ import type { ContractWithTotals, Event, AuditLogEntry } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
 
-async function getContract(id: string) {
+async function loadAudit(contractId: string): Promise<AuditLogEntry[]> {
   const supabase = getSupabaseAdmin();
-
-  const [{ data: contract }, { data: audit }] = await Promise.all([
-    supabase.from('contracts_with_totals').select('*').eq('id', id).single(),
-    supabase.from('audit_log').select('*').eq('contract_id', id).order('occurred_at', { ascending: false }),
-  ]);
-
-  if (!contract) return null;
-
-  const { data: event } = await supabase
-    .from('events').select('*').eq('id', contract.event_id).single();
-
-  return {
-    contract: contract as ContractWithTotals,
-    event:    event as Event | null,
-    audit:    (audit ?? []) as AuditLogEntry[],
-  };
+  const { data: audit } = await supabase
+    .from('audit_log')
+    .select('*')
+    .eq('contract_id', contractId)
+    .order('occurred_at', { ascending: false });
+  return (audit ?? []) as AuditLogEntry[];
 }
 
 export default async function ContractDetailPage({ params }: { params: { id: string } }) {
-  const session = await auth();
-  const isAdmin = (session?.user as { role?: string } | undefined)?.role === 'admin';
-  const data = await getContract(params.id);
-  if (!data) notFound();
-  const { contract, event, audit } = data;
+  const viewed = await getContractWithTotalsForViewer(params.id);
+  if (!viewed) notFound();
+
+  const { contract, actor } = viewed;
+  const supabase = getSupabaseAdmin();
+  const [{ data: event }, audit] = await Promise.all([
+    supabase.from('events').select('*').eq('id', contract.event_id).single(),
+    loadAudit(contract.id),
+  ]);
+
+  const isAdmin = actor.isAdmin;
   const releaseAudit = audit.find((entry) => entry.action === 'released_to_accounting' || entry.action === 'executed');
   const discountPending = requiresDiscountApproval(contract);
 
@@ -139,7 +135,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
         <Card>
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 px-6 py-4">
             <h2 className="font-serif text-lg font-semibold">Exhibitor</h2>
-            {(contract.status === 'approved' || contract.status === 'ready_for_review') && (
+            {isAdmin && (contract.status === 'approved' || contract.status === 'ready_for_review') && (
               <SignerContactEdit
                 contractId={contract.id}
                 initialName={contract.signer_1_name}
@@ -188,7 +184,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
       </div>
 
       {/* Notes */}
-      {contract.notes && (
+      {contract.notes && contract.status !== 'error' && (
         <Card>
           <div className="border-b border-border/50 px-6 py-4">
             <h2 className="font-serif text-lg font-semibold">Internal Notes</h2>
@@ -266,7 +262,14 @@ function describeAction(entry: AuditLogEntry): { title: string; detail?: string 
   };
 
   switch (entry.action) {
-    case 'created': return { title: 'Contract created' };
+    case 'created':
+      return { title: 'Contract created' };
+    case 'contract_created': {
+      const meta = entry.metadata as Record<string, unknown> | null;
+      const rep = meta?.sales_rep_name ? String(meta.sales_rep_name) : '';
+      const ob = meta?.on_behalf_of ? ' (on behalf of sales rep)' : '';
+      return { title: `Contract created${ob}`, detail: rep ? `Sales rep: ${rep}` : undefined };
+    }
     case 'status_changed': return { title: `Status changed from ${entry.from_status} to ${entry.to_status}` };
     case 'pdf_generated': return { title: 'Draft PDF generated' };
     case 'docusign_sent': return { title: 'Sent via DocuSign' };
@@ -294,6 +297,9 @@ function describeAction(entry: AuditLogEntry): { title: string; detail?: string 
     case 'executed': return { title: 'Fully executed' };
     case 'cancelled':
       return { title: `Contract cancelled${entry.metadata?.reason ? ': ' + String(entry.metadata.reason) : ''}` };
-    default: return { title: entry.action };
+    case 'error_reset_to_draft':
+      return { title: 'Error cleared — contract reset to draft' };
+    default:
+      return { title: entry.action };
   }
 }
