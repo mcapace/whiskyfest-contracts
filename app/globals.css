@@ -83,3 +83,43 @@
 }
 
 .tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------------
+   Places API (New) autocomplete styling — match local input styling
+   ------------------------------------------------------------------ */
+.wf-place-autocomplete gmp-place-autocomplete {
+  width: 100%;
+  --gmp-place-autocomplete-input-bg-color: hsl(var(--background));
+  --gmp-place-autocomplete-input-border-color: hsl(var(--input));
+  --gmp-place-autocomplete-input-border-radius: var(--radius);
+  --gmp-place-autocomplete-dropdown-bg-color: hsl(var(--popover));
+}
+
+.wf-place-autocomplete gmp-place-autocomplete::part(input) {
+  height: 2.25rem;
+  border: 1px solid hsl(var(--input));
+  border-radius: var(--radius);
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  padding: 0.25rem 0.75rem;
+  box-shadow: none;
+}
+
+.wf-place-autocomplete gmp-place-autocomplete::part(input):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.35);
+}
+
+.wf-place-autocomplete gmp-place-autocomplete::part(input)::placeholder {
+  color: hsl(var(--muted-foreground));
+}
+
+/* Hide Google-specific icon/chrome when parts are exposed. */
+.wf-place-autocomplete gmp-place-autocomplete::part(leading-icon),
+.wf-place-autocomplete gmp-place-autocomplete::part(trailing-icon),
+.wf-place-autocomplete gmp-place-autocomplete::part(clear-button),
+.wf-place-autocomplete gmp-place-autocomplete::part(search-icon) {
+  display: none;
+}

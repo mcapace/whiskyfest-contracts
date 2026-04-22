@@ -146,7 +146,7 @@ export function AddressAutocomplete({ value, onChange }: AddressAutocompleteProp
         <Label>Search Address</Label>
         <div
           ref={autocompleteHostRef}
-          className="min-h-9 rounded-md border border-input bg-background px-2 py-1"
+          className="wf-place-autocomplete min-h-9 rounded-md border border-input bg-background px-2 py-1"
         />
       </div>
 
