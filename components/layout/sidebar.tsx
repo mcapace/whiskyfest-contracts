@@ -25,11 +25,11 @@ function AccountingNavLink({ pathname }: { pathname: string }) {
       className={cn(
         'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
         active
-          ? 'border-fest-600 bg-gradient-to-r from-fest-600/10 to-transparent text-whisky-900'
-          : 'border-transparent text-muted-foreground hover:border-fest-600/25 hover:bg-accent hover:text-foreground',
+          ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
+          : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
       )}
     >
-      <Landmark className={cn('h-4 w-4', active ? 'text-fest-700' : 'text-muted-foreground/70')} />
+      <Landmark className={cn('h-4 w-4', active ? 'text-accent-brand' : 'text-muted-foreground/70')} />
       Accounting Dashboard
     </Link>
   );
@@ -67,15 +67,15 @@ export function Sidebar({
   const homeHref = accountingOnly ? '/accounting' : '/';
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-fest-600/15 bg-card/50 backdrop-blur-sm lg:flex lg:flex-col">
-      <div className="shrink-0 border-b border-fest-600/15 bg-gradient-to-b from-fest-100/90 via-brass-50/50 to-fest-50/40 px-3 py-4">
+    <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border/60 bg-bg-surface/95 backdrop-blur-md lg:flex">
+      <div className="shrink-0 border-b border-border/50 bg-gradient-to-b from-fest-600/[0.07] via-bg-surface-raised to-bg-surface px-3 py-4">
         <div className="mx-auto max-w-[220px] px-3 py-2">
           <Link href={homeHref} className="relative mx-auto block h-12 w-full max-w-[200px]">
             <Image
               src="/images/WA_BLUE-removebg-preview%20%282%29.png"
               alt="Whisky Advocate"
               fill
-              className="object-contain object-center mix-blend-multiply"
+              className="object-contain object-center mix-blend-multiply dark:mix-blend-normal dark:opacity-95"
               sizes="200px"
               priority
             />
@@ -83,7 +83,7 @@ export function Sidebar({
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 py-6">
+      <nav className="flex-1 space-y-0.5 px-3 py-5">
         {accountingOnly ? (
           <AccountingNavLink pathname={pathname} />
         ) : (
@@ -114,20 +114,18 @@ export function Sidebar({
                     className={cn(
                       'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
                       active
-                        ? 'border-fest-600 bg-gradient-to-r from-fest-600/10 to-transparent text-whisky-900'
-                        : 'border-transparent text-muted-foreground hover:border-fest-600/25 hover:bg-accent hover:text-foreground',
+                        ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
+                        : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
                     )}
                   >
-                    <Icon className={cn('h-4 w-4', active ? 'text-fest-700' : 'text-muted-foreground/70')} />
+                    <Icon className={cn('h-4 w-4', active ? 'text-accent-brand' : 'text-muted-foreground/70')} />
                     {item.label}
                   </Link>
                 );
               })}
             {isAccounting ? (
               <div className="pt-6">
-                <p className="mb-2 px-[10px] text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Accounting
-                </p>
+                <p className="mb-2 px-[10px] wf-label-caps text-[10px]">Accounting</p>
                 <AccountingNavLink pathname={pathname} />
               </div>
             ) : null}
@@ -135,14 +133,14 @@ export function Sidebar({
         )}
       </nav>
 
-      <div className="border-t border-fest-600/15 p-4">
+      <div className="border-t border-border/50 bg-bg-surface-raised/50 p-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
               className="flex w-full items-center gap-3 rounded-md p-2 text-left transition-colors hover:bg-accent/60"
             >
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-fest-100 font-serif text-sm font-semibold text-fest-800 ring-1 ring-fest-600/20">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted font-serif text-sm font-semibold text-foreground ring-1 ring-border">
                 {user.name?.[0] ?? user.email?.[0]?.toUpperCase() ?? '?'}
               </div>
               <div className="min-w-0 flex-1">

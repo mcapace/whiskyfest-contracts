@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { Sidebar } from '@/components/layout/sidebar';
+import { Topbar } from '@/components/layout/topbar';
 import { AuthSessionProvider } from '@/components/session/auth-session-provider';
 import { ImpersonationBanner } from '@/components/impersonation/impersonation-banner';
 
@@ -14,7 +15,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <AuthSessionProvider session={session}>
       <ImpersonationBanner />
-      <div className="min-h-screen bg-gradient-to-br from-fest-600/[0.06] via-background to-background">
+      <div className="min-h-screen bg-bg-page">
         <Sidebar
           user={{
             email: session.user.email,
@@ -26,9 +27,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
           canImpersonate={Boolean(session.user.can_impersonate)}
           readOnlyImpersonation={readOnly}
         />
-        <main className={`lg:pl-64 ${mainPad}`}>
-          <div className="mx-auto max-w-6xl px-6 py-8 lg:px-10 lg:py-10 animate-fade-in">{children}</div>
-        </main>
+        <div className={`flex min-h-screen flex-col lg:pl-64 ${mainPad}`}>
+          <Topbar />
+          <main className="flex-1">
+            <div className="mx-auto max-w-6xl animate-fade-in px-6 py-6 lg:px-10 lg:py-8">{children}</div>
+          </main>
+        </div>
       </div>
     </AuthSessionProvider>
   );
