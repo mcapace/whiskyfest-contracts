@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { formatLongDate } from '@/lib/utils';
+import { formatCurrency, formatTimestamp } from '@/lib/utils';
 import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
+import { calculateDiscountCents, isDiscountedRate } from '@/lib/contracts';
 import { downloadCompletedPdf } from '@/lib/docusign';
 import { sendAccountingEmail } from '@/lib/email';
 import { requiresDiscountApproval } from '@/lib/contracts';
@@ -66,32 +67,36 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   }
 
   const billingSame = contract.billing_same_as_corporate ?? true;
+  const billingAddressLine = billingSame
+    ? (formatExhibitorAddressBlock(contract) || '—').replace(/\n/g, ', ')
+    : (formatBillingAddressBlock(contract) || '—').replace(/\n/g, ', ');
+
+  const discountCents = calculateDiscountCents(contract.booth_count, contract.booth_rate_cents);
+  const discountLine =
+    isDiscountedRate(contract.booth_rate_cents) && discountCents > 0 ? `${formatCurrency(discountCents)} off list` : '—';
+
+  const now = new Date().toISOString();
 
   await sendAccountingEmail({
-    exhibitorCompanyName: contract.exhibitor_company_name,
-    exhibitorLegalName: contract.exhibitor_legal_name,
-    eventName: event.name,
-    eventDate: formatLongDate(event.event_date),
-    eventYear: event.year,
-    boothCount: contract.booth_count,
-    boothRateCents: contract.booth_rate_cents,
-    additionalBrandCount: contract.additional_brand_count,
-    grandTotalCents: contract.grand_total_cents,
+    sponsorCompanyName: contract.exhibitor_company_name,
     signerName: contract.signer_1_name,
     signerTitle: contract.signer_1_title,
     signerEmail: contract.signer_1_email,
     exhibitorTelephone: contract.exhibitor_telephone,
-    corporateAddressFormatted: formatExhibitorAddressBlock(contract),
-    billingSameAsCorporate: billingSame,
-    billingAddressFormatted: billingSame ? null : formatBillingAddressBlock(contract),
-    signedPdfUrl: contract.signed_pdf_url,
+    billingAddressLine,
+    eventName: event.name,
+    eventYear: event.year,
+    boothCount: contract.booth_count,
+    boothRateCents: contract.booth_rate_cents,
+    discountLine,
+    grandTotalCents: contract.grand_total_cents,
+    salesRepName: contract.sales_rep_name ?? null,
+    executedAtFormatted: formatTimestamp(now),
+    countersignedByName: contract.countersigned_by_name,
     signedPdfBytes,
-    contractId: contract.id,
-    dashboardUrl: `${appBaseUrl()}/contracts/${contract.id}`,
+    accountingContractUrl: `${appBaseUrl()}/accounting/${contract.id}`,
     salesRepEmail: contract.sales_rep_email ?? contract.created_by,
   });
-
-  const now = new Date().toISOString();
   await supabase
     .from('contracts')
     .update({ status: 'executed', executed_at: now, accounting_notified_at: now })

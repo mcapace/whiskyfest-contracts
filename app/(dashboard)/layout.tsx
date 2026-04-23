@@ -8,11 +8,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-fest-600/[0.06] via-background to-background">
-      <Sidebar user={{
-        email: session.user.email,
-        name:  session.user.name,
-        role:  session.user.role ?? 'sales',
-      }} />
+      <Sidebar
+        user={{
+          email: session.user.email,
+          name: session.user.name,
+          role: session.user.role ?? 'sales',
+          pipelineAccess: Boolean(session.user.pipeline_access),
+          isAccounting: Boolean(session.user.is_accounting),
+        }}
+      />
       <main className="lg:pl-64">
         <div className="mx-auto max-w-6xl px-6 py-8 lg:px-10 lg:py-10 animate-fade-in">
           {children}

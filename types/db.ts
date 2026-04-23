@@ -13,6 +13,8 @@ export type ContractStatus =
   | 'cancelled'
   | 'error';
 
+export type InvoiceStatus = 'pending' | 'invoice_sent' | 'paid';
+
 export type UserRole = 'admin' | 'sales' | 'sales_rep' | 'viewer';
 
 export interface Event {
@@ -87,6 +89,12 @@ export interface Contract {
   billing_zip: string | null;
   billing_country: string | null;
   accounting_notified_at: string | null;
+  invoice_status: InvoiceStatus;
+  invoice_sent_at: string | null;
+  invoice_sent_by: string | null;
+  paid_at: string | null;
+  paid_by: string | null;
+  accounting_notes: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -119,6 +127,7 @@ export interface AppUser {
   role: UserRole;
   is_active: boolean;
   is_events_team?: boolean;
+  is_accounting?: boolean;
   created_at: string;
 }
 

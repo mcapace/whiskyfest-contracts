@@ -3,9 +3,28 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { FileText, LayoutDashboard, Plus, CalendarDays, Users, UserRound } from 'lucide-react';
+import { FileText, LayoutDashboard, Plus, CalendarDays, Users, UserRound, Landmark } from 'lucide-react';
 import { signOutAction } from '@/app/actions/auth';
 import { cn } from '@/lib/utils';
+
+function AccountingNavLink({ pathname }: { pathname: string }) {
+  const href = '/accounting';
+  const active = pathname === href || pathname.startsWith(`${href}/`);
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
+        active
+          ? 'border-fest-600 bg-gradient-to-r from-fest-600/10 to-transparent text-whisky-900'
+          : 'border-transparent text-muted-foreground hover:border-fest-600/25 hover:bg-accent hover:text-foreground',
+      )}
+    >
+      <Landmark className={cn('h-4 w-4', active ? 'text-fest-700' : 'text-muted-foreground/70')} />
+      Accounting Dashboard
+    </Link>
+  );
+}
 
 const nav = [
   { href: '/',                 label: 'Dashboard',     icon: LayoutDashboard },
@@ -16,16 +35,30 @@ const nav = [
   { href: '/users',            label: 'Users',         icon: Users,         adminOnly: true },
 ];
 
-export function Sidebar({ user }: { user: { email?: string | null; name?: string | null; role?: string } }) {
+export function Sidebar({
+  user,
+}: {
+  user: {
+    email?: string | null;
+    name?: string | null;
+    role?: string;
+    pipelineAccess?: boolean;
+    isAccounting?: boolean;
+  };
+}) {
   const pathname = usePathname();
   const isAdmin = user.role === 'admin';
+  const pipelineAccess = Boolean(user.pipelineAccess);
+  const isAccounting = Boolean(user.isAccounting);
+  const accountingOnly = isAccounting && !pipelineAccess;
+  const homeHref = accountingOnly ? '/accounting' : '/';
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-fest-600/15 bg-card/50 backdrop-blur-sm lg:flex lg:flex-col">
       {/* Brand lockup — centered with subtle gradient backdrop */}
       <div className="shrink-0 border-b border-fest-600/15 bg-gradient-to-b from-fest-100/90 via-brass-50/50 to-fest-50/40 px-3 py-4">
         <div className="mx-auto max-w-[220px] px-3 py-2">
-          <Link href="/" className="relative mx-auto block h-12 w-full max-w-[200px]">
+          <Link href={homeHref} className="relative mx-auto block h-12 w-full max-w-[200px]">
             <Image
               src="/images/WA_BLUE-removebg-preview%20%282%29.png"
               alt="Whisky Advocate"
@@ -40,27 +73,41 @@ export function Sidebar({ user }: { user: { email?: string | null; name?: string
 
       {/* Nav */}
       <nav className="flex-1 space-y-1 px-3 py-6">
-        {nav
-          .filter(item => !item.adminOnly || isAdmin)
-          .map(item => {
-            const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
-                  active
-                    ? 'border-fest-600 bg-gradient-to-r from-fest-600/10 to-transparent text-whisky-900'
-                    : 'border-transparent text-muted-foreground hover:border-fest-600/25 hover:bg-accent hover:text-foreground'
-                )}
-              >
-                <Icon className={cn('h-4 w-4', active ? 'text-fest-700' : 'text-muted-foreground/70')} />
-                {item.label}
-              </Link>
-            );
-          })}
+        {accountingOnly ? (
+          <AccountingNavLink pathname={pathname} />
+        ) : (
+          <>
+            {nav
+              .filter((item) => !item.adminOnly || isAdmin)
+              .map((item) => {
+                const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
+                      active
+                        ? 'border-fest-600 bg-gradient-to-r from-fest-600/10 to-transparent text-whisky-900'
+                        : 'border-transparent text-muted-foreground hover:border-fest-600/25 hover:bg-accent hover:text-foreground',
+                    )}
+                  >
+                    <Icon className={cn('h-4 w-4', active ? 'text-fest-700' : 'text-muted-foreground/70')} />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            {isAccounting ? (
+              <div className="pt-6">
+                <p className="mb-2 px-[10px] text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Accounting
+                </p>
+                <AccountingNavLink pathname={pathname} />
+              </div>
+            ) : null}
+          </>
+        )}
       </nav>
 
       {/* User block */}
@@ -71,7 +118,9 @@ export function Sidebar({ user }: { user: { email?: string | null; name?: string
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-medium text-foreground">{user.name ?? user.email}</p>
-            <p className="truncate text-[11px] uppercase tracking-wider text-muted-foreground">{user.role ?? 'viewer'}</p>
+            <p className="truncate text-[11px] uppercase tracking-wider text-muted-foreground">
+              {accountingOnly ? 'Accounting' : user.role ?? 'viewer'}
+            </p>
           </div>
         </div>
         <form action={signOutAction} className="mt-2">

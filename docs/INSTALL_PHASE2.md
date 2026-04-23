@@ -40,7 +40,7 @@ If this is unset, the app accepts any JSON payload **only for local experimentat
 | Variable | Purpose |
 |----------|---------|
 | `SENDGRID_API_KEY` | API key with Mail Send |
-| `ACCOUNTING_EMAIL` | Comma-separated AP/billing addresses |
+| `ACCOUNTING_EMAILS` | Comma-separated AP/billing addresses (TO on executed handoff). Falls back to `ACCOUNTING_EMAIL` if unset |
 | `ACCOUNTING_FROM_EMAIL` | Verified sender (e.g. `contracts@mshanken.com`) |
 
 SendGrid-only steps (patch order vs. Resend zips, API key, verified sender): **`SENDGRID_SETUP.md`** in the repo root.

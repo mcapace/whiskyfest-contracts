@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { redirect } from 'next/navigation';
 import type { Session } from 'next-auth';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { getAccessibleSalesRepIds } from '@/lib/rep-access';
 import type { Contract, ContractStatus, ContractWithTotals } from '@/types/db';
 
 export interface AppUserRow {
@@ -27,30 +27,6 @@ export interface ContractActorContext {
 
 function jsonErr(status: number, msg: string) {
   return { ok: false as const, response: NextResponse.json({ error: msg }, { status }) };
-}
-
-/** Returns sales_rep ids the user may act on: own active row + assisted reps. */
-export async function getAccessibleSalesRepIds(email: string, supabase: SupabaseClient): Promise<string[]> {
-  const e = email.toLowerCase();
-  const ids = new Set<string>();
-
-  const { data: own } = await supabase
-    .from('sales_reps')
-    .select('id')
-    .eq('email', e)
-    .eq('is_active', true)
-    .maybeSingle();
-
-  if (own?.id) ids.add(own.id);
-
-  const { data: assisted } = await supabase.from('rep_assistants').select('rep_id').eq('assistant_email', e);
-
-  for (const row of assisted ?? []) {
-    const id = (row as { rep_id: string }).rep_id;
-    if (id) ids.add(id);
-  }
-
-  return [...ids];
 }
 
 export async function resolveContractActor(session: Session | null): Promise<

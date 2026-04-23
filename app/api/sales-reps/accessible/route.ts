@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { getAccessibleSalesRepIds } from '@/lib/auth-contract';
+import { getAccessibleSalesRepIds } from '@/lib/rep-access';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';

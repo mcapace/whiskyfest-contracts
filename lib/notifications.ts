@@ -1,5 +1,6 @@
 import sgMail from '@sendgrid/mail';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { formatCurrency } from '@/lib/utils';
 import type { Contract, Event } from '@/types/db';
 
 const WF_CONTRACTS_FROM_EMAIL = process.env['DISCOUNT_ALERT_FROM_EMAIL'] ?? 'wfcontracts@whiskyadvocate.com';
@@ -532,6 +533,111 @@ export async function notifySalesRepContractSentBack(
   `;
 
   const ccAssistants = (await getAssistantEmailsForRep(contract.sales_rep_id)).filter(
+    (a) => a.toLowerCase() !== toAddress.toLowerCase(),
+  );
+
+  await sgMail.send({
+    from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
+    to: toAddress,
+    ...(ccAssistants.length > 0 ? { cc: ccAssistants } : {}),
+    subject,
+    text,
+    html,
+  });
+}
+
+/** Sales rep notification when AR marks invoice sent. */
+export async function notifySalesRepInvoiceSent(params: {
+  contractId: string;
+  companyName: string;
+  grandTotalCents: number;
+  sentAtLabel: string;
+  salesRepId: string | null;
+}): Promise<void> {
+  const apiKey = process.env['SENDGRID_API_KEY'];
+  if (!apiKey) {
+    console.warn('[notifySalesRepInvoiceSent] SENDGRID_API_KEY not set — skipping email');
+    return;
+  }
+  if (!params.salesRepId) return;
+
+  const supabase = getSupabaseAdmin();
+  const { data: rep } = await supabase.from('sales_reps').select('email').eq('id', params.salesRepId).maybeSingle();
+  const toAddress = rep?.email?.trim();
+  if (!toAddress) return;
+
+  sgMail.setApiKey(apiKey);
+  const detailUrl = appContractUrl(params.contractId);
+  const subject = `Invoice sent for ${params.companyName}`;
+  const amt = formatCurrency(params.grandTotalCents);
+
+  const text = [
+    `An invoice has been sent for ${params.companyName}.`,
+    ``,
+    `Amount: ${amt}`,
+    `Invoice sent: ${params.sentAtLabel}`,
+    ``,
+    `Open contract: ${detailUrl}`,
+  ].join('\n');
+
+  const html = `
+    <div style="font-family: system-ui, sans-serif; max-width: 560px;">
+      <p><strong>Invoice sent</strong> for ${escapeHtml(params.companyName)}</p>
+      <p>Amount: <strong>${escapeHtml(amt)}</strong><br/>Marked: ${escapeHtml(params.sentAtLabel)}</p>
+      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
+    </div>
+  `;
+
+  const ccAssistants = (await getAssistantEmailsForRep(params.salesRepId)).filter(
+    (a) => a.toLowerCase() !== toAddress.toLowerCase(),
+  );
+
+  await sgMail.send({
+    from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
+    to: toAddress,
+    ...(ccAssistants.length > 0 ? { cc: ccAssistants } : {}),
+    subject,
+    text,
+    html,
+  });
+}
+
+/** Sales rep notification when AR marks invoice paid. */
+export async function notifySalesRepInvoicePaid(params: {
+  contractId: string;
+  companyName: string;
+  salesRepId: string | null;
+}): Promise<void> {
+  const apiKey = process.env['SENDGRID_API_KEY'];
+  if (!apiKey) {
+    console.warn('[notifySalesRepInvoicePaid] SENDGRID_API_KEY not set — skipping email');
+    return;
+  }
+  if (!params.salesRepId) return;
+
+  const supabase = getSupabaseAdmin();
+  const { data: rep } = await supabase.from('sales_reps').select('email').eq('id', params.salesRepId).maybeSingle();
+  const toAddress = rep?.email?.trim();
+  if (!toAddress) return;
+
+  sgMail.setApiKey(apiKey);
+  const detailUrl = appContractUrl(params.contractId);
+  const subject = `${params.companyName} — Paid`;
+
+  const text = [
+    `Great news — ${params.companyName}'s invoice has been paid. Contract closed out.`,
+    ``,
+    `Open contract: ${detailUrl}`,
+  ].join('\n');
+
+  const html = `
+    <div style="font-family: system-ui, sans-serif; max-width: 560px;">
+      <p>Great news — <strong>${escapeHtml(params.companyName)}</strong>'s invoice has been paid. Contract closed out.</p>
+      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
+    </div>
+  `;
+
+  const ccAssistants = (await getAssistantEmailsForRep(params.salesRepId)).filter(
     (a) => a.toLowerCase() !== toAddress.toLowerCase(),
   );
 

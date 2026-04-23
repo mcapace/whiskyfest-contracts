@@ -44,7 +44,7 @@ vercel env add ACCOUNTING_FROM_EMAIL production
 vercel env add ACCOUNTING_FROM_EMAIL preview
 ```
 
-Use a verified **`ACCOUNTING_FROM_EMAIL`**. Set **`ACCOUNTING_EMAIL`** to the AP/billing recipient list (see `.env.example`).
+Use a verified **`ACCOUNTING_FROM_EMAIL`**. Set **`ACCOUNTING_EMAILS`** to the comma-separated AP/billing recipient list (see `.env.example`; legacy **`ACCOUNTING_EMAIL`** is still read if plural is unset).
 
 ### 5. Install locally
 

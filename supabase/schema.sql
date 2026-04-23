@@ -153,6 +153,23 @@ create index if not exists contracts_discount_pending_idx
   on contracts (id)
   where booth_rate_cents < 1500000 and discount_approved_at is null;
 
+-- Accounting / AR (mirrors migration 018_add_accounting_layer.sql)
+alter table contracts add column if not exists invoice_status text not null default 'pending';
+alter table contracts add column if not exists invoice_sent_at timestamptz;
+alter table contracts add column if not exists invoice_sent_by text;
+alter table contracts add column if not exists paid_at timestamptz;
+alter table contracts add column if not exists paid_by text;
+alter table contracts add column if not exists accounting_notes text;
+
+alter table contracts drop constraint if exists contracts_invoice_status_chk;
+alter table contracts add constraint contracts_invoice_status_chk
+  check (invoice_status in ('pending', 'invoice_sent', 'paid'));
+
+create index if not exists contracts_status_invoice_status_idx on contracts (status, invoice_status);
+create index if not exists contracts_invoice_status_idx on contracts (invoice_status);
+
+alter table app_users add column if not exists is_accounting boolean not null default false;
+
 -- Computed-ish helpers (views make more sense than generated columns for totals)
 create or replace view contracts_with_totals as
 select

@@ -1,6 +1,8 @@
 import NextAuth from 'next-auth';
 import Google from 'next-auth/providers/google';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { getAccessibleSalesRepIds } from '@/lib/rep-access';
+import type { UserRole } from '@/types/db';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
@@ -34,33 +36,59 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         .from('app_users')
         .select('email, is_active, role')
         .eq('email', email)
-        .single();
+        .maybeSingle();
 
-      if (!appUser || !appUser.is_active) {
-        // Auto-provision new @mshanken.com users as 'sales' role
+      if (!appUser) {
         await supabase.from('app_users').upsert({
           email,
           name: user.name,
           role: 'sales',
           is_active: true,
         });
+        return true;
       }
+
+      if (!appUser.is_active) return false;
 
       return true;
     },
-    async session({ session }) {
-      if (!session.user?.email) return session;
+    async jwt({ token }) {
+      const email = (token.email as string | undefined)?.toLowerCase();
+      if (!email) return token;
 
       const supabase = getSupabaseAdmin();
       const { data: appUser } = await supabase
         .from('app_users')
-        .select('role, name')
-        .eq('email', session.user.email.toLowerCase())
-        .single();
+        .select('role, is_active, is_events_team, is_accounting')
+        .eq('email', email)
+        .maybeSingle();
 
-      if (appUser) {
-        session.user.role = appUser.role;
+      if (!appUser?.is_active) {
+        token.pipeline_access = false;
+        token.is_accounting = false;
+        token.is_events_team = false;
+        return token;
       }
+
+      const accessibleSalesRepIds = await getAccessibleSalesRepIds(email, supabase);
+      const isAdmin = appUser.role === 'admin';
+      const isEventsTeam = Boolean((appUser as { is_events_team?: boolean }).is_events_team);
+      const isAccounting = Boolean((appUser as { is_accounting?: boolean }).is_accounting);
+      const hasRep = accessibleSalesRepIds.length > 0;
+
+      token.role = appUser.role;
+      token.is_events_team = isEventsTeam;
+      token.is_accounting = isAccounting;
+      token.pipeline_access = isAdmin || isEventsTeam || hasRep;
+      return token;
+    },
+    async session({ session, token }) {
+      if (!session.user?.email) return session;
+
+      session.user.role = (token.role as UserRole) ?? 'sales';
+      session.user.is_events_team = Boolean(token.is_events_team);
+      session.user.is_accounting = Boolean(token.is_accounting);
+      session.user.pipeline_access = Boolean(token.pipeline_access);
       return session;
     },
   },
