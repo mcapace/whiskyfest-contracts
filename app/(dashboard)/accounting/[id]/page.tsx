@@ -7,8 +7,8 @@ import { calculateDiscountCents, calculateListSubtotalCents, isDiscountedRate } 
 import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { AccountingDetailActions } from '@/components/accounting/accounting-detail-actions';
+import { InvoiceLifecycleTimeline } from '@/components/accounting/invoice-lifecycle';
 import type { ContractWithTotals, Event, InvoiceStatus } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
@@ -47,23 +47,29 @@ export default async function AccountingContractDetailPage({ params }: { params:
   const inv = (contract.invoice_status ?? 'pending') as InvoiceStatus;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-28 md:pb-32">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
         <Link href="/accounting" className="inline-flex items-center gap-1.5 hover:text-foreground">
           <ArrowLeft className="h-3.5 w-3.5" /> AR Dashboard
         </Link>
       </div>
 
-      <div>
-        <h1 className="font-serif text-3xl font-semibold tracking-tight">{contract.exhibitor_company_name}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{event?.name ?? '—'}</p>
-      </div>
+      <header className="border-b border-border/50 pb-6">
+        <p className="wf-label-caps text-[0.6rem]">Contract</p>
+        <h1 className="wf-display-serif mt-1 text-3xl tracking-tight md:text-4xl">{contract.exhibitor_company_name}</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{event?.name ?? '—'}</p>
+      </header>
+
+      <section className="rounded-lg border border-border/50 bg-bg-surface p-4 md:p-6">
+        <p className="wf-label-caps mb-4 text-[0.6rem]">Invoice lifecycle</p>
+        <InvoiceLifecycleTimeline status={inv} />
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="border-fest-600/15 lg:col-span-2">
+        <Card className="border-border/60 lg:col-span-2">
           <CardContent className="space-y-4 p-6 text-sm">
             <h2 className="font-serif text-lg font-semibold">Contract summary</h2>
-            <dl className="grid gap-3 sm:grid-cols-2">
+            <dl className="grid gap-4 border-t border-border/50 pt-4 sm:grid-cols-2">
               <Detail label="Exhibitor" value={`${contract.exhibitor_company_name} — ${contract.signer_1_name ?? '—'}`} />
               <Detail label="Email" value={contract.signer_1_email} mono />
               <Detail label="Address" value={billingBlock || '—'} multiline />
@@ -78,15 +84,23 @@ export default async function AccountingContractDetailPage({ params }: { params:
           </CardContent>
         </Card>
 
-        <Card className="border-fest-600/15">
+        <Card className="border-border/60">
           <CardContent className="space-y-3 p-6">
-            <h2 className="font-serif text-lg font-semibold">Signed PDF</h2>
+            <p className="wf-label-caps text-[0.6rem]">Signed PDF</p>
             {contract.signed_pdf_url ? (
-              <Button variant="outline" size="sm" asChild>
-                <a href={contract.signed_pdf_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2">
-                  <ExternalLink className="h-4 w-4" /> Download / open signed PDF
+              <>
+                <div className="overflow-hidden rounded-lg border border-border/60 shadow-md">
+                  <iframe title="Signed PDF" src={contract.signed_pdf_url} className="aspect-[8.5/11] w-full bg-background" />
+                </div>
+                <a
+                  href={contract.signed_pdf_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 font-mono text-sm text-accent-brand underline-offset-4 hover:underline"
+                >
+                  <ExternalLink className="h-4 w-4" /> Open / download PDF
                 </a>
-              </Button>
+              </>
             ) : (
               <p className="text-sm text-muted-foreground">No signed PDF URL on file.</p>
             )}

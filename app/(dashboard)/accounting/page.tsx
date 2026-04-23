@@ -3,6 +3,7 @@ import { requireAccountingPageAccess } from '@/lib/auth-accounting';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
 import { formatInvoiceStatus, invoiceStatusBadgeClass } from '@/lib/invoice-status';
+import { ARStatCard } from '@/components/accounting/ar-stat-card';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -91,18 +92,40 @@ export default async function AccountingDashboardPage({
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <p className="mb-2 text-xs font-medium uppercase tracking-[0.2em] text-brass-700">Accounting</p>
-        <h1 className="font-serif text-4xl font-semibold tracking-tight">AR Dashboard</h1>
+    <div className="space-y-10">
+      <header className="border-b border-border/50 pb-8">
+        <p className="wf-label-caps text-brass-700 dark:text-brass-400">Accounting</p>
+        <h1 className="wf-display-serif mt-2 text-3xl text-foreground md:text-4xl">Accounts Receivable</h1>
+        <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-foreground md:text-3xl">
+          {formatCurrency(arTotal)} <span className="text-sm font-sans font-normal text-muted-foreground">outstanding</span>
+        </p>
         <p className="mt-2 text-sm text-muted-foreground">Executed contracts only · invoice tracking</p>
-      </div>
+      </header>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard href={href('pending')} title="Pending Invoicing" count={countFor('pending')} cents={pendingTotal} active={invoice === 'pending'} />
-        <StatCard href={href('invoice_sent')} title="Invoice Sent" count={countFor('invoice_sent')} cents={sentTotal} active={invoice === 'invoice_sent'} />
-        <StatCard href={href('paid')} title="Paid" count={countFor('paid')} cents={paidTotal} active={invoice === 'paid'} />
-        <StatCard href={href('all')} title="Total AR Value" count={statsRows.length} cents={arTotal} subtitle="All executed" active={invoice === 'all'} />
+      <div className="grid grid-cols-1 gap-0 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+        <ARStatCard
+          href={href('pending')}
+          title="Pending Invoicing"
+          count={countFor('pending')}
+          cents={pendingTotal}
+          active={invoice === 'pending'}
+        />
+        <ARStatCard
+          href={href('invoice_sent')}
+          title="Invoice Sent"
+          count={countFor('invoice_sent')}
+          cents={sentTotal}
+          active={invoice === 'invoice_sent'}
+        />
+        <ARStatCard href={href('paid')} title="Paid" count={countFor('paid')} cents={paidTotal} active={invoice === 'paid'} />
+        <ARStatCard
+          href={href('all')}
+          title="Total AR Value"
+          count={statsRows.length}
+          cents={arTotal}
+          subtitle="All executed"
+          active={invoice === 'all'}
+        />
       </div>
 
       <Card className="border-fest-600/15">
@@ -149,46 +172,77 @@ export default async function AccountingDashboardPage({
           {contracts.length === 0 ? (
             <p className="py-12 text-center text-sm text-muted-foreground">No contracts match these filters.</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Company</TableHead>
-                  <TableHead>Event</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead>Sales Rep</TableHead>
-                  <TableHead>Executed</TableHead>
-                  <TableHead>Invoice</TableHead>
-                  <TableHead className="w-10" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              <div className="divide-y divide-border/50 md:hidden">
                 {contracts.map((c) => {
                   const ev = eventMap.get(c.event_id);
                   const inv = (c.invoice_status ?? 'pending') as InvoiceStatus;
                   return (
-                    <TableRow key={c.id}>
-                      <TableCell className="font-medium">{c.exhibitor_company_name}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{ev?.name ?? '—'}</TableCell>
-                      <TableCell className="text-right font-mono tabular-nums">{formatCurrency(c.grand_total_cents)}</TableCell>
-                      <TableCell className="text-sm">{c.sales_rep_name ?? c.sales_rep_email ?? '—'}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {c.executed_at ? formatTimestamp(c.executed_at) : '—'}
-                      </TableCell>
-                      <TableCell>
-                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${invoiceStatusBadgeClass(inv)}`}>
+                    <Link
+                      key={c.id}
+                      href={`/accounting/${c.id}`}
+                      className="block py-4 first:pt-0 transition-colors hover:bg-muted/30"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-medium leading-snug">{c.exhibitor_company_name}</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">{ev?.name ?? '—'}</p>
+                        </div>
+                        <span className="font-mono text-sm font-semibold tabular-nums">{formatCurrency(c.grand_total_cents)}</span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <span>{c.sales_rep_name ?? c.sales_rep_email ?? '—'}</span>
+                        <span className={`inline-flex rounded-full px-2 py-0.5 font-medium ${invoiceStatusBadgeClass(inv)}`}>
                           {formatInvoiceStatus(inv)}
                         </span>
-                      </TableCell>
-                      <TableCell>
-                        <Link href={`/accounting/${c.id}`} className="text-fest-700 hover:underline">
-                          →
-                        </Link>
-                      </TableCell>
-                    </TableRow>
+                      </div>
+                    </Link>
                   );
                 })}
-              </TableBody>
-            </Table>
+              </div>
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Company</TableHead>
+                      <TableHead>Event</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead>Sales Rep</TableHead>
+                      <TableHead>Executed</TableHead>
+                      <TableHead>Invoice</TableHead>
+                      <TableHead className="w-10" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {contracts.map((c) => {
+                      const ev = eventMap.get(c.event_id);
+                      const inv = (c.invoice_status ?? 'pending') as InvoiceStatus;
+                      return (
+                        <TableRow key={c.id}>
+                          <TableCell className="font-medium">{c.exhibitor_company_name}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{ev?.name ?? '—'}</TableCell>
+                          <TableCell className="text-right font-mono tabular-nums">{formatCurrency(c.grand_total_cents)}</TableCell>
+                          <TableCell className="text-sm">{c.sales_rep_name ?? c.sales_rep_email ?? '—'}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {c.executed_at ? formatTimestamp(c.executed_at) : '—'}
+                          </TableCell>
+                          <TableCell>
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${invoiceStatusBadgeClass(inv)}`}>
+                              {formatInvoiceStatus(inv)}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <Link href={`/accounting/${c.id}`} className="text-accent-brand hover:underline">
+                              →
+                            </Link>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -196,31 +250,3 @@ export default async function AccountingDashboardPage({
   );
 }
 
-function StatCard({
-  href: hrefProp,
-  title,
-  count,
-  cents,
-  subtitle,
-  active,
-}: {
-  href: string;
-  title: string;
-  count: number;
-  cents: number;
-  subtitle?: string;
-  active?: boolean;
-}) {
-  return (
-    <Link href={hrefProp}>
-      <Card className={`h-full border-fest-600/15 transition-all hover:-translate-y-0.5 hover:shadow-md ${active ? 'ring-2 ring-fest-600/30' : ''}`}>
-        <CardContent className="p-5">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{title}</p>
-          <p className="mt-2 font-serif text-2xl font-semibold tabular-nums">{count}</p>
-          <p className="mt-1 font-mono text-lg text-fest-900 tabular-nums">{formatCurrency(cents)}</p>
-          {subtitle ? <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p> : null}
-        </CardContent>
-      </Card>
-    </Link>
-  );
-}

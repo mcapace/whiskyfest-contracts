@@ -1,9 +1,10 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { useImpersonationReadOnly } from '@/hooks/use-impersonation-read-only';
 import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
+import { FloatingActionBar } from '@/components/contract/floating-action-bar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/input';
 import type { InvoiceStatus } from '@/types/db';
@@ -62,53 +63,60 @@ export function AccountingDetailActions({
     startTransition(() => void patch({ accounting_notes: notes }));
   }
 
+  const fabVisible = useMemo(
+    () => invoiceStatus === 'pending' || invoiceStatus === 'invoice_sent',
+    [invoiceStatus],
+  );
+  const fabBtn =
+    'h-10 shrink-0 gap-2 rounded-full px-4 text-sm font-medium motion-safe:transition-transform motion-safe:duration-150 hover:brightness-[1.04] active:scale-[0.98]';
+
   return (
     <div className="space-y-6">
       {err && <p className="text-sm text-destructive">{err}</p>}
 
-      <div className="rounded-lg border border-border/60 bg-card/40 p-4">
-        <h3 className="font-serif text-lg font-semibold">Actions</h3>
+      <FloatingActionBar visible={fabVisible}>
         {invoiceStatus === 'pending' && (
-          <div className="mt-3">
-            <Button
-              type="button"
-              onClick={markInvoiceSent}
-              disabled={busy}
-              title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
-            >
-              {pending ? 'Saving…' : 'Mark Invoice Sent'}
-            </Button>
-          </div>
+          <Button
+            type="button"
+            className={fabBtn}
+            onClick={markInvoiceSent}
+            disabled={busy}
+            title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+          >
+            {pending ? 'Saving…' : 'Mark Invoice Sent'}
+          </Button>
         )}
         {invoiceStatus === 'invoice_sent' && (
-          <div className="mt-3 space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Invoice sent{invoiceSentLabel ? ` on ${invoiceSentLabel}` : ''}
-              {invoiceSentBy ? ` by ${invoiceSentBy}` : ''}
-            </p>
-            <Button
-              type="button"
-              onClick={markPaid}
-              disabled={busy}
-              title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
-            >
-              {pending ? 'Saving…' : 'Mark Paid'}
-            </Button>
-          </div>
+          <Button
+            type="button"
+            className={fabBtn}
+            onClick={markPaid}
+            disabled={busy}
+            title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+          >
+            {pending ? 'Saving…' : 'Mark Paid'}
+          </Button>
         )}
-        {invoiceStatus === 'paid' && (
-          <div className="mt-3 space-y-1 text-sm text-muted-foreground">
-            <p>
-              Invoice sent{invoiceSentLabel ? `: ${invoiceSentLabel}` : ''}
-              {invoiceSentBy ? ` · ${invoiceSentBy}` : ''}
-            </p>
-            <p>
-              Paid{paidLabel ? `: ${paidLabel}` : ''}
-              {paidBy ? ` · ${paidBy}` : ''}
-            </p>
-          </div>
-        )}
-      </div>
+      </FloatingActionBar>
+
+      {invoiceStatus === 'paid' && (
+        <div className="divide-y divide-border/50 border-b border-border/50 pb-6 text-sm text-muted-foreground">
+          <p>
+            Invoice sent{invoiceSentLabel ? `: ${invoiceSentLabel}` : ''}
+            {invoiceSentBy ? ` · ${invoiceSentBy}` : ''}
+          </p>
+          <p className="pt-3">
+            Paid{paidLabel ? `: ${paidLabel}` : ''}
+            {paidBy ? ` · ${paidBy}` : ''}
+          </p>
+        </div>
+      )}
+      {invoiceStatus === 'invoice_sent' && (
+        <p className="text-sm text-muted-foreground">
+          Invoice sent{invoiceSentLabel ? ` on ${invoiceSentLabel}` : ''}
+          {invoiceSentBy ? ` by ${invoiceSentBy}` : ''}
+        </p>
+      )}
 
       <div className="rounded-lg border border-border/60 bg-card/40 p-4">
         <h3 className="font-serif text-lg font-semibold">Accounting notes</h3>
