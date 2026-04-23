@@ -91,8 +91,9 @@ export async function renderContractPdfFromTemplate(
       });
     }
 
+    // supportsAllDrives is required for Shared Drive files (REST); googleapis Params type omits it.
     const pdfResp = await drive.files.export(
-      { fileId: tempDocId, mimeType: 'application/pdf' },
+      { fileId: tempDocId, mimeType: 'application/pdf', supportsAllDrives: true } as never,
       { responseType: 'arraybuffer' },
     );
 

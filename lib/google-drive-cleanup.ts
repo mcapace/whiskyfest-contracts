@@ -62,6 +62,30 @@ export async function cleanupOrphanTempGoogleDocs(opts: {
   const rootFolderId = await resolveContractsRootFolderId(drive);
   const templateId = process.env['GOOGLE_TEMPLATE_DOC_ID']?.trim() ?? '';
 
+  /** Scope list/delete to the correct corpus (Shared Drive vs My Drive). */
+  let sharedDriveId: string | undefined;
+  try {
+    const rootMeta = await drive.files.get({
+      fileId: rootFolderId,
+      fields: 'driveId',
+      supportsAllDrives: true,
+    });
+    sharedDriveId = rootMeta.data.driveId ?? undefined;
+  } catch {
+    sharedDriveId = undefined;
+  }
+
+  const listBase = {
+    q: `'${rootFolderId}' in parents and trashed = false`,
+    fields: 'nextPageToken, files(id, name, mimeType, createdTime, modifiedTime)',
+    pageSize: 100,
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+    ...(sharedDriveId
+      ? { corpora: 'drive' as const, driveId: sharedDriveId }
+      : { corpora: 'allDrives' as const }),
+  };
+
   const details: DriveTempCleanupDetail[] = [];
   let deleted = 0;
   let failed = 0;
@@ -78,12 +102,8 @@ export async function cleanupOrphanTempGoogleDocs(opts: {
   let pageToken: string | undefined;
   do {
     const res = await drive.files.list({
-      q: `'${rootFolderId}' in parents and trashed = false`,
-      fields: 'nextPageToken, files(id, name, mimeType, createdTime, modifiedTime)',
-      pageSize: 100,
+      ...listBase,
       pageToken,
-      supportsAllDrives: true,
-      includeItemsFromAllDrives: true,
     });
     for (const f of res.data.files ?? []) {
       all.push(f as ListedFile);
