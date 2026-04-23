@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
+import { CommandPaletteProvider, CommandPaletteTrigger } from '@/components/command-palette/command-palette';
 import { AuthSessionProvider } from '@/components/session/auth-session-provider';
 import { ImpersonationBanner } from '@/components/impersonation/impersonation-banner';
 
@@ -14,26 +15,28 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <AuthSessionProvider session={session}>
-      <ImpersonationBanner />
-      <div className="min-h-screen bg-bg-page">
-        <Sidebar
-          user={{
-            email: session.user.email,
-            name: session.user.name,
-            role: session.user.role ?? 'sales',
-            pipelineAccess: Boolean(session.user.pipeline_access),
-            isAccounting: Boolean(session.user.is_accounting),
-          }}
-          canImpersonate={Boolean(session.user.can_impersonate)}
-          readOnlyImpersonation={readOnly}
-        />
-        <div className={`flex min-h-screen flex-col lg:pl-64 ${mainPad}`}>
-          <Topbar />
-          <main className="flex-1">
-            <div className="mx-auto max-w-6xl animate-fade-in px-6 py-6 lg:px-10 lg:py-8">{children}</div>
-          </main>
+      <CommandPaletteProvider>
+        <ImpersonationBanner />
+        <div className="min-h-screen bg-bg-page">
+          <Sidebar
+            user={{
+              email: session.user.email,
+              name: session.user.name,
+              role: session.user.role ?? 'sales',
+              pipelineAccess: Boolean(session.user.pipeline_access),
+              isAccounting: Boolean(session.user.is_accounting),
+            }}
+            canImpersonate={Boolean(session.user.can_impersonate)}
+            readOnlyImpersonation={readOnly}
+          />
+          <div className={`flex min-h-screen flex-col lg:pl-64 ${mainPad}`}>
+            <Topbar endSlot={<CommandPaletteTrigger />} />
+            <main className="flex-1">
+              <div className="mx-auto max-w-6xl animate-fade-in px-6 py-6 lg:px-10 lg:py-8">{children}</div>
+            </main>
+          </div>
         </div>
-      </div>
+      </CommandPaletteProvider>
     </AuthSessionProvider>
   );
 }
