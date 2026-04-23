@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { assertContractAccess } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { renderContractPdfFromTemplate } from '@/lib/google';
-import { sendEnvelope, getCountersignerGroupId } from '@/lib/docusign';
+import { sendEnvelope } from '@/lib/docusign';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
@@ -11,7 +11,7 @@ import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
 
-/** POST — send approved contract via DocuSign (exhibitor routing 1; countersigner signing group routing 2). */
+/** POST — send approved contract via DocuSign (exhibitor routing 1; event countersigner routing 2). */
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
 
@@ -68,12 +68,11 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }
 
-  let groupId: string;
-  try {
-    groupId = getCountersignerGroupId();
-  } catch {
+  const countersignerEmail = event.shanken_signatory_email?.trim();
+  const countersignerName = event.shanken_signatory_name?.trim();
+  if (!countersignerEmail || !countersignerName) {
     return NextResponse.json(
-      { error: 'DOCUSIGN_COUNTERSIGNER_GROUP_ID is not configured.' },
+      { error: 'Event countersigner name and email are required.' },
       { status: 500 },
     );
   }
@@ -97,7 +96,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       emailSubject: `Please sign: ${event.name} ${event.year} participation contract — ${contract.exhibitor_company_name}`,
       emailBlurb: `Attached is the WhiskyFest ${event.year} participation contract for ${contract.exhibitor_company_name}. Please review and sign.`,
       signer1: { name: signerName, email: signerEmail },
-      countersignerSigningGroupId: groupId,
+      countersigner: { name: countersignerName, email: countersignerEmail },
     });
 
     await supabase
@@ -117,7 +116,8 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
         envelope_id: envelopeId,
         envelope_status: 'sent',
         exhibitor_signer: contract.signer_1_email,
-        countersigner_signing_group_id: groupId,
+        countersigner_email: countersignerEmail,
+        countersigner_name: countersignerName,
         docusign_pdf_file: null,
       },
     });

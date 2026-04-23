@@ -24,8 +24,6 @@ npm install
 | `DOCUSIGN_BASE_URL` | Demo: `https://demo.docusign.net/restapi` — Production: `https://www.docusign.net/restapi` |
 | `DOCUSIGN_AUTH_URL` | Demo: `https://account-d.docusign.com` — Production: `https://account.docusign.com` |
 | `DOCUSIGN_RSA_PRIVATE_KEY` | Base64 of `docusign-private-key.pem` (one line, no newlines) |
-| `DOCUSIGN_COUNTERSIGNER_GROUP_ID` | **Required for send:** DocuSign Signing Group ID for Shanken countersignature (routing order 2). Sandbox demo: `1488881`. |
-| `DOCUSIGN_COUNTERSIGNER_GROUP_NAME` | Optional display label for that group (default: `WhiskyFest Countersignatories`). |
 
 ### Webhook HMAC (optional but recommended)
 
@@ -78,7 +76,7 @@ These must exist in the master Google Doc as merge tokens (same as Phase 1).
 1. DocuSign Admin → **Connect** → add configuration (JSON).
 2. **URL:** `https://<your-domain>/api/webhooks/docusign`
 3. Subscribe at minimum to:
-   - **Envelope recipient completed** (exhibitor / routing order 1 → app sets `partially_signed`; countersign invitation goes to the **configured Signing Group** in DocuSign routing order 2)
+   - **Envelope recipient completed** (exhibitor / routing order 1 → app sets `partially_signed`; countersign invitation goes to the event's configured Shanken signatory in routing order 2)
    - **Envelope completed** (both parties signed → contract `signed`, signed PDF to Drive; release-to-accounting is a separate admin step)
 4. Use **JSON** payload format (not XML), or the route will return 200 without updating data.
 5. Optional: enable **HMAC** and set `DOCUSIGN_CONNECT_HMAC_SECRET` in Vercel to the same value.

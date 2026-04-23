@@ -27,10 +27,6 @@ export function getDocuSignAccountId(): string {
   return requireEnv('DOCUSIGN_ACCOUNT_ID');
 }
 
-export function getCountersignerGroupId(): string {
-  return requireEnv('DOCUSIGN_COUNTERSIGNER_GROUP_ID');
-}
-
 /**
  * JWT Grant — same claims as the official DocuSign Node SDK.
  * Implemented with fetch so we avoid bundling `docusign-esign` (incompatible with Next.js webpack).
@@ -92,10 +88,8 @@ export interface SendEnvelopeParams {
   emailSubject: string;
   emailBlurb: string;
   signer1: { email: string; name: string };
-  /** DocuSign signing group ID for Shanken countersignature (routing order 2). */
-  countersignerSigningGroupId: string;
-  /** Optional display name for the signing group in DocuSign. */
-  countersignerSigningGroupName?: string;
+  /** Event-level Shanken countersigner recipient (routing order 2). */
+  countersigner: { email: string; name: string };
 }
 
 export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelopeId: string }> {
@@ -106,11 +100,6 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
   const date1 = anchorOnly(DOCUSIGN_ANCHORS.date1);
   const signHere2 = anchorOnly(DOCUSIGN_ANCHORS.sig2);
   const date2 = anchorOnly(DOCUSIGN_ANCHORS.date2);
-
-  const groupName =
-    params.countersignerSigningGroupName?.trim() ||
-    process.env['DOCUSIGN_COUNTERSIGNER_GROUP_NAME']?.trim() ||
-    'WhiskyFest Countersignatories';
 
   const envelopeDefinition = {
     emailSubject: params.emailSubject,
@@ -137,10 +126,10 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
           },
         },
         {
+          email: params.countersigner.email,
+          name: params.countersigner.name,
           recipientId: '2',
           routingOrder: '2',
-          signingGroupId: params.countersignerSigningGroupId,
-          signingGroupName: groupName,
           roleName: 'Countersigner',
           tabs: {
             signHereTabs: [signHere2],

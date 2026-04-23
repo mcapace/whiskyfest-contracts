@@ -5,7 +5,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { renderContractPdfFromTemplate } from '@/lib/google';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import { requiresDiscountApproval } from '@/lib/contracts';
-import { sendEnvelope, voidEnvelope, getCountersignerGroupId } from '@/lib/docusign';
+import { sendEnvelope, voidEnvelope } from '@/lib/docusign';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import type { ContractWithTotals, Event } from '@/types/db';
 
@@ -101,11 +101,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   let newEnvelopeId: string;
   try {
-    let groupId: string;
-    try {
-      groupId = getCountersignerGroupId();
-    } catch {
-      return NextResponse.json({ error: 'DOCUSIGN_COUNTERSIGNER_GROUP_ID is not configured.' }, { status: 500 });
+    const countersignerEmail = event.shanken_signatory_email?.trim();
+    const countersignerName = event.shanken_signatory_name?.trim();
+    if (!countersignerEmail || !countersignerName) {
+      return NextResponse.json({ error: 'Event countersigner name and email are required.' }, { status: 500 });
     }
 
     const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileName);
@@ -116,7 +115,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       emailSubject: `Please sign: ${event.name} ${event.year} participation contract — ${contract.exhibitor_company_name}`,
       emailBlurb: `Attached is the WhiskyFest ${event.year} participation contract for ${contract.exhibitor_company_name}. Please review and sign.`,
       signer1: { name: newSignerName, email: newSignerEmail },
-      countersignerSigningGroupId: groupId,
+      countersigner: { name: countersignerName, email: countersignerEmail },
     });
     newEnvelopeId = sent.envelopeId;
   } catch (e: unknown) {
