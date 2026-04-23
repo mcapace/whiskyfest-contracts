@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
+import { getEffectiveUserEmail } from '@/lib/effective-user';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { notifySalesRepInvoicePaid, notifySalesRepInvoiceSent } from '@/lib/notifications';
 import { formatTimestamp } from '@/lib/utils';
@@ -22,16 +23,15 @@ async function requireAccountingActor() {
   const isAccounting = Boolean(session.user.is_accounting);
   if (!isAdmin && !isAccounting) return null;
 
+  const eff = getEffectiveUserEmail(session);
+  if (!eff) return null;
+
   const supabase = getSupabaseAdmin();
-  const { data: appUser } = await supabase
-    .from('app_users')
-    .select('is_active')
-    .eq('email', session.user.email.toLowerCase())
-    .maybeSingle();
+  const { data: appUser } = await supabase.from('app_users').select('is_active').eq('email', eff).maybeSingle();
 
   if (!appUser?.is_active) return null;
 
-  return { email: session.user.email.toLowerCase() };
+  return { email: eff };
 }
 
 /** PATCH — invoice status transitions, or save accounting_notes only. */

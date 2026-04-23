@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { auth } from '@/lib/auth';
+import { getEffectiveUserEmail } from '@/lib/effective-user';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { UsersAdmin } from '@/components/users/users-admin';
 import type { AppUser } from '@/types/db';
@@ -29,7 +30,7 @@ export default async function UsersPage() {
         </p>
       </div>
 
-      <UsersAdmin initialUsers={(users ?? []) as AppUser[]} currentEmail={session.user.email} />
+      <UsersAdmin initialUsers={(users ?? []) as AppUser[]} currentEmail={getEffectiveUserEmail(session)!} />
     </div>
   );
 }

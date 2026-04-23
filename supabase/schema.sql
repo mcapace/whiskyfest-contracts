@@ -170,6 +170,10 @@ create index if not exists contracts_invoice_status_idx on contracts (invoice_st
 
 alter table app_users add column if not exists is_accounting boolean not null default false;
 
+alter table app_users add column if not exists can_impersonate boolean not null default false;
+
+alter table audit_log add column if not exists impersonation_target_email text;
+
 -- Computed-ish helpers (views make more sense than generated columns for totals)
 create or replace view contracts_with_totals as
 select

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getAccessibleSalesRepIds } from '@/lib/rep-access';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { getEffectiveUserEmail } from '@/lib/effective-user';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const email = session.user.email.toLowerCase();
+  const email = getEffectiveUserEmail(session)!;
   const supabase = getSupabaseAdmin();
 
   const { data: appUser } = await supabase.from('app_users').select('role, is_active').eq('email', email).single();

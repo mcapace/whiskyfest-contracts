@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useImpersonationReadOnly } from '@/hooks/use-impersonation-read-only';
+import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
 import { Pencil, Loader2, Plus } from 'lucide-react';
 import { formatCurrency, formatLongDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -32,7 +34,9 @@ function emptyForm() {
 
 export function EventsAdmin({ initialEvents }: Props) {
   const router = useRouter();
+  const readOnly = useImpersonationReadOnly();
   const [pending, startTransition] = useTransition();
+  const busy = pending || readOnly;
   const [err, setErr] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm());
@@ -68,6 +72,7 @@ export function EventsAdmin({ initialEvents }: Props) {
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
+    if (readOnly) return;
 
     if (!form.name.trim()) {
       setErr('Event name is required');
@@ -189,7 +194,7 @@ export function EventsAdmin({ initialEvents }: Props) {
               </div>
             )}
             <div className="flex flex-wrap gap-2">
-              <Button type="submit" disabled={pending}>
+              <Button type="submit" disabled={busy} title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}>
                 {pending && <Loader2 className="h-4 w-4 animate-spin" />}
                 {editingId ? 'Save changes' : 'Create event'}
               </Button>

@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { getEffectiveUserEmail } from '@/lib/effective-user';
 
 export interface AccountingPageActor {
   email: string;
@@ -13,7 +14,9 @@ export async function requireAccountingPageAccess(): Promise<AccountingPageActor
   const session = await auth();
   if (!session?.user?.email) redirect('/auth/login');
 
-  const email = session.user.email.toLowerCase();
+  const email = getEffectiveUserEmail(session);
+  if (!email) redirect('/auth/login');
+
   const isAdmin = session.user.role === 'admin';
   const isAccounting = Boolean(session.user.is_accounting);
 

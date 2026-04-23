@@ -4,6 +4,7 @@ import type { Session } from 'next-auth';
 import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getAccessibleSalesRepIds } from '@/lib/rep-access';
+import { getEffectiveUserEmail } from '@/lib/effective-user';
 import type { Contract, ContractStatus, ContractWithTotals } from '@/types/db';
 
 export interface AppUserRow {
@@ -35,7 +36,10 @@ export async function resolveContractActor(session: Session | null): Promise<
 > {
   if (!session?.user?.email) return jsonErr(401, 'Unauthorized');
 
-  const email = session.user.email.toLowerCase();
+  const emailEff = getEffectiveUserEmail(session);
+  if (!emailEff) return jsonErr(401, 'Unauthorized');
+
+  const email = emailEff;
   const supabase = getSupabaseAdmin();
   const { data: appUser, error } = await supabase
     .from('app_users')
@@ -144,7 +148,10 @@ export async function requireContractActorForPage(): Promise<PageContractActor> 
   const session = await auth();
   if (!session?.user?.email) redirect('/auth/login');
 
-  const email = session.user.email.toLowerCase();
+  const emailEff = getEffectiveUserEmail(session);
+  if (!emailEff) redirect('/auth/login');
+
+  const email = emailEff;
   const supabase = getSupabaseAdmin();
   const { data: appUser } = await supabase
     .from('app_users')

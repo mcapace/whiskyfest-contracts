@@ -9,7 +9,18 @@ declare module 'next-auth' {
       is_accounting?: boolean;
       /** True when user may access the main contract pipeline (admin, events team, or rep/assistant). */
       pipeline_access?: boolean;
+      /** Real login user — true only for users allowed to use "View as…". */
+      can_impersonate?: boolean;
     };
+    impersonation?: {
+      active: boolean;
+      target_email: string;
+      target_name: string | null;
+      started_at: string;
+      role_description: string;
+    } | null;
+    /** True while viewing as another user — mutating API calls are blocked. */
+    is_read_only_impersonation?: boolean;
   }
 }
 
@@ -19,5 +30,10 @@ declare module 'next-auth/jwt' {
     is_events_team?: boolean;
     is_accounting?: boolean;
     pipeline_access?: boolean;
+    real_can_impersonate?: boolean;
+    impersonation_target_email?: string | null;
+    impersonation_target_name?: string | null;
+    impersonation_started_at?: number | null;
+    effective_role_description?: string;
   }
 }

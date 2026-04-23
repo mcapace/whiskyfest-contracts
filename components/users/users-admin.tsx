@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useImpersonationReadOnly } from '@/hooks/use-impersonation-read-only';
+import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,11 +16,13 @@ interface Props {
 
 export function UsersAdmin({ initialUsers, currentEmail }: Props) {
   const router = useRouter();
+  const readOnly = useImpersonationReadOnly();
   const [pending, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 
   function updateRole(email: string, role: UserRole) {
+    if (readOnly) return;
     setErr(null);
     setPendingEmail(email);
     startTransition(async () => {
@@ -38,6 +42,7 @@ export function UsersAdmin({ initialUsers, currentEmail }: Props) {
   }
 
   function toggleActive(user: AppUser, is_active: boolean) {
+    if (readOnly) return;
     setErr(null);
     setPendingEmail(user.email);
     startTransition(async () => {
@@ -84,36 +89,45 @@ export function UsersAdmin({ initialUsers, currentEmail }: Props) {
             </thead>
             <tbody className="divide-y divide-border/40">
               {initialUsers.map(u => {
-                const busy = pending && pendingEmail === u.email;
+                const rowPending = pending && pendingEmail === u.email;
                 const isSelf = u.email.toLowerCase() === currentEmail.toLowerCase();
+                const rowDisabled = rowPending || readOnly;
                 return (
                   <tr key={u.email}>
                     <td className="px-4 py-3 font-mono text-xs">{u.email}</td>
                     <td className="px-4 py-3 text-muted-foreground">{u.name ?? '—'}</td>
                     <td className="px-4 py-3">
-                      <Select
-                        value={u.role}
-                        onValueChange={v => updateRole(u.email, v as UserRole)}
-                        disabled={busy}
-                      >
-                        <SelectTrigger className="h-9 w-[140px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="admin">admin</SelectItem>
-                          <SelectItem value="sales">sales</SelectItem>
-                          <SelectItem value="viewer">viewer</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <span title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined} className="inline-block">
+                        <Select
+                          value={u.role}
+                          onValueChange={v => updateRole(u.email, v as UserRole)}
+                          disabled={rowDisabled}
+                        >
+                          <SelectTrigger className="h-9 w-[140px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">admin</SelectItem>
+                            <SelectItem value="sales">sales</SelectItem>
+                            <SelectItem value="viewer">viewer</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       <Button
                         type="button"
                         variant={u.is_active ? 'outline' : 'secondary'}
                         size="sm"
-                        disabled={busy || (isSelf && u.is_active)}
+                        disabled={rowDisabled || (isSelf && u.is_active)}
                         onClick={() => toggleActive(u, !u.is_active)}
-                        title={isSelf && u.is_active ? 'You cannot deactivate yourself' : undefined}
+                        title={
+                          readOnly
+                            ? IMPERSONATION_BUTTON_TOOLTIP
+                            : isSelf && u.is_active
+                              ? 'You cannot deactivate yourself'
+                              : undefined
+                        }
                       >
                         {u.is_active ? 'Active' : 'Inactive'}
                       </Button>

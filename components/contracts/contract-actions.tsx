@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useImpersonationReadOnly } from '@/hooks/use-impersonation-read-only';
+import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -84,7 +86,9 @@ export function ContractActions({
   isEventsTeam,
 }: Props) {
   const router = useRouter();
+  const readOnly = useImpersonationReadOnly();
   const [pending, startTransition] = useTransition();
+  const busy = pending || readOnly;
   const [action, setAction] = useState<string | null>(null);
   const [openRecall, setOpenRecall] = useState(false);
   const [openResendWithChanges, setOpenResendWithChanges] = useState(false);
@@ -138,7 +142,7 @@ export function ContractActions({
               <Button
                 className="min-h-10 flex-1 basis-[min(100%,11rem)]"
                 onClick={() => runAction('generate', 'generate')}
-                disabled={pending}
+                disabled={busy}
               >
                 {pending && action === 'generate' ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -147,14 +151,28 @@ export function ContractActions({
                 )}
                 Generate Draft PDF
               </Button>
-              <Button variant="secondary" className="min-h-10 flex-1 basis-[min(100%,11rem)]" asChild>
-                <Link href={`/contracts/${contractId}/edit`}>Edit Contract</Link>
-              </Button>
+              {readOnly ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                  disabled
+                  title={IMPERSONATION_BUTTON_TOOLTIP}
+                >
+                  Edit Contract
+                </Button>
+              ) : (
+                <Button variant="secondary" className="min-h-10 flex-1 basis-[min(100%,11rem)]" asChild>
+                  <Link href={`/contracts/${contractId}/edit`}>Edit Contract</Link>
+                </Button>
+              )}
               {isAdmin && (
                 <Button
                   variant="outline"
                   className="min-h-10 flex-1 basis-[min(100%,11rem)] text-destructive hover:text-destructive"
                   onClick={() => setOpenCancel(true)}
+                  disabled={readOnly}
+                  title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
                 >
                   Cancel Contract
                 </Button>
@@ -169,6 +187,8 @@ export function ContractActions({
               <Button
                 className="min-h-10 flex-1 basis-[min(100%,11rem)] border-amber-600 bg-amber-600 text-white hover:bg-amber-700"
                 onClick={() => setOpenApproveDiscount(true)}
+                disabled={readOnly}
+                title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
               >
                 <AlertTriangle className="h-4 w-4" />
                 Approve Discount
@@ -177,7 +197,7 @@ export function ContractActions({
                 variant="secondary"
                 className="min-h-10 flex-1 basis-[min(100%,11rem)]"
                 onClick={() => runAction('generate', 'regenerate')}
-                disabled={pending}
+                disabled={busy}
               >
                 {pending && action === 'regenerate' ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -190,6 +210,8 @@ export function ContractActions({
                 variant="outline"
                 className="min-h-10 flex-1 basis-[min(100%,11rem)] text-destructive hover:text-destructive"
                 onClick={() => setOpenCancel(true)}
+                disabled={readOnly}
+                title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
               >
                 Cancel Contract
               </Button>
@@ -204,7 +226,7 @@ export function ContractActions({
                 variant="secondary"
                 className="min-h-10 flex-1 basis-[min(100%,11rem)]"
                 onClick={() => runAction('generate', 'regenerate')}
-                disabled={pending}
+                disabled={busy}
               >
                 {pending && action === 'regenerate' ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -230,7 +252,7 @@ export function ContractActions({
                 variant="secondary"
                 className="min-h-10 flex-1 basis-[min(100%,11rem)]"
                 onClick={() => runAction('generate', 'regenerate')}
-                disabled={pending}
+                disabled={busy}
               >
                 <RefreshCw className="h-4 w-4" />
                 Re-generate PDF (submit for events review)
@@ -240,6 +262,8 @@ export function ContractActions({
                   variant="outline"
                   className="min-h-10 flex-1 basis-[min(100%,11rem)] text-destructive hover:text-destructive"
                   onClick={() => setOpenCancel(true)}
+                  disabled={readOnly}
+                  title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
                 >
                   Cancel Contract
                 </Button>
@@ -252,7 +276,7 @@ export function ContractActions({
               <Button
                 className="min-h-10 flex-1 basis-[min(100%,11rem)]"
                 onClick={() => runAction('events-approve', 'events-approve', {})}
-                disabled={pending}
+                disabled={busy}
               >
                 {pending && action === 'events-approve' ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -265,6 +289,8 @@ export function ContractActions({
                 variant="secondary"
                 className="min-h-10 flex-1 basis-[min(100%,11rem)]"
                 onClick={() => setOpenSendBack(true)}
+                disabled={readOnly}
+                title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
               >
                 Send Back for Changes
               </Button>
@@ -293,7 +319,7 @@ export function ContractActions({
               <Button
                 className="min-h-10 flex-1 basis-[min(100%,11rem)]"
                 onClick={() => runAction('send', 'send')}
-                disabled={pending}
+                disabled={busy}
               >
                 {pending && action === 'send' ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -307,6 +333,8 @@ export function ContractActions({
                   variant="outline"
                   className="min-h-10 flex-1 basis-[min(100%,11rem)] text-destructive hover:text-destructive"
                   onClick={() => setOpenCancel(true)}
+                  disabled={readOnly}
+                  title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
                 >
                   Cancel Contract
                 </Button>
@@ -318,7 +346,7 @@ export function ContractActions({
             <Button
               className="min-h-10 flex-1 basis-[min(100%,11rem)]"
               onClick={() => runAction('release', 'release')}
-              disabled={pending}
+              disabled={busy}
             >
               {pending && action === 'release' ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -349,7 +377,7 @@ export function ContractActions({
                   if (!window.confirm('Reset this contract to draft? Internal notes will be cleared.')) return;
                   runAction('reset-error', 'reset-error');
                 }}
-                disabled={pending}
+                disabled={busy}
               >
                 {pending && action === 'reset-error' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Undo2 className="h-4 w-4" />}
                 Reset to Draft
@@ -362,18 +390,30 @@ export function ContractActions({
         {(canReminder || canResendWithChanges || canRecall) && (
           <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
             {canReminder && (
-              <Button variant="outline" className="min-h-10 flex-1 basis-[min(100%,11rem)]" onClick={() => runAction('send-reminder', 'reminder')} disabled={pending}>
+              <Button variant="outline" className="min-h-10 flex-1 basis-[min(100%,11rem)]" onClick={() => runAction('send-reminder', 'reminder')} disabled={busy}>
                 <Mail className="h-4 w-4" />
                 Send Reminder
               </Button>
             )}
             {canResendWithChanges && (
-              <Button variant="outline" className="min-h-10 flex-1 basis-[min(100%,11rem)]" onClick={() => setOpenResendWithChanges(true)}>
+              <Button
+                variant="outline"
+                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                onClick={() => setOpenResendWithChanges(true)}
+                disabled={readOnly}
+                title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+              >
                 Resend with Changes
               </Button>
             )}
             {canRecall && (
-              <Button variant="outline" className="min-h-10 flex-1 basis-[min(100%,11rem)]" onClick={() => setOpenRecall(true)}>
+              <Button
+                variant="outline"
+                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                onClick={() => setOpenRecall(true)}
+                disabled={readOnly}
+                title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+              >
                 Recall Contract
               </Button>
             )}
@@ -417,7 +457,7 @@ export function ContractActions({
                 runAction('recall', 'recall', { reason: recallReason });
                 setOpenRecall(false);
               }}
-              disabled={pending || recallReason.trim().length < 10}
+              disabled={busy || recallReason.trim().length < 10}
             >
               {pending && action === 'recall' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Recall Contract
@@ -472,7 +512,7 @@ export function ContractActions({
                 runAction('approve-discount', 'approve-discount', { reason: discountReason.trim() || undefined });
                 setOpenApproveDiscount(false);
               }}
-              disabled={pending}
+              disabled={busy}
             >
               {pending && action === 'approve-discount' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Approve Discount
@@ -509,7 +549,7 @@ export function ContractActions({
                 });
                 setOpenResendWithChanges(false);
               }}
-              disabled={pending || !nextSignerName.trim() || !nextSignerEmail.trim()}
+              disabled={busy || !nextSignerName.trim() || !nextSignerEmail.trim()}
             >
               {pending && action === 'resend-with-changes' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Void and Resend
@@ -538,7 +578,7 @@ export function ContractActions({
                 runAction('cancel', 'cancel', { reason: cancelReason });
                 setOpenCancel(false);
               }}
-              disabled={pending || cancelReason.trim().length < 5}
+              disabled={busy || cancelReason.trim().length < 5}
             >
               {pending && action === 'cancel' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Cancel {exhibitorName}
@@ -571,7 +611,7 @@ export function ContractActions({
                 runAction('events-send-back', 'events-send-back', { reason: sendBackReason.trim() });
                 setOpenSendBack(false);
               }}
-              disabled={pending || sendBackReason.trim().length < 10}
+              disabled={busy || sendBackReason.trim().length < 10}
             >
               Send back
             </Button>

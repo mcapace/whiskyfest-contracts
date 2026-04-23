@@ -2,6 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
+import { useImpersonationReadOnly } from '@/hooks/use-impersonation-read-only';
+import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/input';
 import type { InvoiceStatus } from '@/types/db';
@@ -27,7 +29,9 @@ export function AccountingDetailActions({
   notesRecordUpdatedLabel: string | null;
 }) {
   const router = useRouter();
+  const readOnly = useImpersonationReadOnly();
   const [pending, startTransition] = useTransition();
+  const busy = pending || readOnly;
   const [notes, setNotes] = useState(initialNotes ?? '');
   const [err, setErr] = useState<string | null>(null);
 
@@ -66,7 +70,12 @@ export function AccountingDetailActions({
         <h3 className="font-serif text-lg font-semibold">Actions</h3>
         {invoiceStatus === 'pending' && (
           <div className="mt-3">
-            <Button type="button" onClick={markInvoiceSent} disabled={pending}>
+            <Button
+              type="button"
+              onClick={markInvoiceSent}
+              disabled={busy}
+              title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+            >
               {pending ? 'Saving…' : 'Mark Invoice Sent'}
             </Button>
           </div>
@@ -77,7 +86,12 @@ export function AccountingDetailActions({
               Invoice sent{invoiceSentLabel ? ` on ${invoiceSentLabel}` : ''}
               {invoiceSentBy ? ` by ${invoiceSentBy}` : ''}
             </p>
-            <Button type="button" onClick={markPaid} disabled={pending}>
+            <Button
+              type="button"
+              onClick={markPaid}
+              disabled={busy}
+              title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+            >
               {pending ? 'Saving…' : 'Mark Paid'}
             </Button>
           </div>
@@ -99,7 +113,14 @@ export function AccountingDetailActions({
       <div className="rounded-lg border border-border/60 bg-card/40 p-4">
         <h3 className="font-serif text-lg font-semibold">Accounting notes</h3>
         <Textarea className="mt-3 min-h-[120px]" value={notes} onChange={(e) => setNotes(e.target.value)} />
-        <Button type="button" className="mt-3" variant="secondary" onClick={saveNotes} disabled={pending}>
+        <Button
+          type="button"
+          className="mt-3"
+          variant="secondary"
+          onClick={saveNotes}
+          disabled={busy}
+          title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+        >
           {pending ? 'Saving…' : 'Save notes'}
         </Button>
         <p className="mt-2 text-xs text-muted-foreground">Saves to accounting_notes on this contract.</p>

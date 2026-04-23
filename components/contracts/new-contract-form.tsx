@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useImpersonationReadOnly } from '@/hooks/use-impersonation-read-only';
+import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -60,7 +62,9 @@ export function NewContractForm({
   initialValues,
 }: Props) {
   const router = useRouter();
+  const readOnly = useImpersonationReadOnly();
   const [pending, startTransition] = useTransition();
+  const busy = pending || readOnly;
   const [err, setErr] = useState<string | null>(null);
 
   const defaultEvent = events[0];
@@ -152,6 +156,7 @@ export function NewContractForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
+    if (readOnly) return;
 
     if (!form.event_id) { setErr('Please select an event'); return; }
     if (!form.exhibitor_company_name) { setErr('Company name required'); return; }
@@ -439,7 +444,7 @@ export function NewContractForm({
           <Button type="button" variant="outline" asChild>
             <Link href="/">Cancel</Link>
           </Button>
-          <Button type="submit" disabled={pending}>
+          <Button type="submit" disabled={busy} title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}>
             {pending && <Loader2 className="h-4 w-4 animate-spin" />}
             {editContractId ? 'Save Changes' : 'Create Contract'}
           </Button>

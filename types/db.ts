@@ -114,6 +114,8 @@ export interface AuditLogEntry {
   id: number;
   contract_id: string | null;
   actor_email: string | null;
+  /** Present for impersonation_started / impersonation_ended rows. */
+  impersonation_target_email?: string | null;
   action: string;
   from_status: ContractStatus | null;
   to_status: ContractStatus | null;
@@ -128,6 +130,7 @@ export interface AppUser {
   is_active: boolean;
   is_events_team?: boolean;
   is_accounting?: boolean;
+  can_impersonate?: boolean;
   created_at: string;
 }
 

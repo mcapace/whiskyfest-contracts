@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { getEffectiveUserEmail } from '@/lib/effective-user';
 import type { Session } from 'next-auth';
 
 export async function requireAuth(): Promise<
@@ -19,7 +20,7 @@ export async function requireAdmin(): Promise<
   const r = await requireAuth();
   if (!r.ok) return r;
 
-  const email = r.session.user.email?.toLowerCase();
+  const email = getEffectiveUserEmail(r.session);
   if (!email) return { ok: false, res: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
 
   const supabase = getSupabaseAdmin();

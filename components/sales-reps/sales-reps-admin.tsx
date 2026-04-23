@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useImpersonationReadOnly } from '@/hooks/use-impersonation-read-only';
+import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
 import { Plus, Loader2, Check, X, UserMinus, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
@@ -9,13 +11,16 @@ import type { SalesRep } from '@/types/db';
 
 export function SalesRepsAdmin({ initialReps }: { initialReps: SalesRep[] }) {
   const router = useRouter();
+  const readOnly = useImpersonationReadOnly();
   const [pending, startTransition] = useTransition();
+  const busy = pending || readOnly;
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [err, setErr] = useState<string | null>(null);
 
   async function handleAdd() {
+    if (readOnly) return;
     setErr(null);
     if (newName.trim().length < 2 || !newEmail.trim().toLowerCase().endsWith('@mshanken.com')) {
       setErr('Name must be 2+ chars and email must be @mshanken.com');
@@ -40,6 +45,7 @@ export function SalesRepsAdmin({ initialReps }: { initialReps: SalesRep[] }) {
   }
 
   async function toggleActive(rep: SalesRep) {
+    if (readOnly) return;
     startTransition(async () => {
       const res = await fetch(`/api/sales-reps/${rep.id}`, {
         method: 'PATCH',
@@ -62,7 +68,15 @@ export function SalesRepsAdmin({ initialReps }: { initialReps: SalesRep[] }) {
     <div className="space-y-6">
       <div className="rounded-md border bg-card p-4">
         {!showAdd ? (
-          <Button variant="outline" onClick={() => { setShowAdd(true); setErr(null); }}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setShowAdd(true);
+              setErr(null);
+            }}
+            disabled={readOnly}
+            title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+          >
             <Plus className="h-4 w-4" />
             Add sales rep
           </Button>
@@ -77,7 +91,7 @@ export function SalesRepsAdmin({ initialReps }: { initialReps: SalesRep[] }) {
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="First Last"
                   autoFocus
-                  disabled={pending}
+                  disabled={busy}
                 />
               </div>
               <div>
@@ -88,13 +102,13 @@ export function SalesRepsAdmin({ initialReps }: { initialReps: SalesRep[] }) {
                   onChange={(e) => setNewEmail(e.target.value)}
                   placeholder="flast@mshanken.com"
                   type="email"
-                  disabled={pending}
+                  disabled={busy}
                 />
               </div>
             </div>
             {err && <p className="text-sm text-destructive">{err}</p>}
             <div className="flex items-center gap-2">
-              <Button onClick={handleAdd} disabled={pending}>
+              <Button onClick={handleAdd} disabled={busy} title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}>
                 {pending && <Loader2 className="h-4 w-4 animate-spin" />}
                 <Check className="h-4 w-4" />
                 Save
@@ -130,7 +144,13 @@ export function SalesRepsAdmin({ initialReps }: { initialReps: SalesRep[] }) {
                     <td className="px-4 py-3 font-medium">{rep.name}</td>
                     <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{rep.email}</td>
                     <td className="px-4 py-3 text-right">
-                      <Button variant="ghost" size="sm" onClick={() => toggleActive(rep)} disabled={pending}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleActive(rep)}
+                        disabled={busy}
+                        title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                      >
                         <UserMinus className="h-4 w-4" />
                         Deactivate
                       </Button>
@@ -161,7 +181,13 @@ export function SalesRepsAdmin({ initialReps }: { initialReps: SalesRep[] }) {
                     <td className="px-4 py-3 font-medium">{rep.name}</td>
                     <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{rep.email}</td>
                     <td className="px-4 py-3 text-right">
-                      <Button variant="ghost" size="sm" onClick={() => toggleActive(rep)} disabled={pending}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleActive(rep)}
+                        disabled={busy}
+                        title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                      >
                         <UserCheck className="h-4 w-4" />
                         Reactivate
                       </Button>
