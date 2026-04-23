@@ -280,52 +280,77 @@ export default async function DashboardPage({
           {visibleContracts.length === 0 ? (
             <EmptyState hasContracts={allScoped.length > 0} />
           ) : (
-            <Table className="[&_tbody_tr:hover]:bg-fest-50/50">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Exhibitor</TableHead>
-                  <TableHead>Event</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Updated</TableHead>
-                  <TableHead className="w-12" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              <div className="divide-y divide-border/50 md:hidden">
                 {visibleContracts.map((c) => (
-                  <TableRow key={c.id} className="group">
-                    <TableCell>
-                      <Link href={`/contracts/${c.id}`} className="block hover:text-fest-800">
-                        <div className="font-medium">{c.exhibitor_company_name}</div>
-                        {c.brands_poured && (
-                          <div className="mt-0.5 text-xs text-muted-foreground">{c.brands_poured}</div>
-                        )}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {eventMap.get(c.event_id)?.name ?? '—'}
-                    </TableCell>
-                    <TableCell>
+                  <Link
+                    key={c.id}
+                    href={`/contracts/${c.id}`}
+                    className="block px-4 py-4 first:pt-4 transition-colors hover:bg-muted/40"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium leading-snug">{c.exhibitor_company_name}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">{eventMap.get(c.event_id)?.name ?? '—'}</p>
+                      </div>
+                      <span className="font-mono text-sm font-semibold tabular-nums">{formatCurrency(c.grand_total_cents)}</span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
                       <StatusBadge status={c.status} />
-                    </TableCell>
-                    <TableCell className="text-right font-mono tabular-nums">
-                      {formatCurrency(c.grand_total_cents)}
-                    </TableCell>
-                    <TableCell className="text-right text-xs text-muted-foreground">
-                      {formatRelative(c.updated_at)}
-                    </TableCell>
-                    <TableCell>
-                      <Link
-                        href={`/contracts/${c.id}`}
-                        className="text-fest-700 opacity-0 transition-opacity group-hover:opacity-100"
-                      >
-                        →
-                      </Link>
-                    </TableCell>
-                  </TableRow>
+                      <span className="text-xs text-muted-foreground">{formatRelative(c.updated_at)}</span>
+                    </div>
+                  </Link>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+              <div className="hidden md:block">
+                <Table className="[&_tbody_tr:hover]:bg-muted/40">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Exhibitor</TableHead>
+                      <TableHead>Event</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead className="text-right">Updated</TableHead>
+                      <TableHead className="w-12" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {visibleContracts.map((c) => (
+                      <TableRow key={c.id} className="group">
+                        <TableCell>
+                          <Link href={`/contracts/${c.id}`} className="block hover:text-accent-brand">
+                            <div className="font-medium">{c.exhibitor_company_name}</div>
+                            {c.brands_poured && (
+                              <div className="mt-0.5 text-xs text-muted-foreground">{c.brands_poured}</div>
+                            )}
+                          </Link>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {eventMap.get(c.event_id)?.name ?? '—'}
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={c.status} />
+                        </TableCell>
+                        <TableCell className="text-right font-mono tabular-nums">
+                          {formatCurrency(c.grand_total_cents)}
+                        </TableCell>
+                        <TableCell className="text-right text-xs text-muted-foreground">
+                          {formatRelative(c.updated_at)}
+                        </TableCell>
+                        <TableCell>
+                          <Link
+                            href={`/contracts/${c.id}`}
+                            className="text-accent-brand opacity-0 transition-opacity group-hover:opacity-100"
+                          >
+                            →
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
