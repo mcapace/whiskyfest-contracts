@@ -9,6 +9,7 @@ import { downloadContractPdfFromStorage } from '@/lib/contract-pdf-storage';
 import { sendAccountingEmail } from '@/lib/email';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
+import { updateContractRow } from '@/lib/sheets-tracker';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
@@ -125,6 +126,19 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   });
 
   revalidateContractPaths(contract.id);
+
+  const { data: executedContract } = await supabase
+    .from('contracts_with_totals')
+    .select('*')
+    .eq('id', contract.id)
+    .maybeSingle<ContractWithTotals>();
+  if (executedContract) {
+    try {
+      await updateContractRow(executedContract);
+    } catch (err) {
+      console.error('Failed to update Sheets tracker', err);
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }

@@ -4,6 +4,8 @@ import { auth } from '@/lib/auth';
 import { assertContractAccess } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
+import { updateContractRow } from '@/lib/sheets-tracker';
+import type { ContractWithTotals } from '@/types/db';
 
 const schema = z.object({
   reason: z.string().min(3, 'Reason must be at least 3 characters').max(500),
@@ -57,6 +59,19 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   });
 
   revalidateContractPaths(params.id);
+
+  const { data: cancelledContract } = await supabase
+    .from('contracts_with_totals')
+    .select('*')
+    .eq('id', params.id)
+    .maybeSingle<ContractWithTotals>();
+  if (cancelledContract) {
+    try {
+      await updateContractRow(cancelledContract);
+    } catch (err) {
+      console.error('Failed to update Sheets tracker', err);
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }

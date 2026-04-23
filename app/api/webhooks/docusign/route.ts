@@ -9,6 +9,7 @@ import {
 import { uploadPdfBufferToFolder } from '@/lib/google';
 import { contractSignedPdfPath, uploadContractPdfToStorage } from '@/lib/contract-pdf-storage';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
+import { appendContractRow, updateContractRow } from '@/lib/sheets-tracker';
 import { notifyContractFullySigned, notifyPartialSignature } from '@/lib/notifications';
 import type { ContractWithTotals, Event } from '@/types/db';
 
@@ -140,6 +141,22 @@ export async function POST(req: Request) {
       })
       .eq('id', contract.id);
     revalidateContractPaths(contract.id);
+
+    const { data: afterVoid } = await supabase
+      .from('contracts_with_totals')
+      .select('*')
+      .eq('id', contract.id)
+      .maybeSingle<ContractWithTotals>();
+    if (afterVoid) {
+      try {
+        await updateContractRow(afterVoid, {
+          trackerStatus: envelopeStatus === 'declined' ? 'declined' : 'voided',
+        });
+      } catch (err) {
+        console.error('Failed to update Sheets tracker', err);
+      }
+    }
+
     return new NextResponse(null, { status: 200 });
   }
 
@@ -152,6 +169,19 @@ export async function POST(req: Request) {
   ) {
     await supabase.from('contracts').update({ status: 'partially_signed' }).eq('id', contract.id);
     revalidateContractPaths(contract.id);
+
+    const { data: afterPartial } = await supabase
+      .from('contracts_with_totals')
+      .select('*')
+      .eq('id', contract.id)
+      .maybeSingle<ContractWithTotals>();
+    if (afterPartial) {
+      try {
+        await appendContractRow(afterPartial);
+      } catch (err) {
+        console.error('Failed to append to Sheets tracker', err);
+      }
+    }
 
     void notifyPartialSignature(contract, event ?? null).catch((err) =>
       console.error('[notifyPartialSignature]', err),
@@ -224,6 +254,19 @@ export async function POST(req: Request) {
     });
 
     revalidateContractPaths(contract.id);
+
+    const { data: afterSigned } = await supabase
+      .from('contracts_with_totals')
+      .select('*')
+      .eq('id', contract.id)
+      .maybeSingle<ContractWithTotals>();
+    if (afterSigned) {
+      try {
+        await updateContractRow(afterSigned);
+      } catch (err) {
+        console.error('Failed to update Sheets tracker', err);
+      }
+    }
 
     const countersignerDisplayName =
       countersigner?.name?.trim() || event?.shanken_signatory_name?.trim() || 'Countersigner';
