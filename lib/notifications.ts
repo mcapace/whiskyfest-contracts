@@ -1,6 +1,5 @@
 import sgMail from '@sendgrid/mail';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { formatStatus } from '@/lib/status-display';
 import type { Contract, Event } from '@/types/db';
 
 const WF_CONTRACTS_FROM_EMAIL = process.env['DISCOUNT_ALERT_FROM_EMAIL'] ?? 'wfcontracts@whiskyadvocate.com';
@@ -193,13 +192,13 @@ export async function notifySalesRepDiscountApproved(
 }
 
 /**
- * Email admins + assigned sales rep when the exhibitor signs (envelope moves to partially signed).
+ * Email events team + sales rep + assistants when the exhibitor signs (envelope moves to partially signed).
  */
 export async function notifyPartialSignature(
-  contract: Pick<Contract, 'id' | 'exhibitor_company_name' | 'sales_rep_id'> & {
+  contract: Pick<Contract, 'id' | 'exhibitor_company_name' | 'signer_1_name' | 'sales_rep_id'> & {
     sales_rep_email?: string | null;
   },
-  event: Pick<Event, 'name' | 'year'> | null,
+  event: Pick<Event, 'name' | 'year' | 'shanken_signatory_name'> | null,
 ): Promise<void> {
   const apiKey = process.env['SENDGRID_API_KEY'];
   if (!apiKey) {
@@ -242,19 +241,109 @@ export async function notifyPartialSignature(
 
   const eventTitle = event ? `${event.name} ${event.year}`.trim() : 'WhiskyFest';
   const detailUrl = appContractUrl(contract.id);
-  const subject = `${formatStatus('partially_signed')}: ${contract.exhibitor_company_name} — countersignature needed (any events team member can sign)`;
+  const exhibitorPerson = (contract.signer_1_name ?? '').trim() || 'Exhibitor';
+  const company = contract.exhibitor_company_name.trim();
+  const signatoryName = (event?.shanken_signatory_name ?? '').trim() || 'the Shanken signatory';
 
-  const bodySentence = `${contract.exhibitor_company_name} has signed the ${eventTitle} contract and it is now awaiting countersignature from any member of the events team. Please check your DocuSign inbox — whoever opens it first and signs will be the one recorded.`;
+  const subject = `${exhibitorPerson} from ${company} signed — awaiting countersignature`;
+
+  const para1 = `${exhibitorPerson} at ${company} has signed the ${eventTitle} contract.`;
+  const para2 = `The contract is now awaiting countersignature from ${signatoryName}. They will receive a separate DocuSign email shortly.`;
+
+  const text = [para1, ``, para2, ``, `Open contract: ${detailUrl}`].join('\n');
+
+  const html = `
+    <div style="font-family: system-ui, sans-serif; max-width: 560px;">
+      <p>${escapeHtml(para1)}</p>
+      <p>${escapeHtml(para2)}</p>
+      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
+    </div>
+  `;
+
+  await sgMail.send({
+    from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
+    to: recipients,
+    subject,
+    text,
+    html,
+  });
+}
+
+/**
+ * Email events team + sales rep + assistants when the envelope is fully signed (ready for release).
+ */
+export async function notifyContractFullySigned(
+  contract: Pick<Contract, 'id' | 'exhibitor_company_name' | 'signer_1_name' | 'sales_rep_id'> & {
+    sales_rep_email?: string | null;
+  },
+  event: Pick<Event, 'name' | 'year'> | null,
+  countersignerDisplayName: string,
+): Promise<void> {
+  const apiKey = process.env['SENDGRID_API_KEY'];
+  if (!apiKey) {
+    console.warn('[notifyContractFullySigned] SENDGRID_API_KEY not set — skipping email');
+    return;
+  }
+
+  const supabase = getSupabaseAdmin();
+
+  const { data: eventsTeam } = await supabase
+    .from('app_users')
+    .select('email')
+    .eq('is_events_team', true)
+    .eq('is_active', true);
+
+  const recipientSet = new Set<string>(
+    (eventsTeam ?? []).map((u) => String((u as { email: string }).email ?? '').trim().toLowerCase()).filter(Boolean),
+  );
+
+  let repEmail = contract.sales_rep_email?.trim().toLowerCase() ?? null;
+  if (!repEmail && contract.sales_rep_id) {
+    const { data: repRow } = await supabase.from('sales_reps').select('email').eq('id', contract.sales_rep_id).maybeSingle();
+    repEmail = repRow?.email?.trim().toLowerCase() ?? null;
+  }
+  if (repEmail) recipientSet.add(repEmail);
+
+  if (contract.sales_rep_id) {
+    const assistants = await getAssistantEmailsForRep(contract.sales_rep_id);
+    for (const a of assistants) recipientSet.add(a);
+  }
+
+  const recipients = [...recipientSet];
+  if (recipients.length === 0) {
+    console.warn('[notifyContractFullySigned] No recipients — skipping');
+    return;
+  }
+
+  sgMail.setApiKey(apiKey);
+
+  const eventTitle = event ? `${event.name} ${event.year}`.trim() : 'WhiskyFest';
+  const company = contract.exhibitor_company_name.trim();
+  const exhibitorPerson = (contract.signer_1_name ?? '').trim() || 'Exhibitor';
+  const countersignerLine = countersignerDisplayName.trim() || 'Countersigner';
+
+  const subject = `${company} — fully signed and ready for release`;
+  const detailUrl = appContractUrl(contract.id);
 
   const text = [
-    bodySentence,
+    `The ${eventTitle} contract for ${company} has been fully signed.`,
+    ``,
+    `Exhibitor: ${exhibitorPerson} at ${company}`,
+    `Countersigner: ${countersignerLine} (M. Shanken)`,
+    ``,
+    `Contract is now ready to be released to accounting. Open the contract in WhiskyFest Contracts to release.`,
     ``,
     `Open contract: ${detailUrl}`,
   ].join('\n');
 
   const html = `
     <div style="font-family: system-ui, sans-serif; max-width: 560px;">
-      <p>${escapeHtml(bodySentence)}</p>
+      <p>The ${escapeHtml(eventTitle)} contract for <strong>${escapeHtml(company)}</strong> has been fully signed.</p>
+      <p style="margin-top:14px;">
+        <strong>Exhibitor:</strong> ${escapeHtml(exhibitorPerson)} at ${escapeHtml(company)}<br/>
+        <strong>Countersigner:</strong> ${escapeHtml(countersignerLine)} (M. Shanken)
+      </p>
+      <p style="margin-top:14px;">Contract is now ready to be released to accounting. Open the contract in WhiskyFest Contracts to release.</p>
       <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
     </div>
   `;

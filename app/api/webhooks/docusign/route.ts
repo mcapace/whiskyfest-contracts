@@ -8,7 +8,7 @@ import {
 } from '@/lib/docusign';
 import { uploadPdfBufferToFolder } from '@/lib/google';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
-import { notifyPartialSignature } from '@/lib/notifications';
+import { notifyContractFullySigned, notifyPartialSignature } from '@/lib/notifications';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
@@ -142,7 +142,7 @@ export async function POST(req: Request) {
     return new NextResponse(null, { status: 200 });
   }
 
-  // --- Exhibitor (routing order 1) completed → partially_signed; countersign invite goes to signing group ---
+  // --- Exhibitor (routing order 1) completed → partially_signed; countersign invite goes to event signatory (routing 2) ---
   const firstSigner = recipientId === '1' || routingOrder === '1';
   if (
     eventType.includes('recipient-completed') &&
@@ -219,6 +219,13 @@ export async function POST(req: Request) {
     });
 
     revalidateContractPaths(contract.id);
+
+    const countersignerDisplayName =
+      countersigner?.name?.trim() || event?.shanken_signatory_name?.trim() || 'Countersigner';
+
+    void notifyContractFullySigned(contract, event ?? null, countersignerDisplayName).catch((err) =>
+      console.error('[notifyContractFullySigned]', err),
+    );
   } catch (err) {
     console.error('DocuSign completion handling failed:', err);
     await supabase
