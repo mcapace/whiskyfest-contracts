@@ -8,7 +8,7 @@ export default async function LoginPage() {
   if (session?.user) redirect('/');
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-brass-50/90 via-fest-600/[0.04] to-background px-6">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-brass-50/90 via-fest-600/[0.04] to-background px-6 dark:from-background dark:via-background dark:to-background">
       <div className="w-full max-w-md">
         {/* Brand */}
         <div className="mb-8 text-center">
@@ -17,7 +17,7 @@ export default async function LoginPage() {
               src="/images/WA_BLUE-removebg-preview%20%282%29.png"
               alt="Whisky Advocate"
               fill
-              className="object-contain mix-blend-multiply"
+              className="object-contain mix-blend-multiply dark:mix-blend-normal dark:brightness-0 dark:invert"
               sizes="(max-width: 448px) 100vw, 448px"
               priority
             />

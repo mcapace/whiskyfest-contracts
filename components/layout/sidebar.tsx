@@ -75,7 +75,7 @@ export function Sidebar({
               src="/images/WA_BLUE-removebg-preview%20%282%29.png"
               alt="Whisky Advocate"
               fill
-              className="object-contain object-center mix-blend-multiply dark:mix-blend-normal dark:opacity-95"
+              className="object-contain object-center mix-blend-multiply dark:mix-blend-normal dark:brightness-0 dark:invert"
               sizes="200px"
               priority
             />
