@@ -96,7 +96,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       const { data: realUser } = await supabase
         .from('app_users')
-        .select('role, is_active, is_events_team, is_accounting, can_impersonate')
+        .select('role, is_active, is_events_team, is_accounting, can_impersonate, theme_preference')
         .eq('email', loginEmail)
         .maybeSingle();
 
@@ -104,6 +104,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       if (trigger === 'update' && session && typeof session === 'object') {
         const s = session as Record<string, unknown>;
+        const themePref = s.themePreference;
+        if (
+          typeof themePref === 'string' &&
+          (themePref === 'light' || themePref === 'dark' || themePref === 'system')
+        ) {
+          await supabase.from('app_users').update({ theme_preference: themePref }).eq('email', loginEmail);
+          token.theme_preference = themePref;
+        }
         if (s.impersonationClear === true) {
           const prev = (token.impersonation_target_email as string | undefined)?.toLowerCase();
           if (prev) {
@@ -178,6 +186,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       token.pipeline_access = flags.pipeline_access;
       token.real_can_impersonate = realCanImpersonate;
 
+      const tp = (realUser as { theme_preference?: string | null } | null)?.theme_preference;
+      token.theme_preference = tp === 'light' || tp === 'dark' || tp === 'system' ? tp : null;
+
       if (impEmail && token.impersonation_started_at) {
         const d = await loadImpersonationTargetDisplay(impEmail);
         token.impersonation_target_name = d.name;
@@ -197,6 +208,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.is_accounting = Boolean(token.is_accounting);
       session.user.pipeline_access = Boolean(token.pipeline_access);
       session.user.can_impersonate = Boolean(token.real_can_impersonate);
+      session.user.theme_preference =
+        token.theme_preference === 'light' ||
+        token.theme_preference === 'dark' ||
+        token.theme_preference === 'system'
+          ? token.theme_preference
+          : null;
 
       const target = (token.impersonation_target_email as string | null | undefined)?.toLowerCase() ?? null;
       const started = token.impersonation_started_at as number | null | undefined;

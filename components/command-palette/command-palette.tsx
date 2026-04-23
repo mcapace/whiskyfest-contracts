@@ -17,6 +17,7 @@ import {
   UserRound,
   Users,
 } from 'lucide-react';
+import { STORAGE_KEYS } from '@/lib/design-system';
 import { cn } from '@/lib/utils';
 import { formatStatus } from '@/lib/status-display';
 import type { ContractWithTotals } from '@/types/db';
@@ -142,9 +143,13 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
     router.refresh();
   }
 
-  function toggleThemeQuick() {
-    const el = document.documentElement;
-    el.classList.toggle('dark');
+  async function toggleThemeQuick() {
+    const nextDark = !document.documentElement.classList.contains('dark');
+    const pref = nextDark ? 'dark' : 'light';
+    localStorage.setItem(STORAGE_KEYS.theme, pref);
+    await update({ themePreference: pref });
+    document.documentElement.classList.toggle('dark', nextDark);
+    document.documentElement.setAttribute('data-theme', nextDark ? 'dark' : 'light');
     onOpenChange(false);
   }
 
@@ -198,7 +203,7 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
             )}
             <Command.Item
               value="toggle dark mode theme"
-              onSelect={toggleThemeQuick}
+              onSelect={() => void toggleThemeQuick()}
               className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
             >
               <Sun className="h-4 w-4 shrink-0 opacity-70" />

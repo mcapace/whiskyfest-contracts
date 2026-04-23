@@ -11,6 +11,8 @@ declare module 'next-auth' {
       pipeline_access?: boolean;
       /** Real login user — true only for users allowed to use "View as…". */
       can_impersonate?: boolean;
+      /** Persisted UI theme; null/undefined = system. */
+      theme_preference?: 'light' | 'dark' | 'system' | null;
     };
     impersonation?: {
       active: boolean;
@@ -35,5 +37,6 @@ declare module 'next-auth/jwt' {
     impersonation_target_name?: string | null;
     impersonation_started_at?: number | null;
     effective_role_description?: string;
+    theme_preference?: 'light' | 'dark' | 'system' | null;
   }
 }

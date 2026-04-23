@@ -171,6 +171,8 @@ create index if not exists contracts_invoice_status_idx on contracts (invoice_st
 alter table app_users add column if not exists is_accounting boolean not null default false;
 
 alter table app_users add column if not exists can_impersonate boolean not null default false;
+alter table app_users add column if not exists theme_preference text
+  check (theme_preference is null or theme_preference in ('light', 'dark', 'system'));
 
 alter table audit_log add column if not exists impersonation_target_email text;
 

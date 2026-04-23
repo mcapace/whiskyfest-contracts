@@ -131,6 +131,8 @@ export interface AppUser {
   is_events_team?: boolean;
   is_accounting?: boolean;
   can_impersonate?: boolean;
+  /** Null means system (follow OS until user chooses). */
+  theme_preference?: 'light' | 'dark' | 'system' | null;
   created_at: string;
 }
 
