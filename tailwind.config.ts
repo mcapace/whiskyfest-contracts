@@ -14,12 +14,9 @@ const config: Config = {
     },
     extend: {
       fontFamily: {
-        // Editorial serif for headlines (Whisky Advocate–style typography)
-        serif: ['"Source Serif 4"', 'Georgia', 'serif'],
-        // Clean sans for body + UI
-        sans: ['"Inter"', 'system-ui', 'sans-serif'],
-        // Monospace for contract IDs, amounts
-        mono: ['"JetBrains Mono"', 'Menlo', 'monospace'],
+        serif: ['var(--font-serif)', 'Georgia', 'serif'],
+        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-mono)', 'Menlo', 'monospace'],
       },
       colors: {
         // Whisky Advocate–aligned: burgundy editorial + warm neutrals
@@ -90,6 +87,10 @@ const config: Config = {
           DEFAULT:   'hsl(var(--accent))',
           foreground:'hsl(var(--accent-foreground))',
         },
+        'accent-brand': 'hsl(var(--accent-brand) / <alpha-value>)',
+        'bg-page': 'hsl(var(--bg-page) / <alpha-value>)',
+        'bg-surface': 'hsl(var(--bg-surface) / <alpha-value>)',
+        'bg-surface-raised': 'hsl(var(--bg-surface-raised) / <alpha-value>)',
         card: {
           DEFAULT:   'hsl(var(--card))',
           foreground:'hsl(var(--card-foreground))',
@@ -100,17 +101,30 @@ const config: Config = {
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
       },
+      boxShadow: {
+        'wf-floating': '0 10px 40px -12px hsl(222 64% 26% / 0.18), 0 4px 16px -4px hsl(0 0% 0% / 0.08)',
+      },
       keyframes: {
         'accordion-down': { from: { height: '0' }, to: { height: 'var(--radix-accordion-content-height)' } },
         'accordion-up':   { from: { height: 'var(--radix-accordion-content-height)' }, to: { height: '0' } },
         'fade-in':        { from: { opacity: '0' }, to: { opacity: '1' } },
         'slide-up':       { from: { opacity: '0', transform: 'translateY(8px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
+        'wf-node-pulse': {
+          '0%, 100%': { boxShadow: '0 0 0 0 hsl(var(--accent-brand) / 0.35)' },
+          '50%': { boxShadow: '0 0 0 8px hsl(var(--accent-brand) / 0)' },
+        },
+        'wf-skeleton': {
+          '0%, 100%': { opacity: '0.55' },
+          '50%': { opacity: '0.85' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up':   'accordion-up 0.2s ease-out',
         'fade-in':        'fade-in 0.3s ease-out',
         'slide-up':       'slide-up 0.4s ease-out',
+        'wf-node-pulse':  'wf-node-pulse 2s ease-in-out infinite',
+        'wf-skeleton':    'wf-skeleton 1.6s ease-in-out infinite',
       },
     },
   },

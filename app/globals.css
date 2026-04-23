@@ -35,6 +35,9 @@
     --accent: 38 32% 93%;
     --accent-foreground: 222 55% 28%;
 
+    /* Strong brand accent — progression timeline fills, palette selection */
+    --accent-brand: 222 64% 26%;
+
     --destructive: 0 72% 42%;
     --destructive-foreground: 0 0% 98%;
 
@@ -44,9 +47,15 @@
     --ring: 226 58% 26%;
 
     --radius: 0.5rem;
+
+    /* Surfaces (layout shell, floating chrome) */
+    --bg-page: 38 32% 97%;
+    --bg-surface: 0 0% 100%;
+    --bg-surface-raised: 38 28% 99%;
   }
 
-  .dark {
+  .dark,
+  [data-theme='dark'] {
     --background: 350 12% 8%;
     --foreground: 38 28% 96%;
     --card: 350 14% 11%;
@@ -61,11 +70,15 @@
     --muted-foreground: 30 12% 65%;
     --accent: 350 12% 20%;
     --accent-foreground: 38 45% 70%;
+    --accent-brand: 222 58% 52%;
     --destructive: 0 60% 42%;
     --destructive-foreground: 0 0% 98%;
     --border: 350 10% 20%;
     --input: 350 10% 20%;
     --ring: 226 55% 55%;
+    --bg-page: 350 12% 8%;
+    --bg-surface: 350 14% 11%;
+    --bg-surface-raised: 350 14% 14%;
   }
 }
 
@@ -75,6 +88,12 @@
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
   }
+  html.wf-theme-transitioning,
+  html.wf-theme-transitioning * {
+    transition-property: background-color, border-color, color, fill, stroke, box-shadow;
+    transition-duration: 300ms;
+    transition-timing-function: ease;
+  }
   .prose-editorial a {
     text-decoration: underline;
     text-decoration-color: hsl(var(--primary) / 0.35);
@@ -83,6 +102,29 @@
 }
 
 .tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* Typography — contract summary / data labels */
+.wf-label-caps {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+
+.wf-display-serif {
+  font-family: var(--font-serif), ui-serif, Georgia, serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.wf-theme-transitioning,
+  html.wf-theme-transitioning * {
+    transition-duration: 0.01ms !important;
+  }
+}
 
 /* ------------------------------------------------------------------
    Places API (New) autocomplete styling — match local input styling
