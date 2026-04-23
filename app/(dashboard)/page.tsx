@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Plus, FileText, DollarSign, Clock, CheckCircle2, Users } from 'lucide-react';
+import { Plus, FileText, DollarSign, Clock, CheckCircle2 } from 'lucide-react';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { requireContractActorForPage } from '@/lib/auth-contract';
 import { requiresDiscountApproval } from '@/lib/contracts';
@@ -13,6 +13,8 @@ import {
 } from '@/lib/dashboard-filters';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { DashboardHero } from '@/components/dashboard/hero';
+import { DashboardStatCard } from '@/components/dashboard/stat-card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StatusBadge } from '@/components/contracts/status-badge';
 import type { ContractWithTotals, Event } from '@/types/db';
@@ -163,53 +165,14 @@ export default async function DashboardPage({
   })();
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <Card className="overflow-hidden border-fest-600/15">
-        <div className="bg-gradient-to-r from-fest-600/10 via-brass-100/35 to-background px-6 py-6">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <p className="mb-2 text-xs font-medium uppercase tracking-[0.2em] text-brass-700">
-                M. Shanken Communications
-              </p>
-              <h1 className="font-serif text-4xl font-semibold leading-tight tracking-tight">Contract Pipeline</h1>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {contractsCount} total contracts · {events.length} active event{events.length !== 1 && 's'}
-              </p>
-              {supportedRepNames.length > 0 && (
-                <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                  <Users className="h-4 w-4 shrink-0 text-fest-700" />
-                  <span>
-                    Supporting: <span className="font-medium text-foreground">{supportedRepNames.join(', ')}</span>
-                  </span>
-                </p>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" asChild>
-                <Link href="/contracts">View all</Link>
-              </Button>
-              <Button asChild>
-                <Link href="/contracts/new">
-                  <Plus className="h-4 w-4" /> New Contract
-                </Link>
-              </Button>
-            </div>
-          </div>
-          <div className="mt-5">
-            <div className="mb-1 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-              <span>Pipeline completion</span>
-              <span className="text-right font-mono tabular-nums">{completionLabel}</span>
-            </div>
-            <div className="h-2.5 overflow-hidden rounded-full bg-fest-100/70">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-fest-600 to-fest-400"
-                style={{ width: `${progressPct}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      </Card>
+    <div className="space-y-10">
+      <DashboardHero
+        contractsCount={contractsCount}
+        eventsCount={events.length}
+        supportedRepNames={supportedRepNames}
+        completionLabel={completionLabel}
+        progressPct={progressPct}
+      />
 
       {/* Priority */}
       {staffPersona ? (
@@ -264,22 +227,22 @@ export default async function DashboardPage({
 
       {/* Stats row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
+        <DashboardStatCard
           icon={CheckCircle2}
           label="Executed"
           value={formatCurrency(totalExecutedCents)}
           sub={`${executedCount} contracts`}
           accent="emerald"
         />
-        <StatCard
+        <DashboardStatCard
           icon={Clock}
           label="In Flight"
           value={formatCurrency(totalInFlightCents)}
           sub="Sent + Approved + Under Review"
           accent="amber"
         />
-        <StatCard icon={FileText} label="Drafts" value={String(draftCount)} sub="Awaiting review" accent="whisky" />
-        <StatCard
+        <DashboardStatCard icon={FileText} label="Drafts" value={String(draftCount)} sub="Awaiting review" accent="whisky" />
+        <DashboardStatCard
           icon={DollarSign}
           label="Total Pipeline"
           value={formatCurrency(totalPipelineCents)}
@@ -399,42 +362,6 @@ function PriorityCard({
         </CardContent>
       </Card>
     </Link>
-  );
-}
-
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  sub,
-  accent,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-  sub: string;
-  accent: 'whisky' | 'fest' | 'amber' | 'emerald';
-}) {
-  const accentClass = {
-    whisky: 'text-whisky-800 bg-whisky-100/60 ring-whisky-300/30',
-    fest: 'text-fest-800 bg-fest-100/90 ring-fest-300/30',
-    amber: 'text-amber-700 bg-amber-100/60 ring-amber-300/30',
-    emerald: 'text-emerald-700 bg-emerald-100/60 ring-emerald-300/30',
-  }[accent];
-
-  return (
-    <Card className="border-fest-600/10 transition-all hover:-translate-y-0.5 hover:shadow-md">
-      <CardContent className="flex items-start gap-4 p-5">
-        <div className={`flex h-10 w-10 items-center justify-center rounded-md ring-1 ${accentClass}`}>
-          <Icon className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
-          <p className="mt-1 font-serif text-2xl font-semibold tabular-nums">{value}</p>
-          <p className="mt-0.5 break-words text-xs text-muted-foreground">{sub}</p>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
