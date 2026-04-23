@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WhiskyFest Contracts — Palette Comparison</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #1a1a1a;
+  color: #e5e5e5;
+  padding: 24px;
+  line-height: 1.5;
+}
+.intro {
+  max-width: 1200px;
+  margin: 0 auto 32px;
+  padding: 24px;
+  background: #262626;
+  border-radius: 12px;
+}
+.intro h1 { font-size: 20px; margin-bottom: 8px; }
+.intro p { color: #a3a3a3; font-size: 14px; }
+.comparison {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Palette card wrapper */
+.palette {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+}
+.palette-label {
+  padding: 16px 24px;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.palette-label .chips {
+  display: flex;
+  gap: 8px;
+}
+.chip {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.3);
+}
+
+/* Shared mockup structure */
+.mockup {
+  padding: 32px;
+  min-height: 600px;
+}
+.mockup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid;
+}
+.brand {
+  font-family: 'Source Serif 4', serif;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+.brand-subtitle {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-top: 4px;
+  opacity: 0.6;
+}
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-radius: 100px;
+  font-size: 13px;
+}
+.user-avatar {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+/* Hero KPI section */
+.hero {
+  margin-bottom: 32px;
+}
+.hero-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  opacity: 0.6;
+  margin-bottom: 12px;
+}
+.hero-value {
+  font-family: 'Source Serif 4', serif;
+  font-size: 56px;
+  font-weight: 600;
+  letter-spacing: -2px;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+.hero-value .currency {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 36px;
+  font-weight: 400;
+  margin-right: 4px;
+  vertical-align: 8px;
+  opacity: 0.5;
+}
+.hero-trend {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Stat cards row */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.stat {
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid;
+}
+.stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  opacity: 0.6;
+  margin-bottom: 12px;
+}
+.stat-value {
+  font-family: 'Source Serif 4', serif;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -1px;
+  margin-bottom: 4px;
+}
+.stat-subtext {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+/* Contract row */
+.contracts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 16px;
+}
+.contracts-title {
+  font-family: 'Source Serif 4', serif;
+  font-size: 20px;
+  font-weight: 600;
+}
+.contract-list {
+  border: 1px solid;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.contract-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 100px;
+  padding: 16px 20px;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid;
+}
+.contract-row:last-child { border-bottom: none; }
+.contract-name {
+  font-weight: 500;
+  font-size: 14px;
+}
+.contract-name-sub {
+  font-size: 12px;
+  opacity: 0.6;
+  margin-top: 2px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.contract-amount {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  text-align: right;
+}
+.status-pill {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.btn-primary {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+}
+
+/* ============================================ */
+/* PALETTE A: AMBER / WHISKY */
+/* ============================================ */
+.palette-a .palette-label { background: #0f0f0f; }
+.palette-a .chip.c1 { background: #FAFAF7; }
+.palette-a .chip.c2 { background: #D97706; }
+.palette-a .chip.c3 { background: #1C1917; }
+.palette-a .mockup {
+  background: #FAFAF7;
+  color: #1C1917;
+}
+.palette-a .mockup-header { border-color: #E7E5E4; }
+.palette-a .user-chip { background: #F5F5F4; }
+.palette-a .user-avatar { background: #D97706; color: white; }
+.palette-a .stat { background: white; border-color: #E7E5E4; }
+.palette-a .stat-label { color: #78716C; }
+.palette-a .hero-value { color: #1C1917; }
+.palette-a .hero-trend { color: #D97706; }
+.palette-a .contract-list { background: white; border-color: #E7E5E4; }
+.palette-a .contract-row { border-color: #F5F5F4; }
+.palette-a .contract-row:hover { background: #FAFAF7; }
+.palette-a .btn-primary { background: #D97706; color: white; }
+.palette-a .status-pill.signed { background: #FEF3C7; color: #92400E; }
+
+/* ============================================ */
+/* PALETTE B: DEEP TEAL */
+/* ============================================ */
+.palette-b .palette-label { background: #0f0f0f; }
+.palette-b .chip.c1 { background: #F8FAFC; }
+.palette-b .chip.c2 { background: #0F766E; }
+.palette-b .chip.c3 { background: #0F172A; }
+.palette-b .mockup {
+  background: #F8FAFC;
+  color: #0F172A;
+}
+.palette-b .mockup-header { border-color: #E2E8F0; }
+.palette-b .user-chip { background: #F1F5F9; }
+.palette-b .user-avatar { background: #0F766E; color: white; }
+.palette-b .stat { background: white; border-color: #E2E8F0; }
+.palette-b .stat-label { color: #64748B; }
+.palette-b .hero-value { color: #0F172A; }
+.palette-b .hero-trend { color: #0F766E; }
+.palette-b .contract-list { background: white; border-color: #E2E8F0; }
+.palette-b .contract-row { border-color: #F1F5F9; }
+.palette-b .contract-row:hover { background: #F8FAFC; }
+.palette-b .btn-primary { background: #0F766E; color: white; }
+.palette-b .status-pill.signed { background: #CCFBF1; color: #115E59; }
+
+/* ============================================ */
+/* PALETTE C: IVORY CREAM + BOURBON BROWN */
+/* ============================================ */
+.palette-c .palette-label { background: #0f0f0f; }
+.palette-c .chip.c1 { background: #F4EFE6; }
+.palette-c .chip.c2 { background: #7C2D12; }
+.palette-c .chip.c3 { background: #1C1917; }
+.palette-c .mockup {
+  background: #F4EFE6;
+  color: #1C1917;
+}
+.palette-c .mockup-header { border-color: #D6CCB8; }
+.palette-c .user-chip { background: #EAE1CE; }
+.palette-c .user-avatar { background: #7C2D12; color: #F4EFE6; }
+.palette-c .stat { background: #FBF7EF; border-color: #D6CCB8; }
+.palette-c .stat-label { color: #78716C; }
+.palette-c .hero-value { color: #1C1917; }
+.palette-c .hero-trend { color: #7C2D12; }
+.palette-c .contract-list { background: #FBF7EF; border-color: #D6CCB8; }
+.palette-c .contract-row { border-color: #EAE1CE; }
+.palette-c .contract-row:hover { background: #F4EFE6; }
+.palette-c .btn-primary { background: #7C2D12; color: #F4EFE6; }
+.palette-c .status-pill.signed { background: #EAE1CE; color: #7C2D12; }
+
+.footer {
+  max-width: 1200px;
+  margin: 32px auto 0;
+  padding: 24px;
+  text-align: center;
+  color: #737373;
+  font-size: 13px;
+}
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <h1>WhiskyFest Contracts — Palette Direction Comparison</h1>
+  <p>Three directions rendered with identical layout, typography, and components. Dashboard view with hero KPI, stats, and contract list. Same data across all three. Pick whichever feels right.</p>
+</div>
+
+<div class="comparison">
+
+  <!-- PALETTE A: AMBER / WHISKY -->
+  <div class="palette palette-a">
+    <div class="palette-label">
+      <div>
+        <span style="font-size: 14px; font-weight: 700; letter-spacing: 0; text-transform: none;">Option A</span>
+        <span style="margin-left: 12px; opacity: 0.6;">Amber / Whisky · Warm Editorial</span>
+      </div>
+      <div class="chips">
+        <div class="chip c1" title="#FAFAF7 off-white"></div>
+        <div class="chip c2" title="#D97706 amber"></div>
+        <div class="chip c3" title="#1C1917 stone"></div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">
+        <div>
+          <div class="brand">WhiskyFest Contracts</div>
+          <div class="brand-subtitle">2026 Sponsorship Program</div>
+        </div>
+        <div class="user-chip">
+          <div class="user-avatar">MC</div>
+          <div>Michael Capace</div>
+        </div>
+      </div>
+
+      <div class="hero">
+        <div class="hero-label">Pipeline Value</div>
+        <div class="hero-value"><span class="currency">$</span>1,437,500</div>
+        <div class="hero-trend">↑ $240K vs last year · 19 contracts active</div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="stat-label">Draft</div><div class="stat-value">3</div><div class="stat-subtext">$45,000</div></div>
+        <div class="stat"><div class="stat-label">Events Review</div><div class="stat-value">2</div><div class="stat-subtext">$30,000</div></div>
+        <div class="stat"><div class="stat-label">Sent</div><div class="stat-value">8</div><div class="stat-subtext">$615,000</div></div>
+        <div class="stat"><div class="stat-label">Executed</div><div class="stat-value">6</div><div class="stat-subtext">$747,500</div></div>
+      </div>
+
+      <div class="contracts-header">
+        <div class="contracts-title">Recent Contracts</div>
+      </div>
+      <div class="contract-list">
+        <div class="contract-row">
+          <div>
+            <div class="contract-name">Glenfiddich Distillery</div>
+            <div class="contract-name-sub">Miriam Morgenstern</div>
+          </div>
+          <span class="status-pill signed">Fully Signed</span>
+          <div class="contract-amount">$125,000.00</div>
+          <button class="btn-primary">Release</button>
+        </div>
+        <div class="contract-row">
+          <div>
+            <div class="contract-name">Macallan Estate</div>
+            <div class="contract-name-sub">Stephen Senatore</div>
+          </div>
+          <span class="status-pill signed">Fully Signed</span>
+          <div class="contract-amount">$85,000.00</div>
+          <button class="btn-primary">Release</button>
+        </div>
+        <div class="contract-row">
+          <div>
+            <div class="contract-name">Ardbeg Distillery</div>
+            <div class="contract-name-sub">Alyssa Weiss</div>
+          </div>
+          <span class="status-pill signed">Fully Signed</span>
+          <div class="contract-amount">$45,000.00</div>
+          <button class="btn-primary">Release</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PALETTE B: DEEP TEAL -->
+  <div class="palette palette-b">
+    <div class="palette-label">
+      <div>
+        <span style="font-size: 14px; font-weight: 700; letter-spacing: 0; text-transform: none;">Option B</span>
+        <span style="margin-left: 12px; opacity: 0.6;">Deep Teal · Professional Modern</span>
+      </div>
+      <div class="chips">
+        <div class="chip c1" title="#F8FAFC slate-50"></div>
+        <div class="chip c2" title="#0F766E teal-700"></div>
+        <div class="chip c3" title="#0F172A slate-900"></div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">
+        <div>
+          <div class="brand">WhiskyFest Contracts</div>
+          <div class="brand-subtitle">2026 Sponsorship Program</div>
+        </div>
+        <div class="user-chip">
+          <div class="user-avatar">MC</div>
+          <div>Michael Capace</div>
+        </div>
+      </div>
+
+      <div class="hero">
+        <div class="hero-label">Pipeline Value</div>
+        <div class="hero-value"><span class="currency">$</span>1,437,500</div>
+        <div class="hero-trend">↑ $240K vs last year · 19 contracts active</div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="stat-label">Draft</div><div class="stat-value">3</div><div class="stat-subtext">$45,000</div></div>
+        <div class="stat"><div class="stat-label">Events Review</div><div class="stat-value">2</div><div class="stat-subtext">$30,000</div></div>
+        <div class="stat"><div class="stat-label">Sent</div><div class="stat-value">8</div><div class="stat-subtext">$615,000</div></div>
+        <div class="stat"><div class="stat-label">Executed</div><div class="stat-value">6</div><div class="stat-subtext">$747,500</div></div>
+      </div>
+
+      <div class="contracts-header">
+        <div class="contracts-title">Recent Contracts</div>
+      </div>
+      <div class="contract-list">
+        <div class="contract-row">
+          <div>
+            <div class="contract-name">Glenfiddich Distillery</div>
+            <div class="contract-name-sub">Miriam Morgenstern</div>
+          </div>
+          <span class="status-pill signed">Fully Signed</span>
+          <div class="contract-amount">$125,000.00</div>
+          <button class="btn-primary">Release</button>
+        </div>
+        <div class="contract-row">
+          <div>
+            <div class="contract-name">Macallan Estate</div>
+            <div class="contract-name-sub">Stephen Senatore</div>
+          </div>
+          <span class="status-pill signed">Fully Signed</span>
+          <div class="contract-amount">$85,000.00</div>
+          <button class="btn-primary">Release</button>
+        </div>
+        <div class="contract-row">
+          <div>
+            <div class="contract-name">Ardbeg Distillery</div>
+            <div class="contract-name-sub">Alyssa Weiss</div>
+          </div>
+          <span class="status-pill signed">Fully Signed</span>
+          <div class="contract-amount">$45,000.00</div>
+          <button class="btn-primary">Release</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PALETTE C: IVORY CREAM + BOURBON BROWN -->
+  <div class="palette palette-c">
+    <div class="palette-label">
+      <div>
+        <span style="font-size: 14px; font-weight: 700; letter-spacing: 0; text-transform: none;">Option C</span>
+        <span style="margin-left: 12px; opacity: 0.6;">Ivory Cream + Bourbon Brown · Distinctive Editorial</span>
+      </div>
+      <div class="chips">
+        <div class="chip c1" title="#F4EFE6 cream"></div>
+        <div class="chip c2" title="#7C2D12 bourbon"></div>
+        <div class="chip c3" title="#1C1917 espresso"></div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">
+        <div>
+          <div class="brand">WhiskyFest Contracts</div>
+          <div class="brand-subtitle">2026 Sponsorship Program</div>
+        </div>
+        <div class="user-chip">
+          <div class="user-avatar">MC</div>
+          <div>Michael Capace</div>
+        </div>
+      </div>
+
+      <div class="hero">
+        <div class="hero-label">Pipeline Value</div>
+        <div class="hero-value"><span class="currency">$</span>1,437,500</div>
+        <div class="hero-trend">↑ $240K vs last year · 19 contracts active</div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="stat-label">Draft</div><div class="stat-value">3</div><div class="stat-subtext">$45,000</div></div>
+        <div class="stat"><div class="stat-label">Events Review</div><div class="stat-value">2</div><div class="stat-subtext">$30,000</div></div>
+        <div class="stat"><div class="stat-label">Sent</div><div class="stat-value">8</div><div class="stat-subtext">$615,000</div></div>
+        <div class="stat"><div class="stat-label">Executed</div><div class="stat-value">6</div><div class="stat-subtext">$747,500</div></div>
+      </div>
+
+      <div class="contracts-header">
+        <div class="contracts-title">Recent Contracts</div>
+      </div>
+      <div class="contract-list">
+        <div class="contract-row">
+          <div>
+            <div class="contract-name">Glenfiddich Distillery</div>
+            <div class="contract-name-sub">Miriam Morgenstern</div>
+          </div>
+          <span class="status-pill signed">Fully Signed</span>
+          <div class="contract-amount">$125,000.00</div>
+          <button class="btn-primary">Release</button>
+        </div>
+        <div class="contract-row">
+          <div>
+            <div class="contract-name">Macallan Estate</div>
+            <div class="contract-name-sub">Stephen Senatore</div>
+          </div>
+          <span class="status-pill signed">Fully Signed</span>
+          <div class="contract-amount">$85,000.00</div>
+          <button class="btn-primary">Release</button>
+        </div>
+        <div class="contract-row">
+          <div>
+            <div class="contract-name">Ardbeg Distillery</div>
+            <div class="contract-name-sub">Alyssa Weiss</div>
+          </div>
+          <span class="status-pill signed">Fully Signed</span>
+          <div class="contract-amount">$45,000.00</div>
+          <button class="btn-primary">Release</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Three palettes · Same layout · Identical data · Scroll to compare
+</div>
+
+</body>
+</html>
