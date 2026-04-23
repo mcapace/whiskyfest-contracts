@@ -31,6 +31,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               role: session.user.role ?? 'sales',
               pipelineAccess: Boolean(session.user.pipeline_access),
               isAccounting: Boolean(session.user.is_accounting),
+              isEventsTeam: Boolean(session.user.is_events_team),
             }}
             canImpersonate={Boolean(session.user.can_impersonate)}
             readOnlyImpersonation={readOnly}

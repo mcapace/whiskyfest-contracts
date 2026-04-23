@@ -16,6 +16,56 @@ import {
 import { ImpersonationMenu } from '@/components/impersonation/impersonation-menu';
 import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
 
+function formatRoleLabel(role?: string | null): string {
+  switch (role) {
+    case 'admin':
+      return 'Administrator';
+    case 'sales':
+    case 'sales_rep':
+      return 'Sales';
+    case 'viewer':
+      return 'Viewer';
+    default:
+      return role?.trim() ? role : 'User';
+  }
+}
+
+function AccountPermissionSummary({
+  user,
+}: {
+  user: {
+    role?: string | null;
+    pipelineAccess?: boolean;
+    isAccounting?: boolean;
+    isEventsTeam?: boolean;
+  };
+}) {
+  const pipeline = Boolean(user.pipelineAccess);
+  const events = Boolean(user.isEventsTeam);
+  const accounting = Boolean(user.isAccounting);
+
+  const rows = [
+    { label: 'Role', value: formatRoleLabel(user.role) },
+    { label: 'Contract pipeline', value: pipeline ? 'Yes' : 'No' },
+    { label: 'Events team', value: events ? 'Yes' : 'No' },
+    { label: 'Accounting', value: accounting ? 'Yes' : 'No' },
+  ];
+
+  return (
+    <div className="px-2 py-2.5">
+      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Your access</p>
+      <dl className="space-y-1.5">
+        {rows.map((row) => (
+          <div key={row.label} className="flex justify-between gap-4 text-xs leading-snug">
+            <dt className="shrink-0 text-muted-foreground">{row.label}</dt>
+            <dd className="min-w-0 text-right font-medium text-foreground">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 function AccountingNavLink({ pathname }: { pathname: string }) {
   const href = '/accounting';
   const active = pathname === href || pathname.startsWith(`${href}/`);
@@ -55,6 +105,7 @@ export function Sidebar({
     role?: string;
     pipelineAccess?: boolean;
     isAccounting?: boolean;
+    isEventsTeam?: boolean;
   };
   canImpersonate?: boolean;
   readOnlyImpersonation?: boolean;
@@ -152,7 +203,9 @@ export function Sidebar({
               <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent align="end" className="w-64">
+            <AccountPermissionSummary user={user} />
+            <DropdownMenuSeparator />
             {canImpersonate ? (
               <>
                 <ImpersonationMenu canImpersonate />

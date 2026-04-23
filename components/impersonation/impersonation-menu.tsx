@@ -147,7 +147,7 @@ export function ImpersonationMenu({ canImpersonate }: { canImpersonate: boolean 
                             >
                               <span className="font-medium text-foreground">{c.name?.trim() || c.email}</span>
                               <span className="text-xs text-muted-foreground">{c.email}</span>
-                              <span className="text-xs text-fest-800/90">{c.role_description}</span>
+                              <span className="text-xs leading-snug text-muted-foreground">{c.role_description}</span>
                             </button>
                           </li>
                         ))}
