@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useImpersonationReadOnly } from '@/hooks/use-impersonation-read-only';
 import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
@@ -16,6 +16,7 @@ import {
   Send,
   Undo2,
 } from 'lucide-react';
+import { FloatingActionBar } from '@/components/contract/floating-action-bar';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -127,14 +128,42 @@ export function ContractActions({
   const canRelease = status === 'signed' && isAdmin;
   const signerWaitLabel = signerName?.trim() || signerEmail?.trim() || 'signer';
 
+  const fabVisible = useMemo(() => {
+    if (status === 'draft') return true;
+    if (status === 'ready_for_review' || status === 'pending_events_review') {
+      if (discountApprovalPending) return true;
+      if (status === 'ready_for_review') return true;
+      if (status === 'pending_events_review') {
+        if (isEventsTeam) return true;
+        if (isAdmin && draftPdfUrl) return true;
+      }
+    }
+    if (status === 'approved') return true;
+    if (canRelease) return true;
+    if (status === 'executed' && signedPdfUrl) return true;
+    if (status === 'error' && isAdmin) return true;
+    return false;
+  }, [
+    status,
+    discountApprovalPending,
+    isEventsTeam,
+    isAdmin,
+    draftPdfUrl,
+    canRelease,
+    signedPdfUrl,
+  ]);
+
+  const fabBtn =
+    'h-10 shrink-0 gap-2 rounded-full px-4 text-sm font-medium motion-safe:transition-transform motion-safe:duration-150 hover:brightness-[1.04] active:scale-[0.98]';
+
   return (
     <>
       <div className="space-y-5">
-        <div className="flex flex-wrap gap-2">
+        <FloatingActionBar visible={fabVisible}>
           {status === 'draft' && (
             <>
               <Button
-                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                className={fabBtn}
                 onClick={() => runAction('generate', 'generate')}
                 disabled={busy}
               >
@@ -149,21 +178,21 @@ export function ContractActions({
                 <Button
                   type="button"
                   variant="secondary"
-                  className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                  className={fabBtn}
                   disabled
                   title={IMPERSONATION_BUTTON_TOOLTIP}
                 >
                   Edit Contract
                 </Button>
               ) : (
-                <Button variant="secondary" className="min-h-10 flex-1 basis-[min(100%,11rem)]" asChild>
+                <Button variant="secondary" className={fabBtn} asChild>
                   <Link href={`/contracts/${contractId}/edit`}>Edit Contract</Link>
                 </Button>
               )}
               {isAdmin && (
                 <Button
                   variant="outline"
-                  className="min-h-10 flex-1 basis-[min(100%,11rem)] text-destructive hover:text-destructive"
+                  className={`${fabBtn} text-destructive hover:text-destructive`}
                   onClick={() => setOpenCancel(true)}
                   disabled={readOnly}
                   title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
@@ -179,7 +208,7 @@ export function ContractActions({
             isAdmin && (
             <>
               <Button
-                className="min-h-10 flex-1 basis-[min(100%,11rem)] border-amber-600 bg-amber-600 text-white hover:bg-amber-700"
+                className={`${fabBtn} border-amber-600 bg-amber-600 text-white hover:bg-amber-700`}
                 onClick={() => setOpenApproveDiscount(true)}
                 disabled={readOnly}
                 title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
@@ -189,7 +218,7 @@ export function ContractActions({
               </Button>
               <Button
                 variant="secondary"
-                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                className={fabBtn}
                 onClick={() => runAction('generate', 'regenerate')}
                 disabled={busy}
               >
@@ -202,7 +231,7 @@ export function ContractActions({
               </Button>
               <Button
                 variant="outline"
-                className="min-h-10 flex-1 basis-[min(100%,11rem)] text-destructive hover:text-destructive"
+                className={`${fabBtn} text-destructive hover:text-destructive`}
                 onClick={() => setOpenCancel(true)}
                 disabled={readOnly}
                 title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
@@ -218,7 +247,7 @@ export function ContractActions({
             <>
               <Button
                 variant="secondary"
-                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                className={fabBtn}
                 onClick={() => runAction('generate', 'regenerate')}
                 disabled={busy}
               >
@@ -231,7 +260,7 @@ export function ContractActions({
               </Button>
               <Button
                 variant="secondary"
-                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                className={fabBtn}
                 disabled
                 title="Awaiting discount approval"
               >
@@ -244,7 +273,7 @@ export function ContractActions({
             <>
               <Button
                 variant="secondary"
-                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                className={fabBtn}
                 onClick={() => runAction('generate', 'regenerate')}
                 disabled={busy}
               >
@@ -254,7 +283,7 @@ export function ContractActions({
               {isAdmin && (
                 <Button
                   variant="outline"
-                  className="min-h-10 flex-1 basis-[min(100%,11rem)] text-destructive hover:text-destructive"
+                  className={`${fabBtn} text-destructive hover:text-destructive`}
                   onClick={() => setOpenCancel(true)}
                   disabled={readOnly}
                   title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
@@ -268,7 +297,7 @@ export function ContractActions({
           {status === 'pending_events_review' && !discountApprovalPending && isEventsTeam && (
             <>
               <Button
-                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                className={fabBtn}
                 onClick={() => runAction('events-approve', 'events-approve', {})}
                 disabled={busy}
               >
@@ -281,7 +310,7 @@ export function ContractActions({
               </Button>
               <Button
                 variant="secondary"
-                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                className={fabBtn}
                 onClick={() => setOpenSendBack(true)}
                 disabled={readOnly}
                 title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
@@ -289,7 +318,7 @@ export function ContractActions({
                 Send Back for Changes
               </Button>
               {draftPdfUrl && (
-                <Button variant="outline" className="min-h-10 flex-1 basis-[min(100%,11rem)]" asChild>
+                <Button variant="outline" className={fabBtn} asChild>
                   <a href={draftPdfUrl} target="_blank" rel="noreferrer">
                     <ExternalLink className="h-4 w-4" />
                     View Draft PDF
@@ -300,7 +329,7 @@ export function ContractActions({
           )}
 
           {status === 'pending_events_review' && !discountApprovalPending && !isEventsTeam && isAdmin && draftPdfUrl && (
-            <Button variant="outline" className="min-h-10 flex-1 basis-[min(100%,11rem)]" asChild>
+            <Button variant="outline" className={fabBtn} asChild>
               <a href={draftPdfUrl} target="_blank" rel="noreferrer">
                 <ExternalLink className="h-4 w-4" />
                 View Draft PDF
@@ -311,7 +340,7 @@ export function ContractActions({
           {status === 'approved' && (
             <>
               <Button
-                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                className={fabBtn}
                 onClick={() => runAction('send', 'send')}
                 disabled={busy}
               >
@@ -325,7 +354,7 @@ export function ContractActions({
               {isAdmin && (
                 <Button
                   variant="outline"
-                  className="min-h-10 flex-1 basis-[min(100%,11rem)] text-destructive hover:text-destructive"
+                  className={`${fabBtn} text-destructive hover:text-destructive`}
                   onClick={() => setOpenCancel(true)}
                   disabled={readOnly}
                   title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
@@ -338,7 +367,7 @@ export function ContractActions({
 
           {canRelease && (
             <Button
-                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                className={fabBtn}
               onClick={() => runAction('release', 'release')}
               disabled={busy}
             >
@@ -352,7 +381,7 @@ export function ContractActions({
           )}
 
           {status === 'executed' && signedPdfUrl && (
-            <Button variant="secondary" className="min-h-10 flex-1 basis-[min(100%,11rem)]" asChild>
+            <Button variant="secondary" className={fabBtn} asChild>
               <a href={signedPdfUrl} target="_blank" rel="noreferrer">
                 <ExternalLink className="h-4 w-4" />
                 View Signed PDF
@@ -362,11 +391,11 @@ export function ContractActions({
 
           {status === 'error' && isAdmin && (
             <>
-              <Button variant="secondary" className="min-h-10 flex-1 basis-[min(100%,11rem)]" onClick={() => setOpenErrorDetails(true)}>
+              <Button variant="secondary" className={fabBtn} onClick={() => setOpenErrorDetails(true)}>
                 View Error Details
               </Button>
               <Button
-                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                className={fabBtn}
                 onClick={() => {
                   if (!window.confirm('Reset this contract to draft? Internal notes will be cleared.')) return;
                   runAction('reset-error', 'reset-error');
@@ -378,13 +407,18 @@ export function ContractActions({
               </Button>
             </>
           )}
-        </div>
+        </FloatingActionBar>
 
         {/* Secondary admin-only DocuSign controls */}
         {(canReminder || canResendWithChanges || canRecall) && (
           <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
             {canReminder && (
-              <Button variant="outline" className="min-h-10 flex-1 basis-[min(100%,11rem)]" onClick={() => runAction('send-reminder', 'reminder')} disabled={busy}>
+              <Button
+                variant="outline"
+                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                onClick={() => runAction('send-reminder', 'reminder')}
+                disabled={busy}
+              >
                 <Mail className="h-4 w-4" />
                 Send Reminder
               </Button>

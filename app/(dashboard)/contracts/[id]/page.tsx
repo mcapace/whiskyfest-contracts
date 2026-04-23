@@ -44,7 +44,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
   const discountPending = requiresDiscountApproval(contract);
 
   return (
-    <div className="space-y-6 pb-8">
+    <div className="space-y-6 pb-28 md:pb-32">
       {/* Breadcrumb */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
         <Link href="/contracts" className="inline-flex items-center gap-1.5 hover:text-foreground">
