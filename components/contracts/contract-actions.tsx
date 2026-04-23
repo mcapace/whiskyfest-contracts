@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useImpersonationReadOnly } from '@/hooks/use-impersonation-read-only';
 import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
@@ -27,7 +27,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input, Label, Textarea } from '@/components/ui/input';
 import { formatCurrency, formatRelative } from '@/lib/utils';
-import { formatStatus } from '@/lib/status-display';
 import type { ContractStatus } from '@/types/db';
 
 interface Props {
@@ -126,16 +125,11 @@ export function ContractActions({
   const canRecall = canReminder;
   const canResendWithChanges = canReminder && !discountApprovalPending;
   const canRelease = status === 'signed' && isAdmin;
-  const progress = useMemo(() => getProgress(status), [status]);
-
   const signerWaitLabel = signerName?.trim() || signerEmail?.trim() || 'signer';
 
   return (
     <>
       <div className="space-y-5">
-        <ProgressState progress={progress} />
-
-        {/* Primary action row — equal-width buttons */}
         <div className="flex flex-wrap gap-2">
           {status === 'draft' && (
             <>
@@ -344,7 +338,7 @@ export function ContractActions({
 
           {canRelease && (
             <Button
-              className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
               onClick={() => runAction('release', 'release')}
               disabled={busy}
             >
@@ -634,64 +628,6 @@ export function ContractActions({
         </DialogContent>
       </Dialog>
     </>
-  );
-}
-
-const STAGE_KEYS: Exclude<ContractStatus, 'cancelled' | 'error'>[] = [
-  'draft',
-  'ready_for_review',
-  'pending_events_review',
-  'approved',
-  'sent',
-  'partially_signed',
-  'signed',
-  'executed',
-];
-
-function getProgress(status: ContractStatus): { special: string | null; currentIdx: number } {
-  if (status === 'cancelled') return { special: 'cancelled', currentIdx: -1 };
-  if (status === 'error') return { special: 'error', currentIdx: -1 };
-  const idx = STAGE_KEYS.findIndex((k) => k === status);
-  return { special: null, currentIdx: Math.max(idx, 0) };
-}
-
-function ProgressState({ progress }: { progress: { special: string | null; currentIdx: number } }) {
-  if (progress.special === 'cancelled') {
-    return <p className="text-sm font-medium text-red-600">✗ {formatStatus('cancelled')}</p>;
-  }
-  if (progress.special === 'error') {
-    return <p className="text-sm font-medium text-red-600">⚠ {formatStatus('error')}</p>;
-  }
-  return (
-    <div className="space-y-2">
-      <div className="grid grid-cols-8 gap-1">
-        {STAGE_KEYS.map((stageKey, idx) => (
-          <div key={stageKey} className="flex items-center gap-1">
-            <span
-              className={`h-2.5 w-2.5 rounded-full border ${
-                idx === progress.currentIdx
-                  ? 'border-fest-700 bg-fest-700'
-                  : idx < progress.currentIdx
-                    ? 'border-fest-700 bg-fest-100'
-                    : 'border-muted-foreground/40 bg-background'
-              }`}
-            />
-            {idx < STAGE_KEYS.length - 1 && (
-              <span
-                className={`h-px flex-1 border-t border-dotted ${idx < progress.currentIdx ? 'border-fest-700' : 'border-muted-foreground/40'}`}
-              />
-            )}
-          </div>
-        ))}
-      </div>
-      <div className="grid grid-cols-8 gap-1 text-[11px] text-muted-foreground">
-        {STAGE_KEYS.map((stageKey) => (
-          <span key={stageKey} className="min-w-0 break-words hyphens-auto">
-            {formatStatus(stageKey)}
-          </span>
-        ))}
-      </div>
-    </div>
   );
 }
 

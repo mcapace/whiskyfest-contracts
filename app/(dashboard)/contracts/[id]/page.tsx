@@ -11,6 +11,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { StatusBadge } from '@/components/contracts/status-badge';
 import { ContractActions } from '@/components/contracts/contract-actions';
 import { SignerContactEdit } from '@/components/contracts/signer-contact-edit';
+import { ContractProgressionTimeline } from '@/components/contract/progression-timeline';
+import { ContractSummarySection } from '@/components/contract/contract-summary-section';
 import type { ContractWithTotals, Event, AuditLogEntry } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
@@ -42,7 +44,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
   const discountPending = requiresDiscountApproval(contract);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-8">
       {/* Breadcrumb */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
         <Link href="/contracts" className="inline-flex items-center gap-1.5 hover:text-foreground">
@@ -52,29 +54,44 @@ export default async function ContractDetailPage({ params }: { params: { id: str
         <Link href="/" className="hover:text-foreground">Dashboard</Link>
       </div>
 
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="mb-2 flex items-center gap-3">
-            <h1 className="font-serif text-3xl font-semibold tracking-tight">
-              {contract.exhibitor_company_name}
-            </h1>
-            <StatusBadge status={contract.status} />
-            <span className="font-mono text-xs text-muted-foreground">
-              {contract.id.slice(0, 8)}
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {event?.name} · {event && formatLongDate(event.event_date)}
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Grand Total</p>
-          <p className="font-serif text-3xl font-semibold tabular-nums text-fest-900">
-            {formatCurrency(contract.grand_total_cents)}
-          </p>
-        </div>
+      {/* Header — compact; summary panel carries display typography */}
+      <div className="flex flex-wrap items-center gap-3 border-b border-border/40 pb-4">
+        <StatusBadge status={contract.status} />
+        <span className="font-mono text-xs text-muted-foreground">{contract.id.slice(0, 8)}</span>
+        {event && (
+          <span className="text-sm text-muted-foreground">
+            {event.name} · {formatLongDate(event.event_date)}
+          </span>
+        )}
       </div>
+
+      <div className="rounded-lg border border-border/50 bg-bg-surface p-4 md:p-6">
+        <p className="wf-label-caps mb-4 text-[0.6rem]">Progress</p>
+        <ContractProgressionTimeline status={contract.status} audit={audit} />
+      </div>
+
+      <ContractSummarySection contract={contract} event={event ?? null} />
+
+      {(contract.signed_pdf_url || contract.draft_pdf_url) && (
+        <section className="space-y-3">
+          <p className="wf-label-caps text-[0.6rem]">Contract PDF</p>
+          <div className="overflow-hidden rounded-lg border border-border/60 bg-muted/20 shadow-md">
+            <iframe
+              title={contract.signed_pdf_url ? 'Signed contract PDF' : 'Draft contract PDF'}
+              src={contract.signed_pdf_url ?? contract.draft_pdf_url ?? undefined}
+              className="aspect-[8.5/11] w-full bg-background"
+            />
+          </div>
+          <a
+            href={contract.signed_pdf_url ?? contract.draft_pdf_url ?? '#'}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block font-mono text-sm text-accent-brand underline-offset-4 hover:underline"
+          >
+            Download PDF
+          </a>
+        </section>
+      )}
 
       {contract.status === 'cancelled' && contract.cancelled_reason && (
         <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4">
@@ -265,38 +282,50 @@ export default async function ContractDetailPage({ params }: { params: { id: str
         </Card>
       )}
 
-      {/* Audit log */}
-      <Card>
-        <div className="border-b border-border/50 px-6 py-4">
-          <h2 className="font-serif text-lg font-semibold">Activity</h2>
-        </div>
-        <CardContent className="p-0">
-          <ol className="divide-y divide-border/40">
-            {audit.length === 0 ? (
-              <li className="p-6 text-sm text-muted-foreground">No activity yet</li>
-            ) : (
-              audit.map(entry => {
+      {/* Audit log — muted timeline; ids for progression scroll targets */}
+      <section id="contract-activity" className="border-t border-border/40 pt-8">
+        <p className="wf-label-caps mb-4 text-[0.6rem]">Activity</p>
+        <ol className="relative space-y-0 border-l border-border/50 pl-6">
+          {audit.length === 0 ? (
+            <li className="py-4 text-sm text-muted-foreground">No activity yet</li>
+          ) : (
+            [...audit]
+              .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at))
+              .map(entry => {
                 const actionText = describeAction(entry);
+                const initials =
+                  entry.actor_email?.split('@')[0]?.slice(0, 2).toUpperCase() ?? '·';
                 return (
-                  <li key={entry.id} className="flex items-start gap-4 px-6 py-3 text-sm">
-                    <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-whisky-500 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="font-medium">{actionText.title}</p>
-                      {actionText.detail && (
-                        <p className="text-xs text-muted-foreground">{actionText.detail}</p>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        {formatTimestamp(entry.occurred_at)}
-                        {entry.actor_email && ` · ${entry.actor_email}`}
-                      </p>
+                  <li
+                    key={entry.id}
+                    id={`audit-${entry.id}`}
+                    className="relative pb-6 pl-1 text-sm last:pb-0"
+                  >
+                    <span className="absolute -left-[25px] top-1.5 h-2 w-2 rounded-full border border-border bg-muted ring-2 ring-bg-page" />
+                    <div className="flex flex-wrap items-start gap-3">
+                      <div
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold uppercase text-muted-foreground"
+                        aria-hidden
+                      >
+                        {initials}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-foreground/90">{actionText.title}</p>
+                        {actionText.detail && (
+                          <p className="mt-0.5 text-xs text-muted-foreground">{actionText.detail}</p>
+                        )}
+                        <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                          {formatTimestamp(entry.occurred_at)}
+                          {entry.actor_email && ` · ${entry.actor_email}`}
+                        </p>
+                      </div>
                     </div>
                   </li>
                 );
               })
-            )}
-          </ol>
-        </CardContent>
-      </Card>
+          )}
+        </ol>
+      </section>
     </div>
   );
 }

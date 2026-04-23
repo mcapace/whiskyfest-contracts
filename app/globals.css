@@ -126,6 +126,17 @@
   }
 }
 
+@keyframes wf-stagger-node {
+  from {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 /* ------------------------------------------------------------------
    Places API (New) autocomplete styling — match local input styling
    ------------------------------------------------------------------ */
