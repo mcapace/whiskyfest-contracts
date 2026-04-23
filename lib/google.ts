@@ -33,6 +33,12 @@ function getAuth() {
   });
 }
 
+/** Shared Drive API client (service account). */
+export function getGoogleDrive() {
+  const auth = getAuth();
+  return google.drive({ version: 'v3', auth });
+}
+
 /**
  * Merge template tokens and return PDF bytes (no Drive upload).
  * Used for DocuSign: same merge as draft, but merge map uses anchor strings instead of blank lines.
@@ -51,7 +57,23 @@ export async function renderContractPdfFromTemplate(
     requestBody: { name: `TEMP_${tempDocLabel}` },
     supportsAllDrives: true,
   });
-  const tempDocId = copy.data.id!;
+  const rawId = copy.data.id;
+  if (!rawId) {
+    throw new Error('Google Drive copy did not return a file id');
+  }
+  const tempDocId = rawId;
+
+  async function deleteTempDoc(): Promise<void> {
+    try {
+      await drive.files.delete({
+        fileId: tempDocId,
+        supportsAllDrives: true,
+      });
+    } catch (err) {
+      console.error('Failed to delete temp Doc', { tempDocId, err });
+      // Do not throw — PDF generation may already have succeeded; this is cleanup only.
+    }
+  }
 
   try {
     // Merge values may include `\u000b` (vertical tab) for soft line breaks inside cells (see merge-map).
@@ -74,16 +96,12 @@ export async function renderContractPdfFromTemplate(
       { responseType: 'arraybuffer' },
     );
 
-    return Buffer.from(pdfResp.data as ArrayBuffer);
-  } finally {
-    await drive.files
-      .delete({
-        fileId: tempDocId,
-        supportsAllDrives: true,
-      })
-      .catch((err: Error) => {
-        console.warn('Failed to clean up temp doc:', err.message);
-      });
+    const buffer = Buffer.from(pdfResp.data as ArrayBuffer);
+    await deleteTempDoc();
+    return buffer;
+  } catch (e) {
+    await deleteTempDoc();
+    throw e;
   }
 }
 
