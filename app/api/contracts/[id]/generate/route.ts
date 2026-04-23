@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { assertContractAccess } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { mergeAndExportPdf } from '@/lib/google';
+import { renderContractPdfFromTemplate, uploadPdfBufferToFolder } from '@/lib/google';
+import { contractDraftPdfPath, uploadContractPdfToStorage } from '@/lib/contract-pdf-storage';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import { notifyEventsTeamOfPendingReview } from '@/lib/notifications';
 import { requiresDiscountApproval } from '@/lib/contracts';
@@ -46,17 +47,17 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const fileName = `${contract.exhibitor_company_name.replace(/[^\w\s-]/g, '')} — WhiskyFest ${event.year} Contract`;
 
   try {
-    const { fileId, webViewLink } = await mergeAndExportPdf(
-      templateDocId,
-      mergeMap,
-      fileName,
-      draftsFolderId,
-    );
+    const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileName);
+    const { fileId, webViewLink } = await uploadPdfBufferToFolder(pdfBytes, fileName, draftsFolderId);
+
+    const draftStoragePath = contractDraftPdfPath(contract.id);
+    await uploadContractPdfToStorage(draftStoragePath, pdfBytes);
 
     const pdfFields = {
       draft_pdf_drive_id: fileId,
       draft_pdf_url: webViewLink,
       drafted_at: new Date().toISOString(),
+      pdf_storage_path: draftStoragePath,
     };
 
     const { data: curRow } = await supabase.from('contracts').select('*').eq('id', contract.id).single();

@@ -57,6 +57,8 @@ export interface Contract {
   sales_rep_id: string | null;
   draft_pdf_drive_id: string | null;
   draft_pdf_url: string | null;
+  /** Primary PDF in Supabase Storage: `{contract_id}/draft.pdf` or `{contract_id}/signed.pdf`. */
+  pdf_storage_path: string | null;
   docusign_envelope_id: string | null;
   signed_pdf_drive_id: string | null;
   signed_pdf_url: string | null;

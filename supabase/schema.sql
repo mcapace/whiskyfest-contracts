@@ -83,6 +83,7 @@ create table if not exists contracts (
   -- Generated artifacts
   draft_pdf_drive_id      text,
   draft_pdf_url           text,
+  pdf_storage_path        text,
   docusign_envelope_id    text,
   signed_pdf_drive_id     text,
   signed_pdf_url          text,
@@ -119,6 +120,8 @@ alter table contracts add column if not exists events_approval_reason text;
 alter table contracts add column if not exists events_sent_back_at timestamptz;
 alter table contracts add column if not exists events_sent_back_by text;
 alter table contracts add column if not exists events_sent_back_reason text;
+
+alter table contracts add column if not exists pdf_storage_path text;
 
 alter table contracts add column if not exists billing_same_as_corporate boolean not null default true;
 alter table contracts add column if not exists billing_address_line1 text;

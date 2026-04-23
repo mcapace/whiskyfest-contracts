@@ -7,6 +7,7 @@ import {
   fetchEnvelopeSigners,
 } from '@/lib/docusign';
 import { uploadPdfBufferToFolder } from '@/lib/google';
+import { contractSignedPdfPath, uploadContractPdfToStorage } from '@/lib/contract-pdf-storage';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { notifyContractFullySigned, notifyPartialSignature } from '@/lib/notifications';
 import type { ContractWithTotals, Event } from '@/types/db';
@@ -190,6 +191,9 @@ export async function POST(req: Request) {
 
     const { fileId, webViewLink } = await uploadPdfBufferToFolder(pdfBytes, fileBase, signedFolderId);
 
+    const signedStoragePath = contractSignedPdfPath(contract.id);
+    await uploadContractPdfToStorage(signedStoragePath, pdfBytes);
+
     const now = new Date().toISOString();
 
     await supabase
@@ -198,6 +202,7 @@ export async function POST(req: Request) {
         status: 'signed',
         signed_pdf_drive_id: fileId,
         signed_pdf_url: webViewLink,
+        pdf_storage_path: signedStoragePath,
         signed_at: now,
         countersigned_by_email: countersigner?.email ?? null,
         countersigned_by_name: countersigner?.name ?? null,

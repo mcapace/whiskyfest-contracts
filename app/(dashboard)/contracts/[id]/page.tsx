@@ -6,6 +6,7 @@ import { getContractWithTotalsForViewer } from '@/lib/auth-contract';
 import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { requiresDiscountApproval, STANDARD_BOOTH_RATE_CENTS } from '@/lib/contracts';
 import { formatStatus } from '@/lib/status-display';
+import { createContractPdfSignedUrl } from '@/lib/contract-pdf-storage';
 import { cn, formatCurrency, formatLongDate, formatTimestamp } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { StatusBadge } from '@/components/contracts/status-badge';
@@ -43,6 +44,27 @@ export default async function ContractDetailPage({ params }: { params: { id: str
   const releaseAudit = audit.find((entry) => entry.action === 'released_to_accounting' || entry.action === 'executed');
   const discountPending = requiresDiscountApproval(contract);
 
+  let pdfEmbedUrl: string | null = null;
+  if (contract.pdf_storage_path) {
+    try {
+      pdfEmbedUrl = await createContractPdfSignedUrl(contract.pdf_storage_path);
+    } catch {
+      pdfEmbedUrl = null;
+    }
+  }
+
+  const legacyPdfUrl = contract.signed_pdf_url ?? contract.draft_pdf_url;
+  const draftPdfHref =
+    contract.drafted_at || contract.draft_pdf_url || contract.pdf_storage_path
+      ? `/api/contracts/${contract.id}/pdf?variant=draft`
+      : null;
+  const signedPdfHref =
+    contract.signed_pdf_url ||
+    contract.signed_at ||
+    contract.pdf_storage_path?.endsWith('signed.pdf')
+      ? `/api/contracts/${contract.id}/pdf?variant=signed`
+      : null;
+
   return (
     <div className="space-y-6 pb-28 md:pb-32">
       {/* Breadcrumb */}
@@ -72,24 +94,44 @@ export default async function ContractDetailPage({ params }: { params: { id: str
 
       <ContractSummarySection contract={contract} event={event ?? null} />
 
-      {(contract.signed_pdf_url || contract.draft_pdf_url) && (
+      {(pdfEmbedUrl || legacyPdfUrl) && (
         <section className="space-y-3">
           <p className="wf-label-caps text-[0.6rem]">Contract PDF</p>
-          <div className="overflow-hidden rounded-lg border border-border/60 bg-muted/20 shadow-md">
-            <iframe
-              title={contract.signed_pdf_url ? 'Signed contract PDF' : 'Draft contract PDF'}
-              src={contract.signed_pdf_url ?? contract.draft_pdf_url ?? undefined}
-              className="aspect-[8.5/11] w-full bg-background"
-            />
-          </div>
+          {pdfEmbedUrl ? (
+            <div className="overflow-hidden rounded-lg border border-border/60 bg-muted/20 shadow-md">
+              <iframe
+                title={contract.signed_pdf_url ? 'Signed contract PDF' : 'Draft contract PDF'}
+                src={pdfEmbedUrl}
+                className="h-[800px] w-full rounded-lg border border-border/60 bg-background md:aspect-[8.5/11] md:h-auto"
+              />
+            </div>
+          ) : legacyPdfUrl ? (
+            <p className="text-sm text-muted-foreground">
+              <a
+                href={legacyPdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-mono text-accent-brand underline-offset-4 hover:underline"
+              >
+                Open PDF (legacy Google Drive)
+              </a>
+            </p>
+          ) : null}
           <a
-            href={contract.signed_pdf_url ?? contract.draft_pdf_url ?? '#'}
+            href={`/api/contracts/${contract.id}/pdf?variant=auto`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-block font-mono text-sm text-accent-brand underline-offset-4 hover:underline"
           >
             Download PDF
           </a>
+        </section>
+      )}
+
+      {!pdfEmbedUrl && !legacyPdfUrl && (
+        <section className="space-y-2">
+          <p className="wf-label-caps text-[0.6rem]">Contract PDF</p>
+          <p className="text-sm text-muted-foreground">No PDF available yet. Generate Draft PDF first.</p>
         </section>
       )}
 
@@ -180,8 +222,8 @@ export default async function ContractDetailPage({ params }: { params: { id: str
             signerEmail={contract.signer_1_email}
             signerName={contract.signer_1_name}
             status={contract.status}
-            draftPdfUrl={contract.draft_pdf_url}
-            signedPdfUrl={contract.signed_pdf_url}
+            draftPdfHref={draftPdfHref}
+            signedPdfHref={signedPdfHref}
             docusignEnvelopeId={contract.docusign_envelope_id}
             sentAt={contract.sent_at}
             updatedAt={contract.updated_at}

@@ -134,6 +134,50 @@ export async function assertContractAccess(
   return { ok: true, actor, contract: c };
 }
 
+/**
+ * Contract PDF redirects (same audience as contract detail): reps/admins/events team,
+ * plus accounting users for executed contracts only.
+ */
+export async function assertContractPdfAccess(
+  session: Session | null,
+  contractId: string,
+): Promise<{ ok: true; contract: Contract } | { ok: false; response: NextResponse }> {
+  if (!session?.user?.email) return jsonErr(401, 'Unauthorized');
+  const emailEff = getEffectiveUserEmail(session);
+  if (!emailEff) return jsonErr(401, 'Unauthorized');
+
+  const supabase = getSupabaseAdmin();
+  const { data: appUser, error: uerr } = await supabase
+    .from('app_users')
+    .select('role, is_active, is_events_team, is_accounting')
+    .eq('email', emailEff)
+    .single();
+
+  if (uerr || !appUser?.is_active) return jsonErr(401, 'Unauthorized');
+
+  const { data: contract, error: cerr } = await supabase
+    .from('contracts')
+    .select('*')
+    .eq('id', contractId)
+    .single();
+
+  if (cerr || !contract) return jsonErr(404, 'Contract not found');
+  const c = contract as Contract;
+
+  const isAdmin = appUser.role === 'admin';
+  const isEventsTeam = Boolean((appUser as { is_events_team?: boolean }).is_events_team);
+  const isAccounting = Boolean((appUser as { is_accounting?: boolean }).is_accounting);
+
+  if (isAdmin || isEventsTeam) return { ok: true, contract: c };
+  if (isAccounting && c.status === 'executed') return { ok: true, contract: c };
+
+  const accessibleSalesRepIds = await getAccessibleSalesRepIds(emailEff, supabase);
+  const sid = c.sales_rep_id;
+  if (sid && accessibleSalesRepIds.includes(sid)) return { ok: true, contract: c };
+
+  return jsonErr(403, 'Forbidden');
+}
+
 /** Server pages: login redirect for inactive; non-admins must have ≥1 accessible rep id. */
 export interface PageContractActor {
   email: string;

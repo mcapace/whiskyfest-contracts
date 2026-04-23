@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft, ExternalLink } from 'lucide-react';
 import { requireAccountingPageAccess } from '@/lib/auth-accounting';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { createContractPdfSignedUrl } from '@/lib/contract-pdf-storage';
 import { calculateDiscountCents, calculateListSubtotalCents, isDiscountedRate } from '@/lib/contracts';
 import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
@@ -38,6 +39,15 @@ export default async function AccountingContractDetailPage({ params }: { params:
         ? `${pctOff}% / ${formatCurrency(discountCents)}`
         : formatCurrency(discountCents)
       : '—';
+
+  let pdfEmbedUrl: string | null = null;
+  if (contract.pdf_storage_path) {
+    try {
+      pdfEmbedUrl = await createContractPdfSignedUrl(contract.pdf_storage_path);
+    } catch {
+      pdfEmbedUrl = null;
+    }
+  }
 
   const billingBlock =
     contract.billing_same_as_corporate ?? true
@@ -87,18 +97,43 @@ export default async function AccountingContractDetailPage({ params }: { params:
         <Card className="border-border/60">
           <CardContent className="space-y-3 p-6">
             <p className="wf-label-caps text-[0.6rem]">Signed PDF</p>
-            {contract.signed_pdf_url ? (
+            {pdfEmbedUrl ? (
               <>
                 <div className="overflow-hidden rounded-lg border border-border/60 shadow-md">
-                  <iframe title="Signed PDF" src={contract.signed_pdf_url} className="aspect-[8.5/11] w-full bg-background" />
+                  <iframe
+                    title="Signed PDF"
+                    src={pdfEmbedUrl}
+                    className="h-[800px] w-full rounded-lg border border-border/60 bg-background md:aspect-[8.5/11] md:h-auto"
+                  />
                 </div>
                 <a
-                  href={contract.signed_pdf_url}
+                  href={`/api/contracts/${contract.id}/pdf?variant=signed`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 font-mono text-sm text-accent-brand underline-offset-4 hover:underline"
                 >
                   <ExternalLink className="h-4 w-4" /> Open / download PDF
+                </a>
+              </>
+            ) : contract.signed_pdf_url ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  <a
+                    href={contract.signed_pdf_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-mono text-accent-brand underline-offset-4 hover:underline"
+                  >
+                    Open PDF (legacy Google Drive)
+                  </a>
+                </p>
+                <a
+                  href={`/api/contracts/${contract.id}/pdf?variant=signed`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 font-mono text-sm text-accent-brand underline-offset-4 hover:underline"
+                >
+                  <ExternalLink className="h-4 w-4" /> Download PDF
                 </a>
               </>
             ) : (

@@ -36,8 +36,8 @@ interface Props {
   signerEmail: string | null;
   signerName: string | null;
   status: ContractStatus;
-  draftPdfUrl: string | null;
-  signedPdfUrl: string | null;
+  draftPdfHref: string | null;
+  signedPdfHref: string | null;
   docusignEnvelopeId: string | null;
   sentAt: string | null;
   updatedAt: string | null;
@@ -64,8 +64,8 @@ export function ContractActions({
   signerEmail,
   signerName,
   status,
-  draftPdfUrl,
-  signedPdfUrl,
+  draftPdfHref,
+  signedPdfHref,
   docusignEnvelopeId,
   sentAt,
   updatedAt,
@@ -135,12 +135,12 @@ export function ContractActions({
       if (status === 'ready_for_review') return true;
       if (status === 'pending_events_review') {
         if (isEventsTeam) return true;
-        if (isAdmin && draftPdfUrl) return true;
+        if (isAdmin && draftPdfHref) return true;
       }
     }
     if (status === 'approved') return true;
     if (canRelease) return true;
-    if (status === 'executed' && signedPdfUrl) return true;
+    if (status === 'executed' && signedPdfHref) return true;
     if (status === 'error' && isAdmin) return true;
     return false;
   }, [
@@ -148,9 +148,9 @@ export function ContractActions({
     discountApprovalPending,
     isEventsTeam,
     isAdmin,
-    draftPdfUrl,
+    draftPdfHref,
     canRelease,
-    signedPdfUrl,
+    signedPdfHref,
   ]);
 
   const fabBtn =
@@ -317,9 +317,9 @@ export function ContractActions({
               >
                 Send Back for Changes
               </Button>
-              {draftPdfUrl && (
+              {draftPdfHref && (
                 <Button variant="outline" className={fabBtn} asChild>
-                  <a href={draftPdfUrl} target="_blank" rel="noreferrer">
+                  <a href={draftPdfHref} target="_blank" rel="noreferrer">
                     <ExternalLink className="h-4 w-4" />
                     View Draft PDF
                   </a>
@@ -328,9 +328,9 @@ export function ContractActions({
             </>
           )}
 
-          {status === 'pending_events_review' && !discountApprovalPending && !isEventsTeam && isAdmin && draftPdfUrl && (
+          {status === 'pending_events_review' && !discountApprovalPending && !isEventsTeam && isAdmin && draftPdfHref && (
             <Button variant="outline" className={fabBtn} asChild>
-              <a href={draftPdfUrl} target="_blank" rel="noreferrer">
+              <a href={draftPdfHref} target="_blank" rel="noreferrer">
                 <ExternalLink className="h-4 w-4" />
                 View Draft PDF
               </a>
@@ -380,9 +380,9 @@ export function ContractActions({
             </Button>
           )}
 
-          {status === 'executed' && signedPdfUrl && (
+          {status === 'executed' && signedPdfHref && (
             <Button variant="secondary" className={fabBtn} asChild>
-              <a href={signedPdfUrl} target="_blank" rel="noreferrer">
+              <a href={signedPdfHref} target="_blank" rel="noreferrer">
                 <ExternalLink className="h-4 w-4" />
                 View Signed PDF
               </a>

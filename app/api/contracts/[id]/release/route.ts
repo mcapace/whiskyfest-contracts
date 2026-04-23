@@ -5,6 +5,7 @@ import { formatCurrency, formatTimestamp } from '@/lib/utils';
 import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { calculateDiscountCents, isDiscountedRate } from '@/lib/contracts';
 import { downloadCompletedPdf } from '@/lib/docusign';
+import { downloadContractPdfFromStorage } from '@/lib/contract-pdf-storage';
 import { sendAccountingEmail } from '@/lib/email';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
@@ -48,17 +49,30 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: 'SENDGRID_API_KEY is not configured.' }, { status: 500 });
   }
 
-  const envelopeId = contract.docusign_envelope_id?.trim();
-  if (!envelopeId) {
+  const envelopeIdRaw = contract.docusign_envelope_id?.trim();
+  if (!envelopeIdRaw) {
     return NextResponse.json({ error: 'DocuSign contract is missing envelope id.' }, { status: 409 });
   }
-  if (!contract.signed_pdf_url) {
+  const envelopeId = envelopeIdRaw;
+  if (!contract.signed_pdf_url && !contract.pdf_storage_path?.endsWith('signed.pdf')) {
     return NextResponse.json({ error: 'Signed PDF is not yet available.' }, { status: 409 });
+  }
+
+  const storagePath = contract.pdf_storage_path;
+  async function loadSignedPdfBytes(): Promise<Buffer> {
+    if (storagePath?.endsWith('signed.pdf')) {
+      try {
+        return await downloadContractPdfFromStorage(storagePath);
+      } catch {
+        return downloadCompletedPdf(envelopeId);
+      }
+    }
+    return downloadCompletedPdf(envelopeId);
   }
 
   let signedPdfBytes: Buffer;
   try {
-    signedPdfBytes = await downloadCompletedPdf(envelopeId);
+    signedPdfBytes = await loadSignedPdfBytes();
   } catch (e: unknown) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : String(e) },
