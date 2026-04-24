@@ -16,15 +16,18 @@ Every contract exists in one of these states. Transitions are controlled by app 
 stateDiagram-v2
     [*] --> draft: Sales rep creates
     
-    draft --> pending_events_review: Generate Draft PDF
+    draft --> pending_events_review: Generate Draft PDF first submit
     draft --> cancelled: Cancel
+    draft --> error: PDF generation fails
     
     pending_events_review --> approved: Events team approves
-    pending_events_review --> draft: Events team rejects (sent back)
+    pending_events_review --> draft: Events team sends back
     pending_events_review --> cancelled: Cancel
+    pending_events_review --> error: PDF generation fails
     
     approved --> sent: Send via DocuSign
     approved --> cancelled: Cancel
+    approved --> error: Send or integration failure
     
     sent --> partially_signed: Exhibitor signs
     sent --> voided: Void (admin/events)
@@ -35,7 +38,10 @@ stateDiagram-v2
     partially_signed --> voided: Void (admin/events)
     partially_signed --> declined: Countersigner declines
     
-    signed --> executed: Release to Accounting
+    signed --> executed: Admin Release to Accounting
+    signed --> cancelled: Cancel
+    
+    error --> draft: Admin Reset to Draft
     
     executed --> [*]
     cancelled --> [*]
@@ -43,13 +49,17 @@ stateDiagram-v2
     declined --> [*]
 ```
 
+The enum also includes **`ready_for_review`** (legacy / discount workflows): first PDF submit to events can originate from `draft` or `ready_for_review` per `generate` route logic.
+
 ### State definitions
 
 | State | Meaning |
 |-------|---------|
 | **draft** | Contract is being created or edited. No external parties involved. |
+| **ready_for_review** | Legacy / discount path: contract waits (e.g. discounted rate) before first PDF submission to events. |
 | **pending_events_review** | PDF generated. Events team must review and approve before it can be sent. |
 | **approved** | Events team has approved. Sales rep can now send via DocuSign. |
+| **error** | PDF or send failed; admin can reset to draft after fixing data or integration. |
 | **sent** | DocuSign envelope created. Exhibitor has been emailed to sign. |
 | **partially_signed** | Exhibitor has signed. Awaiting M. Shanken countersignature. |
 | **signed** | Both parties have signed. Contract is fully executed legally. |
@@ -93,9 +103,9 @@ sequenceDiagram
     DocuSign-->>Exhibitor: Email: Sign contract
     App->>DB: Status = sent
     
-    Exhibitor->>DocuSign: Review and sign
+    Exhibitor->>DocuSign: Review and sign exhibitor text tabs mailing phone billing event contact
     DocuSign->>App: Webhook: envelope-partially-signed
-    App->>DB: Status = partially_signed
+    App->>DB: Status = partially_signed exhibitor_fields_captured_at when required tabs complete
     App-->>Events: Email: needs countersignature
     DocuSign-->>Countersigner: Email: Sign contract
     
@@ -106,7 +116,7 @@ sequenceDiagram
     App-->>Rep: Email: contract fully signed
     App-->>Events: Email: contract fully signed
     
-    Events->>App: Release to Accounting
+    Admin->>App: Release to Accounting
     App->>DB: Status = executed
     App-->>Accounting: Email: ready to invoice<br/>+ PDF attachment
     App-->>Rep: Email: released to accounting
@@ -175,7 +185,7 @@ sequenceDiagram
     
     Note over App: Contract is fully signed<br/>Status = signed
     
-    Events->>App: Click Release to Accounting
+    Admin->>App: Click Release to Accounting
     App->>DB: Status = executed<br/>executed_at = now<br/>accounting_notified_at = now
     App-->>Accounting: Email with signed PDF attached<br/>+ contract summary table<br/>+ total amount
     App-->>Rep: Email: contract released to accounting
@@ -273,9 +283,8 @@ graph LR
     subgraph "Events Team"
         C1[All contracts]
         C2[Review approval queue]
-        C3[Approve / Reject / Send back]
-        C4[Release to Accounting]
-        C5[Void contracts]
+        C3[Approve / Send back]
+        C4[Void contracts]
     end
     
     subgraph "Accounting"
@@ -302,7 +311,7 @@ graph LR
 | Edit contract (draft) | ✓ own | ✓ for their reps | ✓ | ✗ | ✓ |
 | Approve contract | ✗ | ✗ | ✓ | ✗ | ✓ |
 | Send via DocuSign | ✓ own | ✓ for their reps | ✓ | ✗ | ✓ |
-| Release to Accounting | ✗ | ✗ | ✓ | ✗ | ✓ |
+| Release to Accounting | ✗ | ✗ | ✗ | ✗ | ✓ |
 | Void contract | ✗ | ✗ | ✓ | ✗ | ✓ |
 | Cancel contract | ✗ | ✗ | ✓ | ✗ | ✓ |
 | Mark Invoice Sent | ✗ | ✗ | ✗ | ✓ | ✓ |
@@ -338,20 +347,45 @@ graph TB
 
 ---
 
-## 8. Status Transition Triggers
+## 8. Exhibitor-provided fields (DocuSign)
+
+Mailing address, telephone, billing contact, billing address, and optional event contact are **not** collected on the sales rep create/edit form. They are **required DocuSign text tabs** (plus optional event fields) on the exhibitor’s signing pass. When the webhook sees complete required tab values, the app writes them to `contracts` and sets **`exhibitor_fields_captured_at`**.
+
+```mermaid
+sequenceDiagram
+    participant Rep as Sales Rep
+    participant App
+    participant DocuSign
+    participant Exhibitor
+
+    Rep->>App: Create draft booth brands signer only
+    Note over App: Mailing phone billing cleared until capture
+    Rep->>App: Send via DocuSign
+    App->>DocuSign: Envelope with anchor text tabs
+    Exhibitor->>DocuSign: Fill tabs sign
+    DocuSign->>App: Webhook partial complete
+    App->>App: Patch DB when required tabs present
+```
+
+---
+
+## 9. Status Transition Triggers
 
 Quick reference: what causes each status change?
 
 | From | To | Trigger |
 |------|-----|--------|
 | (none) | draft | Sales rep creates contract |
-| draft | pending_events_review | Sales rep generates Draft PDF |
+| draft or ready_for_review | pending_events_review | First successful Generate Draft PDF submit to events |
 | pending_events_review | approved | Events team clicks Approve |
 | pending_events_review | draft | Events team sends back with reason |
 | approved | sent | Sales rep clicks Send via DocuSign |
 | sent | partially_signed | DocuSign webhook: exhibitor signed |
 | partially_signed | signed | DocuSign webhook: countersigner signed |
-| signed | executed | Events team clicks Release to Accounting |
+| signed | executed | Admin clicks Release to Accounting |
+| signed | cancelled | Admin or events Cancel |
+| draft / rfr / pending / approved | error | PDF or send failure |
+| error | draft | Admin Reset to Draft |
 | executed | invoice_sent (invoice_status) | Accounting clicks Mark Invoice Sent |
 | invoice_sent | paid (invoice_status) | Accounting clicks Mark Paid |
 | sent or partially_signed | voided | Admin/events clicks Void + provides reason |
@@ -367,7 +401,7 @@ Quick reference: what causes each status change?
 
 **Events team** — Internal team responsible for reviewing and approving contracts before they go to exhibitors. Also countersigns on behalf of M. Shanken.
 
-**Countersignatory** — The M. Shanken representative who signs after the exhibitor. Currently: Susannah Nolan, Senior Event Director.
+**Countersignatory** — The M. Shanken representative who signs after the exhibitor; name and email come from the **event** record (defaults in seed data may differ by environment).
 
 **Executed** — A signed contract that has been released to the accounting team for invoicing.
 
@@ -379,5 +413,5 @@ Quick reference: what causes each status change?
 
 ---
 
-*Last updated: [date of last deploy]*
+*Last updated: April 2026 (docs aligned with exhibitor DocuSign capture, daily bubbles, admin release).*  
 *Contact: Michael Capace — mcapace@mshanken.com*

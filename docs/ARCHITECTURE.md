@@ -19,6 +19,7 @@ graph TB
   subgraph "Application — Vercel"
     NextJS[Next.js App]
     WebhookAPI[Webhook Endpoints]
+    VercelCron[Vercel Cron<br/>daily-bubble 12:00 UTC]
   end
 
   subgraph "Data Layer"
@@ -32,6 +33,7 @@ graph TB
     GoogleDrive[Google Drive<br/>PDF Archive]
     GoogleSheets[Google Sheets<br/>Team Tracker]
     SendGrid[SendGrid<br/>Email Delivery]
+    Anthropic[Anthropic Claude API<br/>Daily bubble copy]
   end
 
   SalesRep --> GoogleOAuth
@@ -47,6 +49,8 @@ graph TB
   NextJS --> GoogleDrive
   NextJS --> GoogleSheets
   NextJS --> SendGrid
+  VercelCron -->|Bearer CRON_SECRET| NextJS
+  NextJS -->|generate bubble| Anthropic
 
   DocuSign -->|Connect Webhooks| WebhookAPI
   Exhibitor -->|DocuSign email| DocuSign
@@ -63,10 +67,12 @@ graph TB
 - **Google Drive**: backup/archive location for generated files and operational recovery.
 - **Google Sheets**: business-facing tracker synchronized from signing/release/cancel/void events.
 - **SendGrid**: transactional notification channel (release, cancellation, void, accounting workflows).
+- **Vercel Cron**: scheduled `GET /api/cron/daily-bubble` (see `vercel.json`) creates today’s Eastern `daily_bubbles` row when missing, via Claude + DB + optional email.
+- **Anthropic Claude**: generates short fact/joke/quote text for the dashboard daily bubble (`lib/bubble-generator.ts`).
 
 ## High-level flow
 
-Sales rep creates contract -> events team approves -> app sends DocuSign envelope -> exhibitor signs -> countersigner signs -> release to accounting -> AR tracks invoice sent/paid.
+Sales rep creates contract → events team approves → app sends DocuSign envelope → exhibitor completes signing (including exhibitor-only text tabs for mailing, phone, billing, optional event contact) → countersigner signs → **admin** releases to accounting → AR tracks invoice sent/paid.
 
 ## External dependencies and failure impact
 
