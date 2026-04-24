@@ -276,19 +276,13 @@ export default async function ContractDetailPage({ params }: { params: { id: str
                 initialName={contract.signer_1_name}
                 initialTitle={contract.signer_1_title}
                 initialEmail={contract.signer_1_email}
-                initialAddressLine1={contract.exhibitor_address_line1}
-                initialAddressLine2={contract.exhibitor_address_line2}
-                initialCity={contract.exhibitor_city}
-                initialState={contract.exhibitor_state}
-                initialZip={contract.exhibitor_zip}
-                initialCountry={contract.exhibitor_country}
               />
             )}
           </div>
           <CardContent className="space-y-3 p-6 text-sm">
             <Detail label="Legal Name"   value={contract.exhibitor_legal_name} />
             <Detail label="Display Name" value={contract.exhibitor_company_name} />
-            <Detail label="Address" value={formatExhibitorAddressBlock(contract)} multiline />
+            <ExhibitorMailingAddressDetail contract={contract} />
             <Detail label="Telephone"    value={contract.exhibitor_telephone} />
             <Detail label="Brands"       value={contract.brands_poured} />
             <Detail label="Sales Rep"    value={contract.sales_rep_name ?? contract.sales_rep_email ?? '—'} />
@@ -436,6 +430,39 @@ export default async function ContractDetailPage({ params }: { params: { id: str
   );
 }
 
+function ExhibitorMailingAddressDetail({ contract }: { contract: ContractWithTotals }) {
+  const captured = Boolean(contract.exhibitor_fields_captured_at);
+  const signingOrLater = ['sent', 'partially_signed', 'signed', 'executed'].includes(contract.status);
+  const legacyRepMailing =
+    !captured &&
+    Boolean(
+      contract.exhibitor_address_line1?.trim() ||
+        contract.exhibitor_city?.trim() ||
+        contract.exhibitor_country?.trim(),
+    );
+
+  if (captured || legacyRepMailing) {
+    const block = formatExhibitorAddressBlock(contract) || '—';
+    return <Detail label="Mailing address" value={block} multiline />;
+  }
+
+  if (signingOrLater) {
+    return (
+      <Detail
+        label="Mailing address"
+        value="Mailing address, billing address, billing contact, and event contact will be collected from the exhibitor at signing."
+      />
+    );
+  }
+
+  return (
+    <Detail
+      label="Mailing address"
+      value="Mailing address, billing address, billing contact, and event contact will be collected from the exhibitor at signing."
+    />
+  );
+}
+
 function ExhibitorBillingEventSection({ contract }: { contract: ContractWithTotals }) {
   const captured = Boolean(contract.exhibitor_fields_captured_at);
   const signingOrLater = ['sent', 'partially_signed', 'signed', 'executed'].includes(contract.status);
@@ -500,7 +527,7 @@ function ExhibitorBillingEventSection({ contract }: { contract: ContractWithTota
   if (signingOrLater) {
     return (
       <p className="text-muted-foreground">
-        Billing and event contact will be provided by the exhibitor at signing.
+        Billing contact, billing address, and event contact will be provided by the exhibitor at signing.
       </p>
     );
   }
@@ -518,7 +545,7 @@ function ExhibitorBillingEventSection({ contract }: { contract: ContractWithTota
 
   return (
     <p className="text-muted-foreground">
-      Billing address, billing contact, and event contact information will be collected from the exhibitor at signing.
+      Billing contact, billing address, and event contact information will be collected from the exhibitor at signing.
     </p>
   );
 }

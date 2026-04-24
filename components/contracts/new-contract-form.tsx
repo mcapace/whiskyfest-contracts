@@ -15,7 +15,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input, Label, Textarea } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { AddressAutocomplete } from '@/components/forms/address-autocomplete';
 import { SalesRepSelect } from '@/components/contracts/sales-rep-select';
 import type { Event } from '@/types/db';
 
@@ -23,12 +22,6 @@ export type ContractFormValues = {
   event_id: string;
   exhibitor_legal_name: string;
   exhibitor_company_name: string;
-  exhibitor_address_line1: string;
-  exhibitor_address_line2: string;
-  exhibitor_city: string;
-  exhibitor_state: string;
-  exhibitor_zip: string;
-  exhibitor_country: string;
   exhibitor_telephone: string;
   brands_poured: string;
   booth_count: number;
@@ -121,12 +114,6 @@ export function NewContractForm({
     event_id:               initialValues?.event_id ?? defaultEvent?.id ?? '',
     exhibitor_legal_name:   initialValues?.exhibitor_legal_name ?? '',
     exhibitor_company_name: initialValues?.exhibitor_company_name ?? '',
-    exhibitor_address_line1: initialValues?.exhibitor_address_line1 ?? '',
-    exhibitor_address_line2: initialValues?.exhibitor_address_line2 ?? '',
-    exhibitor_city:          initialValues?.exhibitor_city ?? '',
-    exhibitor_state:         initialValues?.exhibitor_state ?? '',
-    exhibitor_zip:           initialValues?.exhibitor_zip ?? '',
-    exhibitor_country:       initialValues?.exhibitor_country ?? 'United States',
     exhibitor_telephone:    initialValues?.exhibitor_telephone ?? '',
     brands_poured:          initialValues?.brands_poured ?? '',
     booth_count:            initialValues?.booth_count ?? 1,
@@ -196,17 +183,6 @@ export function NewContractForm({
     setForm(f => ({ ...f, [k]: v }));
   }
 
-  const patchAddress = useCallback((patch: Partial<Pick<typeof form,
-    | 'exhibitor_address_line1'
-    | 'exhibitor_address_line2'
-    | 'exhibitor_city'
-    | 'exhibitor_state'
-    | 'exhibitor_zip'
-    | 'exhibitor_country'
-  >>) => {
-    setForm((f) => ({ ...f, ...patch }));
-  }, []);
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
@@ -215,7 +191,6 @@ export function NewContractForm({
     if (!form.event_id) { setErr('Please select an event'); return; }
     if (!form.exhibitor_company_name) { setErr('Company name required'); return; }
     if (!form.exhibitor_legal_name)   { setErr('Legal name required'); return; }
-    if (!form.exhibitor_country) { setErr('Country is required'); return; }
     if (!form.sales_rep_id) { setErr('Sales rep is required'); return; }
 
     const parsedLines = parseLineItemsForSubmit(lineItems);
@@ -310,24 +285,9 @@ export function NewContractForm({
             <Field label="Legal Name" hint="Full legal entity name as it will appear in the agreement line">
               <Input value={form.exhibitor_legal_name} onChange={e => set('exhibitor_legal_name', e.target.value)} placeholder="Sample Distillery Inc." required />
             </Field>
-            <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
-              <p className="mb-3 text-sm font-medium">Mailing address</p>
-              <AddressAutocomplete
-                value={{
-                  exhibitor_address_line1: form.exhibitor_address_line1,
-                  exhibitor_address_line2: form.exhibitor_address_line2,
-                  exhibitor_city: form.exhibitor_city,
-                  exhibitor_state: form.exhibitor_state,
-                  exhibitor_zip: form.exhibitor_zip,
-                  exhibitor_country: form.exhibitor_country,
-                }}
-                onChange={patchAddress}
-              />
-            </div>
-
             <div className="rounded-md border border-dashed border-border/70 bg-muted/15 px-3 py-2.5 text-sm text-muted-foreground">
-              Billing address, billing contact, and event contact information will be collected from the exhibitor at
-              signing (DocuSign).
+              Mailing address, billing address, billing contact, and event contact will be collected from the exhibitor
+              at signing.
             </div>
 
             <Field label="Telephone">

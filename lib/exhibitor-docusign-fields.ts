@@ -2,22 +2,22 @@ export type ExhibitorFieldMergeMode = 'draft' | 'docusign';
 
 /**
  * Google Doc merge tokens for exhibitor-captured fields. In `docusign` mode each resolves to a
- * unique anchor string (same as DocuSign text tab `anchorString`) so tabs sit on the PDF next to labels.
+ * unique anchor string (same as DocuSign text tab `anchorString`).
  *
- * Template (add to contract Google Doc — see repo commit message / PR description):
- *   BILLING INFORMATION
- *   Billing Contact: {{billing_contact_name}}
- *   Billing Email: {{billing_contact_email}}
- *   Billing Address:
- *   {{billing_address_line1}}
- *   {{billing_address_line2}}
- *   {{billing_city}}, {{billing_state}} {{billing_zip}}
- *   {{billing_country}}
- *   EVENT CONTACT
- *   Event Contact Name: {{event_contact_name}}
- *   Event Contact Email: {{event_contact_email}}
+ * Add to contract Google Doc (alongside existing billing/event blocks):
+ *   MAILING / CORPORATE ADDRESS
+ *   {{exhibitor_address_line1}}
+ *   {{exhibitor_address_line2}}
+ *   {{exhibitor_city}}, {{exhibitor_state}} {{exhibitor_zip}}
+ *   {{exhibitor_country}}
  */
 export const EXHIBITOR_DOCUSIGN_TAB_LABELS = [
+  'exhibitor_address_line1',
+  'exhibitor_address_line2',
+  'exhibitor_city',
+  'exhibitor_state',
+  'exhibitor_zip',
+  'exhibitor_country',
   'billing_contact_name',
   'billing_contact_email',
   'billing_address_line1',
@@ -32,8 +32,13 @@ export const EXHIBITOR_DOCUSIGN_TAB_LABELS = [
 
 export type ExhibitorDocuSignTabLabel = (typeof EXHIBITOR_DOCUSIGN_TAB_LABELS)[number];
 
-/** Unique anchor substrings placed via merge (parallel to DOCUSIGN_ANCHORS for signatures). */
 const ANCHOR: Record<ExhibitorDocuSignTabLabel, string> = {
+  exhibitor_address_line1: '\\mal1\\',
+  exhibitor_address_line2: '\\mal2\\',
+  exhibitor_city: '\\mct\\',
+  exhibitor_state: '\\mst\\',
+  exhibitor_zip: '\\mzp\\',
+  exhibitor_country: '\\mcy\\',
   billing_contact_name: '\\bcn\\',
   billing_contact_email: '\\bce\\',
   billing_address_line1: '\\ba1\\',
@@ -65,9 +70,63 @@ type TextTabDef = {
   validationPattern?: string;
 };
 
-/** DocuSign REST textTabs for routing-order-1 (exhibitor) recipient. */
+/** DocuSign REST textTabs for routing-order-1 (exhibitor) recipient — mailing first, then billing, then optional event. */
 export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
   const tabs: TextTabDef[] = [
+    {
+      tabLabel: 'exhibitor_address_line1',
+      required: 'true',
+      anchorString: ANCHOR.exhibitor_address_line1,
+      anchorXOffset: '0',
+      anchorYOffset: '-0.06',
+      anchorUnits: 'inches',
+      documentId: '1',
+    },
+    {
+      tabLabel: 'exhibitor_address_line2',
+      required: 'false',
+      anchorString: ANCHOR.exhibitor_address_line2,
+      anchorXOffset: '0',
+      anchorYOffset: '-0.06',
+      anchorUnits: 'inches',
+      documentId: '1',
+    },
+    {
+      tabLabel: 'exhibitor_city',
+      required: 'true',
+      anchorString: ANCHOR.exhibitor_city,
+      anchorXOffset: '0',
+      anchorYOffset: '-0.06',
+      anchorUnits: 'inches',
+      documentId: '1',
+    },
+    {
+      tabLabel: 'exhibitor_state',
+      required: 'true',
+      anchorString: ANCHOR.exhibitor_state,
+      anchorXOffset: '0.12',
+      anchorYOffset: '-0.06',
+      anchorUnits: 'inches',
+      documentId: '1',
+    },
+    {
+      tabLabel: 'exhibitor_zip',
+      required: 'true',
+      anchorString: ANCHOR.exhibitor_zip,
+      anchorXOffset: '0.12',
+      anchorYOffset: '-0.06',
+      anchorUnits: 'inches',
+      documentId: '1',
+    },
+    {
+      tabLabel: 'exhibitor_country',
+      required: 'true',
+      anchorString: ANCHOR.exhibitor_country,
+      anchorXOffset: '0',
+      anchorYOffset: '-0.06',
+      anchorUnits: 'inches',
+      documentId: '1',
+    },
     {
       tabLabel: 'billing_contact_name',
       required: 'true',

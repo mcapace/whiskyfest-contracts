@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { Pencil, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
-import { AddressAutocomplete } from '@/components/forms/address-autocomplete';
 import {
   Dialog,
   DialogContent,
@@ -21,39 +20,14 @@ interface Props {
   initialName: string | null;
   initialTitle: string | null;
   initialEmail: string | null;
-  initialAddressLine1: string | null;
-  initialAddressLine2: string | null;
-  initialCity: string | null;
-  initialState: string | null;
-  initialZip: string | null;
-  initialCountry: string | null;
 }
 
-export function SignerContactEdit({
-  contractId,
-  initialName,
-  initialTitle,
-  initialEmail,
-  initialAddressLine1,
-  initialAddressLine2,
-  initialCity,
-  initialState,
-  initialZip,
-  initialCountry,
-}: Props) {
+export function SignerContactEdit({ contractId, initialName, initialTitle, initialEmail }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(initialName ?? '');
   const [title, setTitle] = useState(initialTitle ?? '');
   const [email, setEmail] = useState(initialEmail ?? '');
-  const [address, setAddress] = useState({
-    exhibitor_address_line1: initialAddressLine1 ?? '',
-    exhibitor_address_line2: initialAddressLine2 ?? '',
-    exhibitor_city: initialCity ?? '',
-    exhibitor_state: initialState ?? '',
-    exhibitor_zip: initialZip ?? '',
-    exhibitor_country: initialCountry ?? 'United States',
-  });
   const [err, setErr] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -61,14 +35,6 @@ export function SignerContactEdit({
     setName(initialName ?? '');
     setTitle(initialTitle ?? '');
     setEmail(initialEmail ?? '');
-    setAddress({
-      exhibitor_address_line1: initialAddressLine1 ?? '',
-      exhibitor_address_line2: initialAddressLine2 ?? '',
-      exhibitor_city: initialCity ?? '',
-      exhibitor_state: initialState ?? '',
-      exhibitor_zip: initialZip ?? '',
-      exhibitor_country: initialCountry ?? 'United States',
-    });
   }
 
   async function save() {
@@ -81,12 +47,6 @@ export function SignerContactEdit({
           signer_1_name: name.trim(),
           signer_1_title: title.trim() || null,
           signer_1_email: email.trim(),
-          exhibitor_address_line1: address.exhibitor_address_line1.trim(),
-          exhibitor_address_line2: address.exhibitor_address_line2.trim() || null,
-          exhibitor_city: address.exhibitor_city.trim(),
-          exhibitor_state: address.exhibitor_state.trim(),
-          exhibitor_zip: address.exhibitor_zip.trim(),
-          exhibitor_country: address.exhibitor_country.trim(),
         }),
       });
       if (!res.ok) {
@@ -117,11 +77,12 @@ export function SignerContactEdit({
           Edit exhibitor signer
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Edit signer and exhibitor address</DialogTitle>
+          <DialogTitle>Edit exhibitor signer</DialogTitle>
           <DialogDescription>
-            Update the DocuSign recipient and mailing address before sending.
+            Update the DocuSign recipient name and email before sending. Mailing address is collected from the exhibitor
+            at signing.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-5">
@@ -143,13 +104,6 @@ export function SignerContactEdit({
               autoComplete="email"
             />
           </div>
-          <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
-            <p className="mb-3 text-sm font-medium">Mailing address</p>
-            <AddressAutocomplete
-              value={address}
-              onChange={(patch) => setAddress((prev) => ({ ...prev, ...patch }))}
-            />
-          </div>
         </div>
         {err && (
           <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -160,19 +114,7 @@ export function SignerContactEdit({
           <Button variant="outline" onClick={() => setOpen(false)} disabled={pending}>
             Close
           </Button>
-          <Button
-            onClick={save}
-            disabled={
-              pending ||
-              !name.trim() ||
-              !email.trim() ||
-              !address.exhibitor_address_line1.trim() ||
-              !address.exhibitor_city.trim() ||
-              !address.exhibitor_state.trim() ||
-              !address.exhibitor_zip.trim() ||
-              !address.exhibitor_country.trim()
-            }
-          >
+          <Button onClick={save} disabled={pending || !name.trim() || !email.trim()}>
             {pending && <Loader2 className="h-4 w-4 animate-spin" />}
             Save
           </Button>

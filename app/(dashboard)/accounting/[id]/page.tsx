@@ -57,14 +57,16 @@ export default async function AccountingContractDetailPage({ params }: { params:
     }
   }
 
+  const mailingBlock = formatExhibitorAddressBlock(contract);
   const billingBlock = contract.exhibitor_fields_captured_at
     ? [
+        mailingBlock.trim() ? `Mailing:\n${mailingBlock}` : null,
         contract.billing_contact_name,
         contract.billing_contact_email,
         formatBillingAddressBlock(contract),
       ]
         .filter((x) => (x ?? '').toString().trim())
-        .join('\n')
+        .join('\n\n')
     : contract.billing_same_as_corporate ?? true
       ? formatExhibitorAddressBlock(contract)
       : formatBillingAddressBlock(contract);

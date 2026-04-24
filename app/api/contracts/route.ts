@@ -95,15 +95,6 @@ export async function POST(req: Request) {
     effectiveSalesRepId = p.sales_rep_id;
   }
 
-  const addrSlice = {
-    exhibitor_address_line1: p.exhibitor_address_line1 ?? null,
-    exhibitor_address_line2: p.exhibitor_address_line2 ?? null,
-    exhibitor_city: p.exhibitor_city ?? null,
-    exhibitor_state: p.exhibitor_state ?? null,
-    exhibitor_zip: p.exhibitor_zip ?? null,
-    exhibitor_country: p.exhibitor_country ?? null,
-  };
-
   const bill = clearedRepEnteredBilling();
 
   const { data: assignedRepLookup } = await supabase
@@ -122,12 +113,6 @@ export async function POST(req: Request) {
       event_id: p.event_id,
       exhibitor_legal_name: p.exhibitor_legal_name,
       exhibitor_company_name: p.exhibitor_company_name,
-      exhibitor_address_line1: addrSlice.exhibitor_address_line1,
-      exhibitor_address_line2: addrSlice.exhibitor_address_line2,
-      exhibitor_city: addrSlice.exhibitor_city,
-      exhibitor_state: addrSlice.exhibitor_state,
-      exhibitor_zip: addrSlice.exhibitor_zip,
-      exhibitor_country: addrSlice.exhibitor_country,
       exhibitor_telephone: p.exhibitor_telephone ?? null,
       brands_poured: p.brands_poured ?? null,
       booth_count: p.booth_count,
