@@ -235,7 +235,7 @@ export async function appendContractRow(contract: ContractWithTotals): Promise<v
     const at = new Date();
     const row = await buildRowValues(contract, at);
 
-    await sheets.spreadsheets.values.append({
+    const appendRes = await sheets.spreadsheets.values.append({
       spreadsheetId: cfg.spreadsheetId,
       range: tabRange(cfg.tab, 'A4:N'),
       valueInputOption: 'USER_ENTERED',
@@ -246,6 +246,9 @@ export async function appendContractRow(contract: ContractWithTotals): Promise<v
     console.log('[sheets-tracker] appendContractRow Google Sheets append succeeded', {
       contractId: contract.id,
       tab: cfg.tab,
+      httpStatus: appendRes.status,
+      updatedRange: appendRes.data.updates?.updatedRange,
+      updatedRows: appendRes.data.updates?.updatedRows,
     });
   } catch (err) {
     logSheetsApiError('appendContractRow failed', err, { contractId: contract.id, tab: cfg.tab });
