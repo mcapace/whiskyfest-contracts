@@ -1,5 +1,8 @@
 import { google } from 'googleapis';
-import { insertContractLineItemsIntoOrderTable } from '@/lib/google-contract-order-table';
+import {
+  applyContractOrderTableDataRowFormatting,
+  insertContractLineItemsIntoOrderTable,
+} from '@/lib/google-contract-order-table';
 import type { ContractLineItem } from '@/types/db';
 
 /**
@@ -97,6 +100,8 @@ export async function renderContractPdfFromTemplate(
     if (lineItems?.length) {
       await insertContractLineItemsIntoOrderTable(docs, tempDocId, lineItems);
     }
+
+    await applyContractOrderTableDataRowFormatting(docs, tempDocId, lineItems?.length ?? 0);
 
     // supportsAllDrives is required for Shared Drive files (REST); googleapis Params type omits it.
     const pdfResp = await drive.files.export(

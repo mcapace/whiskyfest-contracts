@@ -45,6 +45,29 @@ function rowCellInsertIndices(row: docs_v1.Schema$TableRow | null | undefined): 
   return row.tableCells.map((c) => cellInsertIndex(c));
 }
 
+/** Structural paragraph spans inside a table cell (for range-based style updates). */
+function cellParagraphSpans(cell: docs_v1.Schema$TableCell | null | undefined): Array<{ start: number; end: number }> {
+  if (!cell?.content) return [];
+  const out: Array<{ start: number; end: number }> = [];
+  for (const el of cell.content) {
+    if (el.paragraph != null && el.startIndex != null && el.endIndex != null) {
+      out.push({ start: el.startIndex, end: el.endIndex });
+    }
+  }
+  return out;
+}
+
+/** Resolved horizontal alignment for the Qty column, copied from the booth row when set. */
+function qtyColumnAlignmentFromBoothRow(boothRow: docs_v1.Schema$TableRow | null | undefined): string {
+  const cell = boothRow?.tableCells?.[1];
+  if (!cell?.content) return 'START';
+  for (const el of cell.content) {
+    const a = el.paragraph?.paragraphStyle?.alignment;
+    if (a && a !== 'ALIGNMENT_UNSPECIFIED') return a;
+  }
+  return 'START';
+}
+
 export type ContractOrderTableLocation = {
   tableStartIndex: number;
   grandTotalRowIndex: number;
@@ -165,6 +188,85 @@ export async function insertContractLineItemsIntoOrderTable(
     await docs.documents.batchUpdate({
       documentId,
       requestBody: { requests: textRequests },
+    });
+  }
+}
+
+/**
+ * Normalizes CONTRACT ORDER data rows (booth package + optional line items): left / qty / right
+ * alignment and non-bold text. Does not modify the GRAND TOTAL row.
+ *
+ * @param lineItemCount — number of custom line item rows inserted above GRAND TOTAL (0 if none).
+ */
+export async function applyContractOrderTableDataRowFormatting(
+  docs: DocsClient,
+  documentId: string,
+  lineItemCount: number,
+): Promise<void> {
+  const { data: doc } = await docs.documents.get({ documentId });
+  const loc = locateContractOrderTable(doc);
+  if (!loc) return;
+
+  const { tableStartIndex, grandTotalRowIndex: gtRow } = loc;
+  const boothRowIndex = gtRow - lineItemCount - 1;
+  if (boothRowIndex < 0 || boothRowIndex >= gtRow) return;
+
+  const table = tableAtStartIndex(doc, tableStartIndex);
+  const rows = table?.tableRows;
+  if (!rows?.length) return;
+
+  const boothRow = rows[boothRowIndex];
+  const qtyAlign = qtyColumnAlignmentFromBoothRow(boothRow);
+
+  const styleRequests: docs_v1.Schema$Request[] = [];
+
+  for (let ri = boothRowIndex; ri <= gtRow - 1; ri++) {
+    const row = rows[ri];
+    const cells = row?.tableCells ?? [];
+    if (cells.length === 0) continue;
+
+    const lastCol = cells.length - 1;
+    const alignByCol: string[] = cells.map((_, ci) => {
+      if (ci === 0) return 'START';
+      if (ci === lastCol) return 'END';
+      return qtyAlign;
+    });
+
+    for (let ci = 0; ci < cells.length; ci++) {
+      const alignment = alignByCol[ci] ?? 'START';
+      const cell = cells[ci];
+      for (const { start, end } of cellParagraphSpans(cell)) {
+        if (end <= start) continue;
+        styleRequests.push({
+          updateParagraphStyle: {
+            range: { startIndex: start, endIndex: end },
+            fields: 'alignment',
+            paragraphStyle: { alignment },
+          },
+        });
+        styleRequests.push({
+          updateTextStyle: {
+            range: { startIndex: start, endIndex: end },
+            fields: 'bold',
+            textStyle: { bold: false },
+          },
+        });
+      }
+    }
+  }
+
+  styleRequests.sort((a, b) => {
+    const ra = a.updateParagraphStyle?.range ?? a.updateTextStyle?.range;
+    const rb = b.updateParagraphStyle?.range ?? b.updateTextStyle?.range;
+    const sa = ra?.startIndex ?? 0;
+    const sb = rb?.startIndex ?? 0;
+    return sb - sa;
+  });
+
+  if (styleRequests.length > 0) {
+    await docs.documents.batchUpdate({
+      documentId,
+      requestBody: { requests: styleRequests },
     });
   }
 }
