@@ -279,26 +279,33 @@ export default async function ContractDetailPage({ params }: { params: { id: str
               />
             )}
           </div>
-          <CardContent className="space-y-3 p-6 text-sm">
-            <Detail label="Legal Name"   value={contract.exhibitor_legal_name} />
+          <CardContent className="space-y-4 p-6 text-sm">
+            <div className="rounded-md border border-border/60 bg-muted/25 p-4">
+              <p className="wf-label-caps mb-3 text-[0.65rem] text-muted-foreground">Exhibitor signer</p>
+              <div className="space-y-2.5">
+                <Detail label="Name" value={contract.signer_1_name?.trim() || null} />
+                <Detail label="Title" value={contract.signer_1_title?.trim() || null} />
+                <Detail
+                  label="Signer email"
+                  value={
+                    contract.signer_1_email?.trim() ? (
+                      <a
+                        href={`mailto:${contract.signer_1_email.trim()}`}
+                        className="font-medium text-foreground underline decoration-primary underline-offset-2 transition-colors hover:text-primary"
+                      >
+                        {contract.signer_1_email.trim()}
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )
+                  }
+                />
+              </div>
+            </div>
+            <Detail label="Legal Name" value={contract.exhibitor_legal_name} />
             <Detail label="Display Name" value={contract.exhibitor_company_name} />
-            <Detail label="Brands"       value={contract.brands_poured} />
-            <Detail label="Sales Rep"    value={contract.sales_rep_name ?? contract.sales_rep_email ?? '—'} />
-            <Detail label="Signer" value={contract.signer_1_name?.trim() || null} />
-            <Detail
-              label="Email"
-              value={
-                contract.signer_1_email?.trim() ? (
-                  <a
-                    href={`mailto:${contract.signer_1_email.trim()}`}
-                    className="text-foreground underline decoration-primary/40 underline-offset-2 transition-colors hover:text-primary hover:decoration-primary"
-                  >
-                    {contract.signer_1_email.trim()}
-                  </a>
-                ) : null
-              }
-            />
-            <Detail label="Title" value={contract.signer_1_title?.trim() || null} />
+            <Detail label="Brands" value={contract.brands_poured} />
+            <Detail label="Sales Rep" value={contract.sales_rep_name ?? contract.sales_rep_email ?? '—'} />
             {(contract.status === 'signed' || contract.status === 'executed') &&
               contract.countersigned_at &&
               (contract.countersigned_by_name || contract.countersigned_by_email) && (
