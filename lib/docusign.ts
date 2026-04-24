@@ -73,6 +73,69 @@ export async function getAccessToken(): Promise<string> {
   return data.access_token;
 }
 
+interface OAuthUserInfoAccount {
+  account_id?: string;
+  account_name?: string;
+  is_default?: boolean;
+  base_uri?: string;
+}
+
+function normalizeRestApiBase(baseUri: string): string {
+  return `${baseUri.replace(/\/$/, '')}/restapi`;
+}
+
+async function resolveApiContext(accessToken: string): Promise<{ accountId: string; restApiBase: string }> {
+  const envAccountId = process.env['DOCUSIGN_ACCOUNT_ID']?.trim();
+  const envBase = process.env['DOCUSIGN_BASE_URL']?.trim();
+  const authUrl = process.env['DOCUSIGN_AUTH_URL'] ?? 'https://account-d.docusign.com';
+  const oAuthBasePath = authHostFromUrl(authUrl);
+
+  const userInfoRes = await fetch(`https://${oAuthBasePath}/oauth/userinfo`, {
+    headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+  });
+
+  if (!userInfoRes.ok) {
+    const t = await userInfoRes.text();
+    if (envAccountId && envBase) {
+      console.warn(`[DocuSign] userinfo lookup failed (${userInfoRes.status}); using env account/base fallback`);
+      return { accountId: envAccountId, restApiBase: envBase.replace(/\/$/, '') };
+    }
+    throw new Error(`DocuSign userinfo ${userInfoRes.status}: ${t}`);
+  }
+
+  const payload = (await userInfoRes.json()) as { accounts?: OAuthUserInfoAccount[] };
+  const accounts = payload.accounts ?? [];
+  if (accounts.length === 0) {
+    if (envAccountId && envBase) {
+      console.warn('[DocuSign] userinfo returned no accounts; using env account/base fallback');
+      return { accountId: envAccountId, restApiBase: envBase.replace(/\/$/, '') };
+    }
+    throw new Error('DocuSign userinfo returned no accounts');
+  }
+
+  const chosen =
+    (envAccountId
+      ? accounts.find((a) => (a.account_id ?? '').trim() === envAccountId)
+      : undefined) ??
+    accounts.find((a) => a.is_default) ??
+    accounts[0];
+
+  if (!chosen?.account_id) {
+    throw new Error('DocuSign userinfo did not provide account_id');
+  }
+
+  if (envAccountId && chosen.account_id !== envAccountId) {
+    const available = accounts.map((a) => a.account_id).filter(Boolean).join(', ');
+    throw new Error(`DOCUSIGN_ACCOUNT_ID not found in token userinfo. Configured=${envAccountId}; available=${available}`);
+  }
+
+  const accountId = envAccountId ?? chosen.account_id;
+  const restApiBase = envBase?.replace(/\/$/, '') ?? normalizeRestApiBase(chosen.base_uri ?? '');
+  if (!restApiBase) throw new Error('DocuSign userinfo did not provide base_uri and DOCUSIGN_BASE_URL is not set');
+
+  return { accountId, restApiBase };
+}
+
 function anchorOnly(anchor: string) {
   return {
     anchorString: anchor,
@@ -93,8 +156,8 @@ export interface SendEnvelopeParams {
 }
 
 export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelopeId: string }> {
-  const accountId = getDocuSignAccountId();
   const accessToken = await getAccessToken();
+  const { accountId, restApiBase } = await resolveApiContext(accessToken);
 
   const signHere1 = anchorOnly(DOCUSIGN_ANCHORS.sig1);
   const date1 = anchorOnly(DOCUSIGN_ANCHORS.date1);
@@ -140,7 +203,7 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
     },
   };
 
-  const url = `${restBase()}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes`;
+  const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes`;
   const res = await fetch(url, {
     method: 'POST',
     headers: {
@@ -171,9 +234,9 @@ export interface DocuSignSignerRow {
 
 /** Load envelope recipients (signers) for webhook / audit (actual countersigner identity after signing group completes). */
 export async function fetchEnvelopeSigners(envelopeId: string): Promise<DocuSignSignerRow[]> {
-  const accountId = getDocuSignAccountId();
   const accessToken = await getAccessToken();
-  const url = `${restBase()}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}/recipients`;
+  const { accountId, restApiBase } = await resolveApiContext(accessToken);
+  const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}/recipients`;
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -220,9 +283,9 @@ export function extractCountersignerFromSigners(signers: DocuSignSignerRow[]): {
 
 /** Void an in-flight envelope so recipients can no longer sign; use before correcting email and re-sending from the app. */
 export async function voidEnvelope(envelopeId: string, voidedReason: string): Promise<void> {
-  const accountId = getDocuSignAccountId();
   const accessToken = await getAccessToken();
-  const url = `${restBase()}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}`;
+  const { accountId, restApiBase } = await resolveApiContext(accessToken);
+  const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}`;
   const res = await fetch(url, {
     method: 'PUT',
     headers: {
@@ -246,9 +309,9 @@ export async function voidEnvelope(envelopeId: string, voidedReason: string): Pr
  * Same recipient emails as the live envelope — use Recall if you need to change the address.
  */
 export async function resendEnvelopeNotifications(envelopeId: string): Promise<void> {
-  const accountId = getDocuSignAccountId();
   const accessToken = await getAccessToken();
-  const base = `${restBase()}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}/recipients`;
+  const { accountId, restApiBase } = await resolveApiContext(accessToken);
+  const base = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}/recipients`;
   const getRes = await fetch(base, {
     headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
   });
@@ -274,11 +337,11 @@ export async function resendEnvelopeNotifications(envelopeId: string): Promise<v
 }
 
 export async function downloadCompletedPdf(envelopeId: string): Promise<Buffer> {
-  const accountId = getDocuSignAccountId();
   const accessToken = await getAccessToken();
+  const { accountId, restApiBase } = await resolveApiContext(accessToken);
 
   const q = new URLSearchParams({ certificate: 'true' });
-  const url = `${restBase()}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}/documents/combined?${q}`;
+  const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}/documents/combined?${q}`;
 
   const res = await fetch(url, {
     headers: {
