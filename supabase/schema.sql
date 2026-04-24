@@ -229,6 +229,22 @@ create table if not exists app_users (
 
 alter table app_users add column if not exists is_events_team boolean not null default false;
 
+create table if not exists access_requests (
+  id uuid primary key default gen_random_uuid(),
+  email text not null unique,
+  name text,
+  requested_at timestamptz not null default now(),
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  reviewed_by text,
+  reviewed_at timestamptz,
+  review_notes text,
+  approval_token text not null,
+  token_expires_at timestamptz not null,
+  granted_role text check (granted_role is null or granted_role in ('admin', 'sales', 'viewer', 'sales_rep')),
+  granted_flags jsonb
+);
+create unique index if not exists access_requests_approval_token_key on access_requests(approval_token);
+
 -- Seed admin accounts (idempotent)
 insert into app_users (email, name, role) values
   ('mcapace@mshanken.com',   'Michael Capace', 'admin'),
@@ -322,6 +338,7 @@ alter table events    enable row level security;
 alter table sales_reps enable row level security;
 alter table audit_log enable row level security;
 alter table app_users enable row level security;
+alter table access_requests enable row level security;
 alter table rep_assistants enable row level security;
 
 -- Service role bypasses RLS; these permissive policies are for anon safety.

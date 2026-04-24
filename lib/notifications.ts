@@ -28,10 +28,15 @@ export async function getAssistantEmailsForRep(repId: string): Promise<string[]>
 }
 
 function appContractUrl(contractId: string): string {
+  const base = appBaseUrl();
+  return `${base}/contracts/${contractId}`;
+}
+
+function appBaseUrl(): string {
   const explicit = process.env['NEXTAUTH_URL']?.replace(/\/$/, '');
-  if (explicit) return `${explicit}/contracts/${contractId}`;
-  if (process.env['VERCEL_URL']) return `https://${process.env['VERCEL_URL']}/contracts/${contractId}`;
-  return `http://localhost:3000/contracts/${contractId}`;
+  if (explicit) return explicit;
+  if (process.env['VERCEL_URL']) return `https://${process.env['VERCEL_URL']}`;
+  return 'http://localhost:3000';
 }
 
 /**
@@ -743,6 +748,91 @@ export async function notifySalesRepInvoicePaid(params: {
     subject,
     text,
     html,
+  });
+}
+
+export async function notifyAdminsOfAccessRequest(params: {
+  id: string;
+  email: string;
+  name: string | null;
+  requestedAtIso: string;
+  approvalToken: string;
+}): Promise<void> {
+  const apiKey = process.env['SENDGRID_API_KEY'];
+  if (!apiKey) {
+    console.warn('[notifyAdminsOfAccessRequest] SENDGRID_API_KEY not set — skipping email');
+    return;
+  }
+  sgMail.setApiKey(apiKey);
+  const requestedAt = new Date(params.requestedAtIso).toLocaleString('en-US');
+  const subject = `Access request: ${params.name?.trim() || 'Unknown'} (${params.email})`;
+  const base = appBaseUrl();
+  const approveUrl = `${base}/admin/access-requests/${params.id}?token=${params.approvalToken}&action=approve`;
+  const denyUrl = `${base}/admin/access-requests/${params.id}?token=${params.approvalToken}&action=deny`;
+
+  const text = [
+    'Someone is requesting access to WhiskyFest Contracts.',
+    '',
+    `Name: ${params.name ?? 'Unknown'}`,
+    `Email: ${params.email}`,
+    `Requested at: ${requestedAt}`,
+    '',
+    `Approve: ${approveUrl}`,
+    `Deny: ${denyUrl}`,
+    '',
+    'Tokens expire in 24 hours and can only be used once.',
+  ].join('\n');
+
+  const html = `
+    <div style="font-family: system-ui, sans-serif; max-width: 640px;">
+      <p>Someone is requesting access to WhiskyFest Contracts.</p>
+      <p>
+        <strong>Name:</strong> ${escapeHtml(params.name ?? 'Unknown')}<br/>
+        <strong>Email:</strong> ${escapeHtml(params.email)}<br/>
+        <strong>Requested at:</strong> ${escapeHtml(requestedAt)}
+      </p>
+      <p>
+        <a href="${approveUrl}" style="display:inline-block;margin-right:8px;padding:8px 12px;background:#0f766e;color:#fff;text-decoration:none;border-radius:6px;">Approve</a>
+        <a href="${denyUrl}" style="display:inline-block;padding:8px 12px;background:#991b1b;color:#fff;text-decoration:none;border-radius:6px;">Deny</a>
+      </p>
+      <p>Tokens expire in 24 hours and can only be used once.</p>
+    </div>
+  `;
+
+  await sgMail.send({
+    from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
+    to: ['mcapace@mshanken.com', 'jarcella@mshanken.com'],
+    subject,
+    text,
+    html,
+  });
+}
+
+export async function notifyAccessRequestApproved(email: string): Promise<void> {
+  const apiKey = process.env['SENDGRID_API_KEY'];
+  if (!apiKey) return;
+  sgMail.setApiKey(apiKey);
+  const base = appBaseUrl();
+  await sgMail.send({
+    from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
+    to: email,
+    subject: "You're approved — welcome to WhiskyFest Contracts",
+    text: `Great news — your access to WhiskyFest Contracts has been approved. Sign in at ${base} with your @mshanken.com Google account.`,
+    html: `<p>Great news — your access to WhiskyFest Contracts has been approved.</p><p>Sign in at <a href="${base}">${base}</a> with your @mshanken.com Google account.</p>`,
+  });
+}
+
+export async function notifyAccessRequestRejected(email: string, reason?: string | null): Promise<void> {
+  const apiKey = process.env['SENDGRID_API_KEY'];
+  if (!apiKey) return;
+  sgMail.setApiKey(apiKey);
+  const reasonBlock = reason?.trim() ? `<p><strong>Reason:</strong> ${escapeHtml(reason.trim())}</p>` : '';
+  await sgMail.send({
+    from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
+    to: email,
+    subject: 'Access request declined',
+    text: `Your access request to WhiskyFest Contracts was not approved.${reason?.trim() ? `\nReason: ${reason.trim()}` : ''}\nIf you believe this was in error, contact Mike Capace at mcapace@mshanken.com.`,
+    html: `<p>Your access request to WhiskyFest Contracts was not approved.</p>${reasonBlock}<p>If you believe this was in error, contact Mike Capace at <a href="mailto:mcapace@mshanken.com">mcapace@mshanken.com</a>.</p>`,
   });
 }
 

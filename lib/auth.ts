@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { getAccessibleSalesRepIds } from '@/lib/rep-access';
 import { loadImpersonationTargetDisplay } from '@/lib/effective-user';
 import { logImpersonationEnded, logImpersonationStarted } from '@/lib/impersonation-audit';
+import { ensureAccessRequestForUnknownUser } from '@/lib/access-requests';
 import type { UserRole } from '@/types/db';
 
 const IMPERSONATION_TTL_MS = 30 * 60 * 1000;
@@ -72,16 +73,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         .maybeSingle();
 
       if (!appUser) {
-        await supabase.from('app_users').upsert({
-          email,
-          name: user.name,
-          role: 'sales',
-          is_active: true,
-        });
-        return true;
+        await ensureAccessRequestForUnknownUser({ email, name: user.name });
+        return `/access-pending?email=${encodeURIComponent(email)}`;
       }
 
-      if (!appUser.is_active) return false;
+      if (!appUser.is_active) return '/auth/login?error=account_deactivated';
 
       return true;
     },

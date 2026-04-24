@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
-import { FileText, LayoutDashboard, Plus, CalendarDays, Users, UserRound, Landmark, ChevronDown } from 'lucide-react';
+import { FileText, LayoutDashboard, Plus, CalendarDays, Users, UserRound, Landmark, ChevronDown, UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -99,6 +99,7 @@ export function Sidebar({
   user,
   canImpersonate = false,
   readOnlyImpersonation = false,
+  pendingAccessRequests = 0,
 }: {
   user: {
     email?: string | null;
@@ -110,6 +111,7 @@ export function Sidebar({
   };
   canImpersonate?: boolean;
   readOnlyImpersonation?: boolean;
+  pendingAccessRequests?: number;
 }) {
   const pathname = usePathname();
   const isAdmin = user.role === 'admin';
@@ -186,6 +188,30 @@ export function Sidebar({
               <div className="pt-6">
                 <p className="mb-2 px-[10px] wf-label-caps text-[10px]">Accounting</p>
                 <AccountingNavLink pathname={pathname} />
+              </div>
+            ) : null}
+            {isAdmin ? (
+              <div className="pt-6">
+                <p className="mb-2 px-[10px] wf-label-caps text-[10px]">Admin</p>
+                <Link
+                  href="/admin/access-requests"
+                  className={cn(
+                    'group flex items-center justify-between rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
+                    pathname.startsWith('/admin/access-requests')
+                      ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
+                      : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
+                  )}
+                >
+                  <span className="inline-flex items-center gap-3">
+                    <UserPlus className="h-4 w-4 text-muted-foreground/70" />
+                    Access Requests
+                  </span>
+                  {pendingAccessRequests > 0 ? (
+                    <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+                      {pendingAccessRequests}
+                    </span>
+                  ) : null}
+                </Link>
               </div>
             ) : null}
           </>

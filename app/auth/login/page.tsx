@@ -3,9 +3,17 @@ import { redirect } from 'next/navigation';
 import { auth, signIn } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
   const session = await auth();
   if (session?.user) redirect('/');
+  const err =
+    typeof searchParams?.error === 'string' && searchParams.error === 'account_deactivated'
+      ? 'Account deactivated. Contact Michael Capace for access.'
+      : null;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-brass-50/90 via-fest-600/[0.04] to-background px-6 dark:from-background dark:via-background dark:to-background">
@@ -35,6 +43,7 @@ export default async function LoginPage() {
 
         {/* Card */}
         <div className="rounded-lg border border-border/60 border-t-4 border-t-fest-600 bg-card p-8 shadow-md shadow-fest-900/10">
+          {err ? <p className="mb-4 text-sm text-destructive">{err}</p> : null}
           <form action={async () => {
             'use server';
             await signIn('google', { redirectTo: '/' });

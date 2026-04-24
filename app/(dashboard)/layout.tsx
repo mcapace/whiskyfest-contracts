@@ -8,6 +8,7 @@ import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav';
 import { AuthSessionProvider } from '@/components/session/auth-session-provider';
 import { ImpersonationBanner } from '@/components/impersonation/impersonation-banner';
 import { TutorialProvider } from '@/components/tutorial/tutorial-provider';
+import { getSupabaseAdmin } from '@/lib/supabase';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -19,6 +20,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const isAccounting = Boolean(session.user.is_accounting);
   const accountingOnly = isAccounting && !pipelineAccess;
   const showAccountingNav = isAccounting || session.user.role === 'admin';
+  let pendingAccessRequests = 0;
+  if (session.user.role === 'admin') {
+    const supabase = getSupabaseAdmin();
+    const { count, error } = await supabase
+      .from('access_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending');
+    pendingAccessRequests = error ? 0 : count ?? 0;
+  }
 
   return (
     <AuthSessionProvider>
@@ -37,6 +47,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             }}
             canImpersonate={Boolean(session.user.can_impersonate)}
             readOnlyImpersonation={readOnly}
+            pendingAccessRequests={pendingAccessRequests}
           />
           <div className={`flex min-h-screen flex-col lg:pl-64 ${mainPad}`}>
             <Topbar endSlot={<DashboardTopBarActions />} />

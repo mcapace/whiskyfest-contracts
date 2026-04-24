@@ -142,6 +142,27 @@ export interface AppUser {
   created_at: string;
 }
 
+export type AccessRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export interface AccessRequest {
+  id: string;
+  email: string;
+  name: string | null;
+  requested_at: string;
+  status: AccessRequestStatus;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_notes: string | null;
+  approval_token: string;
+  token_expires_at: string;
+  granted_role: UserRole | null;
+  granted_flags: {
+    is_events_team?: boolean;
+    is_accounting?: boolean;
+    can_impersonate?: boolean;
+  } | null;
+}
+
 export interface SalesRep {
   id: string;
   name: string;
