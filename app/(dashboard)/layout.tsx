@@ -16,7 +16,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!session?.user) redirect('/auth/login');
 
   const readOnly = Boolean(session.is_read_only_impersonation);
-  const mainPad = readOnly ? 'pt-14' : '';
+  /* Clear fixed impersonation banner (taller amber strip + two-line copy on small screens). */
+  const mainPad = readOnly ? 'pt-24 sm:pt-20' : '';
   const pipelineAccess = Boolean(session.user.pipeline_access);
   const isAccounting = Boolean(session.user.is_accounting);
   const accountingOnly = isAccounting && !pipelineAccess;

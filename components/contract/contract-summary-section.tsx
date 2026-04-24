@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { cn, formatCurrency, formatLongDate, formatTimestamp } from '@/lib/utils';
 import { formatStatus } from '@/lib/status-display';
 import type { ContractWithTotals, Event } from '@/types/db';
@@ -36,7 +37,23 @@ export function ContractSummarySection({
         <SummaryField label="Booth rate" value={formatCurrency(contract.booth_rate_cents)} mono />
         <SummaryField label="Booth count" value={String(contract.booth_count)} />
         <SummaryField label="Sales rep" value={contract.sales_rep_name ?? contract.sales_rep_email ?? '—'} />
-        <SummaryField label="Signer" value={[contract.signer_1_name, contract.signer_1_title].filter(Boolean).join(', ') || '—'} />
+        <SummaryField label="Signer" value={contract.signer_1_name?.trim() || '—'} />
+        <SummaryField
+          label="Email"
+          value={
+            contract.signer_1_email?.trim() ? (
+              <a
+                href={`mailto:${contract.signer_1_email.trim()}`}
+                className="underline decoration-primary/40 underline-offset-2 transition-colors hover:text-primary hover:decoration-primary"
+              >
+                {contract.signer_1_email.trim()}
+              </a>
+            ) : (
+              '—'
+            )
+          }
+        />
+        <SummaryField label="Title" value={contract.signer_1_title?.trim() || '—'} />
         <SummaryField label="Last updated" value={formatTimestamp(contract.updated_at)} mono />
       </div>
     </section>
@@ -50,14 +67,14 @@ function SummaryField({
   emphasis,
 }: {
   label: string;
-  value: string;
+  value: ReactNode;
   mono?: boolean;
   emphasis?: boolean;
 }) {
   return (
     <div>
       <p className="wf-label-caps text-[0.6rem]">{label}</p>
-      <p
+      <div
         className={cn(
           'mt-1.5 text-foreground',
           emphasis && 'font-mono text-xl font-semibold tabular-nums tracking-tight md:text-2xl',
@@ -66,7 +83,7 @@ function SummaryField({
         )}
       >
         {value}
-      </p>
+      </div>
     </div>
   );
 }

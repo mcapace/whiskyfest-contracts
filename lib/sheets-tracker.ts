@@ -24,8 +24,33 @@ export function getSheetsClient() {
 function getTrackerConfig(): { spreadsheetId: string; tab: string } | null {
   const spreadsheetId = process.env['SHEETS_TRACKER_ID']?.trim();
   if (!spreadsheetId) return null;
+  /** Must match the tab name in the spreadsheet exactly (case-sensitive); default only if your sheet still uses "Sheet1". */
   const tab = process.env['SHEETS_TRACKER_TAB']?.trim() || 'Sheet1';
   return { spreadsheetId, tab };
+}
+
+/** Log Google Sheets client errors (Gaxios includes `response.data` with API message, e.g. invalid tab/range). */
+function logSheetsApiError(context: string, err: unknown, extra?: Record<string, unknown>) {
+  const g = err as {
+    message?: string;
+    response?: { status?: number; statusText?: string; data?: unknown };
+  };
+  let responseBody: string | undefined;
+  try {
+    const d = g.response?.data;
+    if (d === undefined) responseBody = undefined;
+    else if (typeof d === 'string') responseBody = d;
+    else responseBody = JSON.stringify(d);
+  } catch {
+    responseBody = String(g.response?.data);
+  }
+  console.error('[sheets-tracker]', context, {
+    ...extra,
+    message: g?.message,
+    httpStatus: g?.response?.status,
+    httpStatusText: g?.response?.statusText,
+    responseBody,
+  });
 }
 
 /** Escape sheet tab name for A1 notation when needed. */
@@ -142,26 +167,35 @@ export async function findRowByContractId(contractId: string): Promise<number | 
   const cfg = getTrackerConfig();
   if (!cfg) return null;
 
-  const sheets = getSheetsClient();
-  const range = tabRange(cfg.tab, 'N4:N');
+  try {
+    const sheets = getSheetsClient();
+    const range = tabRange(cfg.tab, 'N4:N');
 
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: cfg.spreadsheetId,
-    range,
-    valueRenderOption: 'UNFORMATTED_VALUE',
-  });
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: cfg.spreadsheetId,
+      range,
+      valueRenderOption: 'UNFORMATTED_VALUE',
+    });
 
-  const rows = res.data.values;
-  if (!rows?.length) return null;
+    const rows = res.data.values;
+    if (!rows?.length) return null;
 
-  const target = contractId.trim();
-  for (let i = 0; i < rows.length; i++) {
-    const cell = rows[i]?.[0];
-    const val = cell != null ? String(cell).trim() : '';
-    if (val === target) return i + 4;
+    const target = contractId.trim();
+    for (let i = 0; i < rows.length; i++) {
+      const cell = rows[i]?.[0];
+      const val = cell != null ? String(cell).trim() : '';
+      if (val === target) return i + 4;
+    }
+
+    return null;
+  } catch (err) {
+    logSheetsApiError('findRowByContractId', err, {
+      contractId,
+      tab: cfg.tab,
+      spreadsheetId: cfg.spreadsheetId,
+    });
+    throw err;
   }
-
-  return null;
 }
 
 /**
@@ -169,42 +203,38 @@ export async function findRowByContractId(contractId: string): Promise<number | 
  * already appears in column N, updates that row instead.
  */
 export async function appendContractRow(contract: ContractWithTotals): Promise<void> {
-  const cfg = getTrackerConfig();
-  if (!cfg) return;
+  console.log('[sheets-tracker] appendContractRow called', { contractId: contract.id });
 
-  const existing = await findRowByContractId(contract.id);
-  if (existing != null) {
-    await updateContractRow(contract);
+  const cfg = getTrackerConfig();
+  if (!cfg) {
+    console.warn('[sheets-tracker] appendContractRow skipped: SHEETS_TRACKER_ID not set', {
+      contractId: contract.id,
+    });
     return;
   }
 
-  const sheets = getSheetsClient();
-  const at = new Date();
-  const row = await buildRowValues(contract, at);
-
-  await sheets.spreadsheets.values.append({
+  console.log('[sheets-tracker] appendContractRow config', {
+    contractId: contract.id,
     spreadsheetId: cfg.spreadsheetId,
+    tab: cfg.tab,
     range: tabRange(cfg.tab, 'A4:N'),
-    valueInputOption: 'USER_ENTERED',
-    insertDataOption: 'INSERT_ROWS',
-    requestBody: { values: [row] },
   });
-}
 
-export async function updateContractRow(
-  contract: ContractWithTotals,
-  options?: { trackerStatus?: 'voided' | 'declined' },
-): Promise<void> {
-  const cfg = getTrackerConfig();
-  if (!cfg) return;
+  try {
+    const existing = await findRowByContractId(contract.id);
+    if (existing != null) {
+      console.log('[sheets-tracker] appendContractRow row already exists; updating instead', {
+        contractId: contract.id,
+        rowNum: existing,
+      });
+      await updateContractRow(contract);
+      return;
+    }
 
-  const rowNum = await findRowByContractId(contract.id);
-  const at = new Date();
-
-  if (rowNum == null) {
-    console.warn('[sheets-tracker] Contract not in sheet yet, appending instead', { contractId: contract.id });
-    const row = await buildRowValues(contract, at, options?.trackerStatus);
     const sheets = getSheetsClient();
+    const at = new Date();
+    const row = await buildRowValues(contract, at);
+
     await sheets.spreadsheets.values.append({
       spreadsheetId: cfg.spreadsheetId,
       range: tabRange(cfg.tab, 'A4:N'),
@@ -212,16 +242,69 @@ export async function updateContractRow(
       insertDataOption: 'INSERT_ROWS',
       requestBody: { values: [row] },
     });
+
+    console.log('[sheets-tracker] appendContractRow Google Sheets append succeeded', {
+      contractId: contract.id,
+      tab: cfg.tab,
+    });
+  } catch (err) {
+    logSheetsApiError('appendContractRow failed', err, { contractId: contract.id, tab: cfg.tab });
+    throw err;
+  }
+}
+
+export async function updateContractRow(
+  contract: ContractWithTotals,
+  options?: { trackerStatus?: 'voided' | 'declined' },
+): Promise<void> {
+  console.log('[sheets-tracker] updateContractRow called', {
+    contractId: contract.id,
+    trackerStatus: options?.trackerStatus,
+  });
+
+  const cfg = getTrackerConfig();
+  if (!cfg) {
+    console.warn('[sheets-tracker] updateContractRow skipped: SHEETS_TRACKER_ID not set', {
+      contractId: contract.id,
+    });
     return;
   }
 
-  const sheets = getSheetsClient();
-  const row = await buildRowValues(contract, at, options?.trackerStatus);
+  try {
+    const rowNum = await findRowByContractId(contract.id);
+    const at = new Date();
 
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: cfg.spreadsheetId,
-    range: tabRange(cfg.tab, `A${rowNum}:N${rowNum}`),
-    valueInputOption: 'USER_ENTERED',
-    requestBody: { values: [row] },
-  });
+    if (rowNum == null) {
+      console.warn('[sheets-tracker] Contract not in sheet yet, appending instead', { contractId: contract.id });
+      const row = await buildRowValues(contract, at, options?.trackerStatus);
+      const sheets = getSheetsClient();
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: cfg.spreadsheetId,
+        range: tabRange(cfg.tab, 'A4:N'),
+        valueInputOption: 'USER_ENTERED',
+        insertDataOption: 'INSERT_ROWS',
+        requestBody: { values: [row] },
+      });
+      console.log('[sheets-tracker] updateContractRow append fallback succeeded', { contractId: contract.id });
+      return;
+    }
+
+    const sheets = getSheetsClient();
+    const row = await buildRowValues(contract, at, options?.trackerStatus);
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: cfg.spreadsheetId,
+      range: tabRange(cfg.tab, `A${rowNum}:N${rowNum}`),
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [row] },
+    });
+
+    console.log('[sheets-tracker] updateContractRow Google Sheets update succeeded', {
+      contractId: contract.id,
+      rowNum,
+    });
+  } catch (err) {
+    logSheetsApiError('updateContractRow failed', err, { contractId: contract.id, tab: cfg.tab });
+    throw err;
+  }
 }

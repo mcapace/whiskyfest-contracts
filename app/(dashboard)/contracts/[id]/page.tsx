@@ -301,7 +301,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
               value={
                 contract.signer_1_email?.trim() ? (
                   <a
-                    href={`mailto:${encodeURIComponent(contract.signer_1_email.trim())}`}
+                    href={`mailto:${contract.signer_1_email.trim()}`}
                     className="text-foreground underline decoration-primary/40 underline-offset-2 transition-colors hover:text-primary hover:decoration-primary"
                   >
                     {contract.signer_1_email.trim()}
