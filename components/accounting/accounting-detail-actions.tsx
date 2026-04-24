@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState, useTransition } from 'react';
 import { useImpersonationReadOnly } from '@/hooks/use-impersonation-read-only';
 import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
-import { FloatingActionBar } from '@/components/contract/floating-action-bar';
+import { BottomActionBar } from '@/components/contract/bottom-action-bar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/input';
 import type { InvoiceStatus } from '@/types/db';
@@ -67,6 +67,7 @@ export function AccountingDetailActions({
     () => invoiceStatus === 'pending' || invoiceStatus === 'invoice_sent',
     [invoiceStatus],
   );
+  const actionCount = invoiceStatus === 'pending' || invoiceStatus === 'invoice_sent' ? 1 : 0;
   const fabBtn =
     'h-10 shrink-0 gap-2 rounded-full px-4 text-sm font-medium motion-safe:transition-transform motion-safe:duration-150 hover:brightness-[1.04] active:scale-[0.98]';
 
@@ -74,7 +75,7 @@ export function AccountingDetailActions({
     <div className="space-y-6">
       {err && <p className="text-sm text-destructive">{err}</p>}
 
-      <FloatingActionBar visible={fabVisible}>
+      <BottomActionBar visible={fabVisible} actionsCount={actionCount}>
         {invoiceStatus === 'pending' && (
           <Button
             type="button"
@@ -97,7 +98,7 @@ export function AccountingDetailActions({
             {pending ? 'Saving…' : 'Mark Paid'}
           </Button>
         )}
-      </FloatingActionBar>
+      </BottomActionBar>
 
       {invoiceStatus === 'paid' && (
         <div className="divide-y divide-border/50 border-b border-border/50 pb-6 text-sm text-muted-foreground">

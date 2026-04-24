@@ -16,7 +16,7 @@ import {
   Send,
   Undo2,
 } from 'lucide-react';
-import { FloatingActionBar } from '@/components/contract/floating-action-bar';
+import { BottomActionBar } from '@/components/contract/bottom-action-bar';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -139,6 +139,7 @@ export function ContractActions({
     Boolean(docusignEnvelopeId);
   const canRelease = status === 'signed' && isAdmin;
   const signerWaitLabel = signerName?.trim() || signerEmail?.trim() || 'signer';
+  const hasDocuSignSecondary = canReminder || canResendWithChanges || canRecall || canVoid;
 
   const fabVisible = useMemo(() => {
     if (status === 'draft') return true;
@@ -168,10 +169,28 @@ export function ContractActions({
   const fabBtn =
     'h-10 shrink-0 gap-2 rounded-full px-4 text-sm font-medium motion-safe:transition-transform motion-safe:duration-150 hover:brightness-[1.04] active:scale-[0.98]';
 
+  let actionsCount = 0;
+  if (status === 'draft') actionsCount += isAdmin ? 3 : 2;
+  if ((status === 'ready_for_review' || status === 'pending_events_review') && discountApprovalPending && isAdmin) actionsCount += 3;
+  if ((status === 'ready_for_review' || status === 'pending_events_review') && discountApprovalPending && !isAdmin) actionsCount += 2;
+  if (status === 'ready_for_review' && !discountApprovalPending) actionsCount += isAdmin ? 2 : 1;
+  if (status === 'pending_events_review' && !discountApprovalPending && isEventsTeam) actionsCount += draftPdfHref ? 3 : 2;
+  if (status === 'pending_events_review' && !discountApprovalPending && !isEventsTeam && isAdmin && draftPdfHref) actionsCount += 1;
+  if (status === 'approved') actionsCount += isAdmin ? 2 : 1;
+  if (canRelease) actionsCount += 1;
+  if (status === 'executed' && signedPdfHref) actionsCount += 1;
+  if (status === 'error' && isAdmin) actionsCount += 2;
+  if (hasDocuSignSecondary) {
+    if (canReminder) actionsCount += 1;
+    if (canResendWithChanges) actionsCount += 1;
+    if (canRecall) actionsCount += 1;
+    if (canVoid) actionsCount += 1;
+  }
+
   return (
     <>
       <div className="space-y-5">
-        <FloatingActionBar visible={fabVisible}>
+        <BottomActionBar visible={fabVisible} actionsCount={actionsCount}>
           {status === 'draft' && (
             <>
               <Button
@@ -419,15 +438,13 @@ export function ContractActions({
               </Button>
             </>
           )}
-        </FloatingActionBar>
-
-        {/* Secondary admin-only DocuSign controls */}
-        {(canReminder || canResendWithChanges || canRecall || canVoid) && (
-          <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
+          {/* Secondary DocuSign controls (same unified bottom bar) */}
+          {hasDocuSignSecondary && (
+            <>
             {canReminder && (
               <Button
                 variant="outline"
-                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                className={fabBtn}
                 onClick={() => runAction('send-reminder', 'reminder')}
                 disabled={busy}
               >
@@ -438,7 +455,7 @@ export function ContractActions({
             {canResendWithChanges && (
               <Button
                 variant="outline"
-                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                className={fabBtn}
                 onClick={() => setOpenResendWithChanges(true)}
                 disabled={readOnly}
                 title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
@@ -449,7 +466,7 @@ export function ContractActions({
             {canRecall && (
               <Button
                 variant="outline"
-                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                className={fabBtn}
                 onClick={() => setOpenRecall(true)}
                 disabled={readOnly}
                 title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
@@ -460,7 +477,7 @@ export function ContractActions({
             {canVoid && (
               <Button
                 variant="destructive"
-                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                className={fabBtn}
                 onClick={() => setOpenVoid(true)}
                 disabled={readOnly}
                 title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
@@ -469,8 +486,9 @@ export function ContractActions({
                 Void Contract
               </Button>
             )}
-          </div>
-        )}
+            </>
+          )}
+        </BottomActionBar>
 
         {/* Status messages when there are no primary row buttons */}
         <StatusLine
