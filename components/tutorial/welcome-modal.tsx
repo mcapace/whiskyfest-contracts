@@ -50,11 +50,11 @@ export function WelcomeTutorialModal({
   }, [roleContext]);
 
   const roleBullets = useMemo(() => {
-    if (roleContext.role === 'admin') return ['Review + approvals', 'User and role management', 'Pipeline oversight + reporting'];
-    if (roleContext.isEventsTeam) return ['Review incoming contracts', 'Approve or send back with notes', 'Maintain signatory quality'];
-    if (roleContext.isAccounting) return ['Executed contract queue', 'Invoice sent / paid lifecycle', 'Close-loop notifications'];
-    if (roleContext.isAssistant) return ['Scoped contract visibility', 'Rep support workflow', 'Status tracking + follow-up'];
-    return ['Create contracts', 'Send via DocuSign', 'Track status to execution'];
+    if (roleContext.role === 'admin') return ['Review and approve', 'Oversee operations', 'Report and unblock'];
+    if (roleContext.isEventsTeam) return ['Review pre-send contracts', 'Approve or send back', 'Protect quality before send'];
+    if (roleContext.isAccounting) return ['Executed queue visibility', 'Invoice and payment tracking', 'AR status control'];
+    if (roleContext.isAssistant) return ['View scoped contracts', 'Support assigned reps', 'Track status and follow-up'];
+    return ['Create contracts', 'Send for signature', 'Track through execution'];
   }, [roleContext]);
 
   if (!open) return null;

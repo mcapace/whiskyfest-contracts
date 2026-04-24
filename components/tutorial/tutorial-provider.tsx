@@ -14,26 +14,30 @@ export function TutorialProvider() {
   const { data: session, update } = useSession();
   const [openWelcome, setOpenWelcome] = useState(false);
   const [supportedRepNames, setSupportedRepNames] = useState<string[]>([]);
+  const [hasOwnSalesRepProfile, setHasOwnSalesRepProfile] = useState<boolean>(false);
   const [liveMessage, setLiveMessage] = useState('');
   const returnFocusRef = useRef<HTMLElement | null>(null);
 
-  const isAssistant = Boolean(
-    session?.user?.pipeline_access &&
-      !session?.user?.is_events_team &&
-      !session?.user?.is_accounting &&
-      session?.user?.role !== 'admin',
-  );
-
   useEffect(() => {
-    if (!isAssistant) return;
     void (async () => {
-      const res = await fetch('/api/sales-reps/accessible');
-      const body = await res.json().catch(() => ({}));
-      if (res.ok && Array.isArray(body.sales_reps)) {
-        setSupportedRepNames((body.sales_reps as { name?: string }[]).map((x) => x.name ?? '').filter(Boolean));
+      const [accessibleRes, meRes] = await Promise.all([
+        fetch('/api/sales-reps/accessible'),
+        fetch('/api/sales-reps/me'),
+      ]);
+      const accessibleBody = await accessibleRes.json().catch(() => ({}));
+      const meBody = await meRes.json().catch(() => ({}));
+      if (accessibleRes.ok && Array.isArray(accessibleBody.sales_reps)) {
+        setSupportedRepNames((accessibleBody.sales_reps as { name?: string }[]).map((x) => x.name ?? '').filter(Boolean));
       }
+      setHasOwnSalesRepProfile(Boolean(meRes.ok && meBody.sales_rep));
     })();
-  }, [isAssistant]);
+  }, []);
+
+  const isAssistant = useMemo(() => {
+    if (!session?.user?.pipeline_access) return false;
+    if (session.user.role === 'admin' || session.user.is_events_team || session.user.is_accounting) return false;
+    return !hasOwnSalesRepProfile && supportedRepNames.length > 0;
+  }, [hasOwnSalesRepProfile, session?.user?.is_accounting, session?.user?.is_events_team, session?.user?.pipeline_access, session?.user?.role, supportedRepNames.length]);
 
   const markCompleted = useCallback(async () => {
     await fetch('/api/users/me', {
