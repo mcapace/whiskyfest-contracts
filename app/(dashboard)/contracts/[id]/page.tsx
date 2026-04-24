@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
@@ -294,8 +295,21 @@ export default async function ContractDetailPage({ params }: { params: { id: str
             <Detail label="Telephone"    value={contract.exhibitor_telephone} />
             <Detail label="Brands"       value={contract.brands_poured} />
             <Detail label="Sales Rep"    value={contract.sales_rep_name ?? contract.sales_rep_email ?? '—'} />
-            <Detail label="Signer"       value={[contract.signer_1_name, contract.signer_1_title].filter(Boolean).join(', ') || '—'} />
-            <Detail label="Email (DocuSign to exhibitor)" value={contract.signer_1_email} mono />
+            <Detail label="Signer" value={contract.signer_1_name?.trim() || null} />
+            <Detail
+              label="Email"
+              value={
+                contract.signer_1_email?.trim() ? (
+                  <a
+                    href={`mailto:${encodeURIComponent(contract.signer_1_email.trim())}`}
+                    className="text-foreground underline decoration-primary/40 underline-offset-2 transition-colors hover:text-primary hover:decoration-primary"
+                  >
+                    {contract.signer_1_email.trim()}
+                  </a>
+                ) : null
+              }
+            />
+            <Detail label="Title" value={contract.signer_1_title?.trim() || null} />
             {(contract.status === 'signed' || contract.status === 'executed') &&
               contract.countersigned_at &&
               (contract.countersigned_by_name || contract.countersigned_by_email) && (
@@ -423,20 +437,25 @@ function Detail({
   multiline,
 }: {
   label: string;
-  value: string | null;
+  value: ReactNode;
   mono?: boolean;
   multiline?: boolean;
 }) {
+  const empty =
+    value == null ||
+    value === false ||
+    (typeof value === 'string' && value.trim() === '');
   return (
     <div className="flex items-baseline justify-between gap-4">
       <span className="text-muted-foreground">{label}</span>
       <span
         className={cn(
+          'text-right',
           mono && 'font-mono tabular-nums',
           multiline && 'max-w-[min(100%,20rem)] whitespace-pre-wrap text-right text-sm leading-snug',
         )}
       >
-        {value || '—'}
+        {empty ? '—' : value}
       </span>
     </div>
   );
