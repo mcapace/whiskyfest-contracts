@@ -16,8 +16,11 @@ import {
   Send,
   Undo2,
 } from 'lucide-react';
+import { ActionWithHelp } from '@/components/contract/action-with-help';
 import { BottomActionBar } from '@/components/contract/bottom-action-bar';
 import { Button } from '@/components/ui/button';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { CONTRACT_ACTION_HELP } from '@/lib/contract-action-help-text';
 import {
   Dialog,
   DialogContent,
@@ -206,37 +209,90 @@ export function ContractActions({
   return (
     <>
       <div className="space-y-5">
-        <BottomActionBar visible={fabVisible} actionsCount={actionsCount}>
+        <TooltipProvider delayDuration={300} skipDelayDuration={200}>
+          <BottomActionBar visible={fabVisible} actionsCount={actionsCount}>
           {status === 'draft' && (
             <>
-              <Button
-                className={fabBtn}
-                onClick={() => runAction('generate', 'generate')}
-                disabled={busy}
-              >
-                {pending && action === 'generate' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <FileText className="h-4 w-4" />
-                )}
-                Generate Draft PDF
-              </Button>
-              {readOnly ? (
+              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.generateDraftPdf}>
                 <Button
-                  type="button"
-                  variant="secondary"
                   className={fabBtn}
-                  disabled
-                  title={IMPERSONATION_BUTTON_TOOLTIP}
+                  onClick={() => runAction('generate', 'generate')}
+                  disabled={busy}
                 >
-                  Edit Contract
+                  {pending && action === 'generate' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <FileText className="h-4 w-4" />
+                  )}
+                  Generate Draft PDF
                 </Button>
+              </ActionWithHelp>
+              {readOnly ? (
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.editContract}>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className={fabBtn}
+                    disabled
+                    title={IMPERSONATION_BUTTON_TOOLTIP}
+                  >
+                    Edit Contract
+                  </Button>
+                </ActionWithHelp>
               ) : (
-                <Button variant="secondary" className={fabBtn} asChild>
-                  <Link href={`/contracts/${contractId}/edit`}>Edit Contract</Link>
-                </Button>
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.editContract}>
+                  <Button variant="secondary" className={fabBtn} asChild>
+                    <Link href={`/contracts/${contractId}/edit`}>Edit Contract</Link>
+                  </Button>
+                </ActionWithHelp>
               )}
               {isAdmin && (
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.cancel}>
+                  <Button
+                    variant="outline"
+                    className={`${fabBtn} text-destructive hover:text-destructive`}
+                    onClick={() => setOpenCancel(true)}
+                    disabled={readOnly}
+                    title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                  >
+                    Cancel Contract
+                  </Button>
+                </ActionWithHelp>
+              )}
+            </>
+          )}
+
+          {(status === 'ready_for_review' || status === 'pending_events_review') &&
+            discountApprovalPending &&
+            isAdmin && (
+            <>
+              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.approveDiscount}>
+                <Button
+                  className={`${fabBtn} border-amber-600 bg-amber-600 text-white hover:bg-amber-700`}
+                  onClick={() => setOpenApproveDiscount(true)}
+                  disabled={readOnly}
+                  title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  Approve Discount
+                </Button>
+              </ActionWithHelp>
+              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.regeneratePdf}>
+                <Button
+                  variant="secondary"
+                  className={fabBtn}
+                  onClick={() => runAction('generate', 'regenerate')}
+                  disabled={busy}
+                >
+                  {pending && action === 'regenerate' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  Re-generate PDF
+                </Button>
+              </ActionWithHelp>
+              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.cancel}>
                 <Button
                   variant="outline"
                   className={`${fabBtn} text-destructive hover:text-destructive`}
@@ -246,36 +302,173 @@ export function ContractActions({
                 >
                   Cancel Contract
                 </Button>
-              )}
+              </ActionWithHelp>
             </>
           )}
 
           {(status === 'ready_for_review' || status === 'pending_events_review') &&
             discountApprovalPending &&
-            isAdmin && (
+            !isAdmin && (
             <>
-              <Button
-                className={`${fabBtn} border-amber-600 bg-amber-600 text-white hover:bg-amber-700`}
-                onClick={() => setOpenApproveDiscount(true)}
-                disabled={readOnly}
-                title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
-              >
-                <AlertTriangle className="h-4 w-4" />
-                Approve Discount
+              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.regeneratePdf}>
+                <Button
+                  variant="secondary"
+                  className={fabBtn}
+                  onClick={() => runAction('generate', 'regenerate')}
+                  disabled={busy}
+                >
+                  {pending && action === 'regenerate' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  Re-generate PDF
+                </Button>
+              </ActionWithHelp>
+              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.approveForSendingDisabled}>
+                <Button
+                  variant="secondary"
+                  className={fabBtn}
+                  disabled
+                  title="Awaiting discount approval"
+                >
+                  Approve for Sending
+                </Button>
+              </ActionWithHelp>
+            </>
+          )}
+
+          {status === 'ready_for_review' && !discountApprovalPending && (
+            <>
+              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.regeneratePdf}>
+                <Button
+                  variant="secondary"
+                  className={fabBtn}
+                  onClick={() => runAction('generate', 'regenerate')}
+                  disabled={busy}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Re-generate PDF (submit for events review)
+                </Button>
+              </ActionWithHelp>
+              {isAdmin && (
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.cancel}>
+                  <Button
+                    variant="outline"
+                    className={`${fabBtn} text-destructive hover:text-destructive`}
+                    onClick={() => setOpenCancel(true)}
+                    disabled={readOnly}
+                    title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                  >
+                    Cancel Contract
+                  </Button>
+                </ActionWithHelp>
+              )}
+            </>
+          )}
+
+          {status === 'pending_events_review' && !discountApprovalPending && isEventsTeam && (
+            <>
+              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.approveContract}>
+                <Button
+                  className={fabBtn}
+                  onClick={() => runAction('events-approve', 'events-approve', {})}
+                  disabled={busy}
+                >
+                  {pending && action === 'events-approve' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4" />
+                  )}
+                  Approve Contract
+                </Button>
+              </ActionWithHelp>
+              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.sendBack}>
+                <Button
+                  variant="secondary"
+                  className={fabBtn}
+                  onClick={() => setOpenSendBack(true)}
+                  disabled={readOnly}
+                  title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                >
+                  Send Back for Changes
+                </Button>
+              </ActionWithHelp>
+              {draftPdfHref && (
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.viewDraftPdf}>
+                  <Button variant="outline" className={fabBtn} asChild>
+                    <a href={draftPdfHref} target="_blank" rel="noreferrer">
+                      <ExternalLink className="h-4 w-4" />
+                      View Draft PDF
+                    </a>
+                  </Button>
+                </ActionWithHelp>
+              )}
+            </>
+          )}
+
+          {status === 'pending_events_review' && !discountApprovalPending && !isEventsTeam && isAdmin && draftPdfHref && (
+            <ActionWithHelp helpText={CONTRACT_ACTION_HELP.viewDraftPdf}>
+              <Button variant="outline" className={fabBtn} asChild>
+                <a href={draftPdfHref} target="_blank" rel="noreferrer">
+                  <ExternalLink className="h-4 w-4" />
+                  View Draft PDF
+                </a>
               </Button>
+            </ActionWithHelp>
+          )}
+
+          {status === 'approved' && (
+            <>
+              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.sendViaDocusign}>
+                <Button
+                  className={fabBtn}
+                  onClick={() => runAction('send', 'send')}
+                  disabled={busy}
+                >
+                  {pending && action === 'send' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                  Send via DocuSign
+                </Button>
+              </ActionWithHelp>
+              {isAdmin && (
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.cancel}>
+                  <Button
+                    variant="outline"
+                    className={`${fabBtn} text-destructive hover:text-destructive`}
+                    onClick={() => setOpenCancel(true)}
+                    disabled={readOnly}
+                    title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                  >
+                    Cancel Contract
+                  </Button>
+                </ActionWithHelp>
+              )}
+            </>
+          )}
+
+          {canRelease && (
+            <ActionWithHelp helpText={CONTRACT_ACTION_HELP.releaseToAccounting}>
               <Button
-                variant="secondary"
                 className={fabBtn}
-                onClick={() => runAction('generate', 'regenerate')}
+                onClick={() => runAction('release', 'release')}
                 disabled={busy}
               >
-                {pending && action === 'regenerate' ? (
+                {pending && action === 'release' ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <RefreshCw className="h-4 w-4" />
+                  <CheckCircle2 className="h-4 w-4" />
                 )}
-                Re-generate PDF
+                Release to Accounting
               </Button>
+            </ActionWithHelp>
+          )}
+
+          {canCancelSigned && (
+            <ActionWithHelp helpText={CONTRACT_ACTION_HELP.cancel}>
               <Button
                 variant="outline"
                 className={`${fabBtn} text-destructive hover:text-destructive`}
@@ -285,250 +478,116 @@ export function ContractActions({
               >
                 Cancel Contract
               </Button>
-            </>
-          )}
-
-          {(status === 'ready_for_review' || status === 'pending_events_review') &&
-            discountApprovalPending &&
-            !isAdmin && (
-            <>
-              <Button
-                variant="secondary"
-                className={fabBtn}
-                onClick={() => runAction('generate', 'regenerate')}
-                disabled={busy}
-              >
-                {pending && action === 'regenerate' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4" />
-                )}
-                Re-generate PDF
-              </Button>
-              <Button
-                variant="secondary"
-                className={fabBtn}
-                disabled
-                title="Awaiting discount approval"
-              >
-                Approve for Sending
-              </Button>
-            </>
-          )}
-
-          {status === 'ready_for_review' && !discountApprovalPending && (
-            <>
-              <Button
-                variant="secondary"
-                className={fabBtn}
-                onClick={() => runAction('generate', 'regenerate')}
-                disabled={busy}
-              >
-                <RefreshCw className="h-4 w-4" />
-                Re-generate PDF (submit for events review)
-              </Button>
-              {isAdmin && (
-                <Button
-                  variant="outline"
-                  className={`${fabBtn} text-destructive hover:text-destructive`}
-                  onClick={() => setOpenCancel(true)}
-                  disabled={readOnly}
-                  title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
-                >
-                  Cancel Contract
-                </Button>
-              )}
-            </>
-          )}
-
-          {status === 'pending_events_review' && !discountApprovalPending && isEventsTeam && (
-            <>
-              <Button
-                className={fabBtn}
-                onClick={() => runAction('events-approve', 'events-approve', {})}
-                disabled={busy}
-              >
-                {pending && action === 'events-approve' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4" />
-                )}
-                Approve Contract
-              </Button>
-              <Button
-                variant="secondary"
-                className={fabBtn}
-                onClick={() => setOpenSendBack(true)}
-                disabled={readOnly}
-                title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
-              >
-                Send Back for Changes
-              </Button>
-              {draftPdfHref && (
-                <Button variant="outline" className={fabBtn} asChild>
-                  <a href={draftPdfHref} target="_blank" rel="noreferrer">
-                    <ExternalLink className="h-4 w-4" />
-                    View Draft PDF
-                  </a>
-                </Button>
-              )}
-            </>
-          )}
-
-          {status === 'pending_events_review' && !discountApprovalPending && !isEventsTeam && isAdmin && draftPdfHref && (
-            <Button variant="outline" className={fabBtn} asChild>
-              <a href={draftPdfHref} target="_blank" rel="noreferrer">
-                <ExternalLink className="h-4 w-4" />
-                View Draft PDF
-              </a>
-            </Button>
-          )}
-
-          {status === 'approved' && (
-            <>
-              <Button
-                className={fabBtn}
-                onClick={() => runAction('send', 'send')}
-                disabled={busy}
-              >
-                {pending && action === 'send' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-                Send via DocuSign
-              </Button>
-              {isAdmin && (
-                <Button
-                  variant="outline"
-                  className={`${fabBtn} text-destructive hover:text-destructive`}
-                  onClick={() => setOpenCancel(true)}
-                  disabled={readOnly}
-                  title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
-                >
-                  Cancel Contract
-                </Button>
-              )}
-            </>
-          )}
-
-          {canRelease && (
-            <Button
-              className={fabBtn}
-              onClick={() => runAction('release', 'release')}
-              disabled={busy}
-            >
-              {pending && action === 'release' ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <CheckCircle2 className="h-4 w-4" />
-              )}
-              Release to Accounting
-            </Button>
-          )}
-
-          {canCancelSigned && (
-            <Button
-              variant="outline"
-              className={`${fabBtn} text-destructive hover:text-destructive`}
-              onClick={() => setOpenCancel(true)}
-              disabled={readOnly}
-              title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
-            >
-              Cancel Contract
-            </Button>
+            </ActionWithHelp>
           )}
 
           {status === 'executed' && signedPdfHref && (
-            <Button variant="secondary" className={fabBtn} asChild>
-              <a href={signedPdfHref} target="_blank" rel="noreferrer">
-                <ExternalLink className="h-4 w-4" />
-                View Signed PDF
-              </a>
-            </Button>
+            <ActionWithHelp helpText={CONTRACT_ACTION_HELP.viewSignedPdf}>
+              <Button variant="secondary" className={fabBtn} asChild>
+                <a href={signedPdfHref} target="_blank" rel="noreferrer">
+                  <ExternalLink className="h-4 w-4" />
+                  View Signed PDF
+                </a>
+              </Button>
+            </ActionWithHelp>
           )}
 
           {status === 'error' && isAdmin && (
             <>
-              <Button variant="secondary" className={fabBtn} onClick={() => setOpenErrorDetails(true)}>
-                View Error Details
-              </Button>
-              <Button
-                className={fabBtn}
-                onClick={() => {
-                  if (!window.confirm('Reset this contract to draft? Internal notes will be cleared.')) return;
-                  runAction('reset-error', 'reset-error');
-                }}
-                disabled={busy}
-              >
-                {pending && action === 'reset-error' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Undo2 className="h-4 w-4" />}
-                Reset to Draft
-              </Button>
+              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.viewErrorDetails}>
+                <Button variant="secondary" className={fabBtn} onClick={() => setOpenErrorDetails(true)}>
+                  View Error Details
+                </Button>
+              </ActionWithHelp>
+              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.resetToDraft}>
+                <Button
+                  className={fabBtn}
+                  onClick={() => {
+                    if (!window.confirm('Reset this contract to draft? Internal notes will be cleared.')) return;
+                    runAction('reset-error', 'reset-error');
+                  }}
+                  disabled={busy}
+                >
+                  {pending && action === 'reset-error' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Undo2 className="h-4 w-4" />}
+                  Reset to Draft
+                </Button>
+              </ActionWithHelp>
             </>
           )}
           {/* Secondary DocuSign controls (same unified bottom bar) */}
           {hasDocuSignSecondary && (
             <>
             {canReminder && (
-              <Button
-                className={fabBtn}
-                onClick={() => runAction('send-reminder', 'reminder')}
-                disabled={busy}
-              >
-                <Mail className="h-4 w-4" />
-                Send Reminder
-              </Button>
+              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.sendReminder}>
+                <Button
+                  className={fabBtn}
+                  onClick={() => runAction('send-reminder', 'reminder')}
+                  disabled={busy}
+                >
+                  <Mail className="h-4 w-4" />
+                  Send Reminder
+                </Button>
+              </ActionWithHelp>
             )}
             {canResendWithChanges && (
-              <Button
-                variant="outline"
-                className={fabBtn}
-                onClick={() => setOpenResendWithChanges(true)}
-                disabled={readOnly}
-                title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
-              >
-                Resend with Changes
-              </Button>
+              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.resendWithChanges}>
+                <Button
+                  variant="outline"
+                  className={fabBtn}
+                  onClick={() => setOpenResendWithChanges(true)}
+                  disabled={readOnly}
+                  title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                >
+                  Resend with Changes
+                </Button>
+              </ActionWithHelp>
             )}
             {canRecall && (
-              <Button
-                variant="outline"
-                className={fabBtn}
-                onClick={() => setOpenRecall(true)}
-                disabled={readOnly}
-                title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
-              >
-                Recall Contract
-              </Button>
+              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.recall}>
+                <Button
+                  variant="outline"
+                  className={fabBtn}
+                  onClick={() => setOpenRecall(true)}
+                  disabled={readOnly}
+                  title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                >
+                  Recall Contract
+                </Button>
+              </ActionWithHelp>
             )}
             {canVoid && (
-              <Button
-                variant="destructive"
-                data-tour="contract-void-btn"
-                className={fabBtn}
-                onClick={() => setOpenVoid(true)}
-                disabled={readOnly}
-                title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
-              >
-                <AlertTriangle className="h-4 w-4" />
-                Void Contract
-              </Button>
+              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.voidContract}>
+                <Button
+                  variant="destructive"
+                  data-tour="contract-void-btn"
+                  className={fabBtn}
+                  onClick={() => setOpenVoid(true)}
+                  disabled={readOnly}
+                  title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  Void Contract
+                </Button>
+              </ActionWithHelp>
             )}
             </>
           )}
 
           {canCancelInflightDocuSign && (
-            <Button
-              variant="outline"
-              className={`${fabBtn} text-destructive hover:text-destructive`}
-              onClick={() => setOpenCancel(true)}
-              disabled={readOnly}
-              title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
-            >
-              Cancel Contract
-            </Button>
+            <ActionWithHelp helpText={CONTRACT_ACTION_HELP.cancel}>
+              <Button
+                variant="outline"
+                className={`${fabBtn} text-destructive hover:text-destructive`}
+                onClick={() => setOpenCancel(true)}
+                disabled={readOnly}
+                title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+              >
+                Cancel Contract
+              </Button>
+            </ActionWithHelp>
           )}
         </BottomActionBar>
+        </TooltipProvider>
 
         {/* Status messages when there are no primary row buttons */}
         <StatusLine
