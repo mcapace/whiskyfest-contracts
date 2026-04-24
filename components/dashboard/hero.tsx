@@ -20,6 +20,7 @@ export function DashboardHero({
 }) {
   return (
     <section
+      data-tour="dashboard-hero"
       className={cn(
         'border-b border-border/50 pb-8',
         className,
@@ -49,13 +50,13 @@ export function DashboardHero({
             <Link href="/contracts">View all</Link>
           </Button>
           <Button asChild className="active:scale-[0.98]">
-            <Link href="/contracts/new">
+            <Link href="/contracts/new" data-tour="new-contract-btn">
               <Plus className="h-4 w-4" /> New Contract
             </Link>
           </Button>
         </div>
       </div>
-      <div className="mt-8 max-w-2xl">
+      <div className="mt-8 max-w-2xl" data-tour="dashboard-stats">
         <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
           <span className="wf-label-caps text-[0.6rem]">Pipeline completion</span>
           <span className="text-right font-mono text-xs tabular-nums text-muted-foreground">{completionLabel}</span>

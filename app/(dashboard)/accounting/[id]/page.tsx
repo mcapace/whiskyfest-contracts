@@ -70,7 +70,7 @@ export default async function AccountingContractDetailPage({ params }: { params:
         <p className="mt-2 text-sm text-muted-foreground">{event?.name ?? '—'}</p>
       </header>
 
-      <section className="rounded-lg border border-border/50 bg-bg-surface p-4 md:p-6">
+      <section className="rounded-lg border border-border/50 bg-bg-surface p-4 md:p-6" data-tour="invoice-lifecycle">
         <p className="wf-label-caps mb-4 text-[0.6rem]">Invoice lifecycle</p>
         <InvoiceLifecycleTimeline status={inv} />
       </section>

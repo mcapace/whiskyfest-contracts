@@ -6,7 +6,15 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { motion, useReducedMotion } from 'framer-motion';
 
-export function StatusBadge({ status, className }: { status: ContractStatus; className?: string }) {
+export function StatusBadge({
+  status,
+  className,
+  dataTour,
+}: {
+  status: ContractStatus;
+  className?: string;
+  dataTour?: string;
+}) {
   const reduce = useReducedMotion();
 
   return (
@@ -17,7 +25,7 @@ export function StatusBadge({ status, className }: { status: ContractStatus; cla
       transition={{ type: 'spring', stiffness: 460, damping: 30 }}
       className="inline-flex"
     >
-      <Badge className={cn(statusBadgeClassName(status), 'border motion-safe:transition-colors', className)}>
+      <Badge data-tour={dataTour} className={cn(statusBadgeClassName(status), 'border motion-safe:transition-colors', className)}>
         {formatStatus(status)}
       </Badge>
     </motion.span>

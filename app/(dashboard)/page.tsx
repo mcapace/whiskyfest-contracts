@@ -226,7 +226,7 @@ export default async function DashboardPage({
       )}
 
       {/* Stats row */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" data-tour="dashboard-stats">
         <DashboardStatCard
           icon={CheckCircle2}
           label="Executed"
@@ -266,7 +266,7 @@ export default async function DashboardPage({
       </div>
 
       {/* Contracts table */}
-      <Card className="overflow-hidden border-fest-600/15">
+      <Card className="overflow-hidden border-fest-600/15" data-tour="dashboard-contracts-table">
         <div className="flex items-center justify-between border-b border-fest-600/10 px-6 py-4">
           <div>
             <h2 className="font-serif text-lg font-semibold">Recent Contracts</h2>
@@ -296,7 +296,7 @@ export default async function DashboardPage({
                       <span className="font-mono text-sm font-semibold tabular-nums">{formatCurrency(c.grand_total_cents)}</span>
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <StatusBadge status={c.status} />
+                      <StatusBadge status={c.status} dataTour="status-badge" />
                       <span className="text-xs text-muted-foreground">{formatRelative(c.updated_at)}</span>
                     </div>
                   </Link>
@@ -329,7 +329,7 @@ export default async function DashboardPage({
                           {eventMap.get(c.event_id)?.name ?? '—'}
                         </TableCell>
                         <TableCell>
-                          <StatusBadge status={c.status} />
+                          <StatusBadge status={c.status} dataTour="status-badge" />
                         </TableCell>
                         <TableCell className="text-right font-mono tabular-nums">
                           {formatCurrency(c.grand_total_cents)}

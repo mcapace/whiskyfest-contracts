@@ -72,6 +72,7 @@ function AccountingNavLink({ pathname }: { pathname: string }) {
   return (
     <Link
       href={href}
+      data-tour="sidebar-accounting"
       className={cn(
         'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
         active
@@ -162,6 +163,13 @@ export function Sidebar({
                   <Link
                     key={item.href}
                     href={item.href}
+                    data-tour={
+                      item.href === '/events'
+                        ? 'sidebar-events'
+                        : item.href === '/users'
+                          ? 'sidebar-users'
+                          : undefined
+                    }
                     className={cn(
                       'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
                       active

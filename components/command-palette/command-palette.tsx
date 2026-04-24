@@ -69,6 +69,7 @@ export function CommandPaletteTrigger() {
   return (
     <button
       type="button"
+      data-tour="command-palette-trigger"
       onClick={() => setOpen(true)}
       className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-bg-surface px-2.5 py-1 font-mono text-[11px] font-medium uppercase tracking-wider text-muted-foreground transition hover:bg-muted/60"
       aria-label="Open command palette"

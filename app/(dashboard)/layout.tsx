@@ -7,6 +7,7 @@ import { DashboardTopBarActions } from '@/components/layout/dashboard-top-bar-ac
 import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav';
 import { AuthSessionProvider } from '@/components/session/auth-session-provider';
 import { ImpersonationBanner } from '@/components/impersonation/impersonation-banner';
+import { TutorialProvider } from '@/components/tutorial/tutorial-provider';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -24,6 +25,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <CommandPaletteProvider>
         <ImpersonationBanner />
         <div className="min-h-screen bg-bg-page">
+          <TutorialProvider />
           <Sidebar
             user={{
               email: session.user.email,

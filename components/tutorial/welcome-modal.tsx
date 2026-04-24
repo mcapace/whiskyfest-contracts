@@ -106,10 +106,10 @@ export function WelcomeTutorialModal({
                 <h2 className="wf-display-serif text-3xl sm:text-4xl">Contract lifecycle, automated</h2>
                 <div className="grid gap-3 sm:grid-cols-3">
                   {[
-                    ['Sales rep creates', FilePlus2],
-                    ['Events team approves', ClipboardCheck],
-                    ['Exhibitor signs', ShieldCheck],
-                  ].map(([label, Icon], i) => (
+                    { label: 'Sales rep creates', Icon: FilePlus2 },
+                    { label: 'Events team approves', Icon: ClipboardCheck },
+                    { label: 'Exhibitor signs', Icon: ShieldCheck },
+                  ].map(({ label, Icon }, i) => (
                     <motion.div
                       key={String(label)}
                       initial={reduce ? false : { opacity: 0, y: 10 }}

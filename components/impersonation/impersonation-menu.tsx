@@ -87,6 +87,7 @@ export function ImpersonationMenu({ canImpersonate }: { canImpersonate: boolean 
   return (
     <>
       <DropdownMenuItem
+        data-tour="impersonation-menu"
         onSelect={(e) => {
           e.preventDefault();
           setOpen(true);

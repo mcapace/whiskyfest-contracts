@@ -75,7 +75,8 @@ export function AccountingDetailActions({
     <div className="space-y-6">
       {err && <p className="text-sm text-destructive">{err}</p>}
 
-      <BottomActionBar visible={fabVisible} actionsCount={actionCount}>
+      <div data-tour="accounting-actions-bar">
+        <BottomActionBar visible={fabVisible} actionsCount={actionCount}>
         {invoiceStatus === 'pending' && (
           <Button
             type="button"
@@ -98,7 +99,8 @@ export function AccountingDetailActions({
             {pending ? 'Saving…' : 'Mark Paid'}
           </Button>
         )}
-      </BottomActionBar>
+        </BottomActionBar>
+      </div>
 
       {invoiceStatus === 'paid' && (
         <div className="divide-y divide-border/50 border-b border-border/50 pb-6 text-sm text-muted-foreground">
