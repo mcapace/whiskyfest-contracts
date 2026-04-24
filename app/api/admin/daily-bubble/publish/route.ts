@@ -1,15 +1,14 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/api-auth';
 import { publishDailyBubbleIfNeeded } from '@/lib/daily-bubble-publish';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
-export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  const secret = process.env['CRON_SECRET']?.trim();
-  if (!secret || authHeader !== `Bearer ${secret}`) {
-    return new Response('Unauthorized', { status: 401 });
-  }
+/** Admin-only: generate and save today’s bubble (same as cron). Use if the banner is empty after deploy/migration. */
+export async function POST() {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.res;
 
   const outcome = await publishDailyBubbleIfNeeded();
 
