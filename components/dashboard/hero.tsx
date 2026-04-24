@@ -29,8 +29,8 @@ export function DashboardHero({
         <div className="min-w-0 max-w-3xl">
           <p className="wf-label-caps mb-2 text-brass-700 dark:text-brass-400">M. Shanken Communications</p>
           <h1 className="wf-display-serif text-[2rem] leading-tight text-foreground sm:text-4xl md:text-[2.75rem]">
-          Contract Pipeline
-        </h1>
+            WhiskyFest 2026 Contract Pipeline
+          </h1>
           <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">
             {contractsCount} total contracts · {eventsCount} active event{eventsCount !== 1 ? 's' : ''}
           </p>
