@@ -156,8 +156,30 @@ export interface AppUser {
   theme_preference?: 'light' | 'dark' | 'system' | null;
   /** Set on each successful Google sign-in. Omitted until migration `027_add_last_login` is applied. */
   last_login_at?: string | null;
+  /** Eastern `YYYY-MM-DD` when user dismissed the daily bubble; same-day bubble stays hidden for them. */
+  last_dismissed_bubble_date?: string | null;
   created_at: string;
 }
+
+export type BubbleContentType = 'fact' | 'joke' | 'quote';
+
+export interface DailyBubble {
+  id: string;
+  content_date: string;
+  content_type: BubbleContentType;
+  content: string;
+  attribution: string | null;
+  generated_at: string;
+  generated_by: string;
+  removed_at: string | null;
+  removed_by: string | null;
+  removed_reason: string | null;
+  remove_token: string | null;
+  remove_token_expires_at: string | null;
+}
+
+/** Bubble row safe to pass to the client banner (no email remove token). */
+export type DailyBubblePublic = Omit<DailyBubble, 'remove_token' | 'remove_token_expires_at'>;
 
 export type AccessRequestStatus = 'pending' | 'approved' | 'rejected';
 

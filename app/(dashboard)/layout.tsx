@@ -8,6 +8,7 @@ import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav';
 import { AuthSessionProvider } from '@/components/session/auth-session-provider';
 import { ImpersonationBanner } from '@/components/impersonation/impersonation-banner';
 import { TutorialProvider } from '@/components/tutorial/tutorial-provider';
+import { DailyBubbleSlot } from '@/components/daily-bubble/daily-bubble-slot';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -51,6 +52,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           />
           <div className={`flex min-h-screen flex-col lg:pl-64 ${mainPad}`}>
             <Topbar endSlot={<DashboardTopBarActions />} />
+            <DailyBubbleSlot />
             <main className="flex-1">
               <div className="mx-auto max-w-6xl animate-fade-in px-6 py-6 pb-24 lg:px-10 lg:py-8 lg:pb-10">
                 {children}

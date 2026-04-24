@@ -197,8 +197,25 @@ alter table app_users add column if not exists theme_preference text
 alter table app_users add column if not exists tour_completed_at timestamptz;
 alter table app_users add column if not exists tour_last_role text;
 alter table app_users add column if not exists last_login_at timestamptz;
+alter table app_users add column if not exists last_dismissed_bubble_date date null;
 
 alter table audit_log add column if not exists impersonation_target_email text;
+
+-- Daily dashboard bubble (see migration 028_daily_bubbles.sql for RLS + indexes).
+create table if not exists daily_bubbles (
+  id uuid primary key default gen_random_uuid(),
+  content_date date not null unique,
+  content_type text not null check (content_type in ('fact', 'joke', 'quote')),
+  content text not null check (char_length(content) <= 250),
+  attribution text null,
+  generated_at timestamptz not null default now(),
+  generated_by text not null default 'ai',
+  removed_at timestamptz null,
+  removed_by text null,
+  removed_reason text null,
+  remove_token text null,
+  remove_token_expires_at timestamptz null
+);
 
 -- Computed-ish helpers (views make more sense than generated columns for totals)
 create or replace view contracts_with_totals as
