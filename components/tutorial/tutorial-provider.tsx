@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { driver } from 'driver.js';
+import confetti from 'canvas-confetti';
 import 'driver.js/dist/driver.css';
 import { getTourStepsForRole } from '@/lib/tutorial/tour-steps';
 import { WelcomeTutorialModal } from '@/components/tutorial/welcome-modal';
@@ -13,6 +14,8 @@ export function TutorialProvider() {
   const { data: session, update } = useSession();
   const [openWelcome, setOpenWelcome] = useState(false);
   const [supportedRepNames, setSupportedRepNames] = useState<string[]>([]);
+  const [liveMessage, setLiveMessage] = useState('');
+  const returnFocusRef = useRef<HTMLElement | null>(null);
 
   const isAssistant = Boolean(
     session?.user?.pipeline_access &&
@@ -53,18 +56,39 @@ export function TutorialProvider() {
       return Boolean(document.querySelector(s.element));
     });
 
+    if (steps.length === 0) {
+      await markCompleted();
+      return;
+    }
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const d = driver({
       showProgress: true,
       animate: true,
       overlayOpacity: 0.52,
       allowClose: true,
+      popoverClass: 'wf-tour-popover',
       doneBtnText: "Let's go",
       nextBtnText: 'Next',
       prevBtnText: 'Back',
+      showButtons: ['previous', 'next', 'close'],
       stagePadding: 6,
+      onHighlightStarted: (_element, step, { state }) => {
+        const title = step?.popover?.title ?? 'Tour step';
+        const stepIndex = (state.activeIndex ?? 0) + 1;
+        setLiveMessage(`Step ${stepIndex} of ${steps.length}: ${title}`);
+      },
       onDestroyed: () => {
         void markCompleted();
+        if (!reducedMotion) {
+          void confetti({
+            particleCount: 50,
+            spread: 65,
+            startVelocity: 28,
+            colors: ['#1f7a78', '#182d6d', '#c7a867', '#f4f1e8'],
+          });
+        }
         sessionStorage.setItem(DISMISSED_KEY, '1');
+        returnFocusRef.current?.focus();
       },
       steps,
     });
@@ -72,6 +96,7 @@ export function TutorialProvider() {
   }, [isAssistant, markCompleted, session?.user?.can_impersonate, session?.user?.is_accounting, session?.user?.is_events_team, session?.user?.role]);
 
   const launchWelcomeAndTour = useCallback(() => {
+    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     sessionStorage.removeItem(DISMISSED_KEY);
     setOpenWelcome(true);
   }, []);
@@ -102,18 +127,25 @@ export function TutorialProvider() {
   );
 
   return (
-    <WelcomeTutorialModal
-      open={openWelcome}
-      roleContext={roleContext}
-      onSkip={() => {
-        sessionStorage.setItem(DISMISSED_KEY, '1');
-        setOpenWelcome(false);
-        void markCompleted();
-      }}
-      onStartTour={() => {
-        setOpenWelcome(false);
-        void startDriverTour();
-      }}
-    />
+    <>
+      <WelcomeTutorialModal
+        open={openWelcome}
+        roleContext={roleContext}
+        onSkip={() => {
+          const ok = window.confirm('Skip onboarding? You can launch it any time from the Help menu.');
+          if (!ok) return;
+          sessionStorage.setItem(DISMISSED_KEY, '1');
+          setOpenWelcome(false);
+          void markCompleted();
+        }}
+        onStartTour={() => {
+          setOpenWelcome(false);
+          void startDriverTour();
+        }}
+      />
+      <span className="sr-only" aria-live="polite">
+        {liveMessage}
+      </span>
+    </>
   );
 }

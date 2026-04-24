@@ -61,11 +61,11 @@ export function WelcomeTutorialModal({
 
   return (
     <div className="fixed inset-0 z-[70] bg-background/75 backdrop-blur-sm">
-      <div className="flex min-h-screen items-center justify-center p-4 sm:p-8">
+      <div className="flex min-h-screen items-center justify-center p-0 sm:p-8">
         <motion.div
           initial={reduce ? false : { opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-2xl rounded-2xl border border-border/60 bg-bg-surface-raised p-6 shadow-2xl sm:p-8"
+          className="h-screen w-full rounded-none border-y border-border/60 bg-bg-surface-raised p-6 shadow-2xl sm:h-auto sm:max-w-2xl sm:rounded-2xl sm:border sm:p-8"
         >
           <div className="mb-5 flex items-center justify-between">
             <p className="wf-label-caps text-[0.62rem] text-muted-foreground">Onboarding · Step {step + 1} of 4</p>
@@ -90,7 +90,7 @@ export function WelcomeTutorialModal({
                 <h2 className="wf-display-serif text-3xl sm:text-4xl">Welcome to WhiskyFest Contracts</h2>
                 <p className="text-sm text-muted-foreground">Let&apos;s get you oriented.</p>
                 <div className="pt-2">
-                  <Button onClick={() => setStep(1)}>Get started</Button>
+                  <Button className="motion-safe:transition-transform motion-safe:hover:scale-[1.02] motion-safe:active:scale-[0.98]" onClick={() => setStep(1)}>Get started</Button>
                 </div>
               </motion.div>
             )}
@@ -127,7 +127,7 @@ export function WelcomeTutorialModal({
                 </p>
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => setStep(0)}>Back</Button>
-                  <Button onClick={() => setStep(2)}>Next</Button>
+                  <Button className="motion-safe:transition-transform motion-safe:hover:scale-[1.02] motion-safe:active:scale-[0.98]" onClick={() => setStep(2)}>Next</Button>
                 </div>
               </motion.div>
             )}
@@ -152,7 +152,7 @@ export function WelcomeTutorialModal({
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
-                  <Button onClick={() => setStep(3)}>Next</Button>
+                  <Button className="motion-safe:transition-transform motion-safe:hover:scale-[1.02] motion-safe:active:scale-[0.98]" onClick={() => setStep(3)}>Next</Button>
                 </div>
               </motion.div>
             )}
@@ -170,7 +170,7 @@ export function WelcomeTutorialModal({
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" onClick={() => setStep(2)}>Back</Button>
                   <Button variant="secondary" onClick={onSkip}>Skip — I&apos;ll explore on my own</Button>
-                  <Button onClick={onStartTour}>Start tour</Button>
+                  <Button className="motion-safe:transition-transform motion-safe:hover:scale-[1.02] motion-safe:active:scale-[0.98]" onClick={onStartTour}>Start tour</Button>
                 </div>
               </motion.div>
             )}
