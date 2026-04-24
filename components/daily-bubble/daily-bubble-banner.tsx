@@ -11,6 +11,8 @@ interface BannerProps {
   bubble: DailyBubblePublic;
   isAdmin: boolean;
   readOnlyImpersonation: boolean;
+  /** Curated tip when no DB row for today (AI/cron not run yet). */
+  isStaticFallback?: boolean;
 }
 
 function headline(contentType: DailyBubblePublic['content_type']): string {
@@ -19,7 +21,12 @@ function headline(contentType: DailyBubblePublic['content_type']): string {
   return 'Quote of the Day';
 }
 
-export function DailyBubbleBanner({ bubble, isAdmin, readOnlyImpersonation }: BannerProps) {
+export function DailyBubbleBanner({
+  bubble,
+  isAdmin,
+  readOnlyImpersonation,
+  isStaticFallback = false,
+}: BannerProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [hidden, setHidden] = useState(false);
@@ -60,8 +67,8 @@ export function DailyBubbleBanner({ bubble, isAdmin, readOnlyImpersonation }: Ba
   return (
     <div
       className={cn(
-        'border-b border-fest-600/15 bg-gradient-to-r from-brass-50/90 via-background to-brass-50/80',
-        'dark:from-fest-950/40 dark:via-background dark:to-fest-950/30',
+        'sticky top-14 z-[19] border-b border-l-4 border-fest-600/25 border-l-fest-600 bg-gradient-to-r from-brass-50 via-background to-brass-50/90 shadow-sm',
+        'dark:border-fest-500/30 dark:border-l-fest-500 dark:from-fest-950/50 dark:via-background dark:to-fest-950/40',
       )}
       title={tooltip}
     >
@@ -69,6 +76,11 @@ export function DailyBubbleBanner({ bubble, isAdmin, readOnlyImpersonation }: Ba
         <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-3">
           <span className="shrink-0 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-fest-700 dark:text-fest-300">
             {headline(bubble.content_type)}
+            {isStaticFallback && isAdmin && !readOnlyImpersonation ? (
+              <span className="ml-2 font-normal normal-case tracking-normal text-muted-foreground">
+                (curated until AI publishes)
+              </span>
+            ) : null}
           </span>
           <p className="text-sm leading-snug text-foreground">
             <span>{bubble.content}</span>
@@ -78,7 +90,7 @@ export function DailyBubbleBanner({ bubble, isAdmin, readOnlyImpersonation }: Ba
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:pl-4">
-          {isAdmin && !readOnlyImpersonation && (
+          {isAdmin && !readOnlyImpersonation && !isStaticFallback && (
             <Button
               type="button"
               variant="ghost"

@@ -35,6 +35,8 @@ export function UsersAdmin({ initialUsers, currentEmail }: Props) {
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [lastLoginSort, setLastLoginSort] = useState<LastLoginSort>('default');
   const [neverLoggedOnly, setNeverLoggedOnly] = useState(false);
+  const [bubblePending, setBubblePending] = useState(false);
+  const [bubbleMsg, setBubbleMsg] = useState<string | null>(null);
 
   const displayedUsers = useMemo(() => {
     const base = neverLoggedOnly ? initialUsers.filter((u) => !u.last_login_at) : [...initialUsers];
@@ -68,6 +70,27 @@ export function UsersAdmin({ initialUsers, currentEmail }: Props) {
       }
       router.refresh();
     });
+  }
+
+  function publishDailyBubble() {
+    if (readOnly) return;
+    setBubbleMsg(null);
+    setBubblePending(true);
+    void (async () => {
+      const res = await fetch('/api/admin/daily-bubble/publish', { method: 'POST' });
+      const j = (await res.json().catch(() => ({}))) as { status?: string; error?: string };
+      setBubblePending(false);
+      if (!res.ok) {
+        setBubbleMsg(j.error ?? `Publish failed (${res.status}). Check ANTHROPIC_API_KEY and migration 028.`);
+        return;
+      }
+      if (j.status === 'already_generated') {
+        setBubbleMsg('Today’s bubble already exists. Go to the dashboard (refresh if needed).');
+      } else {
+        setBubbleMsg('Published. Open or refresh the dashboard to see the banner.');
+      }
+      router.refresh();
+    })();
   }
 
   function toggleActive(user: AppUser, is_active: boolean) {
@@ -198,6 +221,26 @@ export function UsersAdmin({ initialUsers, currentEmail }: Props) {
               })}
             </tbody>
           </table>
+        </div>
+        <div className="rounded-md border border-dashed border-border/60 bg-muted/20 p-4 text-sm">
+          <p className="font-medium text-foreground">Did You Know — daily bubble</p>
+          <p className="mt-1 text-muted-foreground">
+            Apply migrations <span className="font-mono text-xs">028_daily_bubbles</span> and{' '}
+            <span className="font-mono text-xs">029_daily_bubble_fetch_fn</span>. Until the AI row exists, everyone
+            still sees a curated &quot;Did You Know&quot;; cron runs at 12:00 UTC or publish below.
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="mt-3"
+            disabled={readOnly || bubblePending}
+            title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+            onClick={publishDailyBubble}
+          >
+            {bubblePending ? 'Publishing…' : 'Publish today’s bubble (AI)'}
+          </Button>
+          {bubbleMsg ? <p className="mt-2 text-muted-foreground">{bubbleMsg}</p> : null}
         </div>
       </CardContent>
     </Card>
