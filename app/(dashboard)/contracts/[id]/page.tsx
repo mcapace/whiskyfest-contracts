@@ -282,8 +282,6 @@ export default async function ContractDetailPage({ params }: { params: { id: str
           <CardContent className="space-y-3 p-6 text-sm">
             <Detail label="Legal Name"   value={contract.exhibitor_legal_name} />
             <Detail label="Display Name" value={contract.exhibitor_company_name} />
-            <ExhibitorMailingAddressDetail contract={contract} />
-            <Detail label="Telephone"    value={contract.exhibitor_telephone} />
             <Detail label="Brands"       value={contract.brands_poured} />
             <Detail label="Sales Rep"    value={contract.sales_rep_name ?? contract.sales_rep_email ?? '—'} />
             <Detail label="Signer" value={contract.signer_1_name?.trim() || null} />
@@ -364,10 +362,10 @@ export default async function ContractDetailPage({ params }: { params: { id: str
 
         <Card className="lg:col-span-2">
           <div className="border-b border-border/50 px-6 py-4">
-            <h2 className="font-serif text-lg font-semibold">Billing & event contact</h2>
+            <h2 className="font-serif text-lg font-semibold">Exhibitor-provided information</h2>
           </div>
           <CardContent className="p-6 text-sm">
-            <ExhibitorBillingEventSection contract={contract} />
+            <ExhibitorProvidedInformationSection contract={contract} />
           </CardContent>
         </Card>
       </div>
@@ -430,9 +428,15 @@ export default async function ContractDetailPage({ params }: { params: { id: str
   );
 }
 
-function ExhibitorMailingAddressDetail({ contract }: { contract: ContractWithTotals }) {
+const EXHIBITOR_PROVIDED_PLACEHOLDER =
+  'This information will be collected from the exhibitor at signing.';
+
+function mailtoClass() {
+  return 'text-foreground underline decoration-primary/40 underline-offset-2 transition-colors hover:text-primary hover:decoration-primary';
+}
+
+function ExhibitorProvidedInformationSection({ contract }: { contract: ContractWithTotals }) {
   const captured = Boolean(contract.exhibitor_fields_captured_at);
-  const signingOrLater = ['sent', 'partially_signed', 'signed', 'executed'].includes(contract.status);
   const legacyRepMailing =
     !captured &&
     Boolean(
@@ -440,63 +444,46 @@ function ExhibitorMailingAddressDetail({ contract }: { contract: ContractWithTot
         contract.exhibitor_city?.trim() ||
         contract.exhibitor_country?.trim(),
     );
-
-  if (captured || legacyRepMailing) {
-    const block = formatExhibitorAddressBlock(contract) || '—';
-    return <Detail label="Mailing address" value={block} multiline />;
-  }
-
-  if (signingOrLater) {
-    return (
-      <Detail
-        label="Mailing address"
-        value="Mailing address, billing address, billing contact, and event contact will be collected from the exhibitor at signing."
-      />
-    );
-  }
-
-  return (
-    <Detail
-      label="Mailing address"
-      value="Mailing address, billing address, billing contact, and event contact will be collected from the exhibitor at signing."
-    />
-  );
-}
-
-function ExhibitorBillingEventSection({ contract }: { contract: ContractWithTotals }) {
-  const captured = Boolean(contract.exhibitor_fields_captured_at);
-  const signingOrLater = ['sent', 'partially_signed', 'signed', 'executed'].includes(contract.status);
   const legacyRepBilling =
     !captured &&
     contract.billing_same_as_corporate === false &&
     Boolean(contract.billing_address_line1?.trim() || contract.billing_city?.trim());
+  const legacyPhone = !captured && Boolean(contract.exhibitor_telephone?.trim());
+  const hasLegacy = legacyRepMailing || legacyRepBilling || legacyPhone;
 
   if (captured) {
     const billEmail = contract.billing_contact_email?.trim();
     const evEmail = contract.event_contact_email?.trim();
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div>
-          <p className="wf-label-caps mb-2 text-[0.6rem] text-muted-foreground">Billing (exhibitor-provided)</p>
+          <p className="wf-label-caps mb-2 text-[0.6rem] text-muted-foreground">Mailing address</p>
+          <Detail label="Corporate / mailing" value={formatExhibitorAddressBlock(contract) || '—'} multiline />
+        </div>
+        <div className="border-t border-border/50 pt-6">
+          <p className="wf-label-caps mb-2 text-[0.6rem] text-muted-foreground">Telephone</p>
+          <Detail label="Phone" value={contract.exhibitor_telephone?.trim() || '—'} />
+        </div>
+        <div className="border-t border-border/50 pt-6">
+          <p className="wf-label-caps mb-2 text-[0.6rem] text-muted-foreground">Billing</p>
           <div className="space-y-3">
-            <Detail label="Contact" value={contract.billing_contact_name?.trim() || '—'} />
+            <Detail label="Contact name" value={contract.billing_contact_name?.trim() || '—'} />
             <Detail
-              label="Email"
+              label="Contact email"
               value={
                 billEmail ? (
-                  <a
-                    href={`mailto:${billEmail}`}
-                    className="text-foreground underline decoration-primary/40 underline-offset-2 transition-colors hover:text-primary hover:decoration-primary"
-                  >
+                  <a href={`mailto:${billEmail}`} className={mailtoClass()}>
                     {billEmail}
                   </a>
-                ) : null
+                ) : (
+                  '—'
+                )
               }
             />
-            <Detail label="Address" value={formatBillingAddressBlock(contract)} multiline />
+            <Detail label="Billing address" value={formatBillingAddressBlock(contract)} multiline />
           </div>
         </div>
-        <div className="border-t border-border/50 pt-4">
+        <div className="border-t border-border/50 pt-6">
           <p className="wf-label-caps mb-2 text-[0.6rem] text-muted-foreground">Event contact</p>
           <div className="space-y-3">
             <Detail
@@ -507,10 +494,7 @@ function ExhibitorBillingEventSection({ contract }: { contract: ContractWithTota
               label="Email"
               value={
                 evEmail ? (
-                  <a
-                    href={`mailto:${evEmail}`}
-                    className="text-foreground underline decoration-primary/40 underline-offset-2 transition-colors hover:text-primary hover:decoration-primary"
-                  >
+                  <a href={`mailto:${evEmail}`} className={mailtoClass()}>
                     {evEmail}
                   </a>
                 ) : (
@@ -524,30 +508,79 @@ function ExhibitorBillingEventSection({ contract }: { contract: ContractWithTota
     );
   }
 
-  if (signingOrLater) {
+  if (hasLegacy) {
+    const billEmail = contract.billing_contact_email?.trim();
+    const evEmail = contract.event_contact_email?.trim();
     return (
-      <p className="text-muted-foreground">
-        Billing contact, billing address, and event contact will be provided by the exhibitor at signing.
-      </p>
-    );
-  }
-
-  if (legacyRepBilling) {
-    return (
-      <div className="space-y-3">
+      <div className="space-y-6">
         <p className="text-xs font-medium text-amber-900 dark:text-amber-200">
-          Legacy billing address (sales rep entered before exhibitor DocuSign collection).
+          Some values were saved by a sales rep before exhibitor-only DocuSign fields; newer contracts collect these only
+          at signing.
         </p>
-        <Detail label="Billing address" value={formatBillingAddressBlock(contract)} multiline />
+        <div>
+          <p className="wf-label-caps mb-2 text-[0.6rem] text-muted-foreground">Mailing address</p>
+          <Detail
+            label="Corporate / mailing"
+            value={legacyRepMailing ? formatExhibitorAddressBlock(contract) || '—' : '—'}
+            multiline
+          />
+        </div>
+        <div className="border-t border-border/50 pt-6">
+          <p className="wf-label-caps mb-2 text-[0.6rem] text-muted-foreground">Telephone</p>
+          <Detail
+            label="Phone"
+            value={legacyPhone && contract.exhibitor_telephone?.trim() ? contract.exhibitor_telephone.trim() : '—'}
+          />
+        </div>
+        <div className="border-t border-border/50 pt-6">
+          <p className="wf-label-caps mb-2 text-[0.6rem] text-muted-foreground">Billing</p>
+          <div className="space-y-3">
+            <Detail label="Contact name" value={contract.billing_contact_name?.trim() || '—'} />
+            <Detail
+              label="Contact email"
+              value={
+                billEmail ? (
+                  <a href={`mailto:${billEmail}`} className={mailtoClass()}>
+                    {billEmail}
+                  </a>
+                ) : (
+                  '—'
+                )
+              }
+            />
+            <Detail
+              label="Billing address"
+              value={legacyRepBilling ? formatBillingAddressBlock(contract) : '—'}
+              multiline
+            />
+          </div>
+        </div>
+        <div className="border-t border-border/50 pt-6">
+          <p className="wf-label-caps mb-2 text-[0.6rem] text-muted-foreground">Event contact</p>
+          <div className="space-y-3">
+            <Detail
+              label="Name"
+              value={contract.event_contact_name?.trim() ? contract.event_contact_name.trim() : 'Not provided'}
+            />
+            <Detail
+              label="Email"
+              value={
+                evEmail ? (
+                  <a href={`mailto:${evEmail}`} className={mailtoClass()}>
+                    {evEmail}
+                  </a>
+                ) : (
+                  'Not provided'
+                )
+              }
+            />
+          </div>
+        </div>
       </div>
     );
   }
 
-  return (
-    <p className="text-muted-foreground">
-      Billing contact, billing address, and event contact information will be collected from the exhibitor at signing.
-    </p>
-  );
+  return <p className="text-muted-foreground">{EXHIBITOR_PROVIDED_PLACEHOLDER}</p>;
 }
 
 function Detail({

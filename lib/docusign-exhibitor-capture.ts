@@ -15,6 +15,7 @@ export type ExhibitorCaptureDbRow = {
   exhibitor_state: string | null;
   exhibitor_zip: string | null;
   exhibitor_country: string | null;
+  exhibitor_telephone: string | null;
   billing_contact_name: string | null;
   billing_contact_email: string | null;
   billing_address_line1: string | null;
@@ -34,8 +35,8 @@ function gv(map: Record<string, string>, k: string): string {
 }
 
 /**
- * Returns DB patch when required mailing + billing tabs are present; otherwise null.
- * `exhibitor_fields_captured_at` marks capture of mailing, billing, and optional event fields together.
+ * Returns DB patch when required mailing + phone + billing tabs are present; otherwise null.
+ * `exhibitor_fields_captured_at` marks capture of mailing, phone, billing, and optional event fields together.
  */
 export function buildExhibitorCaptureDbPatch(map: Record<string, string>): ExhibitorCaptureDbRow | null {
   const exhibitor_address_line1 = gv(map, 'exhibitor_address_line1');
@@ -43,6 +44,7 @@ export function buildExhibitorCaptureDbPatch(map: Record<string, string>): Exhib
   const exhibitor_state = gv(map, 'exhibitor_state');
   const exhibitor_zip = gv(map, 'exhibitor_zip');
   const exhibitor_country = gv(map, 'exhibitor_country');
+  const exhibitor_telephone = gv(map, 'exhibitor_telephone');
 
   const billing_contact_name = gv(map, 'billing_contact_name');
   const billing_contact_email = gv(map, 'billing_contact_email');
@@ -58,6 +60,7 @@ export function buildExhibitorCaptureDbPatch(map: Record<string, string>): Exhib
     !exhibitor_state ||
     !exhibitor_zip ||
     !exhibitor_country ||
+    !exhibitor_telephone ||
     !billing_contact_name ||
     !billing_contact_email ||
     !billing_address_line1 ||
@@ -81,6 +84,7 @@ export function buildExhibitorCaptureDbPatch(map: Record<string, string>): Exhib
     exhibitor_state,
     exhibitor_zip,
     exhibitor_country,
+    exhibitor_telephone,
     billing_contact_name,
     billing_contact_email,
     billing_address_line1,

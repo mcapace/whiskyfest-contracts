@@ -61,6 +61,7 @@ export default async function AccountingContractDetailPage({ params }: { params:
   const billingBlock = contract.exhibitor_fields_captured_at
     ? [
         mailingBlock.trim() ? `Mailing:\n${mailingBlock}` : null,
+        contract.exhibitor_telephone?.trim() ? `Phone:\n${contract.exhibitor_telephone.trim()}` : null,
         contract.billing_contact_name,
         contract.billing_contact_email,
         formatBillingAddressBlock(contract),

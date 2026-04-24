@@ -81,8 +81,8 @@ export function SignerContactEdit({ contractId, initialName, initialTitle, initi
         <DialogHeader>
           <DialogTitle>Edit exhibitor signer</DialogTitle>
           <DialogDescription>
-            Update the DocuSign recipient name and email before sending. Mailing address is collected from the exhibitor
-            at signing.
+            Update the DocuSign recipient name and email before sending. Mailing address, telephone, billing, and event
+            contact are collected from the exhibitor at signing.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-5">

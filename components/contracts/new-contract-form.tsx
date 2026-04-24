@@ -22,7 +22,6 @@ export type ContractFormValues = {
   event_id: string;
   exhibitor_legal_name: string;
   exhibitor_company_name: string;
-  exhibitor_telephone: string;
   brands_poured: string;
   booth_count: number;
   booth_rate_cents: number;
@@ -45,14 +44,6 @@ interface Props {
   editContractId?: string;
   initialValues?: Partial<ContractFormValues>;
   initialLineItems?: InitialContractLineItem[];
-}
-
-function formatUsPhone(raw: string): string {
-  const digits = raw.replace(/\D/g, '').slice(0, 10);
-  if (digits.length === 0) return '';
-  if (digits.length < 4) return `(${digits}`;
-  if (digits.length < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
-  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
 /** Pretty-print USD with commas for line-item amount fields (on blur). */
@@ -114,7 +105,6 @@ export function NewContractForm({
     event_id:               initialValues?.event_id ?? defaultEvent?.id ?? '',
     exhibitor_legal_name:   initialValues?.exhibitor_legal_name ?? '',
     exhibitor_company_name: initialValues?.exhibitor_company_name ?? '',
-    exhibitor_telephone:    initialValues?.exhibitor_telephone ?? '',
     brands_poured:          initialValues?.brands_poured ?? '',
     booth_count:            initialValues?.booth_count ?? 1,
     booth_rate_cents:       defaultBoothRateCents,
@@ -286,20 +276,10 @@ export function NewContractForm({
               <Input value={form.exhibitor_legal_name} onChange={e => set('exhibitor_legal_name', e.target.value)} placeholder="Sample Distillery Inc." required />
             </Field>
             <div className="rounded-md border border-dashed border-border/70 bg-muted/15 px-3 py-2.5 text-sm text-muted-foreground">
-              Mailing address, billing address, billing contact, and event contact will be collected from the exhibitor
-              at signing.
+              Mailing address, telephone, billing address, billing contact, and event contact will be collected from
+              the exhibitor at signing.
             </div>
 
-            <Field label="Telephone">
-              <Input
-                inputMode="tel"
-                autoComplete="tel"
-                value={form.exhibitor_telephone}
-                onChange={(e) => set('exhibitor_telephone', formatUsPhone(e.target.value))}
-                onBlur={(e) => set('exhibitor_telephone', formatUsPhone(e.target.value))}
-                placeholder="(502) 555-0100"
-              />
-            </Field>
             <Field label="Brands Poured" hint="Comma-separated list; printed on the 'List brand(s) here' line">
               <Input value={form.brands_poured} onChange={e => set('brands_poured', e.target.value)} placeholder="Sample Bourbon, Sample Rye" />
             </Field>

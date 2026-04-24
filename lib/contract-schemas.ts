@@ -8,13 +8,12 @@ const lineItemInputSchema = z.object({
 
 /**
  * New contract (POST) and full draft update (PATCH when status = draft).
- * Mailing address, billing, and event contact are collected from the exhibitor via DocuSign text tabs.
+ * Mailing address, telephone, billing, and event contact are collected from the exhibitor via DocuSign text tabs.
  */
 export const newContractBodySchema = z.object({
   event_id: z.string().uuid(),
   exhibitor_legal_name: z.string().min(1),
   exhibitor_company_name: z.string().min(1),
-  exhibitor_telephone: z.string().optional().nullable(),
   brands_poured: z.string().optional().nullable(),
   booth_count: z.number().int().min(1),
   booth_rate_cents: z.number().int().min(0),
@@ -29,7 +28,7 @@ export const newContractBodySchema = z.object({
 
 export type NewContractBody = z.infer<typeof newContractBodySchema>;
 
-/** Billing + mailing columns are not rep-edited; cleared until exhibitor DocuSign capture. */
+/** Exhibitor-provided columns (mailing, phone, billing) are not rep-edited; cleared until DocuSign capture. */
 export function clearedRepEnteredBilling() {
   return {
     exhibitor_address_line1: null as string | null,
@@ -38,6 +37,7 @@ export function clearedRepEnteredBilling() {
     exhibitor_state: null as string | null,
     exhibitor_zip: null as string | null,
     exhibitor_country: null as string | null,
+    exhibitor_telephone: null as string | null,
     billing_same_as_corporate: true as const,
     billing_address_line1: null as string | null,
     billing_address_line2: null as string | null,

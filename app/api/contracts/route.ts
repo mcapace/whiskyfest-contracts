@@ -113,7 +113,6 @@ export async function POST(req: Request) {
       event_id: p.event_id,
       exhibitor_legal_name: p.exhibitor_legal_name,
       exhibitor_company_name: p.exhibitor_company_name,
-      exhibitor_telephone: p.exhibitor_telephone ?? null,
       brands_poured: p.brands_poured ?? null,
       booth_count: p.booth_count,
       booth_rate_cents: p.booth_rate_cents,

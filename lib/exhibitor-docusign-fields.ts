@@ -10,6 +10,7 @@ export type ExhibitorFieldMergeMode = 'draft' | 'docusign';
  *   {{exhibitor_address_line2}}
  *   {{exhibitor_city}}, {{exhibitor_state}} {{exhibitor_zip}}
  *   {{exhibitor_country}}
+ *   {{exhibitor_telephone}}   (near "Telephone:" in FESTIVAL SPONSOR block)
  */
 export const EXHIBITOR_DOCUSIGN_TAB_LABELS = [
   'exhibitor_address_line1',
@@ -18,6 +19,7 @@ export const EXHIBITOR_DOCUSIGN_TAB_LABELS = [
   'exhibitor_state',
   'exhibitor_zip',
   'exhibitor_country',
+  'exhibitor_telephone',
   'billing_contact_name',
   'billing_contact_email',
   'billing_address_line1',
@@ -39,6 +41,7 @@ const ANCHOR: Record<ExhibitorDocuSignTabLabel, string> = {
   exhibitor_state: '\\mst\\',
   exhibitor_zip: '\\mzp\\',
   exhibitor_country: '\\mcy\\',
+  exhibitor_telephone: '\\mtl\\',
   billing_contact_name: '\\bcn\\',
   billing_contact_email: '\\bce\\',
   billing_address_line1: '\\ba1\\',
@@ -123,6 +126,15 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       required: 'true',
       anchorString: ANCHOR.exhibitor_country,
       anchorXOffset: '0',
+      anchorYOffset: '-0.06',
+      anchorUnits: 'inches',
+      documentId: '1',
+    },
+    {
+      tabLabel: 'exhibitor_telephone',
+      required: 'true',
+      anchorString: ANCHOR.exhibitor_telephone,
+      anchorXOffset: '0.12',
       anchorYOffset: '-0.06',
       anchorUnits: 'inches',
       documentId: '1',

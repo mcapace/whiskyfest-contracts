@@ -122,7 +122,6 @@ export function buildContractMergeMap(
     '{{exhibitor_legal_name}}': contract.exhibitor_legal_name,
     '{{exhibitor_company_name}}': contract.exhibitor_company_name,
     '{{exhibitor_address}}': formatExhibitorAddressBlock(contract),
-    '{{exhibitor_telephone}}': contract.exhibitor_telephone ?? '',
     '{{brands_poured}}': contract.brands_poured ?? '',
     '{{booth_count}}': String(contract.booth_count),
     '{{booth_rate}}': formatCurrency(contract.booth_rate_cents).replace('$', '').trim(),
