@@ -52,6 +52,8 @@ interface Props {
   boothCount: number;
   boothRateCents: number;
   grandTotalCents: number;
+  boothSubtotalCents: number;
+  lineItemsSubtotalCents: number;
   salesRep: string | null;
   salesRepEmail: string | null;
   countersignerName: string | null;
@@ -83,6 +85,8 @@ export function ContractActions({
   boothCount,
   boothRateCents,
   grandTotalCents,
+  boothSubtotalCents,
+  lineItemsSubtotalCents,
   salesRep,
   salesRepEmail,
   countersignerName,
@@ -477,6 +481,7 @@ export function ContractActions({
             {canVoid && (
               <Button
                 variant="destructive"
+                data-tour="contract-void-btn"
                 className={fabBtn}
                 onClick={() => setOpenVoid(true)}
                 disabled={readOnly}
@@ -552,8 +557,20 @@ export function ContractActions({
             <p>
               <span className="text-muted-foreground">Booth count:</span> {boothCount}
             </p>
+            {lineItemsSubtotalCents > 0 && (
+              <>
+                <p>
+                  <span className="text-muted-foreground">Booth subtotal:</span>{' '}
+                  {formatCurrency(boothSubtotalCents)}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Line items:</span>{' '}
+                  {formatCurrency(lineItemsSubtotalCents)}
+                </p>
+              </>
+            )}
             <p>
-              <span className="text-muted-foreground">Grand total:</span> {formatCurrency(grandTotalCents)}
+              <span className="text-muted-foreground">Contract total:</span> {formatCurrency(grandTotalCents)}
             </p>
             <p>
               <span className="text-muted-foreground">Sales rep:</span> {salesRep ?? '—'}

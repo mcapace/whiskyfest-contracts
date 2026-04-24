@@ -160,6 +160,19 @@ create index if not exists contracts_discount_pending_idx
   on contracts (id)
   where booth_rate_cents < 1500000 and discount_approved_at is null;
 
+-- Optional per-contract charges (sponsorships, activations, etc.)
+create table if not exists contract_line_items (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references contracts(id) on delete cascade,
+  description text not null check (char_length(description) between 1 and 200),
+  amount_cents integer not null check (amount_cents >= 0),
+  display_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists contract_line_items_contract_id_idx on contract_line_items (contract_id);
+
 -- Accounting / AR (mirrors migration 018_add_accounting_layer.sql)
 alter table contracts add column if not exists invoice_status text not null default 'pending';
 alter table contracts add column if not exists invoice_sent_at timestamptz;
@@ -189,13 +202,20 @@ alter table audit_log add column if not exists impersonation_target_email text;
 create or replace view contracts_with_totals as
 select
   c.*,
-  (c.booth_count * c.booth_rate_cents)                        as booth_subtotal_cents,
-  0::int                                                      as additional_brand_fee_cents,
-  (c.booth_count * c.booth_rate_cents)                        as grand_total_cents,
+  (c.booth_count * c.booth_rate_cents) as booth_subtotal_cents,
+  0::int as additional_brand_fee_cents,
+  coalesce(li.line_items_total_cents, 0)::integer as line_items_total_cents,
+  ((c.booth_count * c.booth_rate_cents) + coalesce(li.line_items_total_cents, 0))::integer as grand_total_cents,
+  ((c.booth_count * c.booth_rate_cents) + coalesce(li.line_items_total_cents, 0))::integer as total_amount_cents,
   sr.name as sales_rep_name,
   sr.email as sales_rep_email
 from contracts c
-left join sales_reps sr on sr.id = c.sales_rep_id;
+left join sales_reps sr on sr.id = c.sales_rep_id
+left join (
+  select contract_id, sum(amount_cents)::bigint as line_items_total_cents
+  from contract_line_items
+  group by contract_id
+) li on li.contract_id = c.id;
 
 -- -----------------------------------------------------------------------------
 -- AUDIT LOG — immutable trail of status changes + key actions
@@ -311,6 +331,11 @@ create trigger trg_sales_reps_updated
   before update on sales_reps
   for each row execute function set_updated_at();
 
+drop trigger if exists contract_line_items_set_updated_at on contract_line_items;
+create trigger contract_line_items_set_updated_at
+  before update on contract_line_items
+  for each row execute function set_updated_at();
+
 -- Status-change audit
 create or replace function log_status_change() returns trigger as $$
 begin
@@ -327,6 +352,56 @@ create trigger trg_contracts_audit
   for each row execute function log_status_change();
 
 -- -----------------------------------------------------------------------------
+-- RLS helper — same audience as contract PDF reads (reps, assistants, events, admin, accounting executed)
+-- -----------------------------------------------------------------------------
+create or replace function user_can_read_contract_by_id(p_contract_id uuid)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_email text;
+begin
+  v_email := lower(trim(coalesce(auth.jwt()->>'email', '')));
+  if v_email = '' then
+    return false;
+  end if;
+
+  return exists (
+    select 1
+    from contracts c
+    join app_users au on lower(au.email) = v_email and au.is_active = true
+    where c.id = p_contract_id
+      and (
+        au.role = 'admin'
+        or coalesce(au.is_events_team, false) = true
+        or (
+          coalesce(au.is_accounting, false) = true
+          and c.status = 'executed'
+        )
+        or exists (
+          select 1 from sales_reps sr
+          where sr.id = c.sales_rep_id
+            and lower(sr.email) = v_email
+            and coalesce(sr.is_active, true) = true
+        )
+        or exists (
+          select 1 from rep_assistants ra
+          where ra.rep_id = c.sales_rep_id
+            and lower(ra.assistant_email) = v_email
+        )
+      )
+  );
+end;
+$$;
+
+revoke all on function user_can_read_contract_by_id(uuid) from public;
+grant execute on function user_can_read_contract_by_id(uuid) to authenticated;
+grant execute on function user_can_read_contract_by_id(uuid) to service_role;
+
+-- -----------------------------------------------------------------------------
 -- ROW LEVEL SECURITY
 -- Enabled but permissive in Phase 1 — tighten per role in Phase 2.
 -- App authenticates via service role key from Next.js server actions,
@@ -340,6 +415,7 @@ alter table audit_log enable row level security;
 alter table app_users enable row level security;
 alter table access_requests enable row level security;
 alter table rep_assistants enable row level security;
+alter table contract_line_items enable row level security;
 
 -- Service role bypasses RLS; these permissive policies are for anon safety.
 drop policy if exists deny_anon_contracts on contracts;
@@ -361,6 +437,42 @@ create policy deny_anon_users on app_users for all to anon using (false);
 
 drop policy if exists deny_anon_rep_assistants on rep_assistants;
 create policy deny_anon_rep_assistants on rep_assistants for all to anon using (false);
+
+drop policy if exists deny_anon_contract_line_items on contract_line_items;
+create policy deny_anon_contract_line_items on contract_line_items for all to anon using (false);
+
+drop policy if exists contract_line_items_select on contract_line_items;
+create policy contract_line_items_select
+  on contract_line_items for select to authenticated
+  using (user_can_read_contract_by_id(contract_id));
+
+drop policy if exists contract_line_items_insert on contract_line_items;
+create policy contract_line_items_insert
+  on contract_line_items for insert to authenticated
+  with check (
+    user_can_read_contract_by_id(contract_id)
+    and exists (select 1 from contracts c where c.id = contract_id and c.status = 'draft')
+  );
+
+drop policy if exists contract_line_items_update on contract_line_items;
+create policy contract_line_items_update
+  on contract_line_items for update to authenticated
+  using (
+    user_can_read_contract_by_id(contract_id)
+    and exists (select 1 from contracts c where c.id = contract_id and c.status = 'draft')
+  )
+  with check (
+    user_can_read_contract_by_id(contract_id)
+    and exists (select 1 from contracts c where c.id = contract_id and c.status = 'draft')
+  );
+
+drop policy if exists contract_line_items_delete on contract_line_items;
+create policy contract_line_items_delete
+  on contract_line_items for delete to authenticated
+  using (
+    user_can_read_contract_by_id(contract_id)
+    and exists (select 1 from contracts c where c.id = contract_id and c.status = 'draft')
+  );
 
 -- -----------------------------------------------------------------------------
 -- SEED — WhiskyFest NYC 2026 event + a test contract

@@ -107,10 +107,24 @@ export interface Contract {
   notes: string | null;
 }
 
+export interface ContractLineItem {
+  id: string;
+  contract_id: string;
+  description: string;
+  amount_cents: number;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ContractWithTotals extends Contract {
   booth_subtotal_cents: number;
   additional_brand_fee_cents: number;
+  /** Sum of optional `contract_line_items` amounts. */
+  line_items_total_cents: number;
+  /** Booth subtotal + line items (same as `total_amount_cents`). */
   grand_total_cents: number;
+  total_amount_cents: number;
   sales_rep_name: string | null;
   sales_rep_email: string | null;
   event?: Event;

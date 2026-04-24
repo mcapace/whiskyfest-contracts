@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAdmin } from '@/lib/api-auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { renderContractPdfFromTemplate } from '@/lib/google';
+import { fetchContractLineItemsOrdered } from '@/lib/contract-line-items';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { sendEnvelope, voidEnvelope } from '@/lib/docusign';
@@ -58,6 +59,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const { data: event } = await supabase.from('events').select('*').eq('id', contract.event_id).single<Event>();
   if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
 
+  const lineItems = await fetchContractLineItemsOrdered(supabase, contract.id);
+
   const oldSignerEmail = contract.signer_1_email ?? null;
   const oldSignerName = contract.signer_1_name ?? null;
   const newSignerName = parsed.data.signer_1_name ?? oldSignerName;
@@ -96,7 +99,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const safeCompany = contract.exhibitor_company_name.replace(/[^\w\s-]/g, '');
   const templateDocId = process.env.GOOGLE_TEMPLATE_DOC_ID!;
-  const mergeMap = buildContractMergeMap(mergedContract, event, 'docusign');
+  const mergeMap = buildContractMergeMap(mergedContract, event, 'docusign', lineItems);
   const fileName = `${safeCompany} — WhiskyFest ${event.year} Contract (DocuSign)`;
 
   let newEnvelopeId: string;

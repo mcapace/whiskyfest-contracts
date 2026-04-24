@@ -7,7 +7,7 @@ import {
 } from '@/lib/contracts';
 import { formatCurrency } from '@/lib/utils';
 import { formatEventDateForMerge, getAgreementDatePartsInDisplayZone } from '@/lib/datetime';
-import type { ContractWithTotals, Event } from '@/types/db';
+import type { ContractLineItem, ContractWithTotals, Event } from '@/types/db';
 
 /** Draft PDFs use blank lines; DocuSign send uses literal anchor strings in the PDF. */
 export type MergePlaceholderMode = 'draft' | 'docusign';
@@ -31,6 +31,28 @@ const GOOGLE_DOCS_CELL_LINE_BREAK = '\u000b';
 
 function formatMoney(cents: number): string {
   return formatCurrency(cents);
+}
+
+/** Google Doc tokens often omit the leading `$` (matches `{{grand_total}}`). */
+function moneyTokenNoDollar(cents: number): string {
+  return formatCurrency(cents).replace('$', '').trim();
+}
+
+/**
+ * Plain-text block for `{{LINE_ITEMS_SECTION}}` (paragraph placeholder in the template).
+ * Empty string when there are no line items.
+ */
+export function buildLineItemsSectionForMerge(lineItems: ContractLineItem[]): string {
+  if (!lineItems.length) return '';
+  const lines: string[] = ['Additional Line Items:', ''];
+  let sum = 0;
+  for (const item of lineItems) {
+    sum += item.amount_cents;
+    lines.push(`${item.description}: ${formatCurrency(item.amount_cents, { showCents: true })}`);
+  }
+  lines.push('');
+  lines.push(`Line items subtotal: ${formatCurrency(sum, { showCents: true })}`);
+  return lines.join('\n');
 }
 
 /**
@@ -72,10 +94,12 @@ export function buildContractMergeMap(
   contract: ContractWithTotals,
   event: Event,
   mode: MergePlaceholderMode,
+  lineItems: ContractLineItem[] = [],
 ): Record<string, string> {
   const agreement = getAgreementDatePartsInDisplayZone();
 
   const pricing = buildPricingComposition(contract);
+  const lineItemsSection = buildLineItemsSectionForMerge(lineItems);
 
   const discounted = isDiscountedRate(contract.booth_rate_cents);
   const listBoothRateDisplay = formatCurrency(STANDARD_BOOTH_RATE_CENTS);
@@ -127,7 +151,9 @@ export function buildContractMergeMap(
     '{{pricing_amount}}': pricing.pricing_amount,
     '{{additional_brand_count}}': String(contract.additional_brand_count),
     '{{additional_brand_fee}}': formatCurrency(contract.additional_brand_fee_cents).replace('$', '').trim(),
-    '{{grand_total}}': formatCurrency(contract.grand_total_cents).replace('$', '').trim(),
+    '{{grand_total}}': moneyTokenNoDollar(contract.grand_total_cents),
+    '{{TOTAL_AMOUNT}}': moneyTokenNoDollar(contract.grand_total_cents),
+    '{{LINE_ITEMS_SECTION}}': lineItemsSection,
     '{{list_booth_rate}}': listBoothRateDisplay,
     '{{discount_description}}': discountDescription,
     '{{discount_amount}}': discountAmountDisplay,

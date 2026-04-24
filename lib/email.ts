@@ -21,6 +21,10 @@ export interface AccountingEmailPayload {
   boothRateCents: number;
   /** Human-readable discount row, e.g. "$500 off list" or "—" */
   discountLine: string;
+  /** Booth package subtotal (booth count × rate). */
+  boothSubtotalCents: number;
+  /** Sum of optional line items; omit or zero when none. */
+  lineItemsSubtotalCents?: number;
   grandTotalCents: number;
   salesRepName: string | null;
   executedAtFormatted: string;
@@ -72,6 +76,16 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
 
   const signerLine = [p.signerName, p.signerTitle].filter(Boolean).join(', ') || '—';
 
+  const li = p.lineItemsSubtotalCents ?? 0;
+  const amountLines =
+    li > 0
+      ? [
+          `Booth package: ${formatCents(p.boothSubtotalCents)}`,
+          `Line items: ${formatCents(li)}`,
+          `Total: ${formatCents(p.grandTotalCents)}`,
+        ]
+      : [`Total: ${formatCents(p.grandTotalCents)}`];
+
   const text = [
     `A new contract has been executed and is ready for invoicing.`,
     ``,
@@ -84,7 +98,7 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
     `Booth Count: ${p.boothCount}`,
     `Booth Rate: ${formatCents(p.boothRateCents)}`,
     `Discount: ${p.discountLine}`,
-    `Total: ${formatCents(p.grandTotalCents)}`,
+    ...amountLines,
     `Sales Rep: ${p.salesRepName ?? '—'}`,
     `Executed Date: ${p.executedAtFormatted}`,
     `Countersigner: ${p.countersignedByName ?? '—'}`,
@@ -110,7 +124,13 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
           ${row('Booth Count', escape(String(p.boothCount)))}
           ${row('Booth Rate', escape(formatCents(p.boothRateCents)))}
           ${row('Discount', escape(p.discountLine))}
-          ${row('Total', escape(formatCents(p.grandTotalCents)))}
+          ${
+            li > 0
+              ? row('Booth package', escape(formatCents(p.boothSubtotalCents))) +
+                row('Line items', escape(formatCents(li))) +
+                row('Total', escape(formatCents(p.grandTotalCents)))
+              : row('Total', escape(formatCents(p.grandTotalCents)))
+          }
           ${row('Sales Rep', escape(p.salesRepName ?? '—'))}
           ${row('Executed Date', escape(p.executedAtFormatted))}
           ${row('Countersigner', escape(p.countersignedByName ?? '—'))}

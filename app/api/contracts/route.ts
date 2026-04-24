@@ -4,9 +4,10 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { resolveContractActor } from '@/lib/auth-contract';
 import { newContractBodySchema, normalizedBillingColumns } from '@/lib/contract-schemas';
+import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
 import { isDiscountedRate } from '@/lib/contracts';
 import { notifyAdminsOfDiscountRequest } from '@/lib/notifications';
-import type { Contract } from '@/types/db';
+import type { Contract, ContractWithTotals } from '@/types/db';
 import type { ContractStatus } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
@@ -150,6 +151,13 @@ export async function POST(req: Request) {
 
   const row = data as Contract;
 
+  try {
+    await replaceContractLineItemsForContract(supabase, row.id, p.line_items ?? []);
+  } catch (e) {
+    console.error('Failed to save contract line items:', e);
+    return NextResponse.json({ error: e instanceof Error ? e.message : 'Failed to save line items' }, { status: 500 });
+  }
+
   await supabase.from('audit_log').insert({
     contract_id: row.id,
     actor_email: actor.email,
@@ -171,16 +179,19 @@ export async function POST(req: Request) {
 
   revalidateContractPaths(row.id);
 
-  const grandTotalCents = row.booth_count * row.booth_rate_cents;
   if (isDiscountedRate(row.booth_rate_cents)) {
     try {
-      await notifyAdminsOfDiscountRequest(
-        {
-          ...row,
-          grand_total_cents: grandTotalCents,
-        },
-        { email: actor.email, name: actor.appUser.name ?? undefined },
-      );
+      const { data: withTotals } = await supabase
+        .from('contracts_with_totals')
+        .select('*')
+        .eq('id', row.id)
+        .maybeSingle();
+      if (withTotals) {
+        await notifyAdminsOfDiscountRequest(withTotals as ContractWithTotals, {
+          email: actor.email,
+          name: actor.appUser.name ?? undefined,
+        });
+      }
     } catch (e) {
       console.error('notifyAdminsOfDiscountRequest failed:', e);
     }

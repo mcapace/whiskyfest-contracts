@@ -52,6 +52,14 @@ pnpm dev
 
 App runs at http://localhost:3000
 
+### Google Docs contract template (line items)
+
+After applying migration `025_contract_line_items.sql`, update the **Google Doc** used for PDFs (`GOOGLE_TEMPLATE_DOC_ID` in your env). Reference template document ID: `1W5wJvMPZUlHfIkZ7yscYBFQrVATzrvwNhHTNrupeQP4`.
+
+1. Open that template in Google Drive (or the doc your `GOOGLE_TEMPLATE_DOC_ID` points to).
+2. After the booth / pricing section, add a **new paragraph** containing exactly: `{{LINE_ITEMS_SECTION}}` (plain text placeholder; not a table). When the contract has no line items, this token is replaced with nothing so no blank block appears.
+3. Optionally add `{{TOTAL_AMOUNT}}` anywhere you want the full contract total (booth + line items); `{{grand_total}}` is updated the same way.
+
 ### Key contacts
 
 - **Owner / Product**: Michael Capace (mcapace@mshanken.com)

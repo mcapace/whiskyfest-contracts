@@ -5,6 +5,7 @@ import { STANDARD_BOOTH_RATE_CENTS } from '@/lib/contracts';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { assertContractAccess } from '@/lib/auth-contract';
 import { newContractBodySchema, normalizedBillingColumns, signerContactPatchSchema } from '@/lib/contract-schemas';
+import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
 import type { ContractStatus } from '@/types/db';
 
 const signerEditableStatuses: ContractStatus[] = ['approved', 'ready_for_review', 'pending_events_review'];
@@ -99,6 +100,13 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (error) {
       console.error('PATCH draft contract failed:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    try {
+      await replaceContractLineItemsForContract(supabase, params.id, p.line_items ?? []);
+    } catch (e) {
+      console.error('Failed to save contract line items:', e);
+      return NextResponse.json({ error: e instanceof Error ? e.message : 'Failed to save line items' }, { status: 500 });
     }
 
     if (shouldResetDiscountApproval && contract.discount_approved_at) {

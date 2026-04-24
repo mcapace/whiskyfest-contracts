@@ -14,7 +14,7 @@ import { ContractActions } from '@/components/contracts/contract-actions';
 import { SignerContactEdit } from '@/components/contracts/signer-contact-edit';
 import { ContractProgressionTimeline } from '@/components/contract/progression-timeline';
 import { ContractSummarySection } from '@/components/contract/contract-summary-section';
-import type { ContractWithTotals, Event, AuditLogEntry } from '@/types/db';
+import type { ContractLineItem, ContractWithTotals, Event, AuditLogEntry } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,10 +34,18 @@ export default async function ContractDetailPage({ params }: { params: { id: str
 
   const { contract, actor } = viewed;
   const supabase = getSupabaseAdmin();
-  const [{ data: event }, audit] = await Promise.all([
+  const [{ data: event }, audit, { data: lineItemsRows }] = await Promise.all([
     supabase.from('events').select('*').eq('id', contract.event_id).single(),
     loadAudit(contract.id),
+    supabase
+      .from('contract_line_items')
+      .select('*')
+      .eq('contract_id', contract.id)
+      .order('display_order', { ascending: true })
+      .order('created_at', { ascending: true }),
   ]);
+
+  const lineItems = (lineItemsRows ?? []) as ContractLineItem[];
 
   const isAdmin = actor.isAdmin;
   const isEventsTeam = actor.isEventsTeam;
@@ -238,6 +246,8 @@ export default async function ContractDetailPage({ params }: { params: { id: str
             boothCount={contract.booth_count}
             boothRateCents={contract.booth_rate_cents}
             grandTotalCents={contract.grand_total_cents}
+            boothSubtotalCents={contract.booth_subtotal_cents}
+            lineItemsSubtotalCents={contract.line_items_total_cents ?? 0}
             salesRep={contract.sales_rep_name ?? contract.sales_rep_email ?? null}
             salesRepEmail={contract.sales_rep_email ?? null}
             countersignerName={event?.shanken_signatory_name ?? null}
@@ -302,12 +312,32 @@ export default async function ContractDetailPage({ params }: { params: { id: str
             <h2 className="font-serif text-lg font-semibold">Pricing</h2>
           </div>
           <CardContent className="space-y-3 p-6 text-sm">
-            <Detail label="Booth Count" value={String(contract.booth_count)} />
-            <Detail label="Booth Rate"  value={formatCurrency(contract.booth_rate_cents)} mono />
-            <Detail label="Booth Total" value={formatCurrency(contract.booth_subtotal_cents)} mono />
+            <p className="wf-label-caps text-[0.6rem] text-muted-foreground">Booth Package</p>
+            <Detail label="Booth count" value={String(contract.booth_count)} />
+            <Detail label="Rate per booth" value={formatCurrency(contract.booth_rate_cents)} mono />
+            <Detail label="Booth subtotal" value={formatCurrency(contract.booth_subtotal_cents)} mono />
+            {lineItems.length > 0 && (
+              <div className="border-t border-border/50 pt-4">
+                <p className="wf-label-caps text-[0.6rem] text-muted-foreground">Line Items</p>
+                <dl className="mt-3 space-y-2.5">
+                  {lineItems.map((li) => (
+                    <div key={li.id} className="flex justify-between gap-4">
+                      <dt className="min-w-0 flex-1 pr-2 text-foreground">{li.description}</dt>
+                      <dd className="shrink-0 font-mono tabular-nums">{formatCurrency(li.amount_cents)}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <div className="mt-3 flex justify-between border-t border-border/40 pt-2 text-sm font-medium">
+                  <span>Line items subtotal</span>
+                  <span className="font-mono tabular-nums">
+                    {formatCurrency(contract.line_items_total_cents ?? 0)}
+                  </span>
+                </div>
+              </div>
+            )}
             <div className="border-t border-border/50 pt-3">
               <div className="flex items-baseline justify-between">
-                <span className="font-serif text-base font-semibold">Grand Total</span>
+                <span className="font-serif text-base font-semibold">Contract total</span>
                 <span className="font-mono text-lg font-semibold tabular-nums text-fest-900">
                   {formatCurrency(contract.grand_total_cents)}
                 </span>

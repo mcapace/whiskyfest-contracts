@@ -4,6 +4,7 @@ import { assertContractAccess } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { renderContractPdfFromTemplate, uploadPdfBufferToFolder } from '@/lib/google';
 import { contractDraftPdfPath, uploadContractPdfToStorage } from '@/lib/contract-pdf-storage';
+import { fetchContractLineItemsOrdered } from '@/lib/contract-line-items';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import { notifyEventsTeamOfPendingReview } from '@/lib/notifications';
 import { requiresDiscountApproval } from '@/lib/contracts';
@@ -40,7 +41,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
 
-  const mergeMap = buildContractMergeMap(contract, event, 'draft');
+  const lineItems = await fetchContractLineItemsOrdered(supabase, contract.id);
+  const mergeMap = buildContractMergeMap(contract, event, 'draft', lineItems);
 
   const templateDocId = process.env.GOOGLE_TEMPLATE_DOC_ID!;
   const draftsFolderId = process.env.GOOGLE_DRAFTS_FOLDER_ID!;

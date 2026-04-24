@@ -10,7 +10,7 @@ import { formatCurrency, formatTimestamp } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { AccountingDetailActions } from '@/components/accounting/accounting-detail-actions';
 import { InvoiceLifecycleTimeline } from '@/components/accounting/invoice-lifecycle';
-import type { ContractWithTotals, Event, InvoiceStatus } from '@/types/db';
+import type { ContractLineItem, ContractWithTotals, Event, InvoiceStatus } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +28,14 @@ export default async function AccountingContractDetailPage({ params }: { params:
   if (contract.status !== 'executed') notFound();
 
   const { data: event } = await supabase.from('events').select('*').eq('id', contract.event_id).maybeSingle<Event>();
+
+  const { data: accLineRows } = await supabase
+    .from('contract_line_items')
+    .select('*')
+    .eq('contract_id', contract.id)
+    .order('display_order', { ascending: true })
+    .order('created_at', { ascending: true });
+  const accLineItems = (accLineRows ?? []) as ContractLineItem[];
 
   const listCents = calculateListSubtotalCents(contract.booth_count);
   const discountCents = calculateDiscountCents(contract.booth_count, contract.booth_rate_cents);
@@ -87,7 +95,24 @@ export default async function AccountingContractDetailPage({ params }: { params:
               <Detail label="Event" value={event ? `${event.name} ${event.year}` : '—'} />
               <Detail label="Booth Rate" value={formatCurrency(contract.booth_rate_cents)} />
               <Detail label="Discount" value={discountLabel} />
-              <Detail label="Total" value={formatCurrency(contract.grand_total_cents)} />
+              <Detail label="Booth subtotal" value={formatCurrency(contract.booth_subtotal_cents)} />
+              {accLineItems.length > 0 && (
+                <>
+                  <div className="sm:col-span-2">
+                    <p className="wf-label-caps text-[0.6rem] text-muted-foreground">Line items</p>
+                    <ul className="mt-2 space-y-1.5 text-sm">
+                      {accLineItems.map((li) => (
+                        <li key={li.id} className="flex justify-between gap-4">
+                          <span className="min-w-0">{li.description}</span>
+                          <span className="shrink-0 font-mono tabular-nums">{formatCurrency(li.amount_cents)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <Detail label="Line items subtotal" value={formatCurrency(contract.line_items_total_cents ?? 0)} />
+                </>
+              )}
+              <Detail label="Contract total" value={formatCurrency(contract.grand_total_cents)} />
               <Detail label="Executed" value={contract.executed_at ? formatTimestamp(contract.executed_at) : '—'} />
               <Detail label="Countersigned by" value={contract.countersigned_by_name ?? '—'} />
             </dl>

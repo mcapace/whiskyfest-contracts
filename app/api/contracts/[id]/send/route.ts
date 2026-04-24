@@ -4,6 +4,7 @@ import { assertContractAccess } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { renderContractPdfFromTemplate } from '@/lib/google';
 import { sendEnvelope } from '@/lib/docusign';
+import { fetchContractLineItemsOrdered } from '@/lib/contract-line-items';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
@@ -83,7 +84,8 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   const templateDocId = process.env.GOOGLE_TEMPLATE_DOC_ID!;
 
   try {
-    const mergeMap = buildContractMergeMap(contract, event, 'docusign');
+    const lineItems = await fetchContractLineItemsOrdered(supabase, contract.id);
+    const mergeMap = buildContractMergeMap(contract, event, 'docusign', lineItems);
     const fileName = `${contract.exhibitor_company_name.replace(/[^\w\s-]/g, '')} — WhiskyFest ${event.year} Contract (DocuSign)`;
 
     const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileName);

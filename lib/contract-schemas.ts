@@ -1,7 +1,13 @@
 import { z } from 'zod';
 import { COUNTRIES } from '@/lib/countries';
+import { MAX_LINE_ITEM_AMOUNT_CENTS } from '@/lib/contract-line-items';
 
 const validCountries = new Set(COUNTRIES.map((c) => c.name));
+
+const lineItemInputSchema = z.object({
+  description: z.string().min(1).max(200),
+  amount_cents: z.number().int().min(0).max(MAX_LINE_ITEM_AMOUNT_CENTS),
+});
 
 /** New contract (POST) and full draft update (PATCH when status = draft). */
 export const newContractBodySchema = z
@@ -32,6 +38,7 @@ export const newContractBodySchema = z
     billing_state: z.string().max(120).optional().nullable(),
     billing_zip: z.string().max(24).optional().nullable(),
     billing_country: z.string().max(120).optional().nullable(),
+    line_items: z.array(lineItemInputSchema).optional().default([]),
   })
   .superRefine((data, ctx) => {
     if (data.billing_same_as_corporate) return;

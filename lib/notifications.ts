@@ -1,4 +1,5 @@
 import sgMail from '@sendgrid/mail';
+import { contractPricingHtmlFragment, contractPricingTextLines } from '@/lib/contract-email-pricing';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
 import type { Contract, Event } from '@/types/db';
@@ -45,6 +46,8 @@ function appBaseUrl(): string {
 export async function notifyAdminsOfDiscountRequest(
   contract: Pick<Contract, 'id' | 'exhibitor_company_name' | 'booth_rate_cents' | 'booth_count'> & {
     grand_total_cents?: number;
+    booth_subtotal_cents?: number;
+    line_items_total_cents?: number | null;
   },
   creator: { email: string; name?: string | null },
 ): Promise<void> {
@@ -77,6 +80,13 @@ export async function notifyAdminsOfDiscountRequest(
   const boothTotal = contract.booth_count * contract.booth_rate_cents;
   const grand =
     typeof contract.grand_total_cents === 'number' ? contract.grand_total_cents : boothTotal;
+  const boothSub =
+    typeof contract.booth_subtotal_cents === 'number' ? contract.booth_subtotal_cents : boothTotal;
+  const pricingLines = contractPricingTextLines({
+    booth_subtotal_cents: boothSub,
+    line_items_total_cents: contract.line_items_total_cents,
+    grand_total_cents: grand,
+  });
 
   sgMail.setApiKey(apiKey);
 
@@ -90,7 +100,7 @@ export async function notifyAdminsOfDiscountRequest(
     ``,
     `Exhibitor: ${contract.exhibitor_company_name}`,
     `Booth rate: ${formattedRate}`,
-    `Grand total: ${formatCents(grand)}`,
+    ...pricingLines,
     `Created by: ${creatorLine}`,
     ``,
     `Open contract: ${detailUrl}`,
@@ -102,9 +112,13 @@ export async function notifyAdminsOfDiscountRequest(
       <p>Booth rate <strong>${formattedRate}</strong> is below the standard rate.</p>
       <table style="margin-top:16px;font-size:14px;">
         <tr><td style="color:#666;padding:4px 12px 4px 0;">Exhibitor</td><td>${escapeHtml(contract.exhibitor_company_name)}</td></tr>
-        <tr><td style="color:#666;padding:4px 12px 4px 0;">Grand total</td><td>${escapeHtml(formatCents(grand))}</td></tr>
         <tr><td style="color:#666;padding:4px 12px 4px 0;">Created by</td><td>${escapeHtml(creatorLine)}</td></tr>
       </table>
+      ${contractPricingHtmlFragment({
+        booth_subtotal_cents: boothSub,
+        line_items_total_cents: contract.line_items_total_cents,
+        grand_total_cents: grand,
+      })}
       <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
     </div>
   `;
@@ -201,8 +215,14 @@ export async function notifySalesRepDiscountApproved(
  * Email events team + sales rep + assistants when the exhibitor signs (envelope moves to partially signed).
  */
 export async function notifyPartialSignature(
-  contract: Pick<Contract, 'id' | 'exhibitor_company_name' | 'signer_1_name' | 'sales_rep_id'> & {
+  contract: Pick<
+    Contract,
+    'id' | 'exhibitor_company_name' | 'signer_1_name' | 'sales_rep_id' | 'booth_count' | 'booth_rate_cents'
+  > & {
     sales_rep_email?: string | null;
+    booth_subtotal_cents?: number;
+    line_items_total_cents?: number | null;
+    grand_total_cents?: number;
   },
   event: Pick<Event, 'name' | 'year' | 'shanken_signatory_name'> | null,
 ): Promise<void> {
@@ -255,13 +275,28 @@ export async function notifyPartialSignature(
 
   const para1 = `${exhibitorPerson} at ${company} has signed the ${eventTitle} contract.`;
   const para2 = `The contract is now awaiting countersignature from ${signatoryName}. They will receive a separate DocuSign email shortly.`;
+  const boothSub = contract.booth_subtotal_cents ?? contract.booth_count * contract.booth_rate_cents;
+  const grand =
+    typeof contract.grand_total_cents === 'number'
+      ? contract.grand_total_cents
+      : boothSub + (contract.line_items_total_cents ?? 0);
+  const pricingText = contractPricingTextLines({
+    booth_subtotal_cents: boothSub,
+    line_items_total_cents: contract.line_items_total_cents,
+    grand_total_cents: grand,
+  }).join('\n');
 
-  const text = [para1, ``, para2, ``, `Open contract: ${detailUrl}`].join('\n');
+  const text = [para1, ``, para2, ``, pricingText, ``, `Open contract: ${detailUrl}`].join('\n');
 
   const html = `
     <div style="font-family: system-ui, sans-serif; max-width: 560px;">
       <p>${escapeHtml(para1)}</p>
       <p>${escapeHtml(para2)}</p>
+      ${contractPricingHtmlFragment({
+        booth_subtotal_cents: boothSub,
+        line_items_total_cents: contract.line_items_total_cents,
+        grand_total_cents: grand,
+      })}
       <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
     </div>
   `;
@@ -279,8 +314,14 @@ export async function notifyPartialSignature(
  * Email events team + sales rep + assistants when the envelope is fully signed (ready for release).
  */
 export async function notifyContractFullySigned(
-  contract: Pick<Contract, 'id' | 'exhibitor_company_name' | 'signer_1_name' | 'sales_rep_id'> & {
+  contract: Pick<
+    Contract,
+    'id' | 'exhibitor_company_name' | 'signer_1_name' | 'sales_rep_id' | 'booth_count' | 'booth_rate_cents'
+  > & {
     sales_rep_email?: string | null;
+    booth_subtotal_cents?: number;
+    line_items_total_cents?: number | null;
+    grand_total_cents?: number;
   },
   event: Pick<Event, 'name' | 'year'> | null,
   countersignerDisplayName: string,
@@ -331,11 +372,24 @@ export async function notifyContractFullySigned(
   const subject = `${company} — fully signed and ready for release`;
   const detailUrl = appContractUrl(contract.id);
 
+  const boothSub = contract.booth_subtotal_cents ?? contract.booth_count * contract.booth_rate_cents;
+  const grand =
+    typeof contract.grand_total_cents === 'number'
+      ? contract.grand_total_cents
+      : boothSub + (contract.line_items_total_cents ?? 0);
+  const pricingText = contractPricingTextLines({
+    booth_subtotal_cents: boothSub,
+    line_items_total_cents: contract.line_items_total_cents,
+    grand_total_cents: grand,
+  }).join('\n');
+
   const text = [
     `The ${eventTitle} contract for ${company} has been fully signed.`,
     ``,
     `Exhibitor: ${exhibitorPerson} at ${company}`,
     `Countersigner: ${countersignerLine} (M. Shanken)`,
+    ``,
+    pricingText,
     ``,
     `Contract is now ready to be released to accounting. Open the contract in WhiskyFest Contracts to release.`,
     ``,
@@ -349,6 +403,11 @@ export async function notifyContractFullySigned(
         <strong>Exhibitor:</strong> ${escapeHtml(exhibitorPerson)} at ${escapeHtml(company)}<br/>
         <strong>Countersigner:</strong> ${escapeHtml(countersignerLine)} (M. Shanken)
       </p>
+      ${contractPricingHtmlFragment({
+        booth_subtotal_cents: boothSub,
+        line_items_total_cents: contract.line_items_total_cents,
+        grand_total_cents: grand,
+      })}
       <p style="margin-top:14px;">Contract is now ready to be released to accounting. Open the contract in WhiskyFest Contracts to release.</p>
       <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
     </div>
@@ -365,8 +424,10 @@ export async function notifyContractFullySigned(
 
 /** Alert events team that a contract PDF is ready for review. */
 export async function notifyEventsTeamOfPendingReview(
-  contract: Pick<Contract, 'id' | 'exhibitor_company_name' | 'booth_rate_cents'> & {
+  contract: Pick<Contract, 'id' | 'exhibitor_company_name' | 'booth_rate_cents' | 'booth_count'> & {
     grand_total_cents?: number;
+    booth_subtotal_cents?: number;
+    line_items_total_cents?: number | null;
     sales_rep_name?: string | null;
     sales_rep_email?: string | null;
   },
@@ -395,23 +456,31 @@ export async function notifyEventsTeamOfPendingReview(
 
   sgMail.setApiKey(apiKey);
 
+  const boothSubFallback = contract.booth_count * contract.booth_rate_cents;
   const grand =
     typeof contract.grand_total_cents === 'number'
       ? contract.grand_total_cents
-      : contract.booth_rate_cents; // fallback; view normally has grand_total_cents
+      : boothSubFallback;
+  const boothSub =
+    typeof contract.booth_subtotal_cents === 'number' ? contract.booth_subtotal_cents : boothSubFallback;
 
   const totalLabel = formatCents(grand);
   const rateLabel = formatCents(contract.booth_rate_cents);
   const repLabel = contract.sales_rep_name ?? contract.sales_rep_email ?? '—';
   const detailUrl = appContractUrl(contract.id);
   const subject = `Review needed: ${contract.exhibitor_company_name} — ${totalLabel}`;
+  const pricingLines = contractPricingTextLines({
+    booth_subtotal_cents: boothSub,
+    line_items_total_cents: contract.line_items_total_cents,
+    grand_total_cents: grand,
+  });
 
   const text = [
     `A contract PDF has been submitted for events team review.`,
     ``,
     `Exhibitor: ${contract.exhibitor_company_name}`,
     `Booth rate: ${rateLabel}`,
-    `Grand total: ${totalLabel}`,
+    ...pricingLines,
     `Sales rep: ${repLabel}`,
     ``,
     `Open contract: ${detailUrl}`,
@@ -423,9 +492,13 @@ export async function notifyEventsTeamOfPendingReview(
       <table style="margin-top:12px;font-size:14px;">
         <tr><td style="color:#666;padding:4px 12px 4px 0;">Exhibitor</td><td>${escapeHtml(contract.exhibitor_company_name)}</td></tr>
         <tr><td style="color:#666;padding:4px 12px 4px 0;">Booth rate</td><td>${escapeHtml(rateLabel)}</td></tr>
-        <tr><td style="color:#666;padding:4px 12px 4px 0;">Grand total</td><td>${escapeHtml(totalLabel)}</td></tr>
         <tr><td style="color:#666;padding:4px 12px 4px 0;">Sales rep</td><td>${escapeHtml(repLabel)}</td></tr>
       </table>
+      ${contractPricingHtmlFragment({
+        booth_subtotal_cents: boothSub,
+        line_items_total_cents: contract.line_items_total_cents,
+        grand_total_cents: grand,
+      })}
       <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
     </div>
   `;

@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useImpersonationReadOnly } from '@/hooks/use-impersonation-read-only';
 import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { MAX_LINE_ITEM_AMOUNT_CENTS } from '@/lib/contract-line-items';
+import { ArrowLeft, Loader2, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 
 import { formatCurrency, formatLongDate } from '@/lib/utils';
@@ -45,6 +47,10 @@ export type ContractFormValues = {
   billing_country: string;
 };
 
+export type InitialContractLineItem = { description: string; amount_cents: number };
+
+type LineItemDraft = { key: string; description: string; amountInput: string };
+
 interface Props {
   events: Event[];
   currentUserEmail: string | null;
@@ -52,6 +58,39 @@ interface Props {
   isAdmin?: boolean;
   editContractId?: string;
   initialValues?: Partial<ContractFormValues>;
+  initialLineItems?: InitialContractLineItem[];
+}
+
+function formatUsPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 10);
+  if (digits.length === 0) return '';
+  if (digits.length < 4) return `(${digits}`;
+  if (digits.length < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+function parseLineItemsForSubmit(items: LineItemDraft[]):
+  | { ok: true; rows: { description: string; amount_cents: number }[] }
+  | { ok: false; message: string } {
+  const out: { description: string; amount_cents: number }[] = [];
+  for (const row of items) {
+    const d = row.description.trim();
+    const amtRaw = row.amountInput.trim().replace(/,/g, '');
+    if (!d && !amtRaw) continue;
+    if (!d) return { ok: false, message: 'Each line item needs a description (1–200 characters).' };
+    if (d.length > 200) return { ok: false, message: 'Line item descriptions must be at most 200 characters.' };
+    if (!amtRaw) return { ok: false, message: 'Each line item needs an amount.' };
+    const dollars = parseFloat(amtRaw);
+    if (!Number.isFinite(dollars) || dollars < 0) {
+      return { ok: false, message: 'Line item amounts must be valid non-negative numbers.' };
+    }
+    const cents = Math.round(dollars * 100);
+    if (cents > MAX_LINE_ITEM_AMOUNT_CENTS) {
+      return { ok: false, message: 'A line item amount exceeds the maximum allowed ($1,000,000).' };
+    }
+    out.push({ description: d, amount_cents: cents });
+  }
+  return { ok: true, rows: out };
 }
 
 export function NewContractForm({
@@ -60,6 +99,7 @@ export function NewContractForm({
   isAdmin = false,
   editContractId,
   initialValues,
+  initialLineItems,
 }: Props) {
   const router = useRouter();
   const readOnly = useImpersonationReadOnly();
@@ -101,6 +141,14 @@ export function NewContractForm({
   /** Separate from `booth_rate_cents` so typing isn't overwritten every render by .toFixed(2). */
   const [boothRateInput, setBoothRateInput] = useState(() => (defaultBoothRateCents / 100).toFixed(2));
 
+  const [lineItems, setLineItems] = useState<LineItemDraft[]>(() =>
+    (initialLineItems ?? []).map((li) => ({
+      key: crypto.randomUUID(),
+      description: li.description,
+      amountInput: (li.amount_cents / 100).toFixed(2),
+    })),
+  );
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -125,7 +173,14 @@ export function NewContractForm({
 
   const selectedEvent = events.find(e => e.id === form.event_id);
   const boothSubtotal = form.booth_count * form.booth_rate_cents;
-  const grandTotal = boothSubtotal;
+  const lineItemsSumCents = lineItems.reduce((acc, row) => {
+    const raw = row.amountInput.trim().replace(/,/g, '');
+    if (raw === '' || raw === '.') return acc;
+    const dollars = parseFloat(raw);
+    if (!Number.isFinite(dollars) || dollars < 0) return acc;
+    return acc + Math.round(dollars * 100);
+  }, 0);
+  const grandTotal = boothSubtotal + lineItemsSumCents;
 
   useEffect(() => {
     if (!selectedEvent) return;
@@ -164,11 +219,17 @@ export function NewContractForm({
     if (!form.exhibitor_country) { setErr('Country is required'); return; }
     if (!form.sales_rep_id) { setErr('Sales rep is required'); return; }
 
+    const parsedLines = parseLineItemsForSubmit(lineItems);
+    if (!parsedLines.ok) {
+      setErr(parsedLines.message);
+      return;
+    }
+
     startTransition(async () => {
       const url = editContractId ? `/api/contracts/${editContractId}` : '/api/contracts';
       const method = editContractId ? 'PATCH' : 'POST';
 
-      const payload =
+      const base =
         form.billing_same_as_corporate
           ? {
               ...form,
@@ -181,6 +242,8 @@ export function NewContractForm({
               billing_country: null,
             }
           : form;
+
+      const payload = { ...base, line_items: parsedLines.rows };
 
       const res = await fetch(url, {
         method,
@@ -322,7 +385,14 @@ export function NewContractForm({
             </div>
 
             <Field label="Telephone">
-              <Input value={form.exhibitor_telephone} onChange={e => set('exhibitor_telephone', e.target.value)} placeholder="(502) 555-0100" />
+              <Input
+                inputMode="tel"
+                autoComplete="tel"
+                value={form.exhibitor_telephone}
+                onChange={(e) => set('exhibitor_telephone', formatUsPhone(e.target.value))}
+                onBlur={(e) => set('exhibitor_telephone', formatUsPhone(e.target.value))}
+                placeholder="(502) 555-0100"
+              />
             </Field>
             <Field label="Brands Poured" hint="Comma-separated list; printed on the 'List brand(s) here' line">
               <Input value={form.brands_poured} onChange={e => set('brands_poured', e.target.value)} placeholder="Sample Bourbon, Sample Rye" />
@@ -334,7 +404,7 @@ export function NewContractForm({
         <Card>
           <CardHeader>
             <CardTitle>Pricing</CardTitle>
-            <CardDescription>Booth count and booth rate — grand total updates live.</CardDescription>
+            <CardDescription>Booth count, booth rate, and optional line items — contract total updates live.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -377,18 +447,112 @@ export function NewContractForm({
               </Field>
             </div>
 
-            <p className="text-xs text-muted-foreground">
-              Misc add-ons can be captured in internal notes when applicable.
-            </p>
+            <div className="border-t border-border/60 pt-6">
+              <h3 className="font-serif text-base font-semibold">Additional Line Items (optional)</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Add sponsorships, activations, or other custom charges
+              </p>
+
+              {lineItems.length === 0 ? (
+                <p className="mt-4 text-sm text-muted-foreground">
+                  No line items. Click + Add Line Item to add one.
+                </p>
+              ) : null}
+
+              <div className="mt-4 space-y-4">
+                <AnimatePresence initial={false}>
+                  {lineItems.map((row) => (
+                    <motion.div
+                      key={row.key}
+                      layout
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden rounded-lg border border-border/60 bg-muted/10 p-4"
+                    >
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                        <div className="min-w-0 flex-1 space-y-1.5">
+                          <Label>Description</Label>
+                          <Input
+                            value={row.description}
+                            maxLength={200}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setLineItems((list) =>
+                                list.map((r) => (r.key === row.key ? { ...r, description: v } : r)),
+                              );
+                            }}
+                            placeholder="e.g. Gold sponsorship"
+                          />
+                          <p className="text-xs text-muted-foreground">{row.description.length}/200</p>
+                        </div>
+                        <div className="w-full space-y-1.5 sm:w-44">
+                          <Label>Amount (USD)</Label>
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            value={row.amountInput}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              const t = raw.replace(/,/g, '');
+                              if (t !== '' && !/^\d*\.?\d*$/.test(t)) return;
+                              setLineItems((list) =>
+                                list.map((r) => (r.key === row.key ? { ...r, amountInput: raw } : r)),
+                              );
+                            }}
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0 self-end text-muted-foreground hover:text-destructive"
+                          title="Remove line item"
+                          onClick={() =>
+                            setLineItems((list) => list.filter((r) => r.key !== row.key))
+                          }
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-4"
+                onClick={() =>
+                  setLineItems((list) => [
+                    ...list,
+                    { key: crypto.randomUUID(), description: '', amountInput: '' },
+                  ])
+                }
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                + Add Line Item
+              </Button>
+            </div>
 
             {/* Live total */}
             <div className="mt-6 rounded-lg border border-fest-600/20 bg-gradient-to-br from-fest-600/[0.07] to-whisky-50/50 p-5">
               <div className="flex items-baseline justify-between text-sm">
-                <span className="text-muted-foreground">Booths ({form.booth_count} × {formatCurrency(form.booth_rate_cents)})</span>
+                <span className="text-muted-foreground">Booth subtotal</span>
                 <span className="font-mono tabular-nums">{formatCurrency(boothSubtotal)}</span>
               </div>
+              {lineItemsSumCents > 0 && (
+                <div className="mt-2 flex items-baseline justify-between text-sm">
+                  <span className="text-muted-foreground">Line items subtotal</span>
+                  <span className="font-mono tabular-nums">{formatCurrency(lineItemsSumCents)}</span>
+                </div>
+              )}
               <div className="mt-4 flex items-baseline justify-between border-t border-fest-600/15 pt-3">
-                <span className="font-serif text-lg font-semibold">Grand Total</span>
+                <span className="font-serif text-xl font-semibold">Contract total</span>
                 <span className="font-serif text-2xl font-semibold tabular-nums text-fest-900">
                   {formatCurrency(grandTotal)}
                 </span>
