@@ -2,34 +2,25 @@
 
 export const CONTRACT_ACTION_HELP = {
   voidContract:
-    'Use when an error is found after sending. Voids the DocuSign envelope, invalidating any signatures already made. The original signer(s) will be notified automatically. Then create a new contract with corrections.',
+    'Use when an error is found after sending. Voids the DocuSign envelope, invalidating signatures. Then create a new contract with corrections.',
 
-  cancel:
-    'Use when the deal is off — sponsor backed out, contract no longer relevant, or created by mistake. Terminates the contract entirely. If a DocuSign envelope exists, it\'s also voided. Different from Void in intent: Void = fix an error, Cancel = end the deal.',
+  cancel: 'Use when the deal is off. Terminates the contract entirely.',
 
-  sendReminder:
-    'Sends a follow-up email from DocuSign to any recipients who haven\'t signed yet. Useful if a contract has been sitting unsigned for a few days.',
+  sendReminder: 'Follow-up email to unsigned recipients.',
 
-  resendWithChanges:
-    'Recalls the current envelope and lets you make edits before sending a new envelope. Any signatures already made on the current envelope are invalidated. Use when you need to update contract details before completing signing.',
+  resendWithChanges: 'Recall current envelope, edit contract, send new envelope.',
 
-  recall:
-    'Pulls back the current DocuSign envelope and reverts the contract to draft. Any signatures already made are invalidated. Use if you need to stop the signing process without creating a new contract.',
+  recall: 'Pulls back the DocuSign envelope and reverts to draft. Any signatures made are invalidated.',
 
-  approveContract:
-    'Reviews and approves this contract for sending via DocuSign. After approval, the sales rep can send it to the exhibitor.',
+  approveContract: 'Approve for sending via DocuSign.',
 
-  sendBack:
-    'Sends the contract back to draft status with your reason. The sales rep will receive the feedback and can make changes, then regenerate the PDF for review.',
+  sendBack: 'Return to draft with feedback for the sales rep.',
 
-  releaseToAccounting:
-    'Marks the contract as executed and hands it off to the accounting team. An email with the signed PDF is sent to AR. Contract is ready for invoicing.',
+  releaseToAccounting: 'Marks contract executed and hands off to AR for invoicing.',
 
-  markInvoiceSent:
-    'Records that you have sent the invoice to the exhibitor. Sales rep is automatically notified. Use when your invoice is out the door.',
+  markInvoiceSent: 'Records invoice sent. Sales rep notified.',
 
-  markPaid:
-    'Records that payment has been received from the exhibitor. Sales rep is automatically notified. Marks the contract complete from an accounting standpoint.',
+  markPaid: 'Records payment received. Sales rep notified.',
 
   generateDraftPdf:
     'Creates a PDF version of the contract from the current data. Submits to the events team for approval before DocuSign sending.',
@@ -41,10 +32,10 @@ export const CONTRACT_ACTION_HELP = {
     'Rebuilds the contract PDF from the latest saved data. Use after edits while the contract is still under review.',
 
   approveDiscount:
-    'Permits this below-standard booth rate so the contract can move forward to events review and DocuSign.',
+    'Admin approval for below-minimum booth rate. Required before contract proceeds.',
 
   approveForSendingDisabled:
-    'This action unlocks after an admin approves the discounted booth rate.',
+    'Discount approval required first. An admin must approve the discounted booth rate.',
 
   viewDraftPdf:
     'Opens the latest draft PDF in a new tab for review before approval or sending.',
