@@ -70,7 +70,7 @@ erDiagram
   }
 ```
 
-See table sections below for **`daily_bubbles`** and **`access_requests`** (no direct FK to `contracts` in the ER view above).
+See table sections below for **`daily_bubbles`** and **`access_requests`** (no direct FK to `contracts` in the ER view above). `daily_bubbles` is keyed by US Eastern `content_date`; **`app_users.last_dismissed_bubble_date`** hides today’s banner for that user only.
 
 ## Tables
 
