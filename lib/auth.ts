@@ -96,7 +96,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       const { data: realUser } = await supabase
         .from('app_users')
-        .select('role, is_active, is_events_team, is_accounting, can_impersonate, theme_preference')
+        .select('role, is_active, is_events_team, is_accounting, can_impersonate, theme_preference, tour_completed_at, tour_last_role')
         .eq('email', loginEmail)
         .maybeSingle();
 
@@ -188,6 +188,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       const tp = (realUser as { theme_preference?: string | null } | null)?.theme_preference;
       token.theme_preference = tp === 'light' || tp === 'dark' || tp === 'system' ? tp : null;
+      token.tour_completed_at = (realUser as { tour_completed_at?: string | null } | null)?.tour_completed_at ?? null;
+      token.tour_last_role = (realUser as { tour_last_role?: string | null } | null)?.tour_last_role ?? null;
 
       if (impEmail && token.impersonation_started_at) {
         const d = await loadImpersonationTargetDisplay(impEmail);
@@ -214,6 +216,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.theme_preference === 'system'
           ? token.theme_preference
           : null;
+      session.user.tour_completed_at = (token.tour_completed_at as string | null | undefined) ?? null;
+      session.user.tour_last_role = (token.tour_last_role as string | null | undefined) ?? null;
 
       const target = (token.impersonation_target_email as string | null | undefined)?.toLowerCase() ?? null;
       const started = token.impersonation_started_at as number | null | undefined;

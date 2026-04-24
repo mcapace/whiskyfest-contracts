@@ -13,6 +13,8 @@ declare module 'next-auth' {
       can_impersonate?: boolean;
       /** Persisted UI theme; null/undefined = system. */
       theme_preference?: 'light' | 'dark' | 'system' | null;
+      tour_completed_at?: string | null;
+      tour_last_role?: string | null;
     };
     impersonation?: {
       active: boolean;
@@ -38,5 +40,7 @@ declare module 'next-auth/jwt' {
     impersonation_started_at?: number | null;
     effective_role_description?: string;
     theme_preference?: 'light' | 'dark' | 'system' | null;
+    tour_completed_at?: string | null;
+    tour_last_role?: string | null;
   }
 }
