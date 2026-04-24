@@ -176,7 +176,7 @@ export async function notifySalesRepDiscountApproved(
     `Approved booth rate: ${rateLine}`,
     `Approved by: ${approverLine}`,
     ...reasonBlock,
-    `You can now approve this contract for sending (Ready for Review → Approve for Sending).`,
+    `You can continue from the contract page: generate or refresh the PDF, submit for Events Review if needed, and after status is Approved, send via DocuSign.`,
     ``,
     `Open contract: ${detailUrl}`,
   ].join('\n');
@@ -192,7 +192,7 @@ export async function notifySalesRepDiscountApproved(
       <p>${escapeHtml(contract.exhibitor_company_name)} — approved booth rate <strong>${escapeHtml(rateLine)}</strong>.</p>
       <p style="color:#666;font-size:14px;">Approved by ${escapeHtml(approverLine)}</p>
       ${reasonHtml}
-      <p>You can now <strong>approve this contract for sending</strong> when you are ready (Ready for Review → Approve for Sending).</p>
+      <p>You can continue from the contract page: generate or refresh the PDF, submit for <strong>Events Review</strong> if needed, and after the status is <strong>Approved</strong>, use <strong>Send via DocuSign</strong>.</p>
       <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
     </div>
   `;
