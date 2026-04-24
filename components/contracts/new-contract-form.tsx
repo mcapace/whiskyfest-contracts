@@ -155,6 +155,9 @@ export function NewContractForm({
   /** Separate from `booth_rate_cents` so typing isn't overwritten every render by .toFixed(2). */
   const [boothRateInput, setBoothRateInput] = useState(() => (defaultBoothRateCents / 100).toFixed(2));
 
+  /** Separate from `booth_count` so `type="number"` accepts typing and spinner steps without forcing `|| 1` each keystroke. */
+  const [boothCountInput, setBoothCountInput] = useState(() => String(initialValues?.booth_count ?? 1));
+
   const [lineItems, setLineItems] = useState<LineItemDraft[]>(() =>
     (initialLineItems ?? []).map((li) => ({
       key: crypto.randomUUID(),
@@ -239,14 +242,20 @@ export function NewContractForm({
       return;
     }
 
+    const boothCountNorm = Math.max(1, parseInt(boothCountInput.trim(), 10) || 1);
+    setBoothCountInput(String(boothCountNorm));
+    setForm((f) => ({ ...f, booth_count: boothCountNorm }));
+
     startTransition(async () => {
       const url = editContractId ? `/api/contracts/${editContractId}` : '/api/contracts';
       const method = editContractId ? 'PATCH' : 'POST';
 
+      const formForSave = { ...form, booth_count: boothCountNorm };
+
       const base =
-        form.billing_same_as_corporate
+        formForSave.billing_same_as_corporate
           ? {
-              ...form,
+              ...formForSave,
               billing_same_as_corporate: true,
               billing_address_line1: null,
               billing_address_line2: null,
@@ -255,7 +264,7 @@ export function NewContractForm({
               billing_zip: null,
               billing_country: null,
             }
-          : form;
+          : formForSave;
 
       const payload = { ...base, line_items: parsedLines.rows };
 
@@ -423,8 +432,27 @@ export function NewContractForm({
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Booth Count">
-                <Input type="number" min={1} value={form.booth_count}
-                  onChange={e => set('booth_count', Math.max(1, parseInt(e.target.value) || 1))} />
+                <Input
+                  type="number"
+                  min={1}
+                  step={1}
+                  inputMode="numeric"
+                  value={boothCountInput}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setBoothCountInput(raw);
+                    if (raw === '') return;
+                    const n = parseInt(raw, 10);
+                    if (Number.isFinite(n) && n >= 1) {
+                      set('booth_count', n);
+                    }
+                  }}
+                  onBlur={() => {
+                    const n = Math.max(1, parseInt(boothCountInput.trim(), 10) || 1);
+                    setBoothCountInput(String(n));
+                    set('booth_count', n);
+                  }}
+                />
               </Field>
               <Field label="Booth Rate (USD)" hint="Editable for custom booth pricing">
                 <Input
@@ -483,8 +511,8 @@ export function NewContractForm({
                       transition={{ duration: 0.2 }}
                       className="overflow-hidden rounded-lg border border-border/60 bg-muted/10 p-4"
                     >
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(10rem,11rem)_auto] sm:items-end">
-                        <div className="min-w-0 space-y-1.5">
+                      <div className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(10rem,11rem)_auto] sm:items-stretch sm:gap-x-4 sm:gap-y-1.5">
+                        <div className="order-1 min-w-0 space-y-1.5 sm:order-none sm:col-start-1 sm:row-start-1">
                           <Label>Description</Label>
                           <Input
                             value={row.description}
@@ -497,9 +525,11 @@ export function NewContractForm({
                             }}
                             placeholder="e.g. Gold sponsorship"
                           />
-                          <p className="text-xs text-muted-foreground">{row.description.length}/200</p>
                         </div>
-                        <div className="min-w-0 space-y-1.5">
+                        <p className="order-2 text-xs text-muted-foreground sm:order-none sm:col-span-3 sm:col-start-1 sm:row-start-2">
+                          {row.description.length}/200
+                        </p>
+                        <div className="order-3 min-w-0 space-y-1.5 sm:order-none sm:col-start-2 sm:row-start-1">
                           <Label>Amount</Label>
                           <Input
                             type="text"
@@ -524,18 +554,20 @@ export function NewContractForm({
                             placeholder="$10,000.00"
                           />
                         </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="justify-self-start text-muted-foreground hover:text-destructive sm:justify-self-end"
-                          title="Remove line item"
-                          onClick={() =>
-                            setLineItems((list) => list.filter((r) => r.key !== row.key))
-                          }
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="order-4 flex items-end justify-start sm:order-none sm:col-start-3 sm:row-start-1 sm:justify-end">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground hover:text-destructive"
+                            title="Remove line item"
+                            onClick={() =>
+                              setLineItems((list) => list.filter((r) => r.key !== row.key))
+                            }
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </motion.div>
                   ))}
