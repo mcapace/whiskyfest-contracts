@@ -235,5 +235,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
   },
+  events: {
+    async signIn({ user }) {
+      const email = user.email?.toLowerCase()?.trim();
+      if (!email) return;
+      try {
+        const supabase = getSupabaseAdmin();
+        const { error } = await supabase
+          .from('app_users')
+          .update({ last_login_at: new Date().toISOString() })
+          .eq('email', email);
+        if (error) console.error('[auth] last_login_at update failed:', error.message);
+      } catch (e) {
+        console.error('[auth] last_login_at update failed:', e);
+      }
+    },
+  },
   session: { strategy: 'jwt' },
 });

@@ -154,6 +154,8 @@ export interface AppUser {
   can_impersonate?: boolean;
   /** Null means system (follow OS until user chooses). */
   theme_preference?: 'light' | 'dark' | 'system' | null;
+  /** Set on each successful Google sign-in. Omitted until migration `027_add_last_login` is applied. */
+  last_login_at?: string | null;
   created_at: string;
 }
 

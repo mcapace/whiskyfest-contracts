@@ -196,6 +196,7 @@ alter table app_users add column if not exists theme_preference text
   check (theme_preference is null or theme_preference in ('light', 'dark', 'system'));
 alter table app_users add column if not exists tour_completed_at timestamptz;
 alter table app_users add column if not exists tour_last_role text;
+alter table app_users add column if not exists last_login_at timestamptz;
 
 alter table audit_log add column if not exists impersonation_target_email text;
 

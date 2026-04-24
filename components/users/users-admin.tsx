@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useImpersonationReadOnly } from '@/hooks/use-impersonation-read-only';
 import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
+import { formatLastLoginRelative, lastLoginFullTooltip } from '@/lib/last-login-display';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,12 +16,39 @@ interface Props {
   currentEmail: string;
 }
 
+type LastLoginSort = 'default' | 'asc' | 'desc';
+
+function compareByLastLogin(a: AppUser, b: AppUser, dir: 'asc' | 'desc'): number {
+  const ta = a.last_login_at ? new Date(a.last_login_at).getTime() : Number.POSITIVE_INFINITY;
+  const tb = b.last_login_at ? new Date(b.last_login_at).getTime() : Number.POSITIVE_INFINITY;
+  if (ta === Number.POSITIVE_INFINITY && tb === Number.POSITIVE_INFINITY) return 0;
+  if (ta === Number.POSITIVE_INFINITY) return 1;
+  if (tb === Number.POSITIVE_INFINITY) return -1;
+  return dir === 'asc' ? ta - tb : tb - ta;
+}
+
 export function UsersAdmin({ initialUsers, currentEmail }: Props) {
   const router = useRouter();
   const readOnly = useImpersonationReadOnly();
   const [pending, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [lastLoginSort, setLastLoginSort] = useState<LastLoginSort>('default');
+  const [neverLoggedOnly, setNeverLoggedOnly] = useState(false);
+
+  const displayedUsers = useMemo(() => {
+    const base = neverLoggedOnly ? initialUsers.filter((u) => !u.last_login_at) : [...initialUsers];
+    if (lastLoginSort === 'default') {
+      base.sort((a, b) => a.email.localeCompare(b.email));
+      return base;
+    }
+    base.sort((a, b) => compareByLastLogin(a, b, lastLoginSort));
+    return base;
+  }, [initialUsers, lastLoginSort, neverLoggedOnly]);
+
+  function cycleLastLoginSort() {
+    setLastLoginSort((s) => (s === 'default' ? 'desc' : s === 'desc' ? 'asc' : 'default'));
+  }
 
   function updateRole(email: string, role: UserRole) {
     if (readOnly) return;
@@ -77,30 +106,62 @@ export function UsersAdmin({ initialUsers, currentEmail }: Props) {
             {err}
           </div>
         )}
+        <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-muted-foreground">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-input text-primary focus:ring-ring"
+            checked={neverLoggedOnly}
+            onChange={(e) => setNeverLoggedOnly(e.target.checked)}
+          />
+          Show only users who have never logged in
+        </label>
         <div className="overflow-x-auto rounded-md border border-border/50">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border/50 bg-muted/30 text-left text-xs uppercase tracking-wider text-muted-foreground">
                 <th className="px-4 py-3 font-medium">Email</th>
                 <th className="px-4 py-3 font-medium">Name</th>
+                <th className="px-4 py-3 font-medium">
+                  <button
+                    type="button"
+                    onClick={cycleLastLoginSort}
+                    className="inline-flex items-center gap-1 font-medium text-muted-foreground transition-colors hover:text-foreground"
+                    title="Sort by last login (newest first, oldest first, then default)"
+                  >
+                    Last Login
+                    {lastLoginSort === 'desc' ? (
+                      <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+                    ) : lastLoginSort === 'asc' ? (
+                      <ChevronUp className="h-3.5 w-3.5" aria-hidden />
+                    ) : null}
+                  </button>
+                </th>
                 <th className="px-4 py-3 font-medium">Role</th>
                 <th className="px-4 py-3 font-medium">Active</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/40">
-              {initialUsers.map(u => {
+              {displayedUsers.map((u) => {
                 const rowPending = pending && pendingEmail === u.email;
                 const isSelf = u.email.toLowerCase() === currentEmail.toLowerCase();
                 const rowDisabled = rowPending || readOnly;
+                const rel = formatLastLoginRelative(u.last_login_at ?? null);
+                const tip = lastLoginFullTooltip(u.last_login_at ?? null);
                 return (
                   <tr key={u.email}>
                     <td className="px-4 py-3 font-mono text-xs">{u.email}</td>
                     <td className="px-4 py-3 text-muted-foreground">{u.name ?? '—'}</td>
+                    <td
+                      className={`px-4 py-3 tabular-nums ${u.last_login_at ? 'text-foreground' : 'text-muted-foreground'}`}
+                      title={tip}
+                    >
+                      {rel}
+                    </td>
                     <td className="px-4 py-3">
                       <span title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined} className="inline-block">
                         <Select
                           value={u.role}
-                          onValueChange={v => updateRole(u.email, v as UserRole)}
+                          onValueChange={(v) => updateRole(u.email, v as UserRole)}
                           disabled={rowDisabled}
                         >
                           <SelectTrigger className="h-9 w-[140px]">
