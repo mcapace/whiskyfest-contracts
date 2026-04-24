@@ -53,6 +53,9 @@ interface Props {
   boothRateCents: number;
   grandTotalCents: number;
   salesRep: string | null;
+  salesRepEmail: string | null;
+  countersignerName: string | null;
+  countersignerEmail: string | null;
   createdBy: string | null;
   discountApprovalPending: boolean;
   isEventsTeam: boolean;
@@ -81,6 +84,9 @@ export function ContractActions({
   boothRateCents,
   grandTotalCents,
   salesRep,
+  salesRepEmail,
+  countersignerName,
+  countersignerEmail,
   createdBy,
   discountApprovalPending,
   isEventsTeam,
@@ -93,12 +99,14 @@ export function ContractActions({
   const [openRecall, setOpenRecall] = useState(false);
   const [openResendWithChanges, setOpenResendWithChanges] = useState(false);
   const [openCancel, setOpenCancel] = useState(false);
+  const [openVoid, setOpenVoid] = useState(false);
   const [openApproveDiscount, setOpenApproveDiscount] = useState(false);
   const [openErrorDetails, setOpenErrorDetails] = useState(false);
   const [openSendBack, setOpenSendBack] = useState(false);
   const [sendBackReason, setSendBackReason] = useState('');
   const [recallReason, setRecallReason] = useState('');
   const [cancelReason, setCancelReason] = useState('');
+  const [voidReason, setVoidReason] = useState('');
   const [discountReason, setDiscountReason] = useState('');
   const [nextSignerName, setNextSignerName] = useState(signerName ?? '');
   const [nextSignerEmail, setNextSignerEmail] = useState(signerEmail ?? '');
@@ -125,6 +133,10 @@ export function ContractActions({
   const canReminder = isAdmin && (status === 'sent' || status === 'partially_signed') && Boolean(docusignEnvelopeId);
   const canRecall = canReminder;
   const canResendWithChanges = canReminder && !discountApprovalPending;
+  const canVoid =
+    (isAdmin || isEventsTeam) &&
+    (status === 'sent' || status === 'partially_signed') &&
+    Boolean(docusignEnvelopeId);
   const canRelease = status === 'signed' && isAdmin;
   const signerWaitLabel = signerName?.trim() || signerEmail?.trim() || 'signer';
 
@@ -410,7 +422,7 @@ export function ContractActions({
         </FloatingActionBar>
 
         {/* Secondary admin-only DocuSign controls */}
-        {(canReminder || canResendWithChanges || canRecall) && (
+        {(canReminder || canResendWithChanges || canRecall || canVoid) && (
           <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
             {canReminder && (
               <Button
@@ -443,6 +455,18 @@ export function ContractActions({
                 title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
               >
                 Recall Contract
+              </Button>
+            )}
+            {canVoid && (
+              <Button
+                variant="destructive"
+                className="min-h-10 flex-1 basis-[min(100%,11rem)]"
+                onClick={() => setOpenVoid(true)}
+                disabled={readOnly}
+                title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+              >
+                <AlertTriangle className="h-4 w-4" />
+                Void Contract
               </Button>
             )}
           </div>
@@ -610,6 +634,55 @@ export function ContractActions({
             >
               {pending && action === 'cancel' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Cancel {exhibitorName}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={openVoid} onOpenChange={setOpenVoid}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Void Contract?</DialogTitle>
+            <DialogDescription>
+              This will void the DocuSign envelope and notify all parties. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="space-y-2">
+              <Label htmlFor="void-reason">Reason (required, max 100 chars)</Label>
+              <Input
+                id="void-reason"
+                value={voidReason}
+                onChange={(e) => setVoidReason(e.target.value.slice(0, 100))}
+                maxLength={100}
+                placeholder="e.g., Wrong signer, incorrect amount, duplicate"
+              />
+              <p className="text-right text-xs text-muted-foreground">{voidReason.length}/100</p>
+            </div>
+            <div className="rounded-md border border-border/60 bg-muted/30 p-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Who will be notified</p>
+              <ul className="space-y-1 text-sm text-foreground/90">
+                <li>- {signerName?.trim() || 'Exhibitor signer'} {signerEmail ? `(${signerEmail})` : ''}</li>
+                <li>- {countersignerName?.trim() || 'Countersigner'} {countersignerEmail ? `(${countersignerEmail})` : ''}</li>
+                <li>- Sales rep: {salesRep ?? salesRepEmail ?? '—'}</li>
+                <li>- Events team</li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenVoid(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                runAction('void', 'void', { reason: voidReason.trim() });
+                setOpenVoid(false);
+              }}
+              disabled={busy || voidReason.trim().length < 5}
+            >
+              {pending && action === 'void' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Void Contract
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -10,6 +10,7 @@ export type ContractStatus =
   | 'partially_signed'
   | 'signed'
   | 'executed'
+  | 'voided'
   | 'cancelled'
   | 'error';
 
@@ -73,6 +74,9 @@ export interface Contract {
   cancelled_reason: string | null;
   cancelled_at: string | null;
   cancelled_by: string | null;
+  voided_at: string | null;
+  voided_by: string | null;
+  voided_reason: string | null;
   discount_approved_at: string | null;
   discount_approved_by: string | null;
   discount_approval_reason: string | null;

@@ -20,6 +20,7 @@ const VALID: ContractStatus[] = [
   'partially_signed',
   'signed',
   'executed',
+  'voided',
   'cancelled',
   'error',
 ];

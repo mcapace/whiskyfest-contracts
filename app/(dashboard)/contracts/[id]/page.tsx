@@ -239,6 +239,9 @@ export default async function ContractDetailPage({ params }: { params: { id: str
             boothRateCents={contract.booth_rate_cents}
             grandTotalCents={contract.grand_total_cents}
             salesRep={contract.sales_rep_name ?? contract.sales_rep_email ?? null}
+            salesRepEmail={contract.sales_rep_email ?? null}
+            countersignerName={event?.shanken_signatory_name ?? null}
+            countersignerEmail={event?.shanken_signatory_email ?? null}
             createdBy={contract.created_by}
             discountApprovalPending={discountPending}
             isEventsTeam={isEventsTeam}

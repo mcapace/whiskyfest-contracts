@@ -18,6 +18,7 @@ do $$ begin
     'partially_signed',
     'signed',
     'executed',
+    'voided',
     'cancelled',
     'error'
   );
@@ -102,6 +103,9 @@ create table if not exists contracts (
   cancelled_reason        text,
   cancelled_at            timestamptz,
   cancelled_by            text,
+  voided_at               timestamptz,
+  voided_by               text,
+  voided_reason           text,
   discount_approved_at    timestamptz,
   discount_approved_by    text,
   discount_approval_reason text,

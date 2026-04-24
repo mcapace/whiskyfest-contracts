@@ -546,6 +546,101 @@ export async function notifySalesRepContractSentBack(
   });
 }
 
+/**
+ * Notify sales rep + events team that a contract was voided while in DocuSign.
+ * DocuSign itself notifies exhibitor recipients about the envelope void.
+ */
+export async function notifyContractVoided(params: {
+  contract: Pick<Contract, 'id' | 'exhibitor_company_name' | 'sales_rep_id'> & {
+    sales_rep_name?: string | null;
+    sales_rep_email?: string | null;
+  };
+  event: Pick<Event, 'name' | 'year'> | null;
+  voidedBy: { email: string; name?: string | null };
+  reason: string;
+  voidedAtIso: string;
+}): Promise<void> {
+  const apiKey = process.env['SENDGRID_API_KEY'];
+  if (!apiKey) {
+    console.warn('[notifyContractVoided] SENDGRID_API_KEY not set — skipping email');
+    return;
+  }
+
+  const supabase = getSupabaseAdmin();
+  const detailUrl = appContractUrl(params.contract.id);
+  const eventTitle = params.event ? `${params.event.name} ${params.event.year}`.trim() : 'WhiskyFest';
+  const company = params.contract.exhibitor_company_name;
+  const voider = params.voidedBy.name ? `${params.voidedBy.name} <${params.voidedBy.email}>` : params.voidedBy.email;
+  const atLabel = new Date(params.voidedAtIso).toLocaleString('en-US');
+
+  let repEmail = params.contract.sales_rep_email?.trim().toLowerCase() ?? null;
+  if (!repEmail && params.contract.sales_rep_id) {
+    const { data: repRow } = await supabase.from('sales_reps').select('email').eq('id', params.contract.sales_rep_id).maybeSingle();
+    repEmail = repRow?.email?.trim().toLowerCase() ?? null;
+  }
+
+  const { data: eventsRows } = await supabase
+    .from('app_users')
+    .select('email')
+    .eq('is_events_team', true)
+    .eq('is_active', true);
+  const eventRecipients = (eventsRows ?? [])
+    .map((u) => String((u as { email: string }).email ?? '').trim().toLowerCase())
+    .filter(Boolean);
+
+  sgMail.setApiKey(apiKey);
+
+  const subject = `${company} contract voided`;
+  const text = [
+    `The ${eventTitle} contract for ${company} has been voided before countersignature.`,
+    '',
+    `Voided by: ${voider}`,
+    `Reason: ${params.reason}`,
+    `Voided at: ${atLabel}`,
+    '',
+    `If you need to resend this contract with corrections, you'll need to create a new contract.`,
+    '',
+    `Open contract: ${detailUrl}`,
+  ].join('\n');
+
+  const html = `
+    <div style="font-family: system-ui, sans-serif; max-width: 560px;">
+      <p>The contract for <strong>${escapeHtml(company)}</strong> has been voided before countersignature.</p>
+      <p style="margin-top:14px;">
+        <strong>Voided by:</strong> ${escapeHtml(voider)}<br/>
+        <strong>Reason:</strong> ${escapeHtml(params.reason)}<br/>
+        <strong>Voided at:</strong> ${escapeHtml(atLabel)}
+      </p>
+      <p style="margin-top:14px;">If you need to resend this contract with corrections, you'll need to create a new contract.</p>
+      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
+    </div>
+  `;
+
+  if (repEmail) {
+    const ccAssistants = params.contract.sales_rep_id
+      ? (await getAssistantEmailsForRep(params.contract.sales_rep_id)).filter((a) => a.toLowerCase() !== repEmail!.toLowerCase())
+      : [];
+    await sgMail.send({
+      from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
+      to: repEmail,
+      ...(ccAssistants.length > 0 ? { cc: ccAssistants } : {}),
+      subject,
+      text,
+      html,
+    });
+  }
+
+  if (eventRecipients.length > 0) {
+    await sgMail.send({
+      from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
+      to: eventRecipients,
+      subject: `${company} contract voided — visibility`,
+      text,
+      html,
+    });
+  }
+}
+
 /** Sales rep notification when AR marks invoice sent. */
 export async function notifySalesRepInvoiceSent(params: {
   contractId: string;
