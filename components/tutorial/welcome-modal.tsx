@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { BarChart3, ClipboardCheck, DollarSign, FilePlus2, ShieldCheck, Sparkles, Users } from 'lucide-react';
+import { ClipboardCheck, FilePlus2, ShieldCheck, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export interface TutorialRoleContext {
@@ -41,20 +41,35 @@ export function WelcomeTutorialModal({
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onSkip]);
 
-  const roleHeadline = useMemo(() => {
-    if (roleContext.role === 'admin') return 'As an admin, you oversee the entire workflow';
-    if (roleContext.isEventsTeam) return "You'll review contracts before they go to exhibitors";
-    if (roleContext.isAccounting) return "You'll see executed contracts ready to invoice";
-    if (roleContext.isAssistant) return `You'll see contracts for ${roleContext.supportedRepNames?.join(', ') || 'the reps you support'}`;
-    return 'Your role: create contracts and track them through signing';
-  }, [roleContext]);
-
-  const roleBullets = useMemo(() => {
-    if (roleContext.role === 'admin') return ['Review and approve', 'Oversee operations', 'Report and unblock'];
-    if (roleContext.isEventsTeam) return ['Review pre-send contracts', 'Approve or send back', 'Protect quality before send'];
-    if (roleContext.isAccounting) return ['Executed queue visibility', 'Invoice and payment tracking', 'AR status control'];
-    if (roleContext.isAssistant) return ['View scoped contracts', 'Support assigned reps', 'Track status and follow-up'];
-    return ['Create contracts', 'Send for signature', 'Track through execution'];
+  const roleCopy = useMemo(() => {
+    if (roleContext.role === 'admin') {
+      return {
+        headline: "You're an administrator",
+        body: 'You have full visibility across all contracts and can step in at any stage — approve, send, release, or troubleshoot. You can also view the app as any user to help them when questions come up.',
+      };
+    }
+    if (roleContext.isEventsTeam) {
+      return {
+        headline: "You're on the events team",
+        body: "You'll review and approve contracts before they go out to exhibitors. You'll also countersign on behalf of M. Shanken when exhibitors sign.",
+      };
+    }
+    if (roleContext.isAccounting) {
+      return {
+        headline: "You're on the accounting team",
+        body: "Once a contract is fully signed and released, it lands in your dashboard. You'll mark invoices sent and payments received — the sales rep gets notified automatically.",
+      };
+    }
+    if (roleContext.isAssistant) {
+      return {
+        headline: "You're supporting a sales rep",
+        body: "You'll see contracts for the reps you support. You can create and send on their behalf — anything they can do, you can do for them.",
+      };
+    }
+    return {
+      headline: "You're a sales rep",
+      body: "You'll create contracts for your sponsors and track them through signing. The app handles the DocuSign flow — you just watch the status move from Draft to Executed.",
+    };
   }, [roleContext]);
 
   if (!open) return null;
@@ -88,7 +103,7 @@ export function WelcomeTutorialModal({
                   Welcome
                 </div>
                 <h2 className="wf-display-serif text-3xl sm:text-4xl">Welcome to WhiskyFest Contracts</h2>
-                <p className="text-sm text-muted-foreground">Let&apos;s get you oriented.</p>
+                <p className="text-sm text-muted-foreground">Let&apos;s take a quick tour so you know your way around.</p>
                 <div className="pt-2">
                   <Button className="motion-safe:transition-transform motion-safe:hover:scale-[1.02] motion-safe:active:scale-[0.98]" onClick={() => setStep(1)}>Get started</Button>
                 </div>
@@ -103,12 +118,12 @@ export function WelcomeTutorialModal({
                 exit={reduce ? {} : { x: -40 * dir, opacity: 0 }}
                 className="space-y-5"
               >
-                <h2 className="wf-display-serif text-3xl sm:text-4xl">Contract lifecycle, automated</h2>
+                <h2 className="wf-display-serif text-3xl sm:text-4xl">One place for every contract</h2>
                 <div className="grid gap-3 sm:grid-cols-3">
                   {[
-                    { label: 'Sales rep creates', Icon: FilePlus2 },
-                    { label: 'Events team approves', Icon: ClipboardCheck },
-                    { label: 'Exhibitor signs', Icon: ShieldCheck },
+                    { label: 'Create — Sales rep drafts the contract', Icon: FilePlus2 },
+                    { label: 'Approve — Events team reviews and approves', Icon: ClipboardCheck },
+                    { label: 'Sign — DocuSign handles signatures, status updates automatically', Icon: ShieldCheck },
                   ].map(({ label, Icon }, i) => (
                     <motion.div
                       key={String(label)}
@@ -122,9 +137,7 @@ export function WelcomeTutorialModal({
                     </motion.div>
                   ))}
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  From first draft to final signature, everything in one place.
-                </p>
+                <p className="text-sm text-muted-foreground">From first draft to final signature, this app handles the entire WhiskyFest sponsorship contract workflow — creation, approval, signing, and accounting handoff.</p>
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => setStep(0)}>Back</Button>
                   <Button className="motion-safe:transition-transform motion-safe:hover:scale-[1.02] motion-safe:active:scale-[0.98]" onClick={() => setStep(2)}>Next</Button>
@@ -140,16 +153,8 @@ export function WelcomeTutorialModal({
                 exit={reduce ? {} : { x: -40 * dir, opacity: 0 }}
                 className="space-y-5"
               >
-                <h2 className="wf-display-serif text-3xl sm:text-4xl">Your role in this system</h2>
-                <p className="text-sm text-muted-foreground">{roleHeadline}</p>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {[Users, BarChart3, DollarSign].map((Icon, i) => (
-                    <div key={i} className="rounded-xl border border-border/60 bg-card/50 p-3">
-                      <Icon className="mb-2 h-4 w-4 text-accent-brand" />
-                      <p className="text-sm">{roleBullets[i] ?? ''}</p>
-                    </div>
-                  ))}
-                </div>
+                <h2 className="wf-display-serif text-3xl sm:text-4xl">{roleCopy.headline}</h2>
+                <p className="text-sm text-muted-foreground">{roleCopy.body}</p>
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
                   <Button className="motion-safe:transition-transform motion-safe:hover:scale-[1.02] motion-safe:active:scale-[0.98]" onClick={() => setStep(3)}>Next</Button>
@@ -165,8 +170,8 @@ export function WelcomeTutorialModal({
                 exit={reduce ? {} : { x: -40 * dir, opacity: 0 }}
                 className="space-y-4"
               >
-                <h2 className="wf-display-serif text-3xl sm:text-4xl">Ready for a quick tour?</h2>
-                <p className="text-sm text-muted-foreground">Let&apos;s walk through the app. Takes about 2 minutes.</p>
+                <h2 className="wf-display-serif text-3xl sm:text-4xl">Ready for the tour?</h2>
+                <p className="text-sm text-muted-foreground">Takes about two minutes. You can exit anytime with Esc and relaunch from the Help menu.</p>
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" onClick={() => setStep(2)}>Back</Button>
                   <Button variant="secondary" onClick={onSkip}>Skip — I&apos;ll explore on my own</Button>

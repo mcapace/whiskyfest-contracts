@@ -80,6 +80,7 @@ export function AccountingDetailActions({
         {invoiceStatus === 'pending' && (
           <Button
             type="button"
+            data-tour="accounting-mark-invoice-sent"
             className={fabBtn}
             onClick={markInvoiceSent}
             disabled={busy}
@@ -91,6 +92,7 @@ export function AccountingDetailActions({
         {invoiceStatus === 'invoice_sent' && (
           <Button
             type="button"
+            data-tour="accounting-mark-paid"
             className={fabBtn}
             onClick={markPaid}
             disabled={busy}

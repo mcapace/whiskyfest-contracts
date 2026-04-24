@@ -136,7 +136,7 @@ export function TutorialProvider() {
         open={openWelcome}
         roleContext={roleContext}
         onSkip={() => {
-          const ok = window.confirm('Skip onboarding? You can launch it any time from the Help menu.');
+          const ok = window.confirm('Skip the tour?\n\nYou can relaunch it anytime from the Help menu.');
           if (!ok) return;
           sessionStorage.setItem(DISMISSED_KEY, '1');
           setOpenWelcome(false);
