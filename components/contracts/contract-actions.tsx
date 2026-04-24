@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState, useTransition } from 'react';
+import { useMemo, useState, useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useImpersonationReadOnly } from '@/hooks/use-impersonation-read-only';
 import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
@@ -19,7 +19,7 @@ import {
 import { ActionWithHelp } from '@/components/contract/action-with-help';
 import { BottomActionBar } from '@/components/contract/bottom-action-bar';
 import { Button } from '@/components/ui/button';
-import { TooltipProvider } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { CONTRACT_ACTION_HELP } from '@/lib/contract-action-help-text';
 import {
   Dialog,
@@ -32,6 +32,23 @@ import {
 import { Input, Label, Textarea } from '@/components/ui/input';
 import { formatCurrency, formatRelative } from '@/lib/utils';
 import type { ContractStatus } from '@/types/db';
+
+const DISCOUNT_ACTION_BLOCKED = 'Discount approval required first';
+
+/** Wraps actions blocked server-side when `requiresDiscountApproval`; tooltip explains why (disabled buttons do not receive hover). */
+function WhenDiscountBlocks({ active, children }: { active: boolean; children: ReactNode }) {
+  if (!active) return <>{children}</>;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex cursor-not-allowed items-center rounded-full">{children}</span>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>{DISCOUNT_ACTION_BLOCKED}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 interface Props {
   contractId: string;
@@ -213,20 +230,22 @@ export function ContractActions({
           <BottomActionBar visible={fabVisible} actionsCount={actionsCount}>
           {status === 'draft' && (
             <>
-              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.generateDraftPdf}>
-                <Button
-                  className={fabBtn}
-                  onClick={() => runAction('generate', 'generate')}
-                  disabled={busy}
-                >
-                  {pending && action === 'generate' ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <FileText className="h-4 w-4" />
-                  )}
-                  Generate Draft PDF
-                </Button>
-              </ActionWithHelp>
+              <WhenDiscountBlocks active={discountApprovalPending}>
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.generateDraftPdf}>
+                  <Button
+                    className={fabBtn}
+                    onClick={() => runAction('generate', 'generate')}
+                    disabled={busy || discountApprovalPending}
+                  >
+                    {pending && action === 'generate' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <FileText className="h-4 w-4" />
+                    )}
+                    Generate Draft PDF
+                  </Button>
+                </ActionWithHelp>
+              </WhenDiscountBlocks>
               {readOnly ? (
                 <ActionWithHelp helpText={CONTRACT_ACTION_HELP.editContract}>
                   <Button
@@ -277,21 +296,23 @@ export function ContractActions({
                   Approve Discount
                 </Button>
               </ActionWithHelp>
-              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.regeneratePdf}>
-                <Button
-                  variant="secondary"
-                  className={fabBtn}
-                  onClick={() => runAction('generate', 'regenerate')}
-                  disabled={busy}
-                >
-                  {pending && action === 'regenerate' ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-4 w-4" />
-                  )}
-                  Re-generate PDF
-                </Button>
-              </ActionWithHelp>
+              <WhenDiscountBlocks active={discountApprovalPending}>
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.regeneratePdf}>
+                  <Button
+                    variant="secondary"
+                    className={fabBtn}
+                    onClick={() => runAction('generate', 'regenerate')}
+                    disabled={busy || discountApprovalPending}
+                  >
+                    {pending && action === 'regenerate' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                    Re-generate PDF
+                  </Button>
+                </ActionWithHelp>
+              </WhenDiscountBlocks>
               <ActionWithHelp helpText={CONTRACT_ACTION_HELP.cancel}>
                 <Button
                   variant="outline"
@@ -310,27 +331,29 @@ export function ContractActions({
             discountApprovalPending &&
             !isAdmin && (
             <>
-              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.regeneratePdf}>
-                <Button
-                  variant="secondary"
-                  className={fabBtn}
-                  onClick={() => runAction('generate', 'regenerate')}
-                  disabled={busy}
-                >
-                  {pending && action === 'regenerate' ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-4 w-4" />
-                  )}
-                  Re-generate PDF
-                </Button>
-              </ActionWithHelp>
+              <WhenDiscountBlocks active={discountApprovalPending}>
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.regeneratePdf}>
+                  <Button
+                    variant="secondary"
+                    className={fabBtn}
+                    onClick={() => runAction('generate', 'regenerate')}
+                    disabled={busy || discountApprovalPending}
+                  >
+                    {pending && action === 'regenerate' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                    Re-generate PDF
+                  </Button>
+                </ActionWithHelp>
+              </WhenDiscountBlocks>
               <ActionWithHelp helpText={CONTRACT_ACTION_HELP.approveForSendingDisabled}>
                 <Button
                   variant="secondary"
                   className={fabBtn}
                   disabled
-                  title="Awaiting discount approval"
+                  title={DISCOUNT_ACTION_BLOCKED}
                 >
                   Approve for Sending
                 </Button>
@@ -420,20 +443,22 @@ export function ContractActions({
 
           {status === 'approved' && (
             <>
-              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.sendViaDocusign}>
-                <Button
-                  className={fabBtn}
-                  onClick={() => runAction('send', 'send')}
-                  disabled={busy}
-                >
-                  {pending && action === 'send' ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
-                  Send via DocuSign
-                </Button>
-              </ActionWithHelp>
+              <WhenDiscountBlocks active={discountApprovalPending}>
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.sendViaDocusign}>
+                  <Button
+                    className={fabBtn}
+                    onClick={() => runAction('send', 'send')}
+                    disabled={busy || discountApprovalPending}
+                  >
+                    {pending && action === 'send' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                    Send via DocuSign
+                  </Button>
+                </ActionWithHelp>
+              </WhenDiscountBlocks>
               {isAdmin && (
                 <ActionWithHelp helpText={CONTRACT_ACTION_HELP.cancel}>
                   <Button
@@ -451,20 +476,22 @@ export function ContractActions({
           )}
 
           {canRelease && (
-            <ActionWithHelp helpText={CONTRACT_ACTION_HELP.releaseToAccounting}>
-              <Button
-                className={fabBtn}
-                onClick={() => runAction('release', 'release')}
-                disabled={busy}
-              >
-                {pending && action === 'release' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4" />
-                )}
-                Release to Accounting
-              </Button>
-            </ActionWithHelp>
+            <WhenDiscountBlocks active={discountApprovalPending}>
+              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.releaseToAccounting}>
+                <Button
+                  className={fabBtn}
+                  onClick={() => runAction('release', 'release')}
+                  disabled={busy || discountApprovalPending}
+                >
+                  {pending && action === 'release' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4" />
+                  )}
+                  Release to Accounting
+                </Button>
+              </ActionWithHelp>
+            </WhenDiscountBlocks>
           )}
 
           {canCancelSigned && (
