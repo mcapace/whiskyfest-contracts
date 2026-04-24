@@ -141,9 +141,14 @@ export function ContractActions({
     (isAdmin || isEventsTeam) &&
     (status === 'sent' || status === 'partially_signed') &&
     Boolean(docusignEnvelopeId);
+  /** In-flight DocuSign: reminder / recall / resend-with-changes / void */
+  const hasDocuSignSecondary = canReminder || canResendWithChanges || canRecall || canVoid;
+  /** Cancel contract while envelope is out (API allows cancel except executed/cancelled). */
+  const canCancelInflightDocuSign =
+    (status === 'sent' || status === 'partially_signed') && (isAdmin || isEventsTeam);
+  const canCancelSigned = status === 'signed' && (isAdmin || isEventsTeam);
   const canRelease = status === 'signed' && isAdmin;
   const signerWaitLabel = signerName?.trim() || signerEmail?.trim() || 'signer';
-  const hasDocuSignSecondary = canReminder || canResendWithChanges || canRecall || canVoid;
 
   const fabVisible = useMemo(() => {
     if (status === 'draft') return true;
@@ -156,7 +161,9 @@ export function ContractActions({
       }
     }
     if (status === 'approved') return true;
-    if (canRelease) return true;
+    if (hasDocuSignSecondary) return true;
+    if (canCancelInflightDocuSign) return true;
+    if (canRelease || canCancelSigned) return true;
     if (status === 'executed' && signedPdfHref) return true;
     if (status === 'error' && isAdmin) return true;
     return false;
@@ -166,7 +173,10 @@ export function ContractActions({
     isEventsTeam,
     isAdmin,
     draftPdfHref,
+    hasDocuSignSecondary,
+    canCancelInflightDocuSign,
     canRelease,
+    canCancelSigned,
     signedPdfHref,
   ]);
 
@@ -190,6 +200,8 @@ export function ContractActions({
     if (canRecall) actionsCount += 1;
     if (canVoid) actionsCount += 1;
   }
+  if (canCancelInflightDocuSign) actionsCount += 1;
+  if (canCancelSigned) actionsCount += 1;
 
   return (
     <>
@@ -402,7 +414,7 @@ export function ContractActions({
 
           {canRelease && (
             <Button
-                className={fabBtn}
+              className={fabBtn}
               onClick={() => runAction('release', 'release')}
               disabled={busy}
             >
@@ -412,6 +424,18 @@ export function ContractActions({
                 <CheckCircle2 className="h-4 w-4" />
               )}
               Release to Accounting
+            </Button>
+          )}
+
+          {canCancelSigned && (
+            <Button
+              variant="outline"
+              className={`${fabBtn} text-destructive hover:text-destructive`}
+              onClick={() => setOpenCancel(true)}
+              disabled={readOnly}
+              title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+            >
+              Cancel Contract
             </Button>
           )}
 
@@ -447,7 +471,6 @@ export function ContractActions({
             <>
             {canReminder && (
               <Button
-                variant="outline"
                 className={fabBtn}
                 onClick={() => runAction('send-reminder', 'reminder')}
                 disabled={busy}
@@ -492,6 +515,18 @@ export function ContractActions({
               </Button>
             )}
             </>
+          )}
+
+          {canCancelInflightDocuSign && (
+            <Button
+              variant="outline"
+              className={`${fabBtn} text-destructive hover:text-destructive`}
+              onClick={() => setOpenCancel(true)}
+              disabled={readOnly}
+              title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+            >
+              Cancel Contract
+            </Button>
           )}
         </BottomActionBar>
 
