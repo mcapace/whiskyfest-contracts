@@ -2,13 +2,13 @@ import { formatCurrency } from '@/lib/utils';
 
 export type ContractPricingEmailFields = {
   booth_subtotal_cents: number;
-  line_items_total_cents?: number | null;
+  line_items_subtotal_cents?: number | null;
   grand_total_cents: number;
 };
 
 /** Plain-text lines for notification bodies. */
 export function contractPricingTextLines(c: ContractPricingEmailFields): string[] {
-  const li = c.line_items_total_cents ?? 0;
+  const li = c.line_items_subtotal_cents ?? 0;
   if (li <= 0) return [`Total: ${formatCurrency(c.grand_total_cents)}`];
   return [
     `Booth package: ${formatCurrency(c.booth_subtotal_cents)}`,
@@ -19,7 +19,7 @@ export function contractPricingTextLines(c: ContractPricingEmailFields): string[
 
 /** Compact HTML fragment (no outer wrapper). */
 export function contractPricingHtmlFragment(c: ContractPricingEmailFields): string {
-  const li = c.line_items_total_cents ?? 0;
+  const li = c.line_items_subtotal_cents ?? 0;
   if (li <= 0) {
     return `<p><strong>Total:</strong> ${formatCurrency(c.grand_total_cents)}</p>`;
   }

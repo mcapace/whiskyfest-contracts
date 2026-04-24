@@ -109,7 +109,7 @@ export default async function AccountingContractDetailPage({ params }: { params:
                       ))}
                     </ul>
                   </div>
-                  <Detail label="Line items subtotal" value={formatCurrency(contract.line_items_total_cents ?? 0)} />
+                  <Detail label="Line items subtotal" value={formatCurrency(contract.line_items_subtotal_cents ?? 0)} />
                 </>
               )}
               <Detail label="Contract total" value={formatCurrency(contract.grand_total_cents)} />

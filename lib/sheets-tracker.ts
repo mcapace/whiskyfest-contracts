@@ -114,7 +114,7 @@ async function buildRowValues(
 ): Promise<(string | number | boolean)[]> {
   const rep = await getSalesRepName(contract);
   const brands = formatBrandsList(parseBrandsFromContract(contract.brands_poured));
-  const rev = formatBoothAmount(contract.grand_total_cents);
+  const rev = formatBoothAmount(contract.total_amount_cents);
   const statusKey = resolveStatusKeyForNote(contract, trackerStatus);
   const note = formatStatusNote(statusKey, at);
 

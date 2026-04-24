@@ -121,10 +121,11 @@ export interface ContractWithTotals extends Contract {
   booth_subtotal_cents: number;
   additional_brand_fee_cents: number;
   /** Sum of optional `contract_line_items` amounts. */
-  line_items_total_cents: number;
-  /** Booth subtotal + line items (same as `total_amount_cents`). */
-  grand_total_cents: number;
+  line_items_subtotal_cents: number;
+  /** Booth subtotal + line items. */
   total_amount_cents: number;
+  /** Same as `total_amount_cents` (kept for existing call sites). */
+  grand_total_cents: number;
   sales_rep_name: string | null;
   sales_rep_email: string | null;
   event?: Event;

@@ -99,7 +99,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const safeCompany = contract.exhibitor_company_name.replace(/[^\w\s-]/g, '');
   const templateDocId = process.env.GOOGLE_TEMPLATE_DOC_ID!;
-  const mergeMap = buildContractMergeMap(mergedContract, event, 'docusign', lineItems);
+  const mergeMap = buildContractMergeMap(mergedContract, event, 'docusign');
   const fileName = `${safeCompany} — WhiskyFest ${event.year} Contract (DocuSign)`;
 
   let newEnvelopeId: string;
@@ -110,7 +110,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ error: 'Event countersigner name and email are required.' }, { status: 500 });
     }
 
-    const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileName);
+    const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileName, lineItems);
 
     const sent = await sendEnvelope({
       pdfBase64: pdfBytes.toString('base64'),

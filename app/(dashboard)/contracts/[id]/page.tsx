@@ -9,6 +9,7 @@ import { formatStatus } from '@/lib/status-display';
 import { createContractPdfSignedUrl } from '@/lib/contract-pdf-storage';
 import { cn, formatCurrency, formatLongDate, formatTimestamp } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StatusBadge } from '@/components/contracts/status-badge';
 import { ContractActions } from '@/components/contracts/contract-actions';
 import { SignerContactEdit } from '@/components/contracts/signer-contact-edit';
@@ -247,7 +248,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
             boothRateCents={contract.booth_rate_cents}
             grandTotalCents={contract.grand_total_cents}
             boothSubtotalCents={contract.booth_subtotal_cents}
-            lineItemsSubtotalCents={contract.line_items_total_cents ?? 0}
+            lineItemsSubtotalCents={contract.line_items_subtotal_cents ?? 0}
             salesRep={contract.sales_rep_name ?? contract.sales_rep_email ?? null}
             salesRepEmail={contract.sales_rep_email ?? null}
             countersignerName={event?.shanken_signatory_name ?? null}
@@ -319,18 +320,28 @@ export default async function ContractDetailPage({ params }: { params: { id: str
             {lineItems.length > 0 && (
               <div className="border-t border-border/50 pt-4">
                 <p className="wf-label-caps text-[0.6rem] text-muted-foreground">Line Items</p>
-                <dl className="mt-3 space-y-2.5">
-                  {lineItems.map((li) => (
-                    <div key={li.id} className="flex justify-between gap-4">
-                      <dt className="min-w-0 flex-1 pr-2 text-foreground">{li.description}</dt>
-                      <dd className="shrink-0 font-mono tabular-nums">{formatCurrency(li.amount_cents)}</dd>
-                    </div>
-                  ))}
-                </dl>
+                <Table className="mt-3">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {lineItems.map((li) => (
+                      <TableRow key={li.id}>
+                        <TableCell className="max-w-[14rem] text-foreground">{li.description}</TableCell>
+                        <TableCell className="text-right font-mono tabular-nums">
+                          {formatCurrency(li.amount_cents)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
                 <div className="mt-3 flex justify-between border-t border-border/40 pt-2 text-sm font-medium">
                   <span>Line items subtotal</span>
                   <span className="font-mono tabular-nums">
-                    {formatCurrency(contract.line_items_total_cents ?? 0)}
+                    {formatCurrency(contract.line_items_subtotal_cents ?? 0)}
                   </span>
                 </div>
               </div>

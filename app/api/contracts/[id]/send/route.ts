@@ -85,10 +85,10 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
   try {
     const lineItems = await fetchContractLineItemsOrdered(supabase, contract.id);
-    const mergeMap = buildContractMergeMap(contract, event, 'docusign', lineItems);
+    const mergeMap = buildContractMergeMap(contract, event, 'docusign');
     const fileName = `${contract.exhibitor_company_name.replace(/[^\w\s-]/g, '')} — WhiskyFest ${event.year} Contract (DocuSign)`;
 
-    const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileName);
+    const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileName, lineItems);
 
     const pdfBase64 = pdfBytes.toString('base64');
 

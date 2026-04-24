@@ -1,4 +1,6 @@
 import { google } from 'googleapis';
+import { insertContractLineItemsIntoOrderTable } from '@/lib/google-contract-order-table';
+import type { ContractLineItem } from '@/types/db';
 
 /**
  * Google API client using a service account.
@@ -47,6 +49,7 @@ export async function renderContractPdfFromTemplate(
   templateDocId: string,
   mergeMap: Record<string, string>,
   tempDocLabel: string,
+  lineItems?: ContractLineItem[],
 ): Promise<Buffer> {
   const auth = getAuth();
   const drive = google.drive({ version: 'v3', auth });
@@ -89,6 +92,10 @@ export async function renderContractPdfFromTemplate(
         documentId: tempDocId,
         requestBody: { requests },
       });
+    }
+
+    if (lineItems?.length) {
+      await insertContractLineItemsIntoOrderTable(docs, tempDocId, lineItems);
     }
 
     // supportsAllDrives is required for Shared Drive files (REST); googleapis Params type omits it.
@@ -140,7 +147,8 @@ export async function mergeAndExportPdf(
   mergeMap: Record<string, string>,
   outputFileName: string,
   destinationFolderId: string,
+  lineItems?: ContractLineItem[],
 ): Promise<{ fileId: string; webViewLink: string }> {
-  const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, outputFileName);
+  const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, outputFileName, lineItems);
   return uploadPdfBufferToFolder(pdfBytes, outputFileName, destinationFolderId);
 }

@@ -42,14 +42,14 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
 
   const lineItems = await fetchContractLineItemsOrdered(supabase, contract.id);
-  const mergeMap = buildContractMergeMap(contract, event, 'draft', lineItems);
+  const mergeMap = buildContractMergeMap(contract, event, 'draft');
 
   const templateDocId = process.env.GOOGLE_TEMPLATE_DOC_ID!;
   const draftsFolderId = process.env.GOOGLE_DRAFTS_FOLDER_ID!;
   const fileName = `${contract.exhibitor_company_name.replace(/[^\w\s-]/g, '')} — WhiskyFest ${event.year} Contract`;
 
   try {
-    const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileName);
+    const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileName, lineItems);
     const { fileId, webViewLink } = await uploadPdfBufferToFolder(pdfBytes, fileName, draftsFolderId);
 
     const draftStoragePath = contractDraftPdfPath(contract.id);

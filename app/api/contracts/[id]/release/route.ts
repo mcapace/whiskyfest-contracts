@@ -105,7 +105,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     boothRateCents: contract.booth_rate_cents,
     discountLine,
     boothSubtotalCents: contract.booth_subtotal_cents,
-    lineItemsSubtotalCents: contract.line_items_total_cents,
+    lineItemsSubtotalCents: contract.line_items_subtotal_cents,
     grandTotalCents: contract.grand_total_cents,
     salesRepName: contract.sales_rep_name ?? null,
     executedAtFormatted: formatTimestamp(now),

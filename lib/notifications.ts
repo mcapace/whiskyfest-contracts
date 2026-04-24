@@ -47,7 +47,7 @@ export async function notifyAdminsOfDiscountRequest(
   contract: Pick<Contract, 'id' | 'exhibitor_company_name' | 'booth_rate_cents' | 'booth_count'> & {
     grand_total_cents?: number;
     booth_subtotal_cents?: number;
-    line_items_total_cents?: number | null;
+    line_items_subtotal_cents?: number | null;
   },
   creator: { email: string; name?: string | null },
 ): Promise<void> {
@@ -84,7 +84,7 @@ export async function notifyAdminsOfDiscountRequest(
     typeof contract.booth_subtotal_cents === 'number' ? contract.booth_subtotal_cents : boothTotal;
   const pricingLines = contractPricingTextLines({
     booth_subtotal_cents: boothSub,
-    line_items_total_cents: contract.line_items_total_cents,
+    line_items_subtotal_cents: contract.line_items_subtotal_cents,
     grand_total_cents: grand,
   });
 
@@ -116,7 +116,7 @@ export async function notifyAdminsOfDiscountRequest(
       </table>
       ${contractPricingHtmlFragment({
         booth_subtotal_cents: boothSub,
-        line_items_total_cents: contract.line_items_total_cents,
+        line_items_subtotal_cents: contract.line_items_subtotal_cents,
         grand_total_cents: grand,
       })}
       <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
@@ -221,7 +221,7 @@ export async function notifyPartialSignature(
   > & {
     sales_rep_email?: string | null;
     booth_subtotal_cents?: number;
-    line_items_total_cents?: number | null;
+    line_items_subtotal_cents?: number | null;
     grand_total_cents?: number;
   },
   event: Pick<Event, 'name' | 'year' | 'shanken_signatory_name'> | null,
@@ -279,10 +279,10 @@ export async function notifyPartialSignature(
   const grand =
     typeof contract.grand_total_cents === 'number'
       ? contract.grand_total_cents
-      : boothSub + (contract.line_items_total_cents ?? 0);
+      : boothSub + (contract.line_items_subtotal_cents ?? 0);
   const pricingText = contractPricingTextLines({
     booth_subtotal_cents: boothSub,
-    line_items_total_cents: contract.line_items_total_cents,
+    line_items_subtotal_cents: contract.line_items_subtotal_cents,
     grand_total_cents: grand,
   }).join('\n');
 
@@ -294,7 +294,7 @@ export async function notifyPartialSignature(
       <p>${escapeHtml(para2)}</p>
       ${contractPricingHtmlFragment({
         booth_subtotal_cents: boothSub,
-        line_items_total_cents: contract.line_items_total_cents,
+        line_items_subtotal_cents: contract.line_items_subtotal_cents,
         grand_total_cents: grand,
       })}
       <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
@@ -320,7 +320,7 @@ export async function notifyContractFullySigned(
   > & {
     sales_rep_email?: string | null;
     booth_subtotal_cents?: number;
-    line_items_total_cents?: number | null;
+    line_items_subtotal_cents?: number | null;
     grand_total_cents?: number;
   },
   event: Pick<Event, 'name' | 'year'> | null,
@@ -376,10 +376,10 @@ export async function notifyContractFullySigned(
   const grand =
     typeof contract.grand_total_cents === 'number'
       ? contract.grand_total_cents
-      : boothSub + (contract.line_items_total_cents ?? 0);
+      : boothSub + (contract.line_items_subtotal_cents ?? 0);
   const pricingText = contractPricingTextLines({
     booth_subtotal_cents: boothSub,
-    line_items_total_cents: contract.line_items_total_cents,
+    line_items_subtotal_cents: contract.line_items_subtotal_cents,
     grand_total_cents: grand,
   }).join('\n');
 
@@ -405,7 +405,7 @@ export async function notifyContractFullySigned(
       </p>
       ${contractPricingHtmlFragment({
         booth_subtotal_cents: boothSub,
-        line_items_total_cents: contract.line_items_total_cents,
+        line_items_subtotal_cents: contract.line_items_subtotal_cents,
         grand_total_cents: grand,
       })}
       <p style="margin-top:14px;">Contract is now ready to be released to accounting. Open the contract in WhiskyFest Contracts to release.</p>
@@ -427,7 +427,7 @@ export async function notifyEventsTeamOfPendingReview(
   contract: Pick<Contract, 'id' | 'exhibitor_company_name' | 'booth_rate_cents' | 'booth_count'> & {
     grand_total_cents?: number;
     booth_subtotal_cents?: number;
-    line_items_total_cents?: number | null;
+    line_items_subtotal_cents?: number | null;
     sales_rep_name?: string | null;
     sales_rep_email?: string | null;
   },
@@ -471,7 +471,7 @@ export async function notifyEventsTeamOfPendingReview(
   const subject = `Review needed: ${contract.exhibitor_company_name} — ${totalLabel}`;
   const pricingLines = contractPricingTextLines({
     booth_subtotal_cents: boothSub,
-    line_items_total_cents: contract.line_items_total_cents,
+    line_items_subtotal_cents: contract.line_items_subtotal_cents,
     grand_total_cents: grand,
   });
 
@@ -496,7 +496,7 @@ export async function notifyEventsTeamOfPendingReview(
       </table>
       ${contractPricingHtmlFragment({
         booth_subtotal_cents: boothSub,
-        line_items_total_cents: contract.line_items_total_cents,
+        line_items_subtotal_cents: contract.line_items_subtotal_cents,
         grand_total_cents: grand,
       })}
       <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>

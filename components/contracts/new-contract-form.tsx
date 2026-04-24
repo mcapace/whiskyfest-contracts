@@ -69,13 +69,27 @@ function formatUsPhone(raw: string): string {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
+/** Pretty-print USD with commas for line-item amount fields (on blur). */
+function formatLineItemAmountDisplay(raw: string): string {
+  const cleaned = raw.replace(/[$,]/g, '').trim();
+  if (cleaned === '' || cleaned === '.') return '';
+  const dollars = parseFloat(cleaned);
+  if (!Number.isFinite(dollars)) return raw.trim();
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(dollars);
+}
+
 function parseLineItemsForSubmit(items: LineItemDraft[]):
   | { ok: true; rows: { description: string; amount_cents: number }[] }
   | { ok: false; message: string } {
   const out: { description: string; amount_cents: number }[] = [];
   for (const row of items) {
     const d = row.description.trim();
-    const amtRaw = row.amountInput.trim().replace(/,/g, '');
+    const amtRaw = row.amountInput.trim().replace(/[$,]/g, '');
     if (!d && !amtRaw) continue;
     if (!d) return { ok: false, message: 'Each line item needs a description (1–200 characters).' };
     if (d.length > 200) return { ok: false, message: 'Line item descriptions must be at most 200 characters.' };
@@ -174,7 +188,7 @@ export function NewContractForm({
   const selectedEvent = events.find(e => e.id === form.event_id);
   const boothSubtotal = form.booth_count * form.booth_rate_cents;
   const lineItemsSumCents = lineItems.reduce((acc, row) => {
-    const raw = row.amountInput.trim().replace(/,/g, '');
+    const raw = row.amountInput.trim().replace(/[$,]/g, '');
     if (raw === '' || raw === '.') return acc;
     const dollars = parseFloat(raw);
     if (!Number.isFinite(dollars) || dollars < 0) return acc;
@@ -448,15 +462,13 @@ export function NewContractForm({
             </div>
 
             <div className="border-t border-border/60 pt-6">
-              <h3 className="font-serif text-base font-semibold">Additional Line Items (optional)</h3>
+              <h3 className="font-serif text-base font-semibold">Additional Line Items</h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                Add sponsorships, activations, or other custom charges
+                Sponsorships, activations, or other custom charges beyond the booth package (optional)
               </p>
 
               {lineItems.length === 0 ? (
-                <p className="mt-4 text-sm text-muted-foreground">
-                  No line items. Click + Add Line Item to add one.
-                </p>
+                <p className="mt-4 text-sm text-muted-foreground">No line items yet.</p>
               ) : null}
 
               <div className="mt-4 space-y-4">
@@ -471,8 +483,8 @@ export function NewContractForm({
                       transition={{ duration: 0.2 }}
                       className="overflow-hidden rounded-lg border border-border/60 bg-muted/10 p-4"
                     >
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-                        <div className="min-w-0 flex-1 space-y-1.5">
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(10rem,11rem)_auto] sm:items-end">
+                        <div className="min-w-0 space-y-1.5">
                           <Label>Description</Label>
                           <Input
                             value={row.description}
@@ -487,8 +499,8 @@ export function NewContractForm({
                           />
                           <p className="text-xs text-muted-foreground">{row.description.length}/200</p>
                         </div>
-                        <div className="w-full space-y-1.5 sm:w-44">
-                          <Label>Amount (USD)</Label>
+                        <div className="min-w-0 space-y-1.5">
+                          <Label>Amount</Label>
                           <Input
                             type="text"
                             inputMode="decimal"
@@ -496,20 +508,27 @@ export function NewContractForm({
                             value={row.amountInput}
                             onChange={(e) => {
                               const raw = e.target.value;
-                              const t = raw.replace(/,/g, '');
+                              const t = raw.replace(/[$,]/g, '');
                               if (t !== '' && !/^\d*\.?\d*$/.test(t)) return;
                               setLineItems((list) =>
                                 list.map((r) => (r.key === row.key ? { ...r, amountInput: raw } : r)),
                               );
                             }}
-                            placeholder="0.00"
+                            onBlur={() => {
+                              const formatted = formatLineItemAmountDisplay(row.amountInput);
+                              if (!formatted) return;
+                              setLineItems((list) =>
+                                list.map((r) => (r.key === row.key ? { ...r, amountInput: formatted } : r)),
+                              );
+                            }}
+                            placeholder="$10,000.00"
                           />
                         </div>
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="shrink-0 self-end text-muted-foreground hover:text-destructive"
+                          className="justify-self-start text-muted-foreground hover:text-destructive sm:justify-self-end"
                           title="Remove line item"
                           onClick={() =>
                             setLineItems((list) => list.filter((r) => r.key !== row.key))
