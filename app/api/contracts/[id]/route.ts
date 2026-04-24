@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { STANDARD_BOOTH_RATE_CENTS } from '@/lib/contracts';
+import { notifyAdminsIfNewlyRequiresDiscountApproval } from '@/lib/discount-patch-notify';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { assertContractAccess } from '@/lib/auth-contract';
 import { clearedRepEnteredBilling, newContractBodySchema, signerContactPatchSchema } from '@/lib/contract-schemas';
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
-import type { ContractStatus } from '@/types/db';
+import type { Contract, ContractStatus } from '@/types/db';
 
 const signerEditableStatuses: ContractStatus[] = ['approved', 'ready_for_review', 'pending_events_review'];
 
@@ -106,6 +107,14 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       });
     }
 
+    await notifyAdminsIfNewlyRequiresDiscountApproval({
+      contractId: params.id,
+      before: contract as Contract,
+      incomingBoothRate,
+      shouldResetDiscountApproval,
+      editor: { email: actor.email, name: actor.appUser?.name },
+    });
+
     revalidateContractPaths(params.id);
     return NextResponse.json({ ok: true });
   }
@@ -183,6 +192,14 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       },
     });
   }
+
+  await notifyAdminsIfNewlyRequiresDiscountApproval({
+    contractId: params.id,
+    before: contract as Contract,
+    incomingBoothRate,
+    shouldResetDiscountApproval,
+    editor: { email: actor.email, name: actor.appUser?.name },
+  });
 
   revalidateContractPaths(params.id);
 
