@@ -130,7 +130,8 @@ async function resolveApiContext(accessToken: string): Promise<{ accountId: stri
   }
 
   const accountId = envAccountId ?? chosen.account_id;
-  const restApiBase = envBase?.replace(/\/$/, '') ?? normalizeRestApiBase(chosen.base_uri ?? '');
+  // Prefer account-scoped base_uri from userinfo; DOCUSIGN_BASE_URL can be stale/wrong cluster.
+  const restApiBase = normalizeRestApiBase(chosen.base_uri ?? '') || envBase?.replace(/\/$/, '');
   if (!restApiBase) throw new Error('DocuSign userinfo did not provide base_uri and DOCUSIGN_BASE_URL is not set');
 
   return { accountId, restApiBase };
