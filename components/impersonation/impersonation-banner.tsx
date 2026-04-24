@@ -25,7 +25,7 @@ export function ImpersonationBanner() {
     >
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 lg:pl-64 lg:pr-10">
         <p className="text-base font-semibold leading-snug">
-          You are viewing as <span className="font-extrabold tracking-tight">{label}</span>
+          Viewing as <span className="font-extrabold tracking-tight">{label}</span>
           <span className="mx-1.5 font-medium opacity-90">—</span>
           <span className="text-sm font-bold uppercase tracking-wide text-amber-950/90 dark:text-amber-950">
             Read-only
