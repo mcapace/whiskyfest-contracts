@@ -94,6 +94,13 @@ export interface Contract {
   billing_state: string | null;
   billing_zip: string | null;
   billing_country: string | null;
+  /** Designated billing contact (exhibitor DocuSign tabs). */
+  billing_contact_name: string | null;
+  billing_contact_email: string | null;
+  event_contact_name: string | null;
+  event_contact_email: string | null;
+  /** When exhibitor billing/event tab values were persisted from DocuSign. */
+  exhibitor_fields_captured_at: string | null;
   accounting_notified_at: string | null;
   invoice_status: InvoiceStatus;
   invoice_sent_at: string | null;

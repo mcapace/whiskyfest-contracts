@@ -13,8 +13,15 @@ export interface AccountingEmailPayload {
   signerTitle: string | null;
   signerEmail: string | null;
   exhibitorTelephone: string | null;
-  /** Single-line billing / invoice mailing address for the summary table. */
+  /** Single-line billing / invoice mailing address for the summary table (legacy or condensed). */
   billingAddressLine: string;
+  /** Set when exhibitor DocuSign tabs populated `exhibitor_fields_captured_at`. */
+  exhibitorBillingContactName?: string | null;
+  exhibitorBillingContactEmail?: string | null;
+  /** Multiline billing address (HTML uses <br/>). */
+  exhibitorBillingAddressDetail?: string | null;
+  exhibitorEventContactName?: string | null;
+  exhibitorEventContactEmail?: string | null;
   eventName: string;
   eventYear: number;
   boothCount: number;
@@ -86,6 +93,7 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
         ]
       : [`Total: ${formatCents(p.grandTotalCents)}`];
 
+  const hasDesignatedBilling = Boolean(p.exhibitorBillingContactName?.trim() && p.exhibitorBillingContactEmail?.trim());
   const text = [
     `A new contract has been executed and is ready for invoicing.`,
     ``,
@@ -93,7 +101,30 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
     `Signer: ${signerLine}`,
     `Email: ${p.signerEmail ?? '—'}`,
     `Phone: ${p.exhibitorTelephone ?? '—'}`,
-    `Billing Address: ${p.billingAddressLine}`,
+    ...(hasDesignatedBilling
+      ? [
+          ``,
+          `Designated billing contact (exhibitor):`,
+          `  Name: ${p.exhibitorBillingContactName ?? '—'}`,
+          `  Email: ${p.exhibitorBillingContactEmail ?? '—'}`,
+          `  Address:`,
+          ...((p.exhibitorBillingAddressDetail ?? '')
+            .split('\n')
+            .map((ln) => ln.trim())
+            .filter(Boolean)
+            .map((ln) => `    ${ln}`)),
+          ...(p.exhibitorEventContactName?.trim() || p.exhibitorEventContactEmail?.trim()
+            ? [
+                ``,
+                `Event contact (optional):`,
+                `  Name: ${p.exhibitorEventContactName?.trim() || '—'}`,
+                `  Email: ${p.exhibitorEventContactEmail ?? '—'}`,
+              ]
+            : []),
+          ``,
+          `Summary billing line: ${p.billingAddressLine}`,
+        ]
+      : [`Billing Address: ${p.billingAddressLine}`]),
     `Event: ${p.eventName} ${p.eventYear}`,
     `Booth Count: ${p.boothCount}`,
     `Booth Rate: ${formatCents(p.boothRateCents)}`,
@@ -110,6 +141,36 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
     `<tr><td style="padding:8px 12px;border:1px solid #e5e5e5;color:#666;width:160px;">${escape(label)}</td>` +
     `<td style="padding:8px 12px;border:1px solid #e5e5e5;">${value}</td></tr>`;
 
+  const designatedBillingHtml = hasDesignatedBilling
+    ? [
+        `<tr><td colspan="2" style="padding:10px 12px;background:#fff8e6;border:1px solid #e5e5e5;font-weight:600;">Designated billing (exhibitor)</td></tr>`,
+        row('Billing contact', escape(p.exhibitorBillingContactName ?? '—')),
+        row(
+          'Billing email',
+          p.exhibitorBillingContactEmail
+            ? `<a href="mailto:${escape(p.exhibitorBillingContactEmail)}">${escape(p.exhibitorBillingContactEmail)}</a>`
+            : '—',
+        ),
+        row(
+          'Billing address',
+          escape((p.exhibitorBillingAddressDetail ?? '—').replace(/\n/g, ' · ')),
+        ),
+        ...(p.exhibitorEventContactName?.trim() || p.exhibitorEventContactEmail?.trim()
+          ? [
+              `<tr><td colspan="2" style="padding:10px 12px;background:#f7f7f7;border:1px solid #e5e5e5;font-weight:600;">Event contact</td></tr>`,
+              row('Name', escape(p.exhibitorEventContactName?.trim() || '—')),
+              row(
+                'Email',
+                p.exhibitorEventContactEmail?.trim()
+                  ? `<a href="mailto:${escape(p.exhibitorEventContactEmail.trim())}">${escape(p.exhibitorEventContactEmail.trim())}</a>`
+                  : '—',
+              ),
+            ]
+          : []),
+        `<tr><td colspan="2" style="padding:6px 12px;font-size:12px;color:#666;border:1px solid #e5e5e5;">Also summarized as one line: ${escape(p.billingAddressLine)}</td></tr>`,
+      ].join('')
+    : row('Billing Address', escape(p.billingAddressLine));
+
   const html = `
     <div style="font-family: system-ui, -apple-system, sans-serif; color: #1a1a1a; max-width: 640px;">
       <p style="font-size:15px;">A new contract has been executed and is ready for invoicing.</p>
@@ -119,7 +180,7 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
           ${row('Signer', escape(signerLine))}
           ${row('Email', p.signerEmail ? `<a href="mailto:${escape(p.signerEmail)}">${escape(p.signerEmail)}</a>` : '—')}
           ${row('Phone', escape(p.exhibitorTelephone ?? '—'))}
-          ${row('Billing Address', escape(p.billingAddressLine))}
+          ${designatedBillingHtml}
           ${row('Event', escape(`${p.eventName} ${p.eventYear}`))}
           ${row('Booth Count', escape(String(p.boothCount)))}
           ${row('Booth Rate', escape(formatCents(p.boothRateCents)))}

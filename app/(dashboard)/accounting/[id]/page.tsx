@@ -57,8 +57,15 @@ export default async function AccountingContractDetailPage({ params }: { params:
     }
   }
 
-  const billingBlock =
-    contract.billing_same_as_corporate ?? true
+  const billingBlock = contract.exhibitor_fields_captured_at
+    ? [
+        contract.billing_contact_name,
+        contract.billing_contact_email,
+        formatBillingAddressBlock(contract),
+      ]
+        .filter((x) => (x ?? '').toString().trim())
+        .join('\n')
+    : contract.billing_same_as_corporate ?? true
       ? formatExhibitorAddressBlock(contract)
       : formatBillingAddressBlock(contract);
 
@@ -91,6 +98,18 @@ export default async function AccountingContractDetailPage({ params }: { params:
               <Detail label="Exhibitor" value={`${contract.exhibitor_company_name} — ${contract.signer_1_name ?? '—'}`} />
               <Detail label="Email" value={contract.signer_1_email} mono />
               <Detail label="Address" value={billingBlock || '—'} multiline />
+              {contract.exhibitor_fields_captured_at ? (
+                <>
+                  <Detail label="Billing contact" value={contract.billing_contact_name ?? '—'} />
+                  <Detail label="Billing email" value={contract.billing_contact_email ?? '—'} mono />
+                  {(contract.event_contact_name?.trim() || contract.event_contact_email?.trim()) && (
+                    <>
+                      <Detail label="Event contact" value={contract.event_contact_name?.trim() || '—'} />
+                      <Detail label="Event email" value={contract.event_contact_email ?? '—'} mono />
+                    </>
+                  )}
+                </>
+              ) : null}
               <Detail label="Sales Rep" value={contract.sales_rep_name ?? contract.sales_rep_email ?? '—'} />
               <Detail label="Event" value={event ? `${event.name} ${event.year}` : '—'} />
               <Detail label="Booth Rate" value={formatCurrency(contract.booth_rate_cents)} />

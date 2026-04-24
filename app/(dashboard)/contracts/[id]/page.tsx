@@ -289,9 +289,6 @@ export default async function ContractDetailPage({ params }: { params: { id: str
             <Detail label="Legal Name"   value={contract.exhibitor_legal_name} />
             <Detail label="Display Name" value={contract.exhibitor_company_name} />
             <Detail label="Address" value={formatExhibitorAddressBlock(contract)} multiline />
-            {contract.billing_same_as_corporate === false && (
-              <Detail label="Billing Address" value={formatBillingAddressBlock(contract)} multiline />
-            )}
             <Detail label="Telephone"    value={contract.exhibitor_telephone} />
             <Detail label="Brands"       value={contract.brands_poured} />
             <Detail label="Sales Rep"    value={contract.sales_rep_name ?? contract.sales_rep_email ?? '—'} />
@@ -370,6 +367,15 @@ export default async function ContractDetailPage({ params }: { params: { id: str
             </div>
           </CardContent>
         </Card>
+
+        <Card className="lg:col-span-2">
+          <div className="border-b border-border/50 px-6 py-4">
+            <h2 className="font-serif text-lg font-semibold">Billing & event contact</h2>
+          </div>
+          <CardContent className="p-6 text-sm">
+            <ExhibitorBillingEventSection contract={contract} />
+          </CardContent>
+        </Card>
       </div>
 
       {/* Notes */}
@@ -427,6 +433,93 @@ export default async function ContractDetailPage({ params }: { params: { id: str
         </ol>
       </section>
     </div>
+  );
+}
+
+function ExhibitorBillingEventSection({ contract }: { contract: ContractWithTotals }) {
+  const captured = Boolean(contract.exhibitor_fields_captured_at);
+  const signingOrLater = ['sent', 'partially_signed', 'signed', 'executed'].includes(contract.status);
+  const legacyRepBilling =
+    !captured &&
+    contract.billing_same_as_corporate === false &&
+    Boolean(contract.billing_address_line1?.trim() || contract.billing_city?.trim());
+
+  if (captured) {
+    const billEmail = contract.billing_contact_email?.trim();
+    const evEmail = contract.event_contact_email?.trim();
+    return (
+      <div className="space-y-4">
+        <div>
+          <p className="wf-label-caps mb-2 text-[0.6rem] text-muted-foreground">Billing (exhibitor-provided)</p>
+          <div className="space-y-3">
+            <Detail label="Contact" value={contract.billing_contact_name?.trim() || '—'} />
+            <Detail
+              label="Email"
+              value={
+                billEmail ? (
+                  <a
+                    href={`mailto:${billEmail}`}
+                    className="text-foreground underline decoration-primary/40 underline-offset-2 transition-colors hover:text-primary hover:decoration-primary"
+                  >
+                    {billEmail}
+                  </a>
+                ) : null
+              }
+            />
+            <Detail label="Address" value={formatBillingAddressBlock(contract)} multiline />
+          </div>
+        </div>
+        <div className="border-t border-border/50 pt-4">
+          <p className="wf-label-caps mb-2 text-[0.6rem] text-muted-foreground">Event contact</p>
+          <div className="space-y-3">
+            <Detail
+              label="Name"
+              value={contract.event_contact_name?.trim() ? contract.event_contact_name.trim() : 'Not provided'}
+            />
+            <Detail
+              label="Email"
+              value={
+                evEmail ? (
+                  <a
+                    href={`mailto:${evEmail}`}
+                    className="text-foreground underline decoration-primary/40 underline-offset-2 transition-colors hover:text-primary hover:decoration-primary"
+                  >
+                    {evEmail}
+                  </a>
+                ) : (
+                  'Not provided'
+                )
+              }
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (signingOrLater) {
+    return (
+      <p className="text-muted-foreground">
+        Billing and event contact will be provided by the exhibitor at signing.
+      </p>
+    );
+  }
+
+  if (legacyRepBilling) {
+    return (
+      <div className="space-y-3">
+        <p className="text-xs font-medium text-amber-900 dark:text-amber-200">
+          Legacy billing address (sales rep entered before exhibitor DocuSign collection).
+        </p>
+        <Detail label="Billing address" value={formatBillingAddressBlock(contract)} multiline />
+      </div>
+    );
+  }
+
+  return (
+    <p className="text-muted-foreground">
+      Billing address, billing contact, and event contact information will be collected from the exhibitor at signing.
+    </p>
   );
 }
 

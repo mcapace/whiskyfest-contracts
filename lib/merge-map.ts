@@ -1,4 +1,5 @@
 import { formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
+import { exhibitorFieldMergeTokens } from '@/lib/exhibitor-docusign-fields';
 import {
   calculateDiscountCents,
   calculateListSubtotalCents,
@@ -146,5 +147,6 @@ export function buildContractMergeMap(
     '{{shanken_signatory_title}}': event.shanken_signatory_title,
     '{{shanken_signatory_email}}': event.shanken_signatory_email,
     ...anchors,
+    ...exhibitorFieldMergeTokens(mode),
   };
 }

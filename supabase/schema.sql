@@ -135,6 +135,12 @@ alter table contracts add column if not exists billing_state text;
 alter table contracts add column if not exists billing_zip text;
 alter table contracts add column if not exists billing_country text;
 
+alter table contracts add column if not exists billing_contact_name text;
+alter table contracts add column if not exists billing_contact_email text;
+alter table contracts add column if not exists event_contact_name text;
+alter table contracts add column if not exists event_contact_email text;
+alter table contracts add column if not exists exhibitor_fields_captured_at timestamptz;
+
 alter table contracts add column if not exists countersigned_by_email text;
 alter table contracts add column if not exists countersigned_by_name text;
 alter table contracts add column if not exists countersigned_at timestamptz;

@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { resolveContractActor } from '@/lib/auth-contract';
-import { newContractBodySchema, normalizedBillingColumns } from '@/lib/contract-schemas';
+import { clearedRepEnteredBilling, newContractBodySchema } from '@/lib/contract-schemas';
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
 import { isDiscountedRate } from '@/lib/contracts';
 import { notifyAdminsOfDiscountRequest } from '@/lib/notifications';
@@ -104,7 +104,7 @@ export async function POST(req: Request) {
     exhibitor_country: p.exhibitor_country ?? null,
   };
 
-  const bill = normalizedBillingColumns(p);
+  const bill = clearedRepEnteredBilling();
 
   const { data: assignedRepLookup } = await supabase
     .from('sales_reps')

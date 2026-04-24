@@ -82,9 +82,18 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   }
 
   const billingSame = contract.billing_same_as_corporate ?? true;
-  const billingAddressLine = billingSame
-    ? (formatExhibitorAddressBlock(contract) || '—').replace(/\n/g, ', ')
-    : (formatBillingAddressBlock(contract) || '—').replace(/\n/g, ', ');
+  const exhibitorCaptured = Boolean(contract.exhibitor_fields_captured_at);
+  const billingAddressLine = exhibitorCaptured
+    ? [
+        contract.billing_contact_name,
+        contract.billing_contact_email,
+        (formatBillingAddressBlock(contract) || '—').replace(/\n/g, ', '),
+      ]
+        .filter((x) => (x ?? '').toString().trim())
+        .join(' · ')
+    : billingSame
+      ? (formatExhibitorAddressBlock(contract) || '—').replace(/\n/g, ', ')
+      : (formatBillingAddressBlock(contract) || '—').replace(/\n/g, ', ');
 
   const discountCents = calculateDiscountCents(contract.booth_count, contract.booth_rate_cents);
   const discountLine =
@@ -99,6 +108,11 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     signerEmail: contract.signer_1_email,
     exhibitorTelephone: contract.exhibitor_telephone,
     billingAddressLine,
+    exhibitorBillingContactName: exhibitorCaptured ? contract.billing_contact_name : null,
+    exhibitorBillingContactEmail: exhibitorCaptured ? contract.billing_contact_email : null,
+    exhibitorBillingAddressDetail: exhibitorCaptured ? formatBillingAddressBlock(contract) : null,
+    exhibitorEventContactName: exhibitorCaptured ? contract.event_contact_name : null,
+    exhibitorEventContactEmail: exhibitorCaptured ? contract.event_contact_email : null,
     eventName: event.name,
     eventYear: event.year,
     boothCount: contract.booth_count,

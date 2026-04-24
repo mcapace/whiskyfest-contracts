@@ -5,7 +5,9 @@ import {
   downloadCompletedPdf,
   extractCountersignerFromSigners,
   fetchEnvelopeSigners,
+  fetchRecipientTextTabs,
 } from '@/lib/docusign';
+import { buildExhibitorCaptureDbPatch, textTabsToLabelMap } from '@/lib/docusign-exhibitor-capture';
 import { uploadPdfBufferToFolder } from '@/lib/google';
 import { contractSignedPdfPath, uploadContractPdfToStorage } from '@/lib/contract-pdf-storage';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
@@ -167,7 +169,39 @@ export async function POST(req: Request) {
     firstSigner &&
     contract.status === 'sent'
   ) {
-    await supabase.from('contracts').update({ status: 'partially_signed' }).eq('id', contract.id);
+    let exhibitorCapture: ReturnType<typeof buildExhibitorCaptureDbPatch> = null;
+    try {
+      const signersForTabs = await fetchEnvelopeSigners(envelopeId);
+      const exhibitorRecipientId =
+        signersForTabs.find((s) => s.routingOrder === '1')?.recipientId?.trim() || '1';
+      const tabs = await fetchRecipientTextTabs(envelopeId, exhibitorRecipientId);
+      const map = textTabsToLabelMap(tabs);
+      exhibitorCapture = buildExhibitorCaptureDbPatch(map);
+      if (!exhibitorCapture) {
+        console.warn('[docusign-webhook] exhibitor text tabs missing or incomplete (legacy envelope or template)', {
+          contractId: contract.id,
+          envelopeId,
+          tabLabelsReceived: tabs.map((t) => t.tabLabel),
+        });
+      }
+    } catch (e) {
+      console.error('[docusign-webhook] fetchRecipientTextTabs failed', {
+        contractId: contract.id,
+        envelopeId,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+
+    const { error: partialUpdateErr } = await supabase
+      .from('contracts')
+      .update({
+        status: 'partially_signed',
+        ...(exhibitorCapture ?? {}),
+      })
+      .eq('id', contract.id);
+    if (partialUpdateErr) {
+      console.error('[docusign-webhook] partially_signed update failed', partialUpdateErr);
+    }
     revalidateContractPaths(contract.id);
 
     const { data: afterPartial } = await supabase

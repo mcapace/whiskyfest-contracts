@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { buildExhibitorDataTextTabs } from '@/lib/exhibitor-docusign-fields';
 import { DOCUSIGN_ANCHORS } from '@/lib/merge-map';
 
 function requireEnv(name: string): string {
@@ -164,6 +165,7 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
   const date1 = anchorOnly(DOCUSIGN_ANCHORS.date1);
   const signHere2 = anchorOnly(DOCUSIGN_ANCHORS.sig2);
   const date2 = anchorOnly(DOCUSIGN_ANCHORS.date2);
+  const exhibitorTabs = buildExhibitorDataTextTabs();
 
   const envelopeDefinition = {
     emailSubject: params.emailSubject,
@@ -187,6 +189,7 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
           tabs: {
             signHereTabs: [signHere1],
             dateSignedTabs: [date1],
+            ...exhibitorTabs,
           },
         },
         {
@@ -234,6 +237,35 @@ export interface DocuSignSignerRow {
 }
 
 /** Load envelope recipients (signers) for webhook / audit (actual countersigner identity after signing group completes). */
+/** Text tab values for a recipient (e.g. exhibitor routing order 1) after signing. */
+export async function fetchRecipientTextTabs(
+  envelopeId: string,
+  recipientId: string,
+): Promise<{ tabLabel: string; value: string }[]> {
+  const accessToken = await getAccessToken();
+  const { accountId, restApiBase } = await resolveApiContext(accessToken);
+  const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}/recipients/${encodeURIComponent(recipientId)}/tabs`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/json',
+    },
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`DocuSign getRecipientTabs ${res.status}: ${text}`);
+  }
+  const data = JSON.parse(text) as { textTabs?: Record<string, unknown>[] };
+  const textTabs = data.textTabs ?? [];
+  return textTabs
+    .map((t) => {
+      const tabLabel = String(t['tabLabel'] ?? t['TabLabel'] ?? '').trim();
+      const value = String(t['value'] ?? t['Value'] ?? '').trim();
+      return { tabLabel, value };
+    })
+    .filter((x) => x.tabLabel.length > 0);
+}
+
 export async function fetchEnvelopeSigners(envelopeId: string): Promise<DocuSignSignerRow[]> {
   const accessToken = await getAccessToken();
   const { accountId, restApiBase } = await resolveApiContext(accessToken);

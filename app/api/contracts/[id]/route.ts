@@ -4,7 +4,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { STANDARD_BOOTH_RATE_CENTS } from '@/lib/contracts';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { assertContractAccess } from '@/lib/auth-contract';
-import { newContractBodySchema, normalizedBillingColumns, signerContactPatchSchema } from '@/lib/contract-schemas';
+import { clearedRepEnteredBilling, newContractBodySchema, signerContactPatchSchema } from '@/lib/contract-schemas';
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
 import type { ContractStatus } from '@/types/db';
 
@@ -63,7 +63,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       exhibitor_country: p.exhibitor_country ?? null,
     };
 
-    const bill = normalizedBillingColumns(p);
+    const bill = clearedRepEnteredBilling();
 
     const { error } = await supabase
       .from('contracts')
