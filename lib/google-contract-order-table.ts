@@ -60,12 +60,12 @@ function cellParagraphSpans(cell: docs_v1.Schema$TableCell | null | undefined): 
 /** Resolved horizontal alignment for the Qty column, copied from the booth row when set. */
 function qtyColumnAlignmentFromBoothRow(boothRow: docs_v1.Schema$TableRow | null | undefined): string {
   const cell = boothRow?.tableCells?.[1];
-  if (!cell?.content) return 'START';
+  if (!cell?.content) return 'END';
   for (const el of cell.content) {
     const a = el.paragraph?.paragraphStyle?.alignment;
     if (a && a !== 'ALIGNMENT_UNSPECIFIED') return a;
   }
-  return 'START';
+  return 'END';
 }
 
 export type ContractOrderTableLocation = {
@@ -168,7 +168,7 @@ export async function insertContractLineItemsIntoOrderTable(
     const amtIdx = idxs[2] ?? idxs[idxs.length - 1];
 
     const item = lineItems[i]!;
-    const amountDisplay = formatCurrency(item.amount_cents, { showCents: true });
+    const amountDisplay = formatCurrency(item.amount_cents, { showCents: false });
 
     if (descIdx != null) ops.push({ index: descIdx, text: item.description });
     if (qtyIdx != null) ops.push({ index: qtyIdx, text: '1' });
@@ -195,6 +195,10 @@ export async function insertContractLineItemsIntoOrderTable(
 /**
  * Normalizes CONTRACT ORDER data rows (booth package + optional line items): left / qty / right
  * alignment and non-bold text. Does not modify the GRAND TOTAL row.
+ *
+ * Rows inserted with `insertTableRow` above GRAND TOTAL inherit that row's paragraph styles (often
+ * right-aligned, bold). Setting alignment + `bold: false` alone may not override inherited named
+ * styles, so we also set `namedStyleType: NORMAL_TEXT` on these paragraphs only.
  *
  * @param lineItemCount — number of custom line item rows inserted above GRAND TOTAL (0 if none).
  */
@@ -240,8 +244,11 @@ export async function applyContractOrderTableDataRowFormatting(
         styleRequests.push({
           updateParagraphStyle: {
             range: { startIndex: start, endIndex: end },
-            fields: 'alignment',
-            paragraphStyle: { alignment },
+            fields: 'alignment,namedStyleType',
+            paragraphStyle: {
+              alignment,
+              namedStyleType: 'NORMAL_TEXT',
+            },
           },
         });
         styleRequests.push({
@@ -254,14 +261,6 @@ export async function applyContractOrderTableDataRowFormatting(
       }
     }
   }
-
-  styleRequests.sort((a, b) => {
-    const ra = a.updateParagraphStyle?.range ?? a.updateTextStyle?.range;
-    const rb = b.updateParagraphStyle?.range ?? b.updateTextStyle?.range;
-    const sa = ra?.startIndex ?? 0;
-    const sb = rb?.startIndex ?? 0;
-    return sb - sa;
-  });
 
   if (styleRequests.length > 0) {
     await docs.documents.batchUpdate({
