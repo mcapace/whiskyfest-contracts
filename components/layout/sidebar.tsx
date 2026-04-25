@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
-import { FileText, LayoutDashboard, Plus, CalendarDays, Users, UserRound, Landmark, ChevronDown, UserPlus } from 'lucide-react';
+import { FileText, LayoutDashboard, Plus, CalendarDays, Users, UserRound, Landmark, ChevronDown, UserPlus, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -90,6 +90,7 @@ const nav = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/contracts/new', label: 'New Contract', icon: Plus },
   { href: '/contracts', label: 'All Contracts', icon: FileText },
+  { href: '/sponsors', label: 'Sponsors', icon: Building2 },
   { href: '/sales-reps', label: 'Sales Reps', icon: UserRound, adminOnly: true },
   { href: '/events', label: 'Events', icon: CalendarDays, adminOnly: true },
   { href: '/users', label: 'Users', icon: Users, adminOnly: true },
