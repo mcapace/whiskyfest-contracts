@@ -137,6 +137,18 @@
   }
 }
 
+@keyframes wf-status-glow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(201, 137, 47, 0);
+  }
+  35% {
+    box-shadow: 0 0 0 5px rgba(201, 137, 47, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(201, 137, 47, 0);
+  }
+}
+
 /* ------------------------------------------------------------------
    Places API (New) autocomplete styling — match local input styling
    ------------------------------------------------------------------ */

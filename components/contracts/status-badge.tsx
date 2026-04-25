@@ -25,7 +25,15 @@ export function StatusBadge({
       transition={{ type: 'spring', stiffness: 460, damping: 30 }}
       className="inline-flex"
     >
-      <Badge data-tour={dataTour} className={cn(statusBadgeClassName(status), 'border motion-safe:transition-colors', className)}>
+      <Badge
+        data-tour={dataTour}
+        className={cn(
+          statusBadgeClassName(status),
+          'border motion-safe:transition-colors',
+          status === 'partially_signed' && !reduce && 'motion-safe:[animation:wf-status-glow_1.6s_ease-out]',
+          className
+        )}
+      >
         {status === 'partially_signed' && (
           <span
             className={cn(
