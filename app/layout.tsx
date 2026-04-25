@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, JetBrains_Mono, Source_Serif_4 } from 'next/font/google';
+import { Inter, JetBrains_Mono, Spectral } from 'next/font/google';
 import { SessionProvider } from 'next-auth/react';
 import { auth } from '@/lib/auth';
 import { ThemeRoot } from '@/components/theme/theme-root';
@@ -12,9 +12,9 @@ const inter = Inter({
   display: 'swap',
 });
 
-const sourceSerif = Source_Serif_4({
+const spectral = Spectral({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+  weight: ['300', '400', '500', '700'],
   variable: '--font-serif',
   display: 'swap',
 });
@@ -38,7 +38,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html
       lang="en"
-      className={`h-full ${inter.variable} ${sourceSerif.variable} ${jetbrainsMono.variable}`}
+      className={`h-full ${inter.variable} ${spectral.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
       <body className="min-h-full font-sans">

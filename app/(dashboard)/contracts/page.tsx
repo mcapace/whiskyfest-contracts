@@ -87,8 +87,8 @@ export default async function ContractsListPage({
           <p className="mb-2 text-xs font-medium uppercase tracking-[0.2em] text-brass-700">
             Pipeline
           </p>
-          <h1 className="font-serif text-4xl font-semibold leading-tight tracking-tight">
-            All Contracts
+          <h1 className="font-display text-5xl font-medium leading-tight tracking-tight">
+            Contracts
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {contracts.length} result{contracts.length !== 1 ? 's' : ''}
