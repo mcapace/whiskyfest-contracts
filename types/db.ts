@@ -159,6 +159,7 @@ export interface AppUser {
   is_events_team?: boolean;
   is_accounting?: boolean;
   can_impersonate?: boolean;
+  can_view_all_sales?: boolean;
   /** Null means system (follow OS until user chooses). */
   theme_preference?: 'light' | 'dark' | 'system' | null;
   /** Set on each successful Google sign-in. Omitted until migration `027_add_last_login` is applied. */
