@@ -30,13 +30,13 @@ export function DashboardHero({
     >
       <div className="relative h-[480px] overflow-hidden bg-oak-900">
         <Image
-          src="/images/whiskyfest-hero.jpg"
+          src="/images/AdobeStock_271973922.jpeg"
           alt="WhiskyFest"
           fill
-          className="object-cover opacity-45"
+          className="object-cover object-[center_38%] opacity-60 sm:object-[center_35%]"
           priority
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-oak-900/20 to-oak-900" />
+        <div className="absolute inset-0 bg-gradient-to-b from-oak-900/10 via-oak-900/35 to-oak-900/95" />
 
         <div className="relative flex h-full flex-col justify-end gap-6 p-6 sm:p-10 lg:p-12">
           <div>
