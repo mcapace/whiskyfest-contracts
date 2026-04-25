@@ -18,10 +18,11 @@ import { DashboardStatCard } from '@/components/dashboard/stat-card';
 import { EventVitalSignsSection } from '@/components/dashboard/event-vital-signs';
 import { PipelineChart } from '@/components/dashboard/pipeline-chart';
 import { SalesLeaderboard } from '@/components/dashboard/sales-leaderboard';
+import { RecentActivityFeed } from '@/components/dashboard/recent-activity-feed';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StatusBadge } from '@/components/contracts/status-badge';
-import { getEventVitalSigns, getPipelineData, getSalesLeaderboard } from '@/lib/event-metrics';
-import type { ContractWithTotals, Event } from '@/types/db';
+import { getEventVitalSigns, getPipelineData, getRecentActivity, getSalesLeaderboard } from '@/lib/event-metrics';
+import type { AuditLogEntry, ContractWithTotals, Event } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 60;
@@ -54,15 +55,17 @@ async function getDashboardData(actor: Awaited<ReturnType<typeof requireContract
     contractsQuery = contractsQuery.in('sales_rep_id', actor.accessibleSalesRepIds);
   }
 
-  const [contractsRes, eventsRes, supportedRepNames] = await Promise.all([
+  const [contractsRes, eventsRes, auditRes, supportedRepNames] = await Promise.all([
     contractsQuery,
     supabase.from('events').select('*').eq('is_active', true),
+    supabase.from('audit_log').select('*').order('occurred_at', { ascending: false }).limit(200),
     getSupportedRepNames(actor.email),
   ]);
 
   return {
     contracts: (contractsRes.data ?? []) as ContractWithTotals[],
     events: (eventsRes.data ?? []) as Event[],
+    audit: (auditRes.data ?? []) as AuditLogEntry[],
     actor,
     supportedRepNames,
   };
@@ -94,7 +97,7 @@ export default async function DashboardPage({
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
   const actor = await requireContractActorForPage();
-  const { contracts: allScoped, events, supportedRepNames } = await getDashboardData(actor);
+  const { contracts: allScoped, events, audit, supportedRepNames } = await getDashboardData(actor);
 
   const rawFilter =
     typeof searchParams?.filter === 'string' ? searchParams.filter : undefined;
@@ -130,6 +133,11 @@ export default async function DashboardPage({
   const vitalSigns = getEventVitalSigns(allScoped, events);
   const pipelineData = getPipelineData(allScoped);
   const leaderboard = getSalesLeaderboard(allScoped);
+  const scopedIds = new Set(allScoped.map((c) => c.id));
+  const recentActivity = getRecentActivity(
+    audit.filter((a) => !a.contract_id || scopedIds.has(a.contract_id)),
+    allScoped
+  );
 
   const pillDefs: { key: DashboardFilterKey; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -195,12 +203,7 @@ export default async function DashboardPage({
 
       <section className="grid gap-6 lg:grid-cols-2">
         <SalesLeaderboard reps={leaderboard} />
-        <Card className="bg-parchment-50">
-          <CardContent className="p-6">
-            <h3 className="font-display text-xl font-medium text-oak-800">Recent Activity</h3>
-            <p className="mt-4 text-sm text-ink-500">Activity will appear here as contracts move through the system.</p>
-          </CardContent>
-        </Card>
+        <RecentActivityFeed activities={recentActivity} />
       </section>
 
       {/* Priority */}
