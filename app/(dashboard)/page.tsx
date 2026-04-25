@@ -16,9 +16,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { DashboardHero } from '@/components/dashboard/hero';
 import { DashboardStatCard } from '@/components/dashboard/stat-card';
 import { EventVitalSignsSection } from '@/components/dashboard/event-vital-signs';
+import { PipelineChart } from '@/components/dashboard/pipeline-chart';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StatusBadge } from '@/components/contracts/status-badge';
-import { getEventVitalSigns } from '@/lib/event-metrics';
+import { getEventVitalSigns, getPipelineData } from '@/lib/event-metrics';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
@@ -126,6 +127,7 @@ export default async function DashboardPage({
 
   const eventMap = new Map(events.map((e) => [e.id, e]));
   const vitalSigns = getEventVitalSigns(allScoped, events);
+  const pipelineData = getPipelineData(allScoped);
 
   const pillDefs: { key: DashboardFilterKey; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -179,6 +181,15 @@ export default async function DashboardPage({
       />
 
       <EventVitalSignsSection metrics={vitalSigns} />
+
+      <section className="space-y-4">
+        <h2 className="font-display text-2xl font-medium text-oak-800">Pipeline</h2>
+        <Card className="bg-parchment-50">
+          <CardContent className="p-6">
+            <PipelineChart data={pipelineData} />
+          </CardContent>
+        </Card>
+      </section>
 
       {/* Priority */}
       {staffPersona ? (
