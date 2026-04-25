@@ -17,9 +17,10 @@ import { DashboardHero } from '@/components/dashboard/hero';
 import { DashboardStatCard } from '@/components/dashboard/stat-card';
 import { EventVitalSignsSection } from '@/components/dashboard/event-vital-signs';
 import { PipelineChart } from '@/components/dashboard/pipeline-chart';
+import { SalesLeaderboard } from '@/components/dashboard/sales-leaderboard';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StatusBadge } from '@/components/contracts/status-badge';
-import { getEventVitalSigns, getPipelineData } from '@/lib/event-metrics';
+import { getEventVitalSigns, getPipelineData, getSalesLeaderboard } from '@/lib/event-metrics';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
@@ -128,6 +129,7 @@ export default async function DashboardPage({
   const eventMap = new Map(events.map((e) => [e.id, e]));
   const vitalSigns = getEventVitalSigns(allScoped, events);
   const pipelineData = getPipelineData(allScoped);
+  const leaderboard = getSalesLeaderboard(allScoped);
 
   const pillDefs: { key: DashboardFilterKey; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -187,6 +189,16 @@ export default async function DashboardPage({
         <Card className="bg-parchment-50">
           <CardContent className="p-6">
             <PipelineChart data={pipelineData} />
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-2">
+        <SalesLeaderboard reps={leaderboard} />
+        <Card className="bg-parchment-50">
+          <CardContent className="p-6">
+            <h3 className="font-display text-xl font-medium text-oak-800">Recent Activity</h3>
+            <p className="mt-4 text-sm text-ink-500">Activity will appear here as contracts move through the system.</p>
           </CardContent>
         </Card>
       </section>
