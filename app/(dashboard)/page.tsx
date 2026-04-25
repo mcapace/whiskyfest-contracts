@@ -174,6 +174,43 @@ export default async function DashboardPage({
         progressPct={progressPct}
       />
 
+      <section className="space-y-4" aria-label="Event overview placeholders">
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card className="border-parchment-200 bg-parchment-50/80">
+            <CardContent className="p-6">
+              <p className="wf-label-caps">Contracted Revenue</p>
+              <p className="mt-3 font-sans text-3xl font-semibold tabular-nums text-oak-800">{formatCurrency(totalPipelineCents)}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-parchment-200 bg-parchment-50/80">
+            <CardContent className="p-6">
+              <p className="wf-label-caps">Contracts Signed</p>
+              <p className="mt-3 font-sans text-3xl font-semibold tabular-nums text-oak-800">{executedCount}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-parchment-200 bg-parchment-50/80">
+            <CardContent className="p-6">
+              <p className="wf-label-caps">Days to Event</p>
+              <p className="mt-3 font-sans text-3xl font-semibold tabular-nums text-oak-800">TBD</p>
+            </CardContent>
+          </Card>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className="border-parchment-200 bg-parchment-50/80 lg:col-span-2">
+            <CardContent className="p-6">
+              <h2 className="font-display text-2xl font-medium text-oak-800">Pipeline Visualization</h2>
+              <p className="mt-2 text-sm text-ink-500">Phase 1B will render event metrics and stage distribution here.</p>
+            </CardContent>
+          </Card>
+          <Card className="border-parchment-200 bg-parchment-50/80">
+            <CardContent className="p-6">
+              <h2 className="font-display text-2xl font-medium text-oak-800">Upcoming Deadlines</h2>
+              <p className="mt-2 text-sm text-ink-500">Phase 1B will render upcoming review and signature deadlines.</p>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
       {/* Priority */}
       {staffPersona ? (
         <div className="grid gap-4 md:grid-cols-3">
