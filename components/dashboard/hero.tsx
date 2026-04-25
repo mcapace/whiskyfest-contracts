@@ -47,9 +47,9 @@ export function DashboardHero({
               WhiskyFest New York
             </h1>
             <p className="mt-3 font-display text-xl font-light italic text-parchment-100 sm:text-2xl">
-              November 20, 2026 · Marriott Marquis
+              November 20, 2026 · 6:30-9:30 PM EST · Marriott Marquis
             </p>
-            <CountdownTimer targetDate="2026-11-20" className="mt-6" />
+            <CountdownTimer targetDate="2026-11-20" targetDateTimeIso="2026-11-20T18:30:00-05:00" className="mt-6" />
           </div>
         </div>
       </div>

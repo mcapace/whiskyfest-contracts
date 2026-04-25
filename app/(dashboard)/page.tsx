@@ -122,6 +122,14 @@ export default async function DashboardPage({
   const progressPct = totalPipelineCents > 0 ? Math.round((totalExecutedCents / totalPipelineCents) * 100) : 0;
 
   const eventMap = new Map(events.map((e) => [e.id, e]));
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const upcomingEventDates = events
+    .map((e) => new Date(e.event_date))
+    .filter((d) => Number.isFinite(d.getTime()))
+    .sort((a, b) => a.getTime() - b.getTime());
+  const now = new Date();
+  const nextEventDate = upcomingEventDates.find((d) => d.getTime() >= now.getTime()) ?? new Date('2026-11-20');
+  const daysToEvent = Math.max(0, Math.ceil((nextEventDate.getTime() - now.getTime()) / msPerDay));
 
   const pillDefs: { key: DashboardFilterKey; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -191,7 +199,7 @@ export default async function DashboardPage({
           <Card className="border-parchment-200 bg-parchment-50/80">
             <CardContent className="p-6">
               <p className="wf-label-caps">Days to Event</p>
-              <p className="mt-3 font-sans text-3xl font-semibold tabular-nums text-oak-800">TBD</p>
+              <p className="mt-3 font-sans text-3xl font-semibold tabular-nums text-oak-800">{daysToEvent}</p>
             </CardContent>
           </Card>
         </div>
