@@ -21,6 +21,7 @@ import {
 import { STORAGE_KEYS } from '@/lib/design-system';
 import { cn } from '@/lib/utils';
 import { formatStatus } from '@/lib/status-display';
+import { requiresDiscountApproval } from '@/lib/contracts';
 import type { ContractWithTotals } from '@/types/db';
 
 type ImpersonationCand = { email: string; name: string | null; role_description: string; segment: string };
@@ -90,10 +91,15 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
   const [impersonation, setImpersonation] = useState<ImpersonationCand[] | null>(null);
 
   const isAdmin = session?.user?.role === 'admin';
+  const isEventsTeam = Boolean(session?.user?.is_events_team);
+  const isAccounting = Boolean(session?.user?.is_accounting);
   const canImpersonate = Boolean(session?.user?.can_impersonate);
-  const showAccounting = Boolean(session?.user?.is_accounting) || isAdmin;
+  const showAccounting = isAccounting || isAdmin;
+  const canViewAll = isAdmin || isEventsTeam || isAccounting || Boolean(session?.user?.can_view_all_sales);
   const pipeline = Boolean(session?.user?.pipeline_access);
-  const canSearchContracts = pipeline || Boolean(session?.user?.is_accounting);
+  const canSearchContracts = pipeline || isAccounting;
+  const canCreateContract = isAdmin || isEventsTeam || session?.user?.role === 'sales' || session?.user?.role === 'sales_rep';
+  const canGenerateReport = isAdmin || isEventsTeam || isAccounting;
 
   useEffect(() => {
     try {
@@ -183,7 +189,7 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
       <Command className="flex max-h-[min(70vh,520px)] flex-col overflow-hidden rounded-lg">
         <div className="border-b border-border/50 px-4 py-3">
           <Command.Input
-            placeholder="Search contracts, actions, users..."
+            placeholder="Search or jump to..."
             className="w-full border-0 bg-transparent font-serif text-lg outline-none placeholder:text-muted-foreground"
           />
         </div>
@@ -194,7 +200,7 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
             heading={<span className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Actions</span>}
             className="mb-2"
           >
-            {pipeline && (
+            {canCreateContract && (
               <Command.Item
                 value="new contract create"
                 onSelect={() => go('/contracts/new')}
@@ -202,12 +208,12 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
               >
                 <Plus className="h-4 w-4 shrink-0 opacity-70" />
                 <div>
-                  <p className="font-medium">New Contract</p>
+                  <p className="font-medium">Create New Contract</p>
                   <p className="text-xs text-muted-foreground">Create a participation contract</p>
                 </div>
               </Command.Item>
             )}
-            {pipeline && showAccounting && (
+            {showAccounting && (
               <Command.Item
                 value="accounting ar dashboard quick"
                 onSelect={() => go('/accounting')}
@@ -231,7 +237,7 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 <p className="text-xs text-muted-foreground">Invert theme (full persistence in preferences)</p>
               </div>
             </Command.Item>
-            {pipeline && (
+            {canGenerateReport && (
               <Command.Item
                 value="generate report contracts export csv"
                 onSelect={() => go('/api/contracts/export')}
@@ -244,10 +250,23 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 </div>
               </Command.Item>
             )}
+            {isAccounting || isAdmin ? (
+              <Command.Item
+                value="export accounting report"
+                onSelect={() => go('/accounting')}
+                className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
+              >
+                <Calculator className="h-4 w-4 shrink-0 opacity-70" />
+                <div>
+                  <p className="font-medium">Export accounting report</p>
+                  <p className="text-xs text-muted-foreground">Accounting dashboard export tools</p>
+                </div>
+              </Command.Item>
+            ) : null}
             {isAdmin && (
               <Command.Item
                 value="open audit log activity contracts"
-                onSelect={() => go('/contracts')}
+                onSelect={() => go('/admin/audit-log')}
                 className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
               >
                 <FileText className="h-4 w-4 shrink-0 opacity-70" />
@@ -257,13 +276,98 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 </div>
               </Command.Item>
             )}
+            {contracts?.some((c) => requiresDiscountApproval(c)) ? (
+              isAdmin ? (
+                <Command.Item
+                  value="approve discount contract"
+                  onSelect={() => {
+                    const target = contracts.find((c) => requiresDiscountApproval(c));
+                    if (target) go(`/contracts/${target.id}`);
+                  }}
+                  className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
+                >
+                  <FileText className="h-4 w-4 shrink-0 opacity-70" />
+                  <div>
+                    <p className="font-medium">Approve discount on pending contract</p>
+                    <p className="text-xs text-muted-foreground">Jump to contract requiring admin discount approval</p>
+                  </div>
+                </Command.Item>
+              ) : null
+            ) : (
+              isAdmin && (
+                <Command.Item
+                  value="approve discount unavailable"
+                  disabled
+                  className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm opacity-60"
+                >
+                  <FileText className="h-4 w-4 shrink-0 opacity-70" />
+                  <div>
+                    <p className="font-medium">Approve discount</p>
+                    <p className="text-xs text-muted-foreground">No contracts currently need discount approval</p>
+                  </div>
+                </Command.Item>
+              )
+            )}
+            {contracts?.some((c) => c.status === 'pending_events_review') ? (
+              isEventsTeam ? (
+                <Command.Item
+                  value="send back pending review"
+                  onSelect={() => {
+                    const target = contracts.find((c) => c.status === 'pending_events_review');
+                    if (target) go(`/contracts/${target.id}`);
+                  }}
+                  className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
+                >
+                  <Home className="h-4 w-4 shrink-0 opacity-70" />
+                  <div>
+                    <p className="font-medium">Send back pending review contract</p>
+                    <p className="text-xs text-muted-foreground">Open a pending events review contract</p>
+                  </div>
+                </Command.Item>
+              ) : null
+            ) : null}
+            {contracts?.some((c) => c.status === 'signed') ? (
+              isAdmin || isEventsTeam ? (
+                <Command.Item
+                  value="release signed contract accounting"
+                  onSelect={() => {
+                    const target = contracts.find((c) => c.status === 'signed');
+                    if (target) go(`/contracts/${target.id}`);
+                  }}
+                  className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
+                >
+                  <Calculator className="h-4 w-4 shrink-0 opacity-70" />
+                  <div>
+                    <p className="font-medium">Release signed contract to accounting</p>
+                    <p className="text-xs text-muted-foreground">Open a signed contract awaiting release</p>
+                  </div>
+                </Command.Item>
+              ) : null
+            ) : null}
+            {contracts?.some((c) => c.status === 'executed') ? (
+              isAdmin || isAccounting ? (
+                <Command.Item
+                  value="mark invoice sent executed"
+                  onSelect={() => {
+                    const target = contracts.find((c) => c.status === 'executed');
+                    if (target) go(`/accounting/${target.id}`);
+                  }}
+                  className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
+                >
+                  <Calculator className="h-4 w-4 shrink-0 opacity-70" />
+                  <div>
+                    <p className="font-medium">Mark invoice sent</p>
+                    <p className="text-xs text-muted-foreground">Open executed contract in accounting view</p>
+                  </div>
+                </Command.Item>
+              ) : null
+            ) : null}
           </Command.Group>
 
           <Command.Group
             heading={<span className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Pages</span>}
             className="mb-2"
           >
-            {pipeline && (
             <Command.Item
               value="dashboard home pipeline"
               onSelect={() => go('/')}
@@ -273,6 +377,18 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
               <div>
                 <p className="font-medium">Dashboard</p>
                 <p className="text-xs text-muted-foreground">Contract pipeline</p>
+              </div>
+            </Command.Item>
+            {pipeline && (
+            <Command.Item
+              value="all contracts list"
+              onSelect={() => go('/contracts')}
+              className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
+            >
+              <FileText className="h-4 w-4 shrink-0 opacity-70" />
+              <div>
+                <p className="font-medium">Contracts</p>
+                <p className="text-xs text-muted-foreground">Full directory</p>
               </div>
             </Command.Item>
             )}
@@ -291,83 +407,72 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
             )}
             {pipeline && (
             <Command.Item
-              value="events review queue"
-              onSelect={() => go('/?filter=events_review')}
+              value="sponsors directory"
+              onSelect={() => go('/sponsors')}
               className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
             >
-              <Home className="h-4 w-4 shrink-0 opacity-70" />
+              <Building2 className="h-4 w-4 shrink-0 opacity-70" />
               <div>
-                <p className="font-medium">Events Review</p>
-                <p className="text-xs text-muted-foreground">Dashboard filter · pending events</p>
+                <p className="font-medium">Sponsors</p>
+                <p className="text-xs text-muted-foreground">Confirmed sponsor directory</p>
               </div>
             </Command.Item>
             )}
-            {pipeline && (
+            {(isAdmin || isEventsTeam) && (
               <Command.Item
-                value="all contracts list"
-                onSelect={() => go('/contracts')}
+                value="floor plan"
+                onSelect={() => go('/floor-plan')}
                 className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
               >
-                <FileText className="h-4 w-4 shrink-0 opacity-70" />
+                <Building2 className="h-4 w-4 shrink-0 opacity-70" />
                 <div>
-                  <p className="font-medium">All Contracts</p>
-                  <p className="text-xs text-muted-foreground">Full directory</p>
+                  <p className="font-medium">Floor Plan</p>
+                  <p className="text-xs text-muted-foreground">Event layout and booth mapping</p>
+                </div>
+              </Command.Item>
+            )}
+            {(isAdmin || isEventsTeam) && (
+              <Command.Item
+                value="event items"
+                onSelect={() => go('/event-items')}
+                className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
+              >
+                <Home className="h-4 w-4 shrink-0 opacity-70" />
+                <div>
+                  <p className="font-medium">Event Items</p>
+                  <p className="text-xs text-muted-foreground">Event checklist and logistics items</p>
                 </div>
               </Command.Item>
             )}
             {isAdmin && (
               <>
                 <Command.Item
-                  value="sales reps"
-                  onSelect={() => go('/sales-reps')}
-                  className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
-                >
-                  <UserRound className="h-4 w-4 shrink-0 opacity-70" />
-                  <div>
-                    <p className="font-medium">Sales Reps</p>
-                    <p className="text-xs text-muted-foreground">Admin</p>
-                  </div>
-                </Command.Item>
-                <Command.Item
                   value="users app"
-                  onSelect={() => go('/users')}
+                  onSelect={() => go('/admin/users')}
                   className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
                 >
                   <Users className="h-4 w-4 shrink-0 opacity-70" />
                   <div>
                     <p className="font-medium">Users</p>
-                    <p className="text-xs text-muted-foreground">Admin</p>
+                    <p className="text-xs text-muted-foreground">Admin only</p>
                   </div>
                 </Command.Item>
                 <Command.Item
-                  value="events admin"
-                  onSelect={() => go('/events')}
+                  value="audit log admin"
+                  onSelect={() => go('/admin/audit-log')}
                   className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
                 >
-                  <Building2 className="h-4 w-4 shrink-0 opacity-70" />
+                  <FileText className="h-4 w-4 shrink-0 opacity-70" />
                   <div>
-                    <p className="font-medium">Events</p>
-                    <p className="text-xs text-muted-foreground">Admin · event catalog</p>
+                    <p className="font-medium">Audit Log</p>
+                    <p className="text-xs text-muted-foreground">Admin only</p>
                   </div>
                 </Command.Item>
               </>
             )}
-            {pipeline && (
-              <Command.Item
-                value="sponsors directory"
-                onSelect={() => go('/sponsors')}
-                className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
-              >
-                <Building2 className="h-4 w-4 shrink-0 opacity-70" />
-                <div>
-                  <p className="font-medium">Sponsors</p>
-                  <p className="text-xs text-muted-foreground">Confirmed sponsor directory</p>
-                </div>
-              </Command.Item>
-            )}
             <Command.Item
               value="settings"
-              onSelect={() => go('/users')}
+              onSelect={() => go('/settings')}
               className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
             >
               <Users className="h-4 w-4 shrink-0 opacity-70" />
@@ -378,7 +483,7 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
             </Command.Item>
             <Command.Item
               value="help"
-              onSelect={() => go('/')}
+              onSelect={() => go('/help')}
               className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
             >
               <Home className="h-4 w-4 shrink-0 opacity-70" />
@@ -393,7 +498,10 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
             <Command.Group
               heading={<span className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Contracts</span>}
             >
-              {contracts.map((c) => {
+              {contracts
+                .filter((c) => canViewAll || Boolean(c.sales_rep_id))
+                .slice(0, 5)
+                .map((c) => {
                 const signer = c.signer_1_name ?? c.signer_1_email ?? '';
                 const rep = c.sales_rep_name ?? c.sales_rep_email ?? '';
                 const keywords = [c.exhibitor_company_name, signer, rep, c.signer_1_email ?? '', formatStatus(c.status)].join(

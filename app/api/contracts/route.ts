@@ -39,7 +39,7 @@ export async function GET(req: Request) {
   const supabase = getSupabaseAdmin();
   let query = supabase.from('contracts_with_totals').select('*').order('created_at', { ascending: false }).limit(200);
 
-  const scopeAll = gate.actor.isAdmin || gate.actor.isEventsTeam;
+  const scopeAll = gate.actor.canViewAllSales;
   if (!scopeAll && gate.actor.accessibleSalesRepIds.length > 0) {
     query = query.in('sales_rep_id', gate.actor.accessibleSalesRepIds);
   }
