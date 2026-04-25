@@ -216,10 +216,12 @@ export default async function DashboardPage({
         progressPct={progressPct}
       />
 
-      <EventVitalSignsSection metrics={vitalSigns} />
+      <EventVitalSignsSection metrics={vitalSigns} canViewAllSales={hasGlobalVisibility} />
 
       <section className="space-y-4">
-        <h2 className="font-display text-2xl font-medium text-oak-800">Pipeline</h2>
+        <h2 className="font-display text-2xl font-medium text-oak-800">
+          {hasGlobalVisibility ? 'Pipeline' : 'My Pipeline'}
+        </h2>
         <Card className="bg-parchment-50">
           <CardContent className="p-6">
             <PipelineChart data={pipelineData} />

@@ -2,7 +2,13 @@ import { formatCurrency } from '@/lib/utils';
 import type { EventVitalSigns } from '@/lib/event-metrics';
 import { Card, CardContent } from '@/components/ui/card';
 
-export function EventVitalSignsSection({ metrics }: { metrics: EventVitalSigns }) {
+export function EventVitalSignsSection({
+  metrics,
+  canViewAllSales,
+}: {
+  metrics: EventVitalSigns;
+  canViewAllSales: boolean;
+}) {
   return (
     <section className="space-y-4" aria-labelledby="event-vital-signs-heading">
       <h2 id="event-vital-signs-heading" className="font-display text-2xl font-medium text-oak-800">
@@ -11,7 +17,9 @@ export function EventVitalSignsSection({ metrics }: { metrics: EventVitalSigns }
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="bg-parchment-50">
           <CardContent className="p-8">
-            <p className="font-sans text-xs font-medium uppercase tracking-[0.2em] text-ink-500">Contracted Revenue</p>
+            <p className="font-sans text-xs font-medium uppercase tracking-[0.2em] text-ink-500">
+              {canViewAllSales ? 'Contracted Revenue' : 'My Contracted Revenue'}
+            </p>
             <p className="mt-3 font-display text-5xl font-medium tabular-nums text-oak-800">{formatCurrency(metrics.contractedRevenueCents)}</p>
             <p className="mt-2 font-sans text-sm text-ink-700">From {metrics.signedContracts} signed contracts</p>
           </CardContent>
@@ -19,7 +27,9 @@ export function EventVitalSignsSection({ metrics }: { metrics: EventVitalSigns }
 
         <Card className="bg-parchment-50">
           <CardContent className="p-8">
-            <p className="font-sans text-xs font-medium uppercase tracking-[0.2em] text-ink-500">Contracts Signed</p>
+            <p className="font-sans text-xs font-medium uppercase tracking-[0.2em] text-ink-500">
+              {canViewAllSales ? 'Contracts Signed' : 'My Contracts Signed'}
+            </p>
             <p className="mt-3 font-display text-5xl font-medium tabular-nums text-oak-800">{metrics.signedContracts}</p>
             <p className="mt-2 font-sans text-sm text-ink-700">{metrics.signedBooths} booths confirmed</p>
           </CardContent>
