@@ -19,6 +19,7 @@ import { DashboardStatCard } from '@/components/dashboard/stat-card';
 import { EventVitalSignsSection } from '@/components/dashboard/event-vital-signs';
 import { PipelineChart } from '@/components/dashboard/pipeline-chart';
 import { SalesLeaderboard } from '@/components/dashboard/sales-leaderboard';
+import { PersonalSalesSummary } from '@/components/dashboard/personal-sales-summary';
 import { RecentActivityFeed } from '@/components/dashboard/recent-activity-feed';
 import { UpcomingDeadlines } from '@/components/dashboard/upcoming-deadlines';
 import { BrandMixBreakdown } from '@/components/dashboard/brand-mix-breakdown';
@@ -120,7 +121,7 @@ export default async function DashboardPage({
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
   const actor = await requireContractActorForPage();
-  const { contracts: allScoped, events, audit, supportedRepNames } = await getDashboardData(actor);
+  const { contracts: allScoped, events, audit, supportedRepNames, canViewAllSales: hasGlobalVisibility } = await getDashboardData(actor);
 
   const rawFilter =
     typeof searchParams?.filter === 'string' ? searchParams.filter : undefined;
@@ -227,7 +228,14 @@ export default async function DashboardPage({
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
-        <SalesLeaderboard reps={leaderboard} />
+        {hasGlobalVisibility ? (
+          <SalesLeaderboard reps={leaderboard} />
+        ) : (
+          <PersonalSalesSummary
+            contractsSigned={vitalSigns.signedContracts}
+            totalValueCents={vitalSigns.contractedRevenueCents}
+          />
+        )}
         <RecentActivityFeed activities={recentActivity} />
       </section>
 
