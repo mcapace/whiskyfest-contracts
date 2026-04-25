@@ -20,9 +20,10 @@ import { PipelineChart } from '@/components/dashboard/pipeline-chart';
 import { SalesLeaderboard } from '@/components/dashboard/sales-leaderboard';
 import { RecentActivityFeed } from '@/components/dashboard/recent-activity-feed';
 import { UpcomingDeadlines } from '@/components/dashboard/upcoming-deadlines';
+import { BrandMixBreakdown } from '@/components/dashboard/brand-mix-breakdown';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StatusBadge } from '@/components/contracts/status-badge';
-import { getDeadlines, getEventVitalSigns, getPipelineData, getRecentActivity, getSalesLeaderboard } from '@/lib/event-metrics';
+import { getBrandMix, getDeadlines, getEventVitalSigns, getPipelineData, getRecentActivity, getSalesLeaderboard } from '@/lib/event-metrics';
 import type { AuditLogEntry, ContractWithTotals, Event } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
@@ -140,6 +141,7 @@ export default async function DashboardPage({
     allScoped
   );
   const deadlines = getDeadlines(allScoped);
+  const brandMix = getBrandMix(allScoped);
 
   const pillDefs: { key: DashboardFilterKey; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -210,12 +212,7 @@ export default async function DashboardPage({
 
       <section className="grid gap-6 lg:grid-cols-2">
         <UpcomingDeadlines deadlines={deadlines} />
-        <Card className="bg-parchment-50">
-          <CardContent className="p-6">
-            <h3 className="font-display text-xl font-medium text-oak-800">Brand Mix</h3>
-            <p className="mt-4 text-sm text-ink-500">Brand mix will appear once exhibitors are confirmed.</p>
-          </CardContent>
-        </Card>
+        <BrandMixBreakdown categories={brandMix} />
       </section>
 
       {/* Priority */}
