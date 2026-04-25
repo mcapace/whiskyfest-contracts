@@ -20,6 +20,49 @@ const config: Config = {
         mono: ['var(--font-mono)', 'Menlo', 'monospace'],
       },
       colors: {
+        parchment: {
+          50: '#FAF7F2',
+          100: '#F5EFE6',
+          200: '#E8DDC8',
+          300: '#D4C4A0',
+        },
+        oak: {
+          600: '#5C4828',
+          700: '#3E3019',
+          800: '#2A1F0F',
+          900: '#1A1308',
+        },
+        amber: {
+          500: '#C9892F',
+          600: '#A66B1F',
+          700: '#7A4F18',
+        },
+        copper: {
+          500: '#B5651D',
+          600: '#964F0F',
+        },
+        success: {
+          base: '#2D6A4F',
+          bg: '#D8F3DC',
+        },
+        warning: {
+          base: '#9A6914',
+          bg: '#FFF3CD',
+        },
+        danger: {
+          base: '#9A0F0F',
+          bg: '#F8D7DA',
+        },
+        info: {
+          base: '#1B4965',
+          bg: '#D6E4F0',
+        },
+        ink: {
+          900: '#1A1308',
+          700: '#3E3019',
+          500: '#6B5D4A',
+          300: '#A89B85',
+        },
         // Whisky Advocate–aligned: burgundy editorial + warm neutrals
         whisky: {
           50:  '#faf7f6',

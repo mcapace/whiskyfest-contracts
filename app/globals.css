@@ -9,49 +9,49 @@
 
 @layer base {
   :root {
-    /* Neutrals — warm editorial paper */
-    --background: 38 32% 97%;
-    --foreground: 18 18% 12%;
+    /* Neutrals — whisky editorial paper */
+    --background: 36 45% 97%;
+    --foreground: 30 53% 7%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 18 18% 12%;
+    --card: 36 42% 96%;
+    --card-foreground: 30 53% 7%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 18 18% 12%;
+    --popover: 36 42% 96%;
+    --popover-foreground: 30 53% 7%;
 
-    /* Primary — WhiskyFest blue (buttons, links, key CTAs) */
-    --primary: 222 64% 26%;
-    --primary-foreground: 40 42% 98%;
+    /* Primary — oak editorial ink */
+    --primary: 33 47% 11%;
+    --primary-foreground: 36 45% 97%;
 
-    /* Secondary — warm stone */
-    --secondary: 32 20% 93%;
-    --secondary-foreground: 18 22% 18%;
+    /* Secondary — parchment + oak text */
+    --secondary: 38 37% 90%;
+    --secondary-foreground: 30 31% 18%;
 
     /* Muted */
-    --muted: 30 16% 93%;
-    --muted-foreground: 20 10% 42%;
+    --muted: 38 30% 93%;
+    --muted-foreground: 33 18% 35%;
 
     /* Accent — light brass wash on hover */
-    --accent: 38 32% 93%;
-    --accent-foreground: 222 55% 28%;
+    --accent: 38 37% 90%;
+    --accent-foreground: 33 47% 11%;
 
-    /* Strong brand accent — progression timeline fills, palette selection */
-    --accent-brand: 222 64% 26%;
+    /* Strong brand accent — amber */
+    --accent-brand: 34 62% 49%;
 
-    --destructive: 0 72% 42%;
+    --destructive: 0 82% 33%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 30 18% 88%;
-    --input: 30 18% 88%;
-    /* Focus ring — WhiskyFest blue */
-    --ring: 226 58% 26%;
+    --border: 40 40% 85%;
+    --input: 40 34% 78%;
+    /* Focus ring — amber */
+    --ring: 34 62% 49%;
 
     --radius: 0.5rem;
 
     /* Surfaces (layout shell, floating chrome) */
-    --bg-page: 38 32% 97%;
-    --bg-surface: 0 0% 100%;
-    --bg-surface-raised: 38 28% 99%;
+    --bg-page: 36 45% 97%;
+    --bg-surface: 36 42% 96%;
+    --bg-surface-raised: 36 45% 98%;
   }
 
   .dark,
