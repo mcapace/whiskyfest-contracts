@@ -16,53 +16,60 @@ export default async function LoginPage({
       : null;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-brass-50/90 via-fest-600/[0.04] to-background px-6 dark:from-background dark:via-background dark:to-background">
-      <div className="w-full max-w-md">
-        {/* Brand */}
-        <div className="mb-8 text-center">
-          <div className="relative mx-auto mb-6 h-28 w-full max-w-sm">
-            <Image
-              src="/images/WA_BLUE-removebg-preview%20%282%29.png"
-              alt="Whisky Advocate"
-              fill
-              className="object-contain mix-blend-multiply dark:mix-blend-normal dark:brightness-0 dark:invert"
-              sizes="(max-width: 448px) 100vw, 448px"
-              priority
-            />
+    <div className="min-h-screen bg-parchment-50">
+      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-5">
+        <div className="relative h-[260px] overflow-hidden lg:col-span-3 lg:h-screen">
+          <Image
+            src="/images/whiskyfest-login-hero.jpg"
+            alt="WhiskyFest login hero"
+            fill
+            className="object-cover object-center"
+            priority
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-oak-900/70 via-oak-900/35 to-oak-900/80" />
+          <div className="relative flex h-full animate-slide-up flex-col justify-center px-6 py-8 text-parchment-50 sm:px-10 lg:px-12">
+            <p className="font-sans text-xs uppercase tracking-[0.25em] text-amber-500">WhiskyFest 2026</p>
+            <h1 className="mt-3 font-display text-5xl font-medium tracking-tight text-parchment-50 sm:text-6xl">
+              Welcome back
+            </h1>
+            <p className="mt-4 font-display text-lg italic text-parchment-100 sm:text-2xl">
+              WhiskyFest New York · November 20, 2026
+            </p>
           </div>
-          <p className="mb-2 text-xs font-medium uppercase tracking-[0.2em] text-brass-700">
-            M. Shanken Communications
-          </p>
-          <h1 className="font-serif text-2xl font-semibold tracking-tight">
-            Participation contracts
-          </h1>
-          <p className="mt-3 text-sm text-muted-foreground">
-            Sign in with your @mshanken.com Google account
-          </p>
         </div>
 
-        {/* Card */}
-        <div className="rounded-lg border border-border/60 border-t-4 border-t-fest-600 bg-card p-8 shadow-md shadow-fest-900/10">
-          {err ? <p className="mb-4 text-sm text-destructive">{err}</p> : null}
-          <form action={async () => {
-            'use server';
-            await signIn('google', { redirectTo: '/' });
-          }}>
-            <Button type="submit" size="lg" className="w-full">
-              <GoogleIcon /> Continue with Google
-            </Button>
-          </form>
-          <p className="mt-6 text-center text-xs text-muted-foreground">
-            Access restricted to @mshanken.com workspace accounts.
-            <br />
-            If you need access, contact Michael Capace.
-          </p>
-        </div>
+        <div className="flex items-center justify-center px-6 py-10 sm:px-10 lg:col-span-2 lg:px-12">
+          <div className="w-full max-w-md animate-slide-up">
+            <p className="font-sans text-xs font-medium uppercase tracking-[0.2em] text-ink-500">Sign in</p>
+            <h2 className="mt-3 font-display text-4xl font-medium tracking-tight text-oak-800 sm:text-5xl">
+              M. Shanken Operations
+            </h2>
+            <p className="mt-4 text-sm text-ink-700">Use your @mshanken.com Google account</p>
 
-        {/* Footer mark */}
-        <p className="mt-10 text-center font-serif text-xs italic text-muted-foreground">
-          Whisky Advocate · Wine Spectator · Cigar Aficionado
-        </p>
+            <div className="mt-8 rounded-lg border border-parchment-200 bg-parchment-50 p-7 shadow-[0_14px_30px_-20px_rgba(62,48,25,0.45)]">
+              {err ? <p className="mb-4 text-sm text-danger-base">{err}</p> : null}
+              <form
+                action={async () => {
+                  'use server';
+                  await signIn('google', { redirectTo: '/' });
+                }}
+              >
+                <Button type="submit" size="lg" className="w-full">
+                  <GoogleIcon /> Continue with Google
+                </Button>
+              </form>
+              <p className="mt-5 text-center text-xs text-ink-500">
+                Access restricted to @mshanken.com workspace accounts.
+                <br />
+                If you need access, contact Michael Capace.
+              </p>
+            </div>
+
+            <p className="mt-8 text-xs uppercase tracking-[0.14em] text-ink-500">
+              WhiskyFest 2026 · Marriott Marquis · New York
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
