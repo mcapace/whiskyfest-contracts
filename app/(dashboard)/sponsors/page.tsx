@@ -16,7 +16,16 @@ export default async function SponsorsPage() {
         <p className="text-sm text-ink-700">{sponsors.length} sponsors confirmed for WhiskyFest 2026</p>
       </header>
 
-      <SponsorsDirectory sponsors={sponsors} canViewFinancials={actor.canViewAllSales} />
+      <SponsorsDirectory
+        sponsors={sponsors}
+        viewer={{
+          role: actor.role,
+          is_events_team: actor.isEventsTeam,
+          is_accounting: actor.isAccounting,
+          can_view_all_sales: actor.canViewAllSales,
+          accessibleSalesRepIds: actor.accessibleSalesRepIds,
+        }}
+      />
     </div>
   );
 }

@@ -5,13 +5,20 @@ import { Input } from '@/components/ui/input';
 import { SponsorCard } from '@/components/sponsors/sponsor-card';
 import { SponsorProfileDrawer } from '@/components/sponsors/sponsor-profile-drawer';
 import { sponsorCategoryFromBrands, type SponsorRecord } from '@/lib/sponsors';
+import { canViewSponsorDetails } from '@/lib/permissions';
 
 export function SponsorsDirectory({
   sponsors,
-  canViewFinancials,
+  viewer,
 }: {
   sponsors: SponsorRecord[];
-  canViewFinancials: boolean;
+  viewer: {
+    role?: string | null;
+    is_events_team?: boolean | null;
+    is_accounting?: boolean | null;
+    can_view_all_sales?: boolean | null;
+    accessibleSalesRepIds?: string[] | null;
+  };
 }) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('all');
@@ -32,6 +39,8 @@ export function SponsorsDirectory({
       return blob.includes(q);
     });
   }, [sponsors, query, category]);
+
+  const canViewSensitive = selected ? canViewSponsorDetails(viewer, selected) : false;
 
   return (
     <div className="space-y-6">
@@ -77,7 +86,7 @@ export function SponsorsDirectory({
         open={Boolean(selected)}
         onOpenChange={(open) => !open && setSelected(null)}
         sponsor={selected}
-        canViewFinancials={canViewFinancials}
+        canViewSensitive={canViewSensitive}
       />
     </div>
   );

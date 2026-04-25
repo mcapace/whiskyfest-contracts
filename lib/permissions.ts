@@ -6,6 +6,10 @@ type SalesVisibilityUser = {
   accessibleSalesRepIds?: string[] | null;
 };
 
+type SponsorVisibilityTarget = {
+  sales_rep_id?: string | null;
+};
+
 export function canViewAllSales(user: SalesVisibilityUser): boolean {
   if (user.role === 'admin') return true;
   if (Boolean(user.is_events_team)) return true;
@@ -25,4 +29,11 @@ export function getVisibleContractsFilter(user: SalesVisibilityUser): {
 
   const ids = [...new Set((user.accessibleSalesRepIds ?? []).filter(Boolean))];
   return { filter: 'own', salesRepIds: ids };
+}
+
+export function canViewSponsorDetails(user: SalesVisibilityUser, sponsor: SponsorVisibilityTarget): boolean {
+  if (canViewAllSales(user)) return true;
+  if (!sponsor.sales_rep_id) return false;
+  const ids = new Set((user.accessibleSalesRepIds ?? []).filter(Boolean));
+  return ids.has(sponsor.sales_rep_id);
 }
