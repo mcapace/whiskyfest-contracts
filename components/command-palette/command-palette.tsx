@@ -7,6 +7,7 @@ import { Command } from 'cmdk';
 import {
   Building2,
   Calculator,
+  Clock3,
   Eye,
   FileText,
   Home,
@@ -33,6 +34,7 @@ type ImpersonationSegments = {
 };
 
 const Ctx = createContext<{ setOpen: (v: boolean) => void } | null>(null);
+const RECENT_CONTRACTS_KEY = 'wf.recentContracts.v1';
 
 export function useCommandPalette() {
   const c = useContext(Ctx);
@@ -84,6 +86,7 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
   const router = useRouter();
   const { data: session, update } = useSession();
   const [contracts, setContracts] = useState<ContractWithTotals[] | null>(null);
+  const [recentIds, setRecentIds] = useState<string[]>([]);
   const [impersonation, setImpersonation] = useState<ImpersonationCand[] | null>(null);
 
   const isAdmin = session?.user?.role === 'admin';
@@ -91,6 +94,15 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
   const showAccounting = Boolean(session?.user?.is_accounting) || isAdmin;
   const pipeline = Boolean(session?.user?.pipeline_access);
   const canSearchContracts = pipeline || Boolean(session?.user?.is_accounting);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(RECENT_CONTRACTS_KEY);
+      if (raw) setRecentIds(JSON.parse(raw) as string[]);
+    } catch {
+      setRecentIds([]);
+    }
+  }, []);
 
   useEffect(() => {
     if (!open || !canSearchContracts) return;
@@ -137,6 +149,12 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
     router.push(href);
   }
 
+  function rememberContract(id: string) {
+    const next = [id, ...recentIds.filter((v) => v !== id)].slice(0, 5);
+    setRecentIds(next);
+    localStorage.setItem(RECENT_CONTRACTS_KEY, JSON.stringify(next));
+  }
+
   async function viewAs(email: string) {
     onOpenChange(false);
     await update({ impersonationTarget: email });
@@ -160,7 +178,7 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
       onOpenChange={onOpenChange}
       label="Command palette"
       overlayClassName="fixed inset-0 z-[100] bg-bg-page/80 backdrop-blur-sm"
-      contentClassName="fixed left-1/2 top-[12vh] z-[101] w-[calc(100%-1.5rem)] max-w-[640px] -translate-x-1/2 rounded-lg border border-border/60 bg-bg-surface p-0 shadow-wf-floating"
+      contentClassName="fixed left-1/2 top-[12vh] z-[101] w-[calc(100%-1.5rem)] max-w-[680px] -translate-x-1/2 rounded-lg border border-border/60 bg-bg-surface p-0 shadow-wf-floating max-sm:inset-0 max-sm:top-0 max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:rounded-none"
     >
       <Command className="flex max-h-[min(70vh,520px)] flex-col overflow-hidden rounded-lg">
         <div className="border-b border-border/50 px-4 py-3">
@@ -213,6 +231,32 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 <p className="text-xs text-muted-foreground">Invert theme (full persistence in preferences)</p>
               </div>
             </Command.Item>
+            {pipeline && (
+              <Command.Item
+                value="generate report contracts export csv"
+                onSelect={() => go('/api/contracts/export')}
+                className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
+              >
+                <FileText className="h-4 w-4 shrink-0 opacity-70" />
+                <div>
+                  <p className="font-medium">Generate report</p>
+                  <p className="text-xs text-muted-foreground">Export contracts CSV</p>
+                </div>
+              </Command.Item>
+            )}
+            {isAdmin && (
+              <Command.Item
+                value="open audit log activity contracts"
+                onSelect={() => go('/contracts')}
+                className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
+              >
+                <FileText className="h-4 w-4 shrink-0 opacity-70" />
+                <div>
+                  <p className="font-medium">Open audit log</p>
+                  <p className="text-xs text-muted-foreground">Jump to contract activity views</p>
+                </div>
+              </Command.Item>
+            )}
           </Command.Group>
 
           <Command.Group
@@ -308,6 +352,41 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 </Command.Item>
               </>
             )}
+            {pipeline && (
+              <Command.Item
+                value="sponsors directory"
+                onSelect={() => go('/sponsors')}
+                className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
+              >
+                <Building2 className="h-4 w-4 shrink-0 opacity-70" />
+                <div>
+                  <p className="font-medium">Sponsors</p>
+                  <p className="text-xs text-muted-foreground">Confirmed sponsor directory</p>
+                </div>
+              </Command.Item>
+            )}
+            <Command.Item
+              value="settings"
+              onSelect={() => go('/users')}
+              className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
+            >
+              <Users className="h-4 w-4 shrink-0 opacity-70" />
+              <div>
+                <p className="font-medium">Settings</p>
+                <p className="text-xs text-muted-foreground">User and workspace preferences</p>
+              </div>
+            </Command.Item>
+            <Command.Item
+              value="help"
+              onSelect={() => go('/')}
+              className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
+            >
+              <Home className="h-4 w-4 shrink-0 opacity-70" />
+              <div>
+                <p className="font-medium">Help</p>
+                <p className="text-xs text-muted-foreground">Dashboard quick-start and support</p>
+              </div>
+            </Command.Item>
           </Command.Group>
 
           {contracts && contracts.length > 0 && (
@@ -325,7 +404,10 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                     key={c.id}
                     value={`${c.exhibitor_company_name} ${keywords}`}
                     keywords={[signer, rep, c.signer_1_email].filter((x): x is string => Boolean(x))}
-                    onSelect={() => go(`/contracts/${c.id}`)}
+                    onSelect={() => {
+                      rememberContract(c.id);
+                      go(`/contracts/${c.id}`);
+                    }}
                     className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
                   >
                     <FileText className="h-4 w-4 shrink-0 opacity-70" />
@@ -340,6 +422,30 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                   </Command.Item>
                 );
               })}
+            </Command.Group>
+          )}
+
+          {contracts && recentIds.length > 0 && (
+            <Command.Group
+              heading={<span className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Recent</span>}
+            >
+              {recentIds
+                .map((id) => contracts.find((c) => c.id === id))
+                .filter((c): c is ContractWithTotals => Boolean(c))
+                .map((c) => (
+                  <Command.Item
+                    key={`recent-${c.id}`}
+                    value={`recent ${c.exhibitor_company_name} ${c.id}`}
+                    onSelect={() => go(`/contracts/${c.id}`)}
+                    className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
+                  >
+                    <Clock3 className="h-4 w-4 shrink-0 opacity-70" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{c.exhibitor_company_name}</p>
+                      <p className="truncate text-xs text-muted-foreground">{formatStatus(c.status)}</p>
+                    </div>
+                  </Command.Item>
+                ))}
             </Command.Group>
           )}
 
