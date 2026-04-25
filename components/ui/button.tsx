@@ -4,15 +4,15 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-sans text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98]',
   {
     variants: {
       variant: {
-        default:     'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90',
+        default:     'bg-oak-800 text-parchment-50 shadow-sm hover:bg-oak-700 hover:shadow-md',
         destructive: 'bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90',
-        outline:     'border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground',
-        secondary:   'bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80',
-        ghost:       'hover:bg-accent hover:text-accent-foreground',
+        outline:     'border border-parchment-300 bg-parchment-50 text-oak-800 shadow-sm hover:bg-parchment-100',
+        secondary:   'border border-parchment-300 bg-parchment-100 text-oak-800 shadow-sm hover:bg-parchment-200',
+        ghost:       'hover:bg-parchment-100 hover:text-oak-800',
         link:        'text-primary underline-offset-4 hover:underline',
       },
       size: {

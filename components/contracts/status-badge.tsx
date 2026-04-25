@@ -26,6 +26,15 @@ export function StatusBadge({
       className="inline-flex"
     >
       <Badge data-tour={dataTour} className={cn(statusBadgeClassName(status), 'border motion-safe:transition-colors', className)}>
+        {status === 'partially_signed' && (
+          <span
+            className={cn(
+              'mr-1 inline-block h-1.5 w-1.5 rounded-full bg-current',
+              !reduce && 'motion-safe:animate-pulse'
+            )}
+            aria-hidden
+          />
+        )}
         {formatStatus(status)}
       </Badge>
     </motion.span>
