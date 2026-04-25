@@ -1,13 +1,13 @@
 import type { BrandMixRow } from '@/lib/event-metrics';
 import { Card, CardContent } from '@/components/ui/card';
 
-export function BrandMixBreakdown({ categories }: { categories: BrandMixRow[] }) {
+export function BrandMixBreakdown({ categories, title }: { categories: BrandMixRow[]; title?: string }) {
   const hasData = categories.some((c) => c.count > 0);
 
   return (
     <Card className="bg-parchment-50">
       <CardContent className="p-6">
-        <h3 className="font-display text-xl font-medium text-oak-800">Brand Mix</h3>
+        <h3 className="font-display text-xl font-medium text-oak-800">{title ?? 'Brand Mix'}</h3>
         {!hasData ? (
           <p className="mt-4 text-sm text-ink-500">Brand mix will appear once exhibitors are confirmed.</p>
         ) : (

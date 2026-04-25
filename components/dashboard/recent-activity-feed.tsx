@@ -29,11 +29,11 @@ function ActivityIcon({ action }: { action: string }) {
   }
 }
 
-export function RecentActivityFeed({ activities }: { activities: ActivityRow[] }) {
+export function RecentActivityFeed({ activities, title }: { activities: ActivityRow[]; title?: string }) {
   return (
     <Card className="bg-parchment-50">
       <CardContent className="p-6">
-        <h3 className="font-display text-xl font-medium text-oak-800">Recent Activity</h3>
+        <h3 className="font-display text-xl font-medium text-oak-800">{title ?? 'Recent Activity'}</h3>
         {activities.length === 0 ? (
           <p className="mt-4 text-sm text-ink-500">Activity will appear here as contracts move through the system.</p>
         ) : (

@@ -7,6 +7,7 @@ declare module 'next-auth' {
       role?: UserRole;
       is_events_team?: boolean;
       is_accounting?: boolean;
+      can_view_all_sales?: boolean;
       /** True when user may access the main contract pipeline (admin, events team, or rep/assistant). */
       pipeline_access?: boolean;
       /** Real login user — true only for users allowed to use "View as…". */
@@ -33,6 +34,7 @@ declare module 'next-auth/jwt' {
     role?: string;
     is_events_team?: boolean;
     is_accounting?: boolean;
+    can_view_all_sales?: boolean;
     pipeline_access?: boolean;
     real_can_impersonate?: boolean;
     impersonation_target_email?: string | null;

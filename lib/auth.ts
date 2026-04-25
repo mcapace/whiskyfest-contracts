@@ -16,29 +16,39 @@ async function computeAccessFlagsForEmail(
   role: string;
   is_events_team: boolean;
   is_accounting: boolean;
+  can_view_all_sales: boolean;
   pipeline_access: boolean;
 }> {
   const { data: appUser } = await supabase
     .from('app_users')
-    .select('role, is_active, is_events_team, is_accounting')
+    .select('role, is_active, is_events_team, is_accounting, can_view_all_sales')
     .eq('email', email.toLowerCase())
     .maybeSingle();
 
   if (!appUser?.is_active) {
-    return { role: 'viewer', is_events_team: false, is_accounting: false, pipeline_access: false };
+    return {
+      role: 'viewer',
+      is_events_team: false,
+      is_accounting: false,
+      can_view_all_sales: false,
+      pipeline_access: false,
+    };
   }
 
   const accessibleSalesRepIds = await getAccessibleSalesRepIds(email, supabase);
   const isAdmin = appUser.role === 'admin';
   const isEventsTeam = Boolean((appUser as { is_events_team?: boolean }).is_events_team);
   const isAccounting = Boolean((appUser as { is_accounting?: boolean }).is_accounting);
+  const canViewAllSales =
+    isAdmin || isEventsTeam || isAccounting || Boolean((appUser as { can_view_all_sales?: boolean }).can_view_all_sales);
   const hasRep = accessibleSalesRepIds.length > 0;
 
   return {
     role: appUser.role,
     is_events_team: isEventsTeam,
     is_accounting: isAccounting,
-    pipeline_access: isAdmin || isEventsTeam || hasRep,
+    can_view_all_sales: canViewAllSales,
+    pipeline_access: canViewAllSales || hasRep,
   };
 }
 
@@ -139,6 +149,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.pipeline_access = false;
         token.is_accounting = false;
         token.is_events_team = false;
+        token.can_view_all_sales = false;
         token.real_can_impersonate = false;
         token.impersonation_target_email = null;
         token.impersonation_target_name = null;
@@ -179,6 +190,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       token.role = flags.role;
       token.is_events_team = flags.is_events_team;
       token.is_accounting = flags.is_accounting;
+      token.can_view_all_sales = flags.can_view_all_sales;
       token.pipeline_access = flags.pipeline_access;
       token.real_can_impersonate = realCanImpersonate;
 
@@ -204,6 +216,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.role = (token.role as UserRole) ?? 'sales';
       session.user.is_events_team = Boolean(token.is_events_team);
       session.user.is_accounting = Boolean(token.is_accounting);
+      session.user.can_view_all_sales = Boolean(token.can_view_all_sales);
       session.user.pipeline_access = Boolean(token.pipeline_access);
       session.user.can_impersonate = Boolean(token.real_can_impersonate);
       session.user.theme_preference =

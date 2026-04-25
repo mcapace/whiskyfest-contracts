@@ -13,6 +13,8 @@ export interface AppUserRow {
   is_active: boolean;
   name: string | null;
   is_events_team: boolean;
+  is_accounting: boolean;
+  can_view_all_sales: boolean;
 }
 
 /** Own sales_reps row id if any; union with accessibleSalesRepIds for scoped access. */
@@ -21,6 +23,8 @@ export interface ContractActorContext {
   appUser: AppUserRow;
   isAdmin: boolean;
   isEventsTeam: boolean;
+  isAccounting: boolean;
+  canViewAllSales: boolean;
   salesRepId: string | null;
   /** Own rep id plus any reps this user assists (unique). */
   accessibleSalesRepIds: string[];
@@ -43,7 +47,7 @@ export async function resolveContractActor(session: Session | null): Promise<
   const supabase = getSupabaseAdmin();
   const { data: appUser, error } = await supabase
     .from('app_users')
-    .select('email, role, is_active, name, is_events_team')
+    .select('email, role, is_active, name, is_events_team, is_accounting, can_view_all_sales')
     .eq('email', email)
     .single();
 
@@ -52,6 +56,9 @@ export async function resolveContractActor(session: Session | null): Promise<
 
   const isAdmin = appUser.role === 'admin';
   const isEventsTeam = Boolean((appUser as { is_events_team?: boolean }).is_events_team);
+  const isAccounting = Boolean((appUser as { is_accounting?: boolean }).is_accounting);
+  const canViewAllSales =
+    isAdmin || isEventsTeam || isAccounting || Boolean((appUser as { can_view_all_sales?: boolean }).can_view_all_sales);
 
   let salesRepId: string | null = null;
   const { data: sr } = await supabase
@@ -65,7 +72,7 @@ export async function resolveContractActor(session: Session | null): Promise<
 
   const accessibleSalesRepIds = await getAccessibleSalesRepIds(email, supabase);
 
-  if (!isAdmin && !isEventsTeam && accessibleSalesRepIds.length === 0) {
+  if (!canViewAllSales && accessibleSalesRepIds.length === 0) {
     return jsonErr(403, 'Not a registered rep or assistant');
   }
 
@@ -79,6 +86,8 @@ export async function resolveContractActor(session: Session | null): Promise<
       } as AppUserRow,
       isAdmin,
       isEventsTeam,
+      isAccounting,
+      canViewAllSales,
       salesRepId,
       accessibleSalesRepIds,
     },
@@ -115,7 +124,7 @@ export async function assertContractAccess(
     return jsonErr(403, 'Forbidden');
   }
 
-  const mustOwn = !actor.isAdmin && !opts?.skipOwnership;
+  const mustOwn = !actor.canViewAllSales && !opts?.skipOwnership;
   if (mustOwn) {
     const oid = c.sales_rep_id;
     if (!oid || !actor.accessibleSalesRepIds.includes(oid)) {
@@ -182,10 +191,12 @@ export async function assertContractPdfAccess(
 export interface PageContractActor {
   email: string;
   isAdmin: boolean;
+  isEventsTeam: boolean;
+  isAccounting: boolean;
+  canViewAllSales: boolean;
   salesRepId: string | null;
   accessibleSalesRepIds: string[];
   role: string;
-  isEventsTeam: boolean;
 }
 
 export async function requireContractActorForPage(): Promise<PageContractActor> {
@@ -199,13 +210,17 @@ export async function requireContractActorForPage(): Promise<PageContractActor> 
   const supabase = getSupabaseAdmin();
   const { data: appUser } = await supabase
     .from('app_users')
-    .select('role, is_active, is_events_team')
+    .select('role, is_active, is_events_team, is_accounting, can_view_all_sales')
     .eq('email', email)
     .single();
 
   if (!appUser?.is_active) redirect('/auth/login');
 
   const isAdmin = appUser.role === 'admin';
+  const isEventsTeam = Boolean(appUser.is_events_team);
+  const isAccounting = Boolean((appUser as { is_accounting?: boolean }).is_accounting);
+  const canViewAllSales =
+    isAdmin || isEventsTeam || isAccounting || Boolean((appUser as { can_view_all_sales?: boolean }).can_view_all_sales);
 
   let salesRepId: string | null = null;
   const { data: sr } = await supabase
@@ -219,19 +234,19 @@ export async function requireContractActorForPage(): Promise<PageContractActor> 
 
   const accessibleSalesRepIds = await getAccessibleSalesRepIds(email, supabase);
 
-  const isEventsTeam = Boolean(appUser.is_events_team);
-
-  if (!isAdmin && !isEventsTeam && accessibleSalesRepIds.length === 0) {
+  if (!canViewAllSales && accessibleSalesRepIds.length === 0) {
     redirect('/auth/login');
   }
 
   return {
     email,
     isAdmin,
+    isEventsTeam,
+    isAccounting,
+    canViewAllSales,
     salesRepId,
     accessibleSalesRepIds,
     role: appUser.role,
-    isEventsTeam,
   };
 }
 
@@ -251,7 +266,7 @@ export async function getContractWithTotalsForViewer(
 
   const row = contract as ContractWithTotals;
   const sid = row.sales_rep_id;
-  const canViewAll = actor.isAdmin || actor.isEventsTeam;
+  const canViewAll = actor.canViewAllSales;
   if (!canViewAll && (!sid || !actor.accessibleSalesRepIds.includes(sid))) return null;
 
   return { actor, contract: row };

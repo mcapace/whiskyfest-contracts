@@ -73,17 +73,27 @@ async function getDashboardData(actor: Awaited<ReturnType<typeof requireContract
     contractsQuery = contractsQuery.limit(0);
   }
 
-  const [contractsRes, eventsRes, auditRes, supportedRepNames] = await Promise.all([
+  const [contractsRes, eventsRes, supportedRepNames] = await Promise.all([
     contractsQuery,
     supabase.from('events').select('*').eq('is_active', true),
-    supabase.from('audit_log').select('*').order('occurred_at', { ascending: false }).limit(200),
     getSupportedRepNames(actor.email),
   ]);
+  const contracts = (contractsRes.data ?? []) as ContractWithTotals[];
+  const contractIds = contracts.map((c) => c.id);
+  let auditQuery = supabase.from('audit_log').select('*').order('occurred_at', { ascending: false }).limit(200);
+  if (visibility.filter === 'own') {
+    if (contractIds.length === 0) {
+      auditQuery = supabase.from('audit_log').select('*').eq('id', -1);
+    } else {
+      auditQuery = auditQuery.in('contract_id', contractIds);
+    }
+  }
+  const { data: auditRows } = await auditQuery;
 
   return {
-    contracts: (contractsRes.data ?? []) as ContractWithTotals[],
+    contracts,
     events: (eventsRes.data ?? []) as Event[],
-    audit: (auditRes.data ?? []) as AuditLogEntry[],
+    audit: (auditRows ?? []) as AuditLogEntry[],
     actor,
     supportedRepNames,
     canViewAllSales: canViewAllSales({
@@ -157,11 +167,7 @@ export default async function DashboardPage({
   const vitalSigns = getEventVitalSigns(allScoped, events);
   const pipelineData = getPipelineData(allScoped);
   const leaderboard = getSalesLeaderboard(allScoped);
-  const scopedIds = new Set(allScoped.map((c) => c.id));
-  const recentActivity = getRecentActivity(
-    audit.filter((a) => !a.contract_id || scopedIds.has(a.contract_id)),
-    allScoped
-  );
+  const recentActivity = getRecentActivity(audit, allScoped);
   const deadlines = getDeadlines(allScoped);
   const brandMix = getBrandMix(allScoped);
 
@@ -238,12 +244,12 @@ export default async function DashboardPage({
             totalValueCents={vitalSigns.contractedRevenueCents}
           />
         )}
-        <RecentActivityFeed activities={recentActivity} />
+        <RecentActivityFeed activities={recentActivity} title={hasGlobalVisibility ? 'Recent Activity' : 'My Activity'} />
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
         <UpcomingDeadlines deadlines={deadlines} />
-        <BrandMixBreakdown categories={brandMix} />
+        <BrandMixBreakdown categories={brandMix} title={hasGlobalVisibility ? 'Brand Mix' : 'Brands in Your Pipeline'} />
       </section>
 
       {/* Priority */}
