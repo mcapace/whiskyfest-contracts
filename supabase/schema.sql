@@ -198,6 +198,7 @@ create index if not exists contracts_invoice_status_idx on contracts (invoice_st
 alter table app_users add column if not exists is_accounting boolean not null default false;
 
 alter table app_users add column if not exists can_impersonate boolean not null default false;
+alter table app_users add column if not exists can_view_all_sales boolean not null default false;
 alter table app_users add column if not exists theme_preference text
   check (theme_preference is null or theme_preference in ('light', 'dark', 'system'));
 alter table app_users add column if not exists tour_completed_at timestamptz;
@@ -307,6 +308,14 @@ where email in (
   'mcapace@mshanken.com',
   'jarcella@mshanken.com'
 );
+
+update app_users
+set can_view_all_sales = true
+where email = 'ssenatore@mshanken.com';
+
+update app_users
+set can_view_all_sales = true
+where role = 'admin' or is_events_team = true or is_accounting = true;
 
 insert into sales_reps (name, email, sort_order) values
   ('Stephen Senatore',   'ssenatore@mshanken.com',    10),
