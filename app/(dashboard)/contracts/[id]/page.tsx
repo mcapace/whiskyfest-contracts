@@ -14,6 +14,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { StatusBadge } from '@/components/contracts/status-badge';
 import { ContractActions } from '@/components/contracts/contract-actions';
 import { SignerContactEdit } from '@/components/contracts/signer-contact-edit';
+import { ContractDetailHeader } from '@/components/contracts/contract-detail-header';
+import { ContractTableOfContents } from '@/components/contracts/table-of-contents';
+import { ActivityTimeline } from '@/components/contracts/activity-timeline';
+import { PdfPreview } from '@/components/contracts/pdf-preview';
 import { ContractProgressionTimeline } from '@/components/contract/progression-timeline';
 import { ContractSummarySection } from '@/components/contract/contract-summary-section';
 import type { ContractLineItem, ContractWithTotals, Event, AuditLogEntry } from '@/types/db';
@@ -86,18 +90,30 @@ export default async function ContractDetailPage({ params }: { params: { id: str
         <Link href="/" className="hover:text-foreground">Dashboard</Link>
       </div>
 
-      {/* Header — compact; summary panel carries display typography */}
-      <div className="flex flex-wrap items-center gap-3 border-b border-border/40 pb-4">
-        <StatusBadge status={contract.status} />
-        <span className="font-mono text-xs text-muted-foreground">{contract.id.slice(0, 8)}</span>
-        {event && (
-          <span className="text-sm text-muted-foreground">
-            {event.name} · {formatLongDate(event.event_date)}
-          </span>
-        )}
-      </div>
+      <ContractDetailHeader
+        title={contract.exhibitor_company_name}
+        subtitle={`${event?.name ?? 'WhiskyFest'} · ${event ? formatLongDate(event.event_date) : '—'}`}
+        status={contract.status}
+        boothCount={contract.booth_count}
+        totalCents={contract.grand_total_cents}
+        salesRep={contract.sales_rep_name ?? contract.sales_rep_email ?? null}
+      />
 
-      <div className="rounded-lg border border-border/50 bg-bg-surface p-4 md:p-6">
+      <div className="grid gap-6 xl:grid-cols-[240px_minmax(0,1fr)]">
+        <div className="hidden xl:block">
+          <ContractTableOfContents
+            items={[
+              { id: 'overview', label: 'Overview' },
+              { id: 'pricing', label: 'Pricing & Line Items' },
+              { id: 'exhibitor-info', label: 'Exhibitor Info' },
+              { id: 'activity', label: 'Activity Timeline' },
+              { id: 'pdf-preview', label: 'PDF Preview' },
+            ]}
+          />
+        </div>
+        <div className="space-y-6">
+
+      <div id="overview" className="rounded-lg border border-border/50 bg-bg-surface p-4 md:p-6">
         <p className="wf-label-caps mb-4 text-[0.6rem]">Progress</p>
         <ContractProgressionTimeline status={contract.status} audit={audit} />
       </div>
@@ -264,7 +280,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
       {/* Two-column details */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Exhibitor */}
-        <Card>
+        <Card id="exhibitor-info">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 px-6 py-4">
             <h2 className="font-serif text-lg font-semibold">Exhibitor</h2>
             {isAdmin &&
@@ -318,7 +334,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
         </Card>
 
         {/* Pricing */}
-        <Card>
+        <Card id="pricing">
           <div className="border-b border-border/50 px-6 py-4">
             <h2 className="font-serif text-lg font-semibold">Pricing</h2>
           </div>
@@ -387,50 +403,21 @@ export default async function ContractDetailPage({ params }: { params: { id: str
         </Card>
       )}
 
-      {/* Audit log — muted timeline; ids for progression scroll targets */}
-      <section id="contract-activity" className="border-t border-border/40 pt-8">
-        <p className="wf-label-caps mb-4 text-[0.6rem]">Activity</p>
-        <ol className="relative space-y-0 border-l border-border/50 pl-6">
-          {audit.length === 0 ? (
-            <li className="py-4 text-sm text-muted-foreground">No activity yet</li>
-          ) : (
-            [...audit]
-              .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at))
-              .map(entry => {
-                const actionText = describeAction(entry);
-                const initials =
-                  entry.actor_email?.split('@')[0]?.slice(0, 2).toUpperCase() ?? '·';
-                return (
-                  <li
-                    key={entry.id}
-                    id={`audit-${entry.id}`}
-                    className="relative pb-6 pl-1 text-sm last:pb-0"
-                  >
-                    <span className="absolute -left-[25px] top-1.5 h-2 w-2 rounded-full border border-border bg-muted ring-2 ring-bg-page" />
-                    <div className="flex flex-wrap items-start gap-3">
-                      <div
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold uppercase text-muted-foreground"
-                        aria-hidden
-                      >
-                        {initials}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-foreground/90">{actionText.title}</p>
-                        {actionText.detail && (
-                          <p className="mt-0.5 text-xs text-muted-foreground">{actionText.detail}</p>
-                        )}
-                        <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-                          {formatTimestamp(entry.occurred_at)}
-                          {entry.actor_email && ` · ${entry.actor_email}`}
-                        </p>
-                      </div>
-                    </div>
-                  </li>
-                );
-              })
-          )}
-        </ol>
+      <hr className="border-parchment-300/70" />
+
+      <section id="activity" className="space-y-3">
+        <p className="wf-label-caps text-[0.6rem]">Activity Timeline</p>
+        <ActivityTimeline audit={audit} />
       </section>
+
+      <hr className="border-parchment-300/70" />
+
+      <section id="pdf-preview" className="space-y-3">
+        <p className="wf-label-caps text-[0.6rem]">Inline PDF Preview</p>
+        <PdfPreview fileUrl={`/api/contracts/${contract.id}/pdf?variant=auto`} />
+      </section>
+      </div>
+      </div>
     </div>
   );
 }
