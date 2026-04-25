@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { requireContractActorForPage } from '@/lib/auth-contract';
+import { getVisibleContractsFilter } from '@/lib/permissions';
 import { formatCurrency, formatRelative } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -32,9 +33,22 @@ async function loadContracts(
   const supabase = getSupabaseAdmin();
   let query = supabase.from('contracts_with_totals').select('*').order('created_at', { ascending: false }).limit(200);
 
-  const scopeAll = actor.isAdmin || actor.isEventsTeam;
-  if (!scopeAll && actor.accessibleSalesRepIds.length > 0) {
-    query = query.in('sales_rep_id', actor.accessibleSalesRepIds);
+  const { data: appUser } = await supabase
+    .from('app_users')
+    .select('is_accounting, can_view_all_sales')
+    .eq('email', actor.email)
+    .maybeSingle();
+  const visibility = getVisibleContractsFilter({
+    role: actor.role,
+    is_events_team: actor.isEventsTeam,
+    is_accounting: Boolean((appUser as { is_accounting?: boolean } | null)?.is_accounting),
+    can_view_all_sales: Boolean((appUser as { can_view_all_sales?: boolean } | null)?.can_view_all_sales),
+    accessibleSalesRepIds: actor.accessibleSalesRepIds,
+  });
+  if (visibility.filter === 'own' && visibility.salesRepIds.length > 0) {
+    query = query.in('sales_rep_id', visibility.salesRepIds);
+  } else if (visibility.filter === 'own') {
+    query = query.limit(0);
   }
 
   const status = searchParams.status;
