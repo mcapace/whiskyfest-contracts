@@ -1,8 +1,6 @@
 import { requiresDiscountApproval } from '@/lib/contracts';
 import type { AuditLogEntry, ContractWithTotals, Event } from '@/types/db';
 
-const EVENT_TARGET_REVENUE_CENTS = 180000000;
-const EVENT_TARGET_BOOTHS = 75;
 const EVENT_DATE_FALLBACK = '2026-11-20T18:30:00-05:00';
 
 const PIPELINE_ORDER = [
@@ -39,11 +37,8 @@ type PipelineKey = (typeof PIPELINE_ORDER)[number];
 
 export interface EventVitalSigns {
   contractedRevenueCents: number;
-  targetRevenueCents: number;
-  contractedRevenuePct: number;
   signedContracts: number;
-  signedTarget: number;
-  signedPct: number;
+  signedBooths: number;
   daysToEvent: number;
   eventDateLabel: string;
 }
@@ -106,20 +101,17 @@ function daysSince(input: string | null | undefined, nowMs: number): number {
 }
 
 export function getEventVitalSigns(contracts: ContractWithTotals[], events: Event[]): EventVitalSigns {
-  const contractedRevenueCents = contracts
-    .filter((c) => c.status === 'signed' || c.status === 'executed')
-    .reduce((sum, c) => sum + c.grand_total_cents, 0);
-  const signedContracts = contracts.filter((c) => c.status === 'signed' || c.status === 'executed').length;
+  const signedRows = contracts.filter((c) => c.status === 'signed' || c.status === 'executed');
+  const contractedRevenueCents = signedRows.reduce((sum, c) => sum + c.grand_total_cents, 0);
+  const signedContracts = signedRows.length;
+  const signedBooths = signedRows.reduce((sum, c) => sum + (c.booth_count ?? 0), 0);
   const nextEvent = getNextEventDate(events);
   const daysToEvent = Math.max(0, Math.ceil((nextEvent.getTime() - Date.now()) / 86400000));
 
   return {
     contractedRevenueCents,
-    targetRevenueCents: EVENT_TARGET_REVENUE_CENTS,
-    contractedRevenuePct: Math.min(100, Math.round((contractedRevenueCents / EVENT_TARGET_REVENUE_CENTS) * 100)),
     signedContracts,
-    signedTarget: EVENT_TARGET_BOOTHS,
-    signedPct: Math.min(100, Math.round((signedContracts / EVENT_TARGET_BOOTHS) * 100)),
+    signedBooths,
     daysToEvent,
     eventDateLabel: 'November 20, 2026',
   };
