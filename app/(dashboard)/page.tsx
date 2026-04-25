@@ -15,11 +15,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DashboardHero } from '@/components/dashboard/hero';
 import { DashboardStatCard } from '@/components/dashboard/stat-card';
+import { EventVitalSignsSection } from '@/components/dashboard/event-vital-signs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StatusBadge } from '@/components/contracts/status-badge';
+import { getEventVitalSigns } from '@/lib/event-metrics';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
 const DASH_SCOPE_LIMIT = 2500;
 
@@ -122,14 +125,7 @@ export default async function DashboardPage({
   const progressPct = totalPipelineCents > 0 ? Math.round((totalExecutedCents / totalPipelineCents) * 100) : 0;
 
   const eventMap = new Map(events.map((e) => [e.id, e]));
-  const msPerDay = 1000 * 60 * 60 * 24;
-  const upcomingEventDates = events
-    .map((e) => new Date(e.event_date))
-    .filter((d) => Number.isFinite(d.getTime()))
-    .sort((a, b) => a.getTime() - b.getTime());
-  const now = new Date();
-  const nextEventDate = upcomingEventDates.find((d) => d.getTime() >= now.getTime()) ?? new Date('2026-11-20');
-  const daysToEvent = Math.max(0, Math.ceil((nextEventDate.getTime() - now.getTime()) / msPerDay));
+  const vitalSigns = getEventVitalSigns(allScoped, events);
 
   const pillDefs: { key: DashboardFilterKey; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -182,42 +178,7 @@ export default async function DashboardPage({
         progressPct={progressPct}
       />
 
-      <section className="space-y-4" aria-label="Event overview placeholders">
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card className="border-parchment-200 bg-parchment-50/80">
-            <CardContent className="p-6">
-              <p className="wf-label-caps">Contracted Revenue</p>
-              <p className="mt-3 font-sans text-3xl font-semibold tabular-nums text-oak-800">{formatCurrency(totalPipelineCents)}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-parchment-200 bg-parchment-50/80">
-            <CardContent className="p-6">
-              <p className="wf-label-caps">Contracts Signed</p>
-              <p className="mt-3 font-sans text-3xl font-semibold tabular-nums text-oak-800">{executedCount}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-parchment-200 bg-parchment-50/80">
-            <CardContent className="p-6">
-              <p className="wf-label-caps">Days to Event</p>
-              <p className="mt-3 font-sans text-3xl font-semibold tabular-nums text-oak-800">{daysToEvent}</p>
-            </CardContent>
-          </Card>
-        </div>
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Card className="border-parchment-200 bg-parchment-50/80 lg:col-span-2">
-            <CardContent className="p-6">
-              <h2 className="font-display text-2xl font-medium text-oak-800">Pipeline Visualization</h2>
-              <p className="mt-2 text-sm text-ink-500">Phase 1B will render event metrics and stage distribution here.</p>
-            </CardContent>
-          </Card>
-          <Card className="border-parchment-200 bg-parchment-50/80">
-            <CardContent className="p-6">
-              <h2 className="font-display text-2xl font-medium text-oak-800">Upcoming Deadlines</h2>
-              <p className="mt-2 text-sm text-ink-500">Phase 1B will render upcoming review and signature deadlines.</p>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
+      <EventVitalSignsSection metrics={vitalSigns} />
 
       {/* Priority */}
       {staffPersona ? (
