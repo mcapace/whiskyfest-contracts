@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Plus, FileText, DollarSign, Clock, CheckCircle2 } from 'lucide-react';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { requireContractActorForPage } from '@/lib/auth-contract';
+import { canViewAllSales, getVisibleContractsFilter } from '@/lib/permissions';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { formatCurrency, formatRelative } from '@/lib/utils';
 import { formatStatus, statusBadgeClassName } from '@/lib/status-display';
@@ -52,9 +53,23 @@ async function getDashboardData(actor: Awaited<ReturnType<typeof requireContract
     .order('created_at', { ascending: false })
     .limit(DASH_SCOPE_LIMIT);
 
-  const scopeAll = actor.isAdmin || actor.isEventsTeam;
-  if (!scopeAll && actor.accessibleSalesRepIds.length > 0) {
-    contractsQuery = contractsQuery.in('sales_rep_id', actor.accessibleSalesRepIds);
+  const { data: appUser } = await supabase
+    .from('app_users')
+    .select('is_accounting, can_view_all_sales')
+    .eq('email', actor.email)
+    .maybeSingle();
+
+  const visibility = getVisibleContractsFilter({
+    role: actor.role,
+    is_events_team: actor.isEventsTeam,
+    is_accounting: Boolean((appUser as { is_accounting?: boolean } | null)?.is_accounting),
+    can_view_all_sales: Boolean((appUser as { can_view_all_sales?: boolean } | null)?.can_view_all_sales),
+    accessibleSalesRepIds: actor.accessibleSalesRepIds,
+  });
+  if (visibility.filter === 'own' && visibility.salesRepIds.length > 0) {
+    contractsQuery = contractsQuery.in('sales_rep_id', visibility.salesRepIds);
+  } else if (visibility.filter === 'own') {
+    contractsQuery = contractsQuery.limit(0);
   }
 
   const [contractsRes, eventsRes, auditRes, supportedRepNames] = await Promise.all([
@@ -70,6 +85,12 @@ async function getDashboardData(actor: Awaited<ReturnType<typeof requireContract
     audit: (auditRes.data ?? []) as AuditLogEntry[],
     actor,
     supportedRepNames,
+    canViewAllSales: canViewAllSales({
+      role: actor.role,
+      is_events_team: actor.isEventsTeam,
+      is_accounting: Boolean((appUser as { is_accounting?: boolean } | null)?.is_accounting),
+      can_view_all_sales: Boolean((appUser as { can_view_all_sales?: boolean } | null)?.can_view_all_sales),
+    }),
   };
 }
 
