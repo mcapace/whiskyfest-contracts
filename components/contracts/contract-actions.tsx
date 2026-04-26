@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input, Label, Textarea } from '@/components/ui/input';
 import { formatCurrency, formatRelative } from '@/lib/utils';
+import { useContractLiveOptional } from '@/components/contracts/contract-live-context';
 import type { ContractStatus } from '@/types/db';
 
 const DISCOUNT_ACTION_BLOCKED = 'Discount approval required first';
@@ -116,6 +117,7 @@ export function ContractActions({
   isEventsTeam,
 }: Props) {
   const router = useRouter();
+  const contractLive = useContractLiveOptional();
   const readOnly = useImpersonationReadOnly();
   const [pending, startTransition] = useTransition();
   const busy = pending || readOnly;
@@ -135,8 +137,16 @@ export function ContractActions({
   const [nextSignerName, setNextSignerName] = useState(signerName ?? '');
   const [nextSignerEmail, setNextSignerEmail] = useState(signerEmail ?? '');
 
-  async function runAction(path: string, actionName: string, body?: Record<string, unknown>) {
+  async function runAction(
+    path: string,
+    actionName: string,
+    body?: Record<string, unknown>,
+    optimisticNextStatus?: ContractStatus,
+  ) {
     setAction(actionName);
+    if (optimisticNextStatus && contractLive) {
+      contractLive.setOptimisticStatus(optimisticNextStatus);
+    }
     startTransition(async () => {
       const res = await fetch(`/api/contracts/${contractId}/${path}`, {
         method: 'POST',
@@ -144,9 +154,11 @@ export function ContractActions({
         body: body ? JSON.stringify(body) : undefined,
       });
       if (res.ok) {
+        contractLive?.setOptimisticStatus(null);
         router.refresh();
         queueMicrotask(() => router.refresh());
       } else {
+        contractLive?.setOptimisticStatus(null);
         const j = await res.json().catch(() => ({}));
         alert(`Action failed: ${j.error ?? res.status}`);
       }
@@ -395,7 +407,7 @@ export function ContractActions({
               <ActionWithHelp helpText={CONTRACT_ACTION_HELP.approveContract}>
                 <Button
                   className={fabBtn}
-                  onClick={() => runAction('events-approve', 'events-approve', {})}
+                  onClick={() => runAction('events-approve', 'events-approve', {}, 'approved')}
                   disabled={busy}
                 >
                   {pending && action === 'events-approve' ? (
@@ -447,7 +459,7 @@ export function ContractActions({
                 <ActionWithHelp helpText={CONTRACT_ACTION_HELP.sendViaDocusign}>
                   <Button
                     className={fabBtn}
-                    onClick={() => runAction('send', 'send')}
+                    onClick={() => runAction('send', 'send', undefined, 'sent')}
                     disabled={busy || discountApprovalPending}
                   >
                     {pending && action === 'send' ? (
@@ -480,7 +492,7 @@ export function ContractActions({
               <ActionWithHelp helpText={CONTRACT_ACTION_HELP.releaseToAccounting}>
                 <Button
                   className={fabBtn}
-                  onClick={() => runAction('release', 'release')}
+                  onClick={() => runAction('release', 'release', undefined, 'executed')}
                   disabled={busy || discountApprovalPending}
                 >
                   {pending && action === 'release' ? (
@@ -531,7 +543,7 @@ export function ContractActions({
                   className={fabBtn}
                   onClick={() => {
                     if (!window.confirm('Reset this contract to draft? Internal notes will be cleared.')) return;
-                    runAction('reset-error', 'reset-error');
+                    runAction('reset-error', 'reset-error', undefined, 'draft');
                   }}
                   disabled={busy}
                 >
@@ -650,7 +662,7 @@ export function ContractActions({
             </Button>
             <Button
               onClick={() => {
-                runAction('recall', 'recall', { reason: recallReason });
+                runAction('recall', 'recall', { reason: recallReason }, 'approved');
                 setOpenRecall(false);
               }}
               disabled={busy || recallReason.trim().length < 10}
@@ -751,10 +763,15 @@ export function ContractActions({
             </Button>
             <Button
               onClick={() => {
-                runAction('resend-with-changes', 'resend-with-changes', {
-                  signer_1_name: nextSignerName.trim(),
-                  signer_1_email: nextSignerEmail.trim(),
-                });
+                runAction(
+                  'resend-with-changes',
+                  'resend-with-changes',
+                  {
+                    signer_1_name: nextSignerName.trim(),
+                    signer_1_email: nextSignerEmail.trim(),
+                  },
+                  'approved',
+                );
                 setOpenResendWithChanges(false);
               }}
               disabled={busy || !nextSignerName.trim() || !nextSignerEmail.trim()}
@@ -783,7 +800,7 @@ export function ContractActions({
             <Button
               variant="destructive"
               onClick={() => {
-                runAction('cancel', 'cancel', { reason: cancelReason });
+                runAction('cancel', 'cancel', { reason: cancelReason }, 'cancelled');
                 setOpenCancel(false);
               }}
               disabled={busy || cancelReason.trim().length < 5}
@@ -832,7 +849,7 @@ export function ContractActions({
             <Button
               variant="destructive"
               onClick={() => {
-                runAction('void', 'void', { reason: voidReason.trim() });
+                runAction('void', 'void', { reason: voidReason.trim() }, 'voided');
                 setOpenVoid(false);
               }}
               disabled={busy || voidReason.trim().length < 5}
@@ -865,7 +882,7 @@ export function ContractActions({
             </Button>
             <Button
               onClick={() => {
-                runAction('events-send-back', 'events-send-back', { reason: sendBackReason.trim() });
+                runAction('events-send-back', 'events-send-back', { reason: sendBackReason.trim() }, 'draft');
                 setOpenSendBack(false);
               }}
               disabled={busy || sendBackReason.trim().length < 10}

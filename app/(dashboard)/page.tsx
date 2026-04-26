@@ -15,9 +15,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DashboardHero } from '@/components/dashboard/hero';
+import { DashboardLiveRefresh } from '@/components/dashboard/dashboard-live-refresh';
+import { PipelineLive } from '@/components/dashboard/pipeline-live';
 import { DashboardStatCard } from '@/components/dashboard/stat-card';
 import { EventVitalSignsSection } from '@/components/dashboard/event-vital-signs';
-import { PipelineChart } from '@/components/dashboard/pipeline-chart';
 import { SalesLeaderboard } from '@/components/dashboard/sales-leaderboard';
 import { PersonalSalesSummary } from '@/components/dashboard/personal-sales-summary';
 import { RecentActivityFeed } from '@/components/dashboard/recent-activity-feed';
@@ -214,6 +215,7 @@ export default async function DashboardPage({
 
   return (
     <div className="space-y-10">
+      <DashboardLiveRefresh />
       <DashboardHero
         contractsCount={contractsCount}
         eventsCount={events.length}
@@ -230,7 +232,7 @@ export default async function DashboardPage({
         </h2>
         <Card className="bg-parchment-50">
           <CardContent className="p-6">
-            <PipelineChart data={pipelineData} />
+            <PipelineLive data={pipelineData} />
           </CardContent>
         </Card>
       </section>

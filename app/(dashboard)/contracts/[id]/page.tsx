@@ -14,6 +14,8 @@ import { StatusBadge } from '@/components/contracts/status-badge';
 import { ContractActions } from '@/components/contracts/contract-actions';
 import { SignerContactEdit } from '@/components/contracts/signer-contact-edit';
 import { ContractDetailHeader } from '@/components/contracts/contract-detail-header';
+import { ContractLiveProvider } from '@/components/contracts/contract-live-context';
+import { ContractDetailRealtime } from '@/components/contracts/contract-detail-realtime';
 import { ContractTableOfContents } from '@/components/contracts/table-of-contents';
 import { ActivityTimeline } from '@/components/contracts/activity-timeline';
 import { PdfPreview } from '@/components/contracts/pdf-preview';
@@ -79,7 +81,9 @@ export default async function ContractDetailPage({ params }: { params: { id: str
   const canInlinePdf = hasPdfSource;
 
   return (
+    <ContractLiveProvider>
     <div className="space-y-6 pb-28 md:pb-32">
+      <ContractDetailRealtime contractId={contract.id} />
       <div className="sticky top-0 z-30 -mx-4 border-b border-parchment-200/80 bg-parchment-50/95 px-4 py-3 backdrop-blur-sm supports-[backdrop-filter]:bg-parchment-50/85 md:-mx-6 md:px-6">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-sans text-sm text-muted-foreground">
           <Link href="/contracts" className="inline-flex items-center gap-1.5 hover:text-foreground">
@@ -402,6 +406,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
       </div>
       </div>
     </div>
+    </ContractLiveProvider>
   );
 }
 

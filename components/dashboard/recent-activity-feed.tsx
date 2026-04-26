@@ -1,11 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { motion, useReducedMotion } from 'framer-motion';
 import { CheckCircle2, Clock3, FileCheck2, FilePenLine, FileX2, Send, ShieldCheck } from 'lucide-react';
 import { describeAuditAction, type ActivityRow } from '@/lib/event-metrics';
 import { formatRelative, cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
+import { subscribeToActivity } from '@/lib/realtime-client';
 
 function ActivityIcon({ action }: { action: string }) {
   const className = 'mt-0.5 h-4 w-4 shrink-0 text-ink-500';
@@ -35,7 +38,27 @@ function ActivityIcon({ action }: { action: string }) {
 const ACTIVITY_CAP = 15;
 
 export function RecentActivityFeed({ activities, title }: { activities: ActivityRow[]; title?: string }) {
+  const router = useRouter();
+  const reduce = useReducedMotion();
   const [expanded, setExpanded] = useState(false);
+  const prevHead = useRef<string | undefined>(undefined);
+  const [enterPulse, setEnterPulse] = useState(0);
+
+  useEffect(() => {
+    const off = subscribeToActivity(() => {
+      router.refresh();
+    });
+    return () => off();
+  }, [router]);
+
+  const headId = activities[0]?.id;
+  useEffect(() => {
+    if (prevHead.current !== undefined && headId && headId !== prevHead.current && !reduce) {
+      setEnterPulse((n) => n + 1);
+    }
+    prevHead.current = headId;
+  }, [headId, reduce]);
+
   const capped = activities.slice(0, ACTIVITY_CAP);
   const visible = expanded ? capped : capped.slice(0, 3);
   const hasMore = capped.length > 3;
@@ -54,9 +77,16 @@ export function RecentActivityFeed({ activities, title }: { activities: Activity
                 expanded ? 'max-h-[2000px]' : 'max-h-[280px]',
               )}
             >
-              <ul className="space-y-4">
-                {visible.map((a) => (
-                  <li key={a.id} className="flex gap-3 text-sm">
+              <motion.ul className="space-y-4" layout={!reduce}>
+                {visible.map((a, idx) => (
+                  <motion.li
+                    key={idx === 0 ? `${a.id}-${enterPulse}` : a.id}
+                    layout={!reduce}
+                    initial={!reduce && idx === 0 && enterPulse > 0 ? { opacity: 0, y: 8 } : false}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.28, ease: [0.25, 0.1, 0.25, 1] }}
+                    className="flex gap-3 text-sm"
+                  >
                     <ActivityIcon action={a.action} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-sans text-ink-700">
@@ -70,9 +100,9 @@ export function RecentActivityFeed({ activities, title }: { activities: Activity
                       </p>
                       <p className="mt-1 font-sans text-xs text-ink-500">{formatRelative(a.occurredAt)}</p>
                     </div>
-                  </li>
+                  </motion.li>
                 ))}
-              </ul>
+              </motion.ul>
             </div>
             {hasMore ? (
               <button

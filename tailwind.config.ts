@@ -166,6 +166,10 @@ const config: Config = {
           '0%, 100%': { opacity: '0.55' },
           '50%': { opacity: '0.85' },
         },
+        'wf-pipeline-flash': {
+          '0%, 100%': { opacity: '1', filter: 'brightness(1)' },
+          '40%': { opacity: '1', filter: 'brightness(1.06)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -175,6 +179,7 @@ const config: Config = {
         'login-mount':    'login-mount 0.6s ease-out both',
         'wf-node-pulse':  'wf-node-pulse 2s ease-in-out infinite',
         'wf-skeleton':    'wf-skeleton 1.6s ease-in-out infinite',
+        'wf-pipeline-flash': 'wf-pipeline-flash 0.75s ease-out 1',
       },
     },
   },
