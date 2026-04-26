@@ -6,6 +6,7 @@ import { CommandPaletteProvider } from '@/components/command-palette/command-pal
 import { DashboardTopBarActions } from '@/components/layout/dashboard-top-bar-actions';
 import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav';
 import { AuthSessionProvider } from '@/components/session/auth-session-provider';
+import { DashboardKeyboardShortcuts } from '@/components/keyboard-shortcuts/dashboard-keyboard-shortcuts';
 import { ImpersonationBanner } from '@/components/impersonation/impersonation-banner';
 import { TutorialProvider } from '@/components/tutorial/tutorial-provider';
 import { DailyBubbleSlot } from '@/components/daily-bubble/daily-bubble-slot';
@@ -34,6 +35,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <AuthSessionProvider>
+      <DashboardKeyboardShortcuts>
       <CommandPaletteProvider>
         <ImpersonationBanner />
         <div className="min-h-screen bg-bg-page">
@@ -63,6 +65,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <MobileBottomNav accountingOnly={accountingOnly} showAdminLinks={showAccountingNav} />
         </div>
       </CommandPaletteProvider>
+      </DashboardKeyboardShortcuts>
     </AuthSessionProvider>
   );
 }

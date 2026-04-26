@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { ThemeToggle } from '@/components/theme/theme-toggle';
 import { CommandPaletteTrigger } from '@/components/command-palette/command-palette';
 import { HelpMenu } from '@/components/help-menu';
+import { useOpenShortcutsModal } from '@/components/keyboard-shortcuts/dashboard-keyboard-shortcuts';
+import { Keyboard } from 'lucide-react';
 import { ImpersonationViewAsTopbarButton } from '@/components/impersonation/impersonation-view-as-topbar-button';
 
 function LocalDateTimePill() {
@@ -37,10 +39,23 @@ function LocalDateTimePill() {
 }
 
 export function DashboardTopBarActions() {
+  const shortcuts = useOpenShortcutsModal();
+
   return (
     <div className="flex items-center gap-1 sm:gap-2">
       <LocalDateTimePill />
       <ImpersonationViewAsTopbarButton />
+      {shortcuts ? (
+        <button
+          type="button"
+          onClick={() => shortcuts.openShortcutsModal()}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border/60 text-muted-foreground transition hover:bg-muted/60 hover:text-foreground"
+          aria-label="Keyboard shortcuts"
+          title="Keyboard shortcuts (?)"
+        >
+          <Keyboard className="h-4 w-4" aria-hidden />
+        </button>
+      ) : null}
       <HelpMenu />
       <ThemeToggle />
       <CommandPaletteTrigger />
