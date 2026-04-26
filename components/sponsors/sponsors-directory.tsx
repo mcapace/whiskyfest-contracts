@@ -69,8 +69,17 @@ export function SponsorsDirectory({
 
       {filtered.length === 0 ? (
         <div className="rounded-lg border border-parchment-200 bg-parchment-50 px-6 py-14 text-center">
-          <h3 className="font-display text-3xl font-medium text-oak-800">No sponsors confirmed yet</h3>
-          <p className="mt-3 text-sm text-ink-600">As exhibitors sign their contracts, they&apos;ll appear here.</p>
+          {sponsors.length === 0 ? (
+            <>
+              <h3 className="font-display text-3xl font-medium text-oak-800">No sponsors confirmed yet</h3>
+              <p className="mt-3 text-sm text-ink-600">As exhibitors sign their contracts, they&apos;ll appear here.</p>
+            </>
+          ) : (
+            <>
+              <h3 className="font-display text-3xl font-medium text-oak-800">No sponsors match your filters</h3>
+              <p className="mt-3 text-sm text-ink-600">Try another category or clear the search to see all confirmed sponsors.</p>
+            </>
+          )}
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
