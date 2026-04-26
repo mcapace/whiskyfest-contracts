@@ -8,17 +8,25 @@ export type ContractViewFilters = {
   rep: string;
   brand: string;
   search: string;
+  /** Advanced saved views beyond a single status chip. */
+  listPreset: 'none' | 'pending_action' | 'recent_signed' | 'stuck';
 };
 
 type SavedView = { name: string; filters: ContractViewFilters };
 
 const PRESET_VIEWS: SavedView[] = [
-  { name: 'All contracts', filters: { status: 'all', rep: 'all', brand: 'all', search: '' } },
-  { name: 'My contracts', filters: { status: 'all', rep: 'mine', brand: 'all', search: '' } },
-  { name: 'Pending action', filters: { status: 'pending_events_review', rep: 'all', brand: 'all', search: '' } },
-  { name: 'Awaiting events review', filters: { status: 'pending_events_review', rep: 'all', brand: 'all', search: '' } },
-  { name: 'Recently signed', filters: { status: 'signed', rep: 'all', brand: 'all', search: '' } },
-  { name: 'Stuck contracts', filters: { status: 'sent', rep: 'all', brand: 'all', search: '' } },
+  { name: 'All contracts', filters: { status: 'all', rep: 'all', brand: 'all', search: '', listPreset: 'none' } },
+  { name: 'My contracts', filters: { status: 'all', rep: 'mine', brand: 'all', search: '', listPreset: 'none' } },
+  {
+    name: 'Pending action',
+    filters: { status: 'all', rep: 'all', brand: 'all', search: '', listPreset: 'pending_action' },
+  },
+  {
+    name: 'Awaiting events review',
+    filters: { status: 'pending_events_review', rep: 'all', brand: 'all', search: '', listPreset: 'none' },
+  },
+  { name: 'Recently signed', filters: { status: 'all', rep: 'all', brand: 'all', search: '', listPreset: 'recent_signed' } },
+  { name: 'Stuck contracts', filters: { status: 'all', rep: 'all', brand: 'all', search: '', listPreset: 'stuck' } },
 ];
 
 export function SavedViewsDropdown({

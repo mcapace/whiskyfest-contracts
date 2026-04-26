@@ -43,12 +43,16 @@ function ChipGroup({
 
 export function ContractsFilterBar({
   filters,
+  searchDraft,
+  onSearchDraftChange,
   onChange,
   statusOptions,
   repOptions,
   brandOptions,
 }: {
   filters: ContractViewFilters;
+  searchDraft: string;
+  onSearchDraftChange: (value: string) => void;
   onChange: (next: ContractViewFilters) => void;
   statusOptions: Option[];
   repOptions: Option[];
@@ -57,35 +61,57 @@ export function ContractsFilterBar({
   return (
     <div className="space-y-4 rounded-lg border border-parchment-200 bg-parchment-50 p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <ChipGroup label="Status" options={statusOptions} selected={filters.status} onSelect={(status) => onChange({ ...filters, status })} />
+        <ChipGroup
+          label="Status"
+          options={statusOptions}
+          selected={filters.status}
+          onSelect={(status) => onChange({ ...filters, status, listPreset: 'none' })}
+        />
         <div className="flex w-full max-w-md items-center gap-2">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-ink-500" />
             <Input
-              value={filters.search}
-              onChange={(e) => onChange({ ...filters, search: e.target.value })}
+              value={searchDraft}
+              onChange={(e) => onSearchDraftChange(e.target.value)}
               placeholder="Search company, signer, email, brands"
-              className="pl-8 pr-8"
+              className="pl-8 pr-8 font-sans"
+              aria-label="Search contracts"
             />
-            {filters.search ? (
+            {searchDraft ? (
               <button
                 type="button"
-                onClick={() => onChange({ ...filters, search: '' })}
-                className="absolute right-2.5 top-2.5 text-ink-500"
+                onClick={() => onSearchDraftChange('')}
+                className="absolute right-2.5 top-2.5 text-ink-500 hover:text-oak-800"
                 aria-label="Clear search"
               >
                 <X className="h-4 w-4" />
               </button>
             ) : null}
           </div>
-          <Button variant="outline" onClick={() => onChange({ status: 'all', rep: 'all', brand: 'all', search: '' })}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              onSearchDraftChange('');
+              onChange({ status: 'all', rep: 'all', brand: 'all', search: '', listPreset: 'none' });
+            }}
+          >
             Clear
           </Button>
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        <ChipGroup label="Sales rep" options={repOptions} selected={filters.rep} onSelect={(rep) => onChange({ ...filters, rep })} />
-        <ChipGroup label="Brand category" options={brandOptions} selected={filters.brand} onSelect={(brand) => onChange({ ...filters, brand })} />
+        <ChipGroup
+          label="Sales rep"
+          options={repOptions}
+          selected={filters.rep}
+          onSelect={(rep) => onChange({ ...filters, rep, listPreset: 'none' })}
+        />
+        <ChipGroup
+          label="Brand category"
+          options={brandOptions}
+          selected={filters.brand}
+          onSelect={(brand) => onChange({ ...filters, brand, listPreset: 'none' })}
+        />
       </div>
     </div>
   );

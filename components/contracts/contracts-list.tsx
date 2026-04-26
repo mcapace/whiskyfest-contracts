@@ -2,17 +2,35 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { LayoutGrid, Table2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { LayoutGrid, MoreHorizontal, Table2 } from 'lucide-react';
 import { formatCurrency, formatRelative } from '@/lib/utils';
 import { StatusBadge } from '@/components/contracts/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { ContractCard } from '@/components/contracts/contract-card';
 import { ContractsFilterBar } from '@/components/contracts/filter-bar';
 import { SavedViewsDropdown, type ContractViewFilters } from '@/components/contracts/saved-views-dropdown';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 const STORAGE_KEY = 'wf.contracts.savedViews.v1';
+
+const PENDING_ACTION_STATUSES = new Set([
+  'draft',
+  'ready_for_review',
+  'pending_events_review',
+  'approved',
+  'sent',
+  'partially_signed',
+]);
+
+const STUCK_STATUSES = new Set(['sent', 'pending_events_review', 'draft', 'ready_for_review', 'approved']);
 
 function categorizeBrands(brandsPoured: string | null): string {
   const n = (brandsPoured ?? '').toLowerCase();
@@ -25,6 +43,14 @@ function categorizeBrands(brandsPoured: string | null): string {
   return 'Other';
 }
 
+function firstBrandPill(brandsPoured: string | null): string | null {
+  const first = (brandsPoured ?? '')
+    .split(/[\n,;]+/)
+    .map((b) => b.trim())
+    .filter(Boolean)[0];
+  return first ?? null;
+}
+
 export function ContractsList({
   contracts,
   events,
@@ -34,15 +60,47 @@ export function ContractsList({
   events: Event[];
   currentRepId: string | null;
 }) {
+  const router = useRouter();
   const [view, setView] = useState<'table' | 'cards'>('table');
-  const [filters, setFilters] = useState<ContractViewFilters>({ status: 'all', rep: 'all', brand: 'all', search: '' });
+  const [filters, setFilters] = useState<ContractViewFilters>({
+    status: 'all',
+    rep: 'all',
+    brand: 'all',
+    search: '',
+    listPreset: 'none',
+  });
+  const [searchInput, setSearchInput] = useState('');
   const [customViews, setCustomViews] = useState<{ name: string; filters: ContractViewFilters }[]>([]);
   const eventMap = useMemo(() => new Map(events.map((e) => [e.id, e.name])), [events]);
 
   useEffect(() => {
+    setSearchInput(filters.search);
+  }, [filters.search]);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      setFilters((f) => (f.search === searchInput ? f : { ...f, search: searchInput }));
+    }, 250);
+    return () => window.clearTimeout(id);
+  }, [searchInput]);
+
+  useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setCustomViews(JSON.parse(raw));
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { name: string; filters: ContractViewFilters }[];
+      setCustomViews(
+        parsed.map((v) => ({
+          ...v,
+          filters: {
+            status: v.filters.status ?? 'all',
+            rep: v.filters.rep ?? 'all',
+            brand: v.filters.brand ?? 'all',
+            search: v.filters.search ?? '',
+            listPreset: v.filters.listPreset ?? 'none',
+          },
+        })),
+      );
     } catch {
       setCustomViews([]);
     }
@@ -65,6 +123,20 @@ export function ContractsList({
 
   const filtered = useMemo(() => {
     return contracts.filter((c) => {
+      if (filters.listPreset === 'pending_action') {
+        if (!PENDING_ACTION_STATUSES.has(c.status)) return false;
+      } else if (filters.listPreset === 'recent_signed') {
+        if (c.status !== 'signed') return false;
+        if (!c.signed_at) return false;
+        const signedMs = new Date(c.signed_at).getTime();
+        if (Number.isNaN(signedMs) || Date.now() - signedMs > 7 * 86400000) return false;
+      } else if (filters.listPreset === 'stuck') {
+        if (!STUCK_STATUSES.has(c.status)) return false;
+        const updatedMs = new Date(c.updated_at).getTime();
+        if (Number.isNaN(updatedMs)) return false;
+        if ((Date.now() - updatedMs) / 86400000 <= 7) return false;
+      }
+
       if (filters.status !== 'all') {
         if (filters.status === 'draft') {
           if (c.status !== 'draft' && c.status !== 'ready_for_review') return false;
@@ -96,7 +168,9 @@ export function ContractsList({
 
   const activeCount = filtered.filter((c) => c.status !== 'cancelled' && c.status !== 'voided').length;
   const pipelineCount = filtered.filter((c) =>
-    ['draft', 'ready_for_review', 'pending_events_review', 'approved', 'sent', 'partially_signed', 'signed'].includes(c.status),
+    ['draft', 'ready_for_review', 'pending_events_review', 'approved', 'sent', 'partially_signed', 'signed'].includes(
+      c.status,
+    ),
   ).length;
 
   function saveCurrentView() {
@@ -107,16 +181,25 @@ export function ContractsList({
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   }
 
+  const resetFilters = () => {
+    setSearchInput('');
+    setFilters({ status: 'all', rep: 'all', brand: 'all', search: '', listPreset: 'none' });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-5xl font-medium tracking-tight text-oak-800">Contracts</h1>
-          <p className="mt-2 text-sm text-ink-700">{activeCount} active · {pipelineCount} in pipeline</p>
+          <p className="mt-2 font-sans text-sm text-ink-700">
+            {filtered.length} shown · {activeCount} active · {pipelineCount} in pipeline
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <SavedViewsDropdown onApply={setFilters} customSaved={customViews} />
-          <Button variant="outline" onClick={saveCurrentView}>Save view</Button>
+          <Button variant="outline" onClick={saveCurrentView}>
+            Save view
+          </Button>
           <div className="inline-flex rounded-md border border-parchment-300 bg-parchment-50 p-0.5">
             <button
               type="button"
@@ -140,6 +223,8 @@ export function ContractsList({
 
       <ContractsFilterBar
         filters={filters}
+        searchDraft={searchInput}
+        onSearchDraftChange={setSearchInput}
         onChange={setFilters}
         statusOptions={[
           { value: 'all', label: 'All' },
@@ -157,10 +242,13 @@ export function ContractsList({
       {filtered.length === 0 ? (
         <div className="rounded-lg border border-parchment-200 bg-parchment-50 px-6 py-16 text-center">
           <h3 className="font-display text-3xl font-medium text-oak-800">No contracts match your filters</h3>
-          <p className="mt-3 text-sm text-ink-600">Try broadening your criteria or clear filters to explore all contracts.</p>
-          <div className="mt-6">
-            <Button variant="outline" onClick={() => setFilters({ status: 'all', rep: 'all', brand: 'all', search: '' })}>
+          <p className="mt-3 font-sans text-sm text-ink-600">Try broadening your criteria or clear filters to explore all contracts.</p>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <Button variant="outline" onClick={resetFilters}>
               Clear filters
+            </Button>
+            <Button variant="default" asChild>
+              <Link href="/contracts/new">Create new contract</Link>
             </Button>
           </div>
         </div>
@@ -172,31 +260,78 @@ export function ContractsList({
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-parchment-200 bg-parchment-50">
-          <Table className="[&_tbody_tr]:transition-all [&_tbody_tr:hover]:bg-parchment-100">
+          <Table className="font-sans [&_tbody_tr]:origin-left [&_tbody_tr]:transition-all [&_tbody_tr:hover]:scale-[1.005] [&_tbody_tr:hover]:bg-parchment-100">
             <TableHeader>
               <TableRow>
                 <TableHead>Company / Brand</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Booths</TableHead>
+                <TableHead className="tabular-nums">Booths</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead>Sales Rep</TableHead>
                 <TableHead className="text-right">Last Activity</TableHead>
+                <TableHead className="w-12 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((c) => (
-                <TableRow key={c.id} className="cursor-pointer" onClick={() => (window.location.href = `/contracts/${c.id}`)}>
-                  <TableCell>
-                    <div className="font-medium text-oak-800">{c.exhibitor_company_name}</div>
-                    <div className="mt-0.5 text-xs text-ink-500">{eventMap.get(c.event_id) ?? '—'}</div>
-                  </TableCell>
-                  <TableCell><StatusBadge status={c.status} /></TableCell>
-                  <TableCell className="tabular-nums">{c.booth_count}</TableCell>
-                  <TableCell className="text-right font-semibold tabular-nums">{formatCurrency(c.grand_total_cents)}</TableCell>
-                  <TableCell>{c.sales_rep_name ?? c.sales_rep_email ?? '—'}</TableCell>
-                  <TableCell className="text-right text-xs text-ink-500">{formatRelative(c.updated_at)}</TableCell>
-                </TableRow>
-              ))}
+              {filtered.map((c) => {
+                const pill = firstBrandPill(c.brands_poured);
+                return (
+                  <TableRow
+                    key={c.id}
+                    role="link"
+                    tabIndex={0}
+                    className="cursor-pointer"
+                    onClick={() => router.push(`/contracts/${c.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        router.push(`/contracts/${c.id}`);
+                      }
+                    }}
+                  >
+                    <TableCell>
+                      <div className="font-medium text-oak-800">{c.exhibitor_company_name}</div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-ink-500">{eventMap.get(c.event_id) ?? '—'}</span>
+                        {pill ? (
+                          <span className="rounded-full border border-parchment-300 bg-parchment-100 px-2 py-0.5 text-[11px] font-medium text-ink-700">
+                            {pill}
+                          </span>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={c.status} />
+                    </TableCell>
+                    <TableCell className="tabular-nums">{c.booth_count}</TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums">{formatCurrency(c.grand_total_cents)}</TableCell>
+                    <TableCell>{c.sales_rep_name ?? c.sales_rep_email ?? '—'}</TableCell>
+                    <TableCell className="text-right text-xs text-ink-500 tabular-nums">{formatRelative(c.updated_at)}</TableCell>
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            aria-label={`Actions for ${c.exhibitor_company_name}`}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenuItem onSelect={() => router.push(`/contracts/${c.id}`)}>View contract</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => window.open(`/contracts/${c.id}`, '_blank')}>
+                            Open in new tab
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>

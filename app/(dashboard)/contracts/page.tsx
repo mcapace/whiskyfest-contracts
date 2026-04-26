@@ -55,7 +55,11 @@ async function loadContracts(
 
   const q = searchParams.q?.trim();
   if (q) {
-    query = query.ilike('exhibitor_company_name', `%${q}%`);
+    const safe = q.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_').replace(/,/g, ' ');
+    const pattern = `%${safe}%`;
+    query = query.or(
+      `exhibitor_company_name.ilike.${pattern},brands_poured.ilike.${pattern},signer_1_name.ilike.${pattern},signer_1_email.ilike.${pattern}`,
+    );
   }
 
   const [{ data: contracts }, { data: events }] = await Promise.all([
