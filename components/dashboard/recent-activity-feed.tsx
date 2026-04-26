@@ -1,7 +1,10 @@
+'use client';
+
+import { useState } from 'react';
 import Link from 'next/link';
 import { CheckCircle2, Clock3, FileCheck2, FilePenLine, FileX2, Send, ShieldCheck } from 'lucide-react';
 import { describeAuditAction, type ActivityRow } from '@/lib/event-metrics';
-import { formatRelative } from '@/lib/utils';
+import { formatRelative, cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 
 function ActivityIcon({ action }: { action: string }) {
@@ -29,7 +32,14 @@ function ActivityIcon({ action }: { action: string }) {
   }
 }
 
+const ACTIVITY_CAP = 15;
+
 export function RecentActivityFeed({ activities, title }: { activities: ActivityRow[]; title?: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const capped = activities.slice(0, ACTIVITY_CAP);
+  const visible = expanded ? capped : capped.slice(0, 3);
+  const hasMore = capped.length > 3;
+
   return (
     <Card className="bg-parchment-50">
       <CardContent className="p-6">
@@ -37,25 +47,43 @@ export function RecentActivityFeed({ activities, title }: { activities: Activity
         {activities.length === 0 ? (
           <p className="mt-4 text-sm text-ink-500">Activity will appear here as contracts move through the system.</p>
         ) : (
-          <ul className="mt-5 space-y-4">
-            {activities.map((a) => (
-              <li key={a.id} className="flex gap-3 text-sm">
-                <ActivityIcon action={a.action} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-sans text-ink-700">
-                    <span className="font-medium text-oak-800">{a.actor}</span>{' '}
-                    <span>{describeAuditAction(a.action)}</span>{' '}
-                    {a.contractId && a.contractName ? (
-                      <Link href={`/contracts/${a.contractId}`} className="font-medium text-amber-700 hover:underline">
-                        {a.contractName}
-                      </Link>
-                    ) : null}
-                  </p>
-                  <p className="mt-1 font-sans text-xs text-ink-500">{formatRelative(a.occurredAt)}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <>
+            <div
+              className={cn(
+                'mt-5 overflow-hidden transition-[max-height] duration-200 ease-out',
+                expanded ? 'max-h-[2000px]' : 'max-h-[280px]',
+              )}
+            >
+              <ul className="space-y-4">
+                {visible.map((a) => (
+                  <li key={a.id} className="flex gap-3 text-sm">
+                    <ActivityIcon action={a.action} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-sans text-ink-700">
+                        <span className="font-medium text-oak-800">{a.actor}</span>{' '}
+                        <span>{describeAuditAction(a.action)}</span>{' '}
+                        {a.contractId && a.contractName ? (
+                          <Link href={`/contracts/${a.contractId}`} className="font-medium text-amber-700 hover:underline">
+                            {a.contractName}
+                          </Link>
+                        ) : null}
+                      </p>
+                      <p className="mt-1 font-sans text-xs text-ink-500">{formatRelative(a.occurredAt)}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {hasMore ? (
+              <button
+                type="button"
+                onClick={() => setExpanded((e) => !e)}
+                className="mt-4 text-left text-sm font-medium text-amber-700 hover:text-amber-800"
+              >
+                {expanded ? 'Show less' : 'Show more'}
+              </button>
+            ) : null}
+          </>
         )}
       </CardContent>
     </Card>
