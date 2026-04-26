@@ -37,7 +37,7 @@ export async function GET(req: Request) {
   const q = url.searchParams.get('q')?.trim();
 
   const supabase = getSupabaseAdmin();
-  let query = supabase.from('contracts_with_totals').select('*').order('created_at', { ascending: false }).limit(200);
+  let query = supabase.from('contracts_with_totals').select('*').order('created_at', { ascending: false });
 
   const scopeAll = gate.actor.canViewAllSales;
   if (!scopeAll && gate.actor.accessibleSalesRepIds.length > 0) {
@@ -53,7 +53,14 @@ export async function GET(req: Request) {
   }
 
   if (q) {
-    query = query.ilike('exhibitor_company_name', `%${q}%`);
+    const safe = q.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_').replace(/,/g, ' ');
+    const pattern = `%${safe}%`;
+    query = query.or(
+      `exhibitor_company_name.ilike.${pattern},brands_poured.ilike.${pattern},signer_1_name.ilike.${pattern},signer_1_email.ilike.${pattern}`,
+    );
+    query = query.limit(5);
+  } else {
+    query = query.limit(200);
   }
 
   const { data, error } = await query;

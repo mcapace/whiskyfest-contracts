@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Command } from 'cmdk';
@@ -15,13 +15,13 @@ import {
   Plus,
   Search,
   Sun,
-  UserRound,
   Users,
 } from 'lucide-react';
 import { STORAGE_KEYS } from '@/lib/design-system';
 import { cn } from '@/lib/utils';
 import { formatStatus } from '@/lib/status-display';
 import { requiresDiscountApproval } from '@/lib/contracts';
+import { StatusBadge } from '@/components/contracts/status-badge';
 import type { ContractWithTotals } from '@/types/db';
 
 type ImpersonationCand = { email: string; name: string | null; role_description: string; segment: string };
@@ -89,13 +89,15 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
   const [contracts, setContracts] = useState<ContractWithTotals[] | null>(null);
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [impersonation, setImpersonation] = useState<ImpersonationCand[] | null>(null);
+  const [paletteQuery, setPaletteQuery] = useState('');
+  const [debouncedPaletteQuery, setDebouncedPaletteQuery] = useState('');
+  const [cmdkInstance, setCmdkInstance] = useState(0);
 
   const isAdmin = session?.user?.role === 'admin';
   const isEventsTeam = Boolean(session?.user?.is_events_team);
   const isAccounting = Boolean(session?.user?.is_accounting);
   const canImpersonate = Boolean(session?.user?.can_impersonate);
   const showAccounting = isAccounting || isAdmin;
-  const canViewAll = isAdmin || isEventsTeam || isAccounting || Boolean(session?.user?.can_view_all_sales);
   const pipeline = Boolean(session?.user?.pipeline_access);
   const canSearchContracts = pipeline || isAccounting;
   const canCreateContract = isAdmin || isEventsTeam || session?.user?.role === 'sales' || session?.user?.role === 'sales_rep';
@@ -109,6 +111,22 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
       setRecentIds([]);
     }
   }, []);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebouncedPaletteQuery(paletteQuery), 200);
+    return () => window.clearTimeout(id);
+  }, [paletteQuery]);
+
+  useEffect(() => {
+    if (!open) {
+      setPaletteQuery('');
+      setDebouncedPaletteQuery('');
+      return;
+    }
+    setCmdkInstance((k) => k + 1);
+    setPaletteQuery('');
+    setDebouncedPaletteQuery('');
+  }, [open]);
 
   useEffect(() => {
     if (!open || !canSearchContracts) return;
@@ -150,6 +168,28 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
 
   const flatImpersonation = impersonation ?? [];
 
+  const contractHits = useMemo(() => {
+    if (!contracts) return [];
+    const t = debouncedPaletteQuery.trim().toLowerCase();
+    if (!t) return contracts.slice(0, 5);
+    return contracts
+      .filter((c) => {
+        const blob = [
+          c.exhibitor_company_name,
+          c.brands_poured,
+          c.signer_1_name,
+          c.signer_1_email,
+          c.sales_rep_name,
+          c.sales_rep_email,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return blob.includes(t);
+      })
+      .slice(0, 5);
+  }, [contracts, debouncedPaletteQuery]);
+
   function go(href: string) {
     onOpenChange(false);
     router.push(href);
@@ -186,10 +226,15 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
       overlayClassName="fixed inset-0 z-[100] bg-bg-page/80 backdrop-blur-sm"
       contentClassName="fixed left-1/2 top-[12vh] z-[101] w-[calc(100%-1.5rem)] max-w-[680px] -translate-x-1/2 rounded-lg border border-border/60 bg-bg-surface p-0 shadow-wf-floating max-sm:inset-0 max-sm:top-0 max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:rounded-none"
     >
-      <Command className="flex max-h-[min(70vh,520px)] flex-col overflow-hidden rounded-lg">
+      <Command
+        key={cmdkInstance}
+        shouldFilter={false}
+        className="flex max-h-[min(70vh,520px)] flex-col overflow-hidden rounded-lg"
+      >
         <div className="border-b border-border/50 px-4 py-3">
           <Command.Input
             placeholder="Search or jump to..."
+            onValueChange={setPaletteQuery}
             className="w-full border-0 bg-transparent font-serif text-lg outline-none placeholder:text-muted-foreground"
           />
         </div>
@@ -263,19 +308,6 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 </div>
               </Command.Item>
             ) : null}
-            {isAdmin && (
-              <Command.Item
-                value="open audit log activity contracts"
-                onSelect={() => go('/admin/audit-log')}
-                className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
-              >
-                <FileText className="h-4 w-4 shrink-0 opacity-70" />
-                <div>
-                  <p className="font-medium">Open audit log</p>
-                  <p className="text-xs text-muted-foreground">Jump to contract activity views</p>
-                </div>
-              </Command.Item>
-            )}
             {contracts?.some((c) => requiresDiscountApproval(c)) ? (
               isAdmin ? (
                 <Command.Item
@@ -494,24 +526,17 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
             </Command.Item>
           </Command.Group>
 
-          {contracts && contracts.length > 0 && (
+          {canSearchContracts && contractHits.length > 0 && (
             <Command.Group
               heading={<span className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Contracts</span>}
             >
-              {contracts
-                .filter((c) => canViewAll || Boolean(c.sales_rep_id))
-                .slice(0, 5)
-                .map((c) => {
+              {contractHits.map((c) => {
                 const signer = c.signer_1_name ?? c.signer_1_email ?? '';
                 const rep = c.sales_rep_name ?? c.sales_rep_email ?? '';
-                const keywords = [c.exhibitor_company_name, signer, rep, c.signer_1_email ?? '', formatStatus(c.status)].join(
-                  ' ',
-                );
                 return (
                   <Command.Item
                     key={c.id}
-                    value={`${c.exhibitor_company_name} ${keywords}`}
-                    keywords={[signer, rep, c.signer_1_email].filter((x): x is string => Boolean(x))}
+                    value={`contract ${c.id} ${c.exhibitor_company_name} ${c.brands_poured ?? ''} ${signer} ${rep}`}
                     onSelect={() => {
                       rememberContract(c.id);
                       go(`/contracts/${c.id}`);
@@ -520,11 +545,14 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                   >
                     <FileText className="h-4 w-4 shrink-0 opacity-70" />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{c.exhibitor_company_name}</p>
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <p className="truncate font-medium">{c.exhibitor_company_name}</p>
+                        <StatusBadge status={c.status} />
+                      </div>
                       <p className="truncate text-xs text-muted-foreground">
-                        {formatStatus(c.status)}
-                        {signer ? ` · ${signer}` : ''}
-                        {rep ? ` · ${rep}` : ''}
+                        {signer ? `${signer}` : ''}
+                        {signer && rep ? ' · ' : ''}
+                        {rep ? rep : ''}
                       </p>
                     </div>
                   </Command.Item>
@@ -540,6 +568,16 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
               {recentIds
                 .map((id) => contracts.find((c) => c.id === id))
                 .filter((c): c is ContractWithTotals => Boolean(c))
+                .filter((c) => {
+                  const t = debouncedPaletteQuery.trim().toLowerCase();
+                  if (!t) return true;
+                  return [c.exhibitor_company_name, c.brands_poured, c.signer_1_name, c.signer_1_email]
+                    .filter(Boolean)
+                    .join(' ')
+                    .toLowerCase()
+                    .includes(t);
+                })
+                .slice(0, 5)
                 .map((c) => (
                   <Command.Item
                     key={`recent-${c.id}`}
