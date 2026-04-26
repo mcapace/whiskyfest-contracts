@@ -76,7 +76,7 @@ export function SuggestedActions({
   if (suggestions.length === 0) return null;
 
   return (
-    <Card className="border-amber-200/60 bg-gradient-to-br from-parchment-50 to-amber-50/40 shadow-sm">
+    <Card className="border-amber-200/60 bg-gradient-to-br from-parchment-50 to-amber-50/40 shadow-wf-editorial-sm">
       <CardContent className="p-6">
         <h3 className="mb-4 flex items-center gap-2 font-display text-xl font-medium text-oak-800">
           <Sparkles className="h-5 w-5 shrink-0 text-amber-600" aria-hidden />

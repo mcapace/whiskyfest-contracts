@@ -1,9 +1,12 @@
+'use client';
+
 import Link from 'next/link';
-import Image from 'next/image';
 import { Plus, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CountdownTimer } from '@/components/countdown-timer';
 import { cn } from '@/lib/utils';
+import { HeroParallaxLayer } from '@/components/dashboard/hero-parallax-layer';
+import { MagneticButton } from '@/components/motion/magnetic-button';
 
 export function DashboardHero({
   contractsCount,
@@ -29,18 +32,12 @@ export function DashboardHero({
     <section
       data-tour="dashboard-hero"
       className={cn(
-        'overflow-hidden rounded-xl border border-oak-800/30 bg-oak-900',
+        'overflow-hidden rounded-xl border border-oak-800/30 bg-oak-900 shadow-wf-editorial',
         className,
       )}
     >
       <div className="relative h-[480px] overflow-hidden bg-oak-900">
-        <Image
-          src="/images/AdobeStock_271973922.jpeg"
-          alt="WhiskyFest"
-          fill
-          className="object-cover object-[center_38%] opacity-60 sm:object-[center_35%]"
-          priority
-        />
+        <HeroParallaxLayer />
         <div className="absolute inset-0 bg-gradient-to-b from-oak-900/10 via-oak-900/35 to-oak-900/95" />
 
         <div className="relative flex h-full flex-col justify-end gap-6 p-6 sm:p-10 lg:p-12">
@@ -94,14 +91,18 @@ export function DashboardHero({
           <p className="mt-2 text-xs text-parchment-200/90">{completionLabel}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" asChild className="border-parchment-200/50 bg-transparent text-parchment-50 hover:bg-parchment-100/10">
-            <Link href="/contracts">View all</Link>
-          </Button>
-          <Button asChild className="bg-amber-600 text-parchment-50 hover:bg-amber-700">
-            <Link href="/contracts/new" data-tour="new-contract-btn">
-              <Plus className="h-4 w-4" /> New Contract
-            </Link>
-          </Button>
+          <MagneticButton strength={0.65}>
+            <Button variant="outline" asChild className="border-parchment-200/50 bg-transparent text-parchment-50 hover:bg-parchment-100/10">
+              <Link href="/contracts">View all</Link>
+            </Button>
+          </MagneticButton>
+          <MagneticButton strength={0.85}>
+            <Button asChild className="bg-amber-600 text-parchment-50 shadow-lg shadow-amber-950/25 hover:bg-amber-700">
+              <Link href="/contracts/new" data-tour="new-contract-btn">
+                <Plus className="h-4 w-4" /> New Contract
+              </Link>
+            </Button>
+          </MagneticButton>
         </div>
       </div>
       <div className="hidden px-6 pb-6 sm:block" data-tour="dashboard-stats">

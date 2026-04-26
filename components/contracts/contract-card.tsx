@@ -16,7 +16,7 @@ export function ContractCard({ contract }: { contract: ContractWithTotals }) {
   return (
     <Link
       href={`/contracts/${contract.id}`}
-      className="block rounded-lg border border-parchment-200 bg-parchment-50 p-5 transition-all hover:-translate-y-0.5 hover:shadow-md"
+      className="block rounded-lg border border-parchment-200 bg-parchment-50 p-5 shadow-wf-editorial-sm transition-all hover:-translate-y-0.5 hover:shadow-wf-editorial motion-reduce:transform-none motion-reduce:hover:translate-y-0"
     >
       <div className="flex items-start justify-between gap-3">
         <h3 className="font-display text-2xl font-medium leading-tight text-oak-800">{contract.exhibitor_company_name}</h3>

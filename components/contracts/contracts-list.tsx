@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { motion, useReducedMotion } from 'framer-motion';
 import { LayoutGrid, MoreHorizontal, Table2 } from 'lucide-react';
 import { formatCurrency, formatRelative } from '@/lib/utils';
 import { StatusBadge } from '@/components/contracts/status-badge';
@@ -51,6 +52,8 @@ function firstBrandPill(brandsPoured: string | null): string | null {
   return first ?? null;
 }
 
+const MotionTableRow = motion(TableRow);
+
 export function ContractsList({
   contracts,
   events,
@@ -61,6 +64,7 @@ export function ContractsList({
   currentRepId: string | null;
 }) {
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
   const [view, setView] = useState<'table' | 'cards'>('table');
   const [filters, setFilters] = useState<ContractViewFilters>({
     status: 'all',
@@ -254,13 +258,24 @@ export function ContractsList({
         </div>
       ) : view === 'cards' ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((contract) => (
-            <ContractCard key={contract.id} contract={contract} />
+          {filtered.map((contract, i) => (
+            <motion.div
+              key={contract.id}
+              initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                duration: 0.26,
+                delay: reduceMotion ? 0 : Math.min(i, 18) * 0.032,
+                ease: [0.25, 0.1, 0.25, 1],
+              }}
+            >
+              <ContractCard contract={contract} />
+            </motion.div>
           ))}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-parchment-200 bg-parchment-50">
-          <Table className="font-sans [&_tbody_tr]:origin-left [&_tbody_tr]:transition-all [&_tbody_tr:hover]:scale-[1.005] [&_tbody_tr:hover]:bg-parchment-100">
+        <div className="overflow-hidden rounded-lg border border-parchment-200 bg-parchment-50 shadow-wf-editorial-sm">
+          <Table className="font-sans [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-parchment-100">
             <TableHeader>
               <TableRow>
                 <TableHead>Company / Brand</TableHead>
@@ -273,14 +288,21 @@ export function ContractsList({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((c) => {
+              {filtered.map((c, rowIdx) => {
                 const pill = firstBrandPill(c.brands_poured);
                 return (
-                  <TableRow
+                  <MotionTableRow
                     key={c.id}
                     role="link"
                     tabIndex={0}
                     className="cursor-pointer"
+                    initial={reduceMotion ? false : { opacity: 0, x: -6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{
+                      duration: 0.24,
+                      delay: reduceMotion ? 0 : Math.min(rowIdx, 20) * 0.028,
+                      ease: [0.25, 0.1, 0.25, 1],
+                    }}
                     onClick={() => router.push(`/contracts/${c.id}`)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -329,7 +351,7 @@ export function ContractsList({
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
-                  </TableRow>
+                  </MotionTableRow>
                 );
               })}
             </TableBody>

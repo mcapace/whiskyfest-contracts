@@ -151,6 +151,10 @@ const config: Config = {
       },
       boxShadow: {
         'wf-floating': '0 10px 40px -12px hsl(222 64% 26% / 0.18), 0 4px 16px -4px hsl(0 0% 0% / 0.08)',
+        'wf-editorial':
+          '0 1px 0 hsl(28 22% 18% / 0.06), 0 14px 48px -10px hsl(28 35% 8% / 0.14), 0 4px 12px -4px hsl(0 0% 0% / 0.08)',
+        'wf-editorial-sm':
+          '0 1px 0 hsl(28 20% 20% / 0.05), 0 6px 20px -6px hsl(28 30% 10% / 0.1)',
       },
       keyframes: {
         'accordion-down': { from: { height: '0' }, to: { height: 'var(--radix-accordion-content-height)' } },
