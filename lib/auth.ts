@@ -100,9 +100,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       if (!loginEmail) return token;
 
+      let sessionSoundOverride: boolean | undefined;
+
       const { data: realUser } = await supabase
         .from('app_users')
-        .select('role, is_active, is_events_team, is_accounting, can_impersonate, theme_preference, tour_completed_at, tour_last_role')
+        .select(
+          'role, is_active, is_events_team, is_accounting, can_impersonate, theme_preference, tour_completed_at, tour_last_role, sound_enabled',
+        )
         .eq('email', loginEmail)
         .maybeSingle();
 
@@ -117,6 +121,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         ) {
           await supabase.from('app_users').update({ theme_preference: themePref }).eq('email', loginEmail);
           token.theme_preference = themePref;
+        }
+        const soundEn = s.soundEnabled;
+        if (typeof soundEn === 'boolean') {
+          await supabase.from('app_users').update({ sound_enabled: soundEn }).eq('email', loginEmail);
+          token.sound_enabled = soundEn;
+          sessionSoundOverride = soundEn;
         }
         if (s.impersonationClear === true) {
           const prev = (token.impersonation_target_email as string | undefined)?.toLowerCase();
@@ -155,6 +165,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.impersonation_target_name = null;
         token.impersonation_started_at = null;
         token.effective_role_description = 'Inactive';
+        token.sound_enabled = false;
         return token;
       }
 
@@ -198,6 +209,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       token.theme_preference = tp === 'light' || tp === 'dark' || tp === 'system' ? tp : null;
       token.tour_completed_at = (realUser as { tour_completed_at?: string | null } | null)?.tour_completed_at ?? null;
       token.tour_last_role = (realUser as { tour_last_role?: string | null } | null)?.tour_last_role ?? null;
+      token.sound_enabled =
+        sessionSoundOverride !== undefined
+          ? sessionSoundOverride
+          : Boolean((realUser as { sound_enabled?: boolean } | null)?.sound_enabled);
 
       if (impEmail && token.impersonation_started_at) {
         const d = await loadImpersonationTargetDisplay(impEmail);
@@ -227,6 +242,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           : null;
       session.user.tour_completed_at = (token.tour_completed_at as string | null | undefined) ?? null;
       session.user.tour_last_role = (token.tour_last_role as string | null | undefined) ?? null;
+      session.user.sound_enabled = Boolean(token.sound_enabled);
 
       const target = (token.impersonation_target_email as string | null | undefined)?.toLowerCase() ?? null;
       const started = token.impersonation_started_at as number | null | undefined;

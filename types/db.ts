@@ -162,6 +162,8 @@ export interface AppUser {
   can_view_all_sales?: boolean;
   /** Null means system (follow OS until user chooses). */
   theme_preference?: 'light' | 'dark' | 'system' | null;
+  /** When true, client plays success sound + light haptic after contract actions. */
+  sound_enabled?: boolean;
   /** Set on each successful Google sign-in. Omitted until migration `027_add_last_login` is applied. */
   last_login_at?: string | null;
   /** Eastern `YYYY-MM-DD` when user dismissed the daily bubble; same-day bubble stays hidden for them. */

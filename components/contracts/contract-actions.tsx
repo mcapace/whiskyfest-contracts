@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useMemo, useState, useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { emitContractActionSuccessFeedback } from '@/lib/contract-action-feedback';
 import { useImpersonationReadOnly } from '@/hooks/use-impersonation-read-only';
 import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
 import {
@@ -117,6 +119,7 @@ export function ContractActions({
   isEventsTeam,
 }: Props) {
   const router = useRouter();
+  const { data: session } = useSession();
   const contractLive = useContractLiveOptional();
   const readOnly = useImpersonationReadOnly();
   const [pending, startTransition] = useTransition();
@@ -155,6 +158,7 @@ export function ContractActions({
       });
       if (res.ok) {
         contractLive?.setOptimisticStatus(null);
+        emitContractActionSuccessFeedback(Boolean(session?.user?.sound_enabled));
         router.refresh();
         queueMicrotask(() => router.refresh());
       } else {

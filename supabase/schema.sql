@@ -206,6 +206,8 @@ alter table app_users add column if not exists tour_last_role text;
 alter table app_users add column if not exists last_login_at timestamptz;
 alter table app_users add column if not exists last_dismissed_bubble_date date null;
 
+alter table app_users add column if not exists sound_enabled boolean not null default false;
+
 alter table audit_log add column if not exists impersonation_target_email text;
 
 -- Daily dashboard bubble (see migration 028_daily_bubbles.sql for RLS + indexes).

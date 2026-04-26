@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
-import { FileText, LayoutDashboard, Plus, CalendarDays, Users, UserRound, Landmark, ChevronDown, UserPlus, Building2 } from 'lucide-react';
+import { FileText, LayoutDashboard, Plus, CalendarDays, Users, UserRound, Landmark, ChevronDown, UserPlus, Building2, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -91,6 +91,7 @@ const nav = [
   { href: '/contracts/new', label: 'New Contract', icon: Plus },
   { href: '/contracts', label: 'All Contracts', icon: FileText },
   { href: '/sponsors', label: 'Sponsors', icon: Building2 },
+  { href: '/settings', label: 'Settings', icon: Settings },
   { href: '/sales-reps', label: 'Sales Reps', icon: UserRound, adminOnly: true },
   { href: '/events', label: 'Events', icon: CalendarDays, adminOnly: true },
   { href: '/users', label: 'Users', icon: Users, adminOnly: true },
@@ -140,7 +141,21 @@ export function Sidebar({
 
       <nav className="flex-1 space-y-0.5 px-3 py-5">
         {accountingOnly ? (
-          <AccountingNavLink pathname={pathname} />
+          <div className="space-y-1">
+            <AccountingNavLink pathname={pathname} />
+            <Link
+              href="/settings"
+              className={cn(
+                'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
+                pathname.startsWith('/settings')
+                  ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
+                  : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
+              )}
+            >
+              <Settings className="h-4 w-4 text-muted-foreground/70" />
+              Settings
+            </Link>
+          </div>
         ) : (
           <>
             {nav

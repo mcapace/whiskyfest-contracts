@@ -16,6 +16,8 @@ declare module 'next-auth' {
       theme_preference?: 'light' | 'dark' | 'system' | null;
       tour_completed_at?: string | null;
       tour_last_role?: string | null;
+      /** Opt-in success sound + haptic on contract actions. */
+      sound_enabled?: boolean;
     };
     impersonation?: {
       active: boolean;
@@ -44,5 +46,6 @@ declare module 'next-auth/jwt' {
     theme_preference?: 'light' | 'dark' | 'system' | null;
     tour_completed_at?: string | null;
     tour_last_role?: string | null;
+    sound_enabled?: boolean;
   }
 }

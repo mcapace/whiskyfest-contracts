@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { emitContractActionSuccessFeedback } from '@/lib/contract-action-feedback';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useImpersonationReadOnly } from '@/hooks/use-impersonation-read-only';
 import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
@@ -97,6 +99,7 @@ export function NewContractForm({
   smartHints,
 }: Props) {
   const router = useRouter();
+  const { data: session } = useSession();
   const readOnly = useImpersonationReadOnly();
   const [pending, startTransition] = useTransition();
   const busy = pending || readOnly;
@@ -229,12 +232,14 @@ export function NewContractForm({
       }
 
       if (editContractId) {
+        emitContractActionSuccessFeedback(Boolean(session?.user?.sound_enabled));
         router.push(`/contracts/${editContractId}`);
         router.refresh();
         return;
       }
 
       const { id } = await res.json();
+      emitContractActionSuccessFeedback(Boolean(session?.user?.sound_enabled));
       router.push(`/contracts/${id}`);
     });
   }
