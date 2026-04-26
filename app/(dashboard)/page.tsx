@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Plus, FileText, DollarSign, Clock, CheckCircle2 } from 'lucide-react';
+import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { requireContractActorForPage } from '@/lib/auth-contract';
 import { canViewAllSales, getVisibleContractsFilter } from '@/lib/permissions';
@@ -22,6 +23,8 @@ import { EventVitalSignsSection } from '@/components/dashboard/event-vital-signs
 import { SalesLeaderboard } from '@/components/dashboard/sales-leaderboard';
 import { PersonalSalesSummary } from '@/components/dashboard/personal-sales-summary';
 import { RecentActivityFeed } from '@/components/dashboard/recent-activity-feed';
+import { SuggestedActions } from '@/components/dashboard/suggested-actions';
+import { buildGreetingSubtitle, buildSmartMetrics, greetingHour, greetingWord } from '@/lib/dashboard-greeting';
 import { UpcomingDeadlines } from '@/components/dashboard/upcoming-deadlines';
 import { BrandMixBreakdown } from '@/components/dashboard/brand-mix-breakdown';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -131,6 +134,7 @@ export default async function DashboardPage({
 }: {
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
+  const session = await auth();
   const actor = await requireContractActorForPage();
   const { contracts: allScoped, events, audit, supportedRepNames, canViewAllSales: hasGlobalVisibility } = await getDashboardData(actor);
 
@@ -205,6 +209,20 @@ export default async function DashboardPage({
 
   const completionLabel = `${executedCount} of ${contractsCount} contracts executed · ${formatCurrency(totalExecutedCents)} of ${formatCurrency(totalPipelineCents)} executed value`;
 
+  const tz = process.env.NEXT_PUBLIC_DISPLAY_TIMEZONE ?? 'America/New_York';
+  const hour = greetingHour(tz);
+  const word = greetingWord(hour);
+  const first =
+    session?.user?.name?.trim()?.split(/\s+/).filter(Boolean)[0] ??
+    session?.user?.email?.split('@')[0] ??
+    'there';
+  const greetingHeadline = `${word}, ${first}`;
+  const smartMetrics = buildSmartMetrics(allScoped, actor.salesRepId, requiresDiscountApproval);
+  const primaryEvent = events.find((e) => e.is_active) ?? events[0];
+  const wfDate = primaryEvent?.event_date ? new Date(`${primaryEvent.event_date}T12:00:00`) : new Date('2026-11-20T12:00:00');
+  const daysToEvent = Math.max(0, Math.ceil((wfDate.getTime() - Date.now()) / 86400000));
+  const greetingSubtitle = buildGreetingSubtitle(actor.role, actor.isEventsTeam, actor.isAdmin, smartMetrics, daysToEvent);
+
   const filterDescription = (() => {
     if (filter === 'all') return 'Most recent 50 contracts matching your access';
     if (filter.startsWith('staff_') || filter.startsWith('rep_')) {
@@ -222,6 +240,18 @@ export default async function DashboardPage({
         supportedRepNames={supportedRepNames}
         completionLabel={completionLabel}
         progressPct={progressPct}
+        greetingHeadline={greetingHeadline}
+        greetingSubtitle={greetingSubtitle}
+      />
+
+      <SuggestedActions
+        contracts={allScoped}
+        viewer={{
+          role: actor.role,
+          is_events_team: actor.isEventsTeam,
+          is_admin: actor.isAdmin,
+          sales_rep_id: actor.salesRepId,
+        }}
       />
 
       <EventVitalSignsSection metrics={vitalSigns} canViewAllSales={hasGlobalVisibility} />

@@ -1,12 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useImpersonationReadOnly } from '@/hooks/use-impersonation-read-only';
 import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
 import { MAX_LINE_ITEM_AMOUNT_CENTS } from '@/lib/contract-line-items';
-import { ArrowLeft, Loader2, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 
 import { formatCurrency, formatLongDate } from '@/lib/utils';
@@ -16,7 +16,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input, Label, Textarea } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { SalesRepSelect } from '@/components/contracts/sales-rep-select';
-import type { Event } from '@/types/db';
+import type { ContractWithTotals, Event } from '@/types/db';
+import { findReturningSponsor, medianBoothCountForCompany } from '@/lib/new-contract-hints';
 
 export type ContractFormValues = {
   event_id: string;
@@ -44,6 +45,8 @@ interface Props {
   editContractId?: string;
   initialValues?: Partial<ContractFormValues>;
   initialLineItems?: InitialContractLineItem[];
+  /** Recent companies + signed/executed contracts for smart defaults (Phase 3). */
+  smartHints?: { recentCompanies: string[]; priorContracts: ContractWithTotals[] };
 }
 
 /** Pretty-print USD with commas for line-item amount fields (on blur). */
@@ -91,6 +94,7 @@ export function NewContractForm({
   editContractId,
   initialValues,
   initialLineItems,
+  smartHints,
 }: Props) {
   const router = useRouter();
   const readOnly = useImpersonationReadOnly();
@@ -150,6 +154,18 @@ export function NewContractForm({
       cancelled = true;
     };
   }, []);
+
+  const recentCompanies = smartHints?.recentCompanies ?? [];
+  const priorContracts = smartHints?.priorContracts ?? [];
+  const matchedSponsor = useMemo(
+    () => findReturningSponsor(priorContracts, form.exhibitor_company_name),
+    [priorContracts, form.exhibitor_company_name],
+  );
+  const medianBooths = useMemo(() => {
+    const n = form.exhibitor_company_name.trim().toLowerCase();
+    if (n.length < 2) return null;
+    return medianBoothCountForCompany(priorContracts, n);
+  }, [priorContracts, form.exhibitor_company_name]);
 
   const selectedEvent = events.find(e => e.id === form.event_id);
   const boothSubtotal = form.booth_count * form.booth_rate_cents;
@@ -270,8 +286,69 @@ export function NewContractForm({
           </CardHeader>
           <CardContent className="space-y-4">
             <Field label="Company Name" hint="Display name (e.g. 'Sample Distillery')">
-              <Input value={form.exhibitor_company_name} onChange={e => set('exhibitor_company_name', e.target.value)} placeholder="Sample Distillery" required />
+              <Input
+                value={form.exhibitor_company_name}
+                onChange={(e) => set('exhibitor_company_name', e.target.value)}
+                placeholder="Sample Distillery"
+                list={recentCompanies.length > 0 ? 'wf-recent-companies' : undefined}
+                autoComplete="off"
+                required
+              />
+              {recentCompanies.length > 0 ? (
+                <datalist id="wf-recent-companies">
+                  {recentCompanies.map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
+              ) : null}
             </Field>
+            {matchedSponsor ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm text-amber-950">
+                <div className="flex gap-2">
+                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden />
+                  <div>
+                    <p className="font-medium text-oak-900">{matchedSponsor.company} has exhibited before</p>
+                    <p className="mt-1 text-xs text-amber-900/90">
+                      Prior agreement: {matchedSponsor.boothCount} booths · {formatCurrency(matchedSponsor.boothRateCents)} rate
+                      {matchedSponsor.brandsPoured ? ` · Brands: ${matchedSponsor.brandsPoured}` : ''}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="mt-1 h-auto p-0 text-amber-800 underline"
+                      onClick={() => {
+                        set('brands_poured', matchedSponsor.brandsPoured || form.brands_poured);
+                        set('booth_count', matchedSponsor.boothCount);
+                        setBoothCountInput(String(matchedSponsor.boothCount));
+                        set('booth_rate_cents', matchedSponsor.boothRateCents);
+                        setBoothRateInput((matchedSponsor.boothRateCents / 100).toFixed(2));
+                        set(
+                          'notes',
+                          (form.notes ? `${form.notes}\n` : '') + 'Starting point copied from a prior signed contract.',
+                        );
+                      }}
+                    >
+                      Use prior booth terms as starting point →
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+            {medianBooths != null && !matchedSponsor ? (
+              <p className="text-xs text-muted-foreground">
+                Typical booth count for this name in your history:{' '}
+                <button
+                  type="button"
+                  className="font-medium text-amber-800 underline"
+                  onClick={() => {
+                    set('booth_count', medianBooths);
+                    setBoothCountInput(String(medianBooths));
+                  }}
+                >
+                  Use {medianBooths} booths
+                </button>
+              </p>
+            ) : null}
             <Field label="Legal Name" hint="Full legal entity name as it will appear in the agreement line">
               <Input value={form.exhibitor_legal_name} onChange={e => set('exhibitor_legal_name', e.target.value)} placeholder="Sample Distillery Inc." required />
             </Field>

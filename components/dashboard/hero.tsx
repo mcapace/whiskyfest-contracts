@@ -12,6 +12,8 @@ export function DashboardHero({
   completionLabel,
   progressPct,
   className,
+  greetingHeadline,
+  greetingSubtitle,
 }: {
   contractsCount: number;
   eventsCount: number;
@@ -19,6 +21,9 @@ export function DashboardHero({
   completionLabel: string;
   progressPct: number;
   className?: string;
+  /** When set, replaces default hero title block with personalized greeting (Phase 3). */
+  greetingHeadline?: string;
+  greetingSubtitle?: string;
 }) {
   return (
     <section
@@ -41,14 +46,33 @@ export function DashboardHero({
         <div className="relative flex h-full flex-col justify-end gap-6 p-6 sm:p-10 lg:p-12">
           <div>
             <p className="mb-3 font-sans text-xs uppercase tracking-[0.24em] text-amber-500">
-              M. Shanken Communications · WhiskyFest 2026
+              WhiskyFest 2026
             </p>
-            <h1 className="font-display text-5xl font-medium tracking-tight text-parchment-50 sm:text-6xl lg:text-7xl">
-              WhiskyFest New York
-            </h1>
-            <p className="mt-3 font-display text-xl font-light italic text-parchment-100 sm:text-2xl">
-              November 20, 2026 · 6:30-9:30 PM EST · Marriott Marquis
-            </p>
+            {greetingHeadline && greetingSubtitle ? (
+              <>
+                <h1 className="font-display text-5xl font-medium tracking-tight text-parchment-50 sm:text-6xl lg:text-7xl">
+                  {greetingHeadline}
+                </h1>
+                <p className="mt-3 font-display text-xl font-light italic text-parchment-100 sm:text-2xl">
+                  {greetingSubtitle}
+                </p>
+                <p className="mt-2 font-display text-lg text-parchment-200/95 sm:text-xl">
+                  WhiskyFest New York · November 20, 2026 · Marriott Marquis
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="mb-1 font-sans text-[11px] uppercase tracking-[0.2em] text-parchment-300/90">
+                  M. Shanken Communications
+                </p>
+                <h1 className="font-display text-5xl font-medium tracking-tight text-parchment-50 sm:text-6xl lg:text-7xl">
+                  WhiskyFest New York
+                </h1>
+                <p className="mt-3 font-display text-xl font-light italic text-parchment-100 sm:text-2xl">
+                  November 20, 2026 · 6:30-9:30 PM EST · Marriott Marquis
+                </p>
+              </>
+            )}
             <CountdownTimer targetDate="2026-11-20" targetDateTimeIso="2026-11-20T18:30:00-05:00" className="mt-6" />
           </div>
         </div>
