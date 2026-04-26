@@ -7,7 +7,6 @@ import { getContractWithTotalsForViewer } from '@/lib/auth-contract';
 import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { requiresDiscountApproval, STANDARD_BOOTH_RATE_CENTS } from '@/lib/contracts';
 import { formatStatus } from '@/lib/status-display';
-import { createContractPdfSignedUrl } from '@/lib/contract-pdf-storage';
 import { cn, formatCurrency, formatLongDate, formatTimestamp } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -58,15 +57,6 @@ export default async function ContractDetailPage({ params }: { params: { id: str
   const releaseAudit = audit.find((entry) => entry.action === 'released_to_accounting' || entry.action === 'executed');
   const discountPending = requiresDiscountApproval(contract);
 
-  let pdfEmbedUrl: string | null = null;
-  if (contract.pdf_storage_path) {
-    try {
-      pdfEmbedUrl = await createContractPdfSignedUrl(contract.pdf_storage_path);
-    } catch {
-      pdfEmbedUrl = null;
-    }
-  }
-
   const legacyPdfUrl = contract.signed_pdf_url ?? contract.draft_pdf_url;
   const draftPdfHref =
     contract.drafted_at || contract.draft_pdf_url || contract.pdf_storage_path
@@ -79,15 +69,27 @@ export default async function ContractDetailPage({ params }: { params: { id: str
       ? `/api/contracts/${contract.id}/pdf?variant=signed`
       : null;
 
+  const hasPdfSource = Boolean(
+    contract.drafted_at ||
+      contract.draft_pdf_url ||
+      contract.pdf_storage_path ||
+      contract.signed_pdf_url ||
+      contract.signed_at,
+  );
+  const canInlinePdf = hasPdfSource;
+
   return (
     <div className="space-y-6 pb-28 md:pb-32">
-      {/* Breadcrumb */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-        <Link href="/contracts" className="inline-flex items-center gap-1.5 hover:text-foreground">
-          <ArrowLeft className="h-3.5 w-3.5" /> All contracts
-        </Link>
-        <span className="text-border">/</span>
-        <Link href="/" className="hover:text-foreground">Dashboard</Link>
+      <div className="sticky top-0 z-30 -mx-4 border-b border-parchment-200/80 bg-parchment-50/95 px-4 py-3 backdrop-blur-sm supports-[backdrop-filter]:bg-parchment-50/85 md:-mx-6 md:px-6">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-sans text-sm text-muted-foreground">
+          <Link href="/contracts" className="inline-flex items-center gap-1.5 hover:text-foreground">
+            <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> All contracts
+          </Link>
+          <span className="text-border">/</span>
+          <Link href="/" className="hover:text-foreground">
+            Dashboard
+          </Link>
+        </div>
       </div>
 
       <ContractDetailHeader
@@ -120,41 +122,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
 
       <ContractSummarySection contract={contract} event={event ?? null} />
 
-      {(pdfEmbedUrl || legacyPdfUrl) && (
-        <section className="space-y-3">
-          <p className="wf-label-caps text-[0.6rem]">Contract PDF</p>
-          {pdfEmbedUrl ? (
-            <div className="overflow-hidden rounded-lg border border-border/60 bg-muted/20 shadow-md">
-              <iframe
-                title={contract.signed_pdf_url ? 'Signed contract PDF' : 'Draft contract PDF'}
-                src={pdfEmbedUrl}
-                className="h-[800px] w-full rounded-lg border border-border/60 bg-background md:aspect-[8.5/11] md:h-auto"
-              />
-            </div>
-          ) : legacyPdfUrl ? (
-            <p className="text-sm text-muted-foreground">
-              <a
-                href={legacyPdfUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-mono text-accent-brand underline-offset-4 hover:underline"
-              >
-                Open PDF (legacy Google Drive)
-              </a>
-            </p>
-          ) : null}
-          <a
-            href={`/api/contracts/${contract.id}/pdf?variant=auto`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block font-mono text-sm text-accent-brand underline-offset-4 hover:underline"
-          >
-            Download PDF
-          </a>
-        </section>
-      )}
-
-      {!pdfEmbedUrl && !legacyPdfUrl && (
+      {!canInlinePdf && (
         <section className="space-y-2">
           <p className="wf-label-caps text-[0.6rem]">Contract PDF</p>
           <p className="text-sm text-muted-foreground">No PDF available yet. Generate Draft PDF first.</p>
@@ -240,8 +208,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
         </div>
       )}
 
-      <Card>
-        <CardContent className="p-4">
+      <div className="rounded-lg border border-parchment-200/90 bg-parchment-50/80 p-4 shadow-sm">
           <ContractActions
             contractId={contract.id}
             exhibitorName={contract.exhibitor_company_name}
@@ -274,8 +241,9 @@ export default async function ContractDetailPage({ params }: { params: { id: str
             discountApprovalPending={discountPending}
             isEventsTeam={isEventsTeam}
           />
-        </CardContent>
-      </Card>
+      </div>
+
+      <hr className="my-2 border-parchment-300" />
 
       {/* Two-column details */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -403,19 +371,34 @@ export default async function ContractDetailPage({ params }: { params: { id: str
         </Card>
       )}
 
-      <hr className="border-parchment-300/70" />
+      <hr className="my-2 border-parchment-300" />
 
-      <section id="activity" className="space-y-3">
-        <p className="wf-label-caps text-[0.6rem]">Activity Timeline</p>
+      <section id="activity" className="space-y-4">
+        <p className="wf-label-caps text-[0.6rem] text-ink-500">Activity Timeline</p>
         <ActivityTimeline audit={audit} />
       </section>
 
-      <hr className="border-parchment-300/70" />
-
-      <section id="pdf-preview" className="space-y-3">
-        <p className="wf-label-caps text-[0.6rem]">Inline PDF Preview</p>
-        <PdfPreview fileUrl={`/api/contracts/${contract.id}/pdf?variant=auto`} />
-      </section>
+      {canInlinePdf ? (
+        <>
+          <hr className="my-2 border-parchment-300" />
+          <section id="pdf-preview" className="space-y-4">
+            <p className="wf-label-caps text-[0.6rem] text-ink-500">Inline PDF Preview</p>
+            <PdfPreview fileUrl={`/api/contracts/${contract.id}/pdf?variant=auto`} />
+            {legacyPdfUrl ? (
+              <p className="font-sans text-xs text-muted-foreground">
+                <a
+                  href={legacyPdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-amber-700 underline-offset-4 hover:underline"
+                >
+                  Open legacy Google Drive PDF
+                </a>
+              </p>
+            ) : null}
+          </section>
+        </>
+      ) : null}
       </div>
       </div>
     </div>
