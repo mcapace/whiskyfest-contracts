@@ -194,8 +194,8 @@ export function ContractsList({
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-5xl font-medium tracking-tight text-oak-800">Contracts</h1>
-          <p className="mt-2 font-sans text-sm text-ink-700">
+          <h1 className="font-display text-5xl font-medium tracking-tight text-foreground">Contracts</h1>
+          <p className="mt-2 font-sans text-sm text-foreground">
             {filtered.length} shown · {activeCount} active · {pipelineCount} in pipeline
           </p>
         </div>
@@ -204,10 +204,10 @@ export function ContractsList({
           <Button variant="outline" onClick={saveCurrentView}>
             Save view
           </Button>
-          <div className="inline-flex rounded-md border border-parchment-300 bg-parchment-50 p-0.5">
+          <div className="inline-flex rounded-md border border-border bg-card p-0.5">
             <button
               type="button"
-              className={`rounded px-2 py-1 text-xs ${view === 'table' ? 'bg-oak-800 text-parchment-50' : 'text-ink-700'}`}
+              className={`rounded px-2 py-1 text-xs ${view === 'table' ? 'bg-oak-800 text-parchment-50' : 'text-foreground'}`}
               onClick={() => setView('table')}
               aria-label="Table view"
             >
@@ -215,7 +215,7 @@ export function ContractsList({
             </button>
             <button
               type="button"
-              className={`rounded px-2 py-1 text-xs ${view === 'cards' ? 'bg-oak-800 text-parchment-50' : 'text-ink-700'}`}
+              className={`rounded px-2 py-1 text-xs ${view === 'cards' ? 'bg-oak-800 text-parchment-50' : 'text-foreground'}`}
               onClick={() => setView('cards')}
               aria-label="Card view"
             >
@@ -244,9 +244,9 @@ export function ContractsList({
       />
 
       {filtered.length === 0 ? (
-        <div className="rounded-lg border border-parchment-200 bg-parchment-50 px-6 py-16 text-center">
-          <h3 className="font-display text-3xl font-medium text-oak-800">No contracts match your filters</h3>
-          <p className="mt-3 font-sans text-sm text-ink-600">Try broadening your criteria or clear filters to explore all contracts.</p>
+        <div className="rounded-lg border border-border bg-card px-6 py-16 text-center">
+          <h3 className="font-display text-3xl font-medium text-foreground">No contracts match your filters</h3>
+          <p className="mt-3 font-sans text-sm text-muted-foreground">Try broadening your criteria or clear filters to explore all contracts.</p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <Button variant="outline" onClick={resetFilters}>
               Clear filters
@@ -274,8 +274,8 @@ export function ContractsList({
           ))}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-parchment-200 bg-parchment-50 shadow-wf-editorial-sm">
-          <Table className="font-sans [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-parchment-100">
+        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-wf-editorial-sm">
+          <Table className="font-sans [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-muted">
             <TableHeader>
               <TableRow>
                 <TableHead>Company / Brand</TableHead>
@@ -312,11 +312,11 @@ export function ContractsList({
                     }}
                   >
                     <TableCell>
-                      <div className="font-medium text-oak-800">{c.exhibitor_company_name}</div>
+                      <div className="font-medium text-foreground">{c.exhibitor_company_name}</div>
                       <div className="mt-1 flex flex-wrap items-center gap-2">
-                        <span className="text-xs text-ink-500">{eventMap.get(c.event_id) ?? '—'}</span>
+                        <span className="text-xs text-muted-foreground">{eventMap.get(c.event_id) ?? '—'}</span>
                         {pill ? (
-                          <span className="rounded-full border border-parchment-300 bg-parchment-100 px-2 py-0.5 text-[11px] font-medium text-ink-700">
+                          <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground">
                             {pill}
                           </span>
                         ) : null}
@@ -328,7 +328,7 @@ export function ContractsList({
                     <TableCell className="tabular-nums">{c.booth_count}</TableCell>
                     <TableCell className="text-right font-semibold tabular-nums">{formatCurrency(c.grand_total_cents)}</TableCell>
                     <TableCell>{c.sales_rep_name ?? c.sales_rep_email ?? '—'}</TableCell>
-                    <TableCell className="text-right text-xs text-ink-500 tabular-nums">{formatRelative(c.updated_at)}</TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground tabular-nums">{formatRelative(c.updated_at)}</TableCell>
                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

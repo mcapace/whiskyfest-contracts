@@ -92,7 +92,7 @@ export function DashboardHero({
         </div>
         <div className="flex flex-wrap gap-2">
           <MagneticButton strength={0.65}>
-            <Button variant="outline" asChild className="border-parchment-200/50 bg-transparent text-parchment-50 hover:bg-parchment-100/10">
+            <Button variant="outline" asChild className="border-border bg-transparent text-parchment-50 hover:bg-muted/10">
               <Link href="/contracts">View all</Link>
             </Button>
           </MagneticButton>
@@ -110,7 +110,7 @@ export function DashboardHero({
           <span className="wf-label-caps text-[0.6rem] text-parchment-200/90">Pipeline completion</span>
           <span className="text-right font-mono text-xs tabular-nums text-parchment-200/90">{progressPct}% complete</span>
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-parchment-200/20">
+        <div className="h-2 overflow-hidden rounded-full bg-muted/30">
           <div
             className="h-full rounded-full bg-gradient-to-r from-amber-500 to-copper-500 transition-[width] duration-500 ease-out"
             style={{ width: `${progressPct}%` }}

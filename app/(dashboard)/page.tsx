@@ -279,10 +279,10 @@ export default async function DashboardPage({
       <EventVitalSignsSection metrics={vitalSigns} canViewAllSales={hasGlobalVisibility} />
 
       <section className="space-y-4">
-        <h2 className="font-display text-2xl font-medium text-oak-800">
+        <h2 className="font-display text-2xl font-medium text-foreground">
           {hasGlobalVisibility ? 'Pipeline' : 'My Pipeline'}
         </h2>
-        <Card className="bg-parchment-50">
+        <Card className="bg-card">
           <CardContent className="p-6">
             <PipelineLive data={pipelineData} />
           </CardContent>

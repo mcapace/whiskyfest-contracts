@@ -42,7 +42,7 @@ export function statusBadgeClassName(status: ContractStatus | string): string {
   switch (status as string) {
     case 'draft':
     case 'ready_for_review':
-      return 'border border-ink-500 bg-ink-500 text-parchment-50';
+      return 'border border-border bg-muted text-foreground';
     case 'pending_events_review':
       return 'border border-warning-base/30 bg-warning-bg text-warning-base';
     case 'approved':
