@@ -226,9 +226,9 @@ export default async function DashboardPage({
   const filterDescription = (() => {
     if (filter === 'all') return 'Most recent 50 contracts matching your access';
     if (filter.startsWith('staff_') || filter.startsWith('rep_')) {
-      return `Filtered by priority · showing up to 50 matches`;
+      return `Filtered by priority · ${visibleContracts.length} of ${allScoped.length} match`;
     }
-    return `Filtered by ${pillDefs.find((p) => p.key === filter)?.label ?? filter} · up to 50 shown`;
+    return `Filtered by ${pillDefs.find((p) => p.key === filter)?.label ?? filter} · ${visibleContracts.length} of ${allScoped.length} match`;
   })();
 
   return (
@@ -388,7 +388,12 @@ export default async function DashboardPage({
         </div>
         <CardContent className="p-0">
           {visibleContracts.length === 0 ? (
-            <EmptyState hasContracts={allScoped.length > 0} />
+            <EmptyState
+              hasContracts={allScoped.length > 0}
+              activeFilter={filter !== 'all' ? filter : undefined}
+              activeFilterLabel={pillDefs.find((p) => p.key === filter)?.label}
+              totalContracts={allScoped.length}
+            />
           ) : (
             <>
               <div className="divide-y divide-border/50 md:hidden">
@@ -500,7 +505,36 @@ function PriorityCard({
   );
 }
 
-function EmptyState({ hasContracts }: { hasContracts: boolean }) {
+function EmptyState({
+  hasContracts,
+  activeFilter,
+  activeFilterLabel,
+  totalContracts,
+}: {
+  hasContracts: boolean;
+  activeFilter?: string;
+  activeFilterLabel?: string;
+  totalContracts: number;
+}) {
+  if (activeFilter) {
+    return (
+      <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-fest-100 text-fest-800">
+          <FileText className="h-6 w-6" />
+        </div>
+        <h3 className="font-serif text-lg font-semibold">
+          No contracts match the {activeFilterLabel ?? activeFilter} filter.
+        </h3>
+        <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+          Showing 0 of {totalContracts} total contracts.
+        </p>
+        <Button variant="outline" className="mt-6" asChild>
+          <Link href="/">Clear filter</Link>
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
       <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-fest-100 text-fest-800">
