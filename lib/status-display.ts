@@ -6,7 +6,7 @@ export function formatStatus(status: ContractStatus | string): string {
     case 'draft':
       return 'Draft';
     case 'ready_for_review':
-      return 'Draft';
+      return 'In Review';
     case 'pending_events_review':
       return 'Events Review';
     case 'approved':
