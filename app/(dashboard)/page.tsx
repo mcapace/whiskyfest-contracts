@@ -188,7 +188,6 @@ export default async function DashboardPage({
   const totalPipelineCents = totalExecutedCents + totalInFlightCents;
   const draftCount = allScoped.filter((c) => c.status === 'draft' || c.status === 'ready_for_review').length;
   const executedCount = allScoped.filter((c) => c.status === 'executed').length;
-  const progressPct = totalPipelineCents > 0 ? Math.round((totalExecutedCents / totalPipelineCents) * 100) : 0;
 
   const eventMap = new Map(events.map((e) => [e.id, e]));
   const vitalSigns = getEventVitalSigns(allScoped, events);
@@ -261,7 +260,6 @@ export default async function DashboardPage({
         eventsCount={events.length}
         supportedRepNames={supportedRepNames}
         completionLabel={completionLabel}
-        progressPct={progressPct}
         greetingHeadline={greetingHeadline}
         greetingSubtitle={greetingSubtitle}
       />

@@ -13,7 +13,6 @@ export function DashboardHero({
   eventsCount,
   supportedRepNames,
   completionLabel,
-  progressPct,
   className,
   greetingHeadline,
   greetingSubtitle,
@@ -22,7 +21,6 @@ export function DashboardHero({
   eventsCount: number;
   supportedRepNames: string[];
   completionLabel: string;
-  progressPct: number;
   className?: string;
   /** When set, replaces default hero title block with personalized greeting (Phase 3). */
   greetingHeadline?: string;
@@ -103,18 +101,6 @@ export function DashboardHero({
               </Link>
             </Button>
           </MagneticButton>
-        </div>
-      </div>
-      <div className="hidden px-6 pb-6 sm:block" data-tour="dashboard-stats">
-        <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-          <span className="wf-label-caps text-[0.6rem] text-parchment-200/90">Pipeline completion</span>
-          <span className="text-right font-mono text-xs tabular-nums text-parchment-200/90">{progressPct}% complete</span>
-        </div>
-        <div className="h-2 overflow-hidden rounded-full bg-muted/30">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-amber-500 to-copper-500 transition-[width] duration-500 ease-out"
-            style={{ width: `${progressPct}%` }}
-          />
         </div>
       </div>
     </section>
