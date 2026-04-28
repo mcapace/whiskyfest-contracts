@@ -129,6 +129,28 @@ function pillTone(filter: DashboardFilterKey, active: boolean): string {
   return active ? `${base} ring-1 ring-fest-600/40 ring-offset-1` : `${base} opacity-95 hover:opacity-100`;
 }
 
+function filterBannerLabel(
+  filter: DashboardFilterKey,
+  pillDefs: { key: DashboardFilterKey; label: string }[],
+): string {
+  switch (filter) {
+    case 'staff_needs_approval':
+      return 'Needs Your Approval';
+    case 'staff_countersign':
+      return 'Awaiting Countersignature';
+    case 'staff_ready_release':
+      return 'Ready to Release';
+    case 'rep_attention':
+      return 'Needs Your Attention';
+    case 'rep_events':
+      return 'Awaiting Events Approval';
+    case 'rep_ready_send':
+      return 'Ready to Send';
+    default:
+      return pillDefs.find((p) => p.key === filter)?.label ?? filter;
+  }
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -285,24 +307,40 @@ export default async function DashboardPage({
       </section>
 
       {/* Priority */}
+      {filter !== 'all' && (
+        <div className="mb-4 flex items-center justify-between rounded-md border border-fest-200 bg-fest-50 px-4 py-3 dark:border-fest-700 dark:bg-fest-900/20">
+          <div className="text-sm">
+            <span className="font-medium text-fest-900 dark:text-fest-100">Filtered:</span>{' '}
+            <span className="text-ink-700 dark:text-parchment-200">
+              {filterBannerLabel(filter, pillDefs)} · {visibleContracts.length} of {allScoped.length} contracts
+            </span>
+          </div>
+          <Link
+            href="/"
+            className="text-xs font-medium text-fest-700 underline-offset-2 hover:underline dark:text-fest-300"
+          >
+            Clear filter
+          </Link>
+        </div>
+      )}
       {staffPersona ? (
         <div className="grid gap-4 md:grid-cols-3">
           <PriorityCard
-            href="/?filter=staff_needs_approval"
+            href="/?filter=staff_needs_approval#recent-contracts"
             active={filter === 'staff_needs_approval'}
             title="Needs Your Approval"
             description="Discount approval pending or events review queue"
             count={staffNeedsApprovalCount}
           />
           <PriorityCard
-            href="/?filter=staff_countersign"
+            href="/?filter=staff_countersign#recent-contracts"
             active={filter === 'staff_countersign'}
             title="Awaiting Countersignature"
             description={formatStatus('partially_signed')}
             count={staffCountersignCount}
           />
           <PriorityCard
-            href="/?filter=staff_ready_release"
+            href="/?filter=staff_ready_release#recent-contracts"
             active={filter === 'staff_ready_release'}
             title="Ready to Release"
             description={`${formatStatus('signed')} — not yet released`}
@@ -312,21 +350,21 @@ export default async function DashboardPage({
       ) : (
         <div className="grid gap-4 md:grid-cols-3">
           <PriorityCard
-            href="/?filter=rep_attention"
+            href="/?filter=rep_attention#recent-contracts"
             active={filter === 'rep_attention'}
             title="Needs Your Attention"
             description="Sent back for changes or error state"
             count={repAttentionCount}
           />
           <PriorityCard
-            href="/?filter=rep_events"
+            href="/?filter=rep_events#recent-contracts"
             active={filter === 'rep_events'}
             title="Awaiting Events Approval"
             description={formatStatus('pending_events_review')}
             count={repEventsCount}
           />
           <PriorityCard
-            href="/?filter=rep_ready_send"
+            href="/?filter=rep_ready_send#recent-contracts"
             active={filter === 'rep_ready_send'}
             title="Ready to Send"
             description={`${formatStatus('approved')} — awaiting DocuSign`}
@@ -366,7 +404,7 @@ export default async function DashboardPage({
         {pillDefs.map((p) => (
           <Link
             key={p.key}
-            href={p.key === 'all' ? '/' : `/?filter=${p.key}`}
+            href={p.key === 'all' ? '/' : `/?filter=${p.key}#recent-contracts`}
             className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all hover:-translate-y-0.5 hover:shadow-sm ${pillTone(p.key, filter === p.key)}`}
           >
             <span>{p.label}</span>
@@ -376,7 +414,11 @@ export default async function DashboardPage({
       </div>
 
       {/* Contracts table */}
-      <Card className="overflow-hidden border-fest-600/15" data-tour="dashboard-contracts-table">
+      <Card
+        id="recent-contracts"
+        className="overflow-hidden border-fest-600/15"
+        data-tour="dashboard-contracts-table"
+      >
         <div className="flex items-center justify-between border-b border-fest-600/10 px-6 py-4">
           <div>
             <h2 className="font-serif text-lg font-semibold">Recent Contracts</h2>
