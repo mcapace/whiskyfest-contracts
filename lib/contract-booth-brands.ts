@@ -56,16 +56,25 @@ export async function replaceContractBoothBrandsForContract(
   if (insErr) throw new Error(insErr.message);
 }
 
-/** Paragraph-oriented merge token for Google Docs templates. */
-export function formatBoothBrandsMergeDetail(brands: ContractBoothBrand[]): string {
+/**
+ * Google Docs merge token `{{booth_brands_block}}` — one line per booth.
+ * With expressions: Booth 1: Don Julio (Blanco, Reposado)
+ * Brand only: Booth 1: Don Julio
+ */
+export function formatBoothBrandsBlock(brands: ContractBoothBrand[]): string {
   if (!brands.length) return '';
   const sorted = [...brands].sort((a, b) => a.booth_index - b.booth_index);
   return sorted
     .map((b) => {
-      const expr = (b.expressions ?? []).filter(Boolean).join(', ');
-      return expr.length > 0
-        ? `Booth ${b.booth_index}: ${b.brand_name.trim()} — ${expr}`
-        : `Booth ${b.booth_index}: ${b.brand_name.trim()}`;
+      const expr = (b.expressions ?? []).filter(Boolean);
+      const brand = b.brand_name.trim();
+      if (expr.length === 0) return `Booth ${b.booth_index}: ${brand}`;
+      return `Booth ${b.booth_index}: ${brand} (${expr.join(', ')})`;
     })
     .join('\n');
+}
+
+/** @deprecated Use formatBoothBrandsBlock / {{booth_brands_block}} */
+export function formatBoothBrandsMergeDetail(brands: ContractBoothBrand[]): string {
+  return formatBoothBrandsBlock(brands);
 }

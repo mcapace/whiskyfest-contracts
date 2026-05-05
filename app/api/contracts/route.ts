@@ -13,6 +13,10 @@ import type { ContractStatus } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
 
+function escapeIlikePattern(raw: string): string {
+  return raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_').replace(/,/g, ' ');
+}
+
 const VALID: ContractStatus[] = [
   'draft',
   'ready_for_review',
@@ -54,11 +58,20 @@ export async function GET(req: Request) {
   }
 
   if (q) {
-    const safe = q.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_').replace(/,/g, ' ');
+    const safe = escapeIlikePattern(q);
     const pattern = `%${safe}%`;
-    query = query.or(
-      `exhibitor_company_name.ilike.${pattern},brands_poured.ilike.${pattern},signer_1_name.ilike.${pattern},signer_1_email.ilike.${pattern}`,
-    );
+    const { data: boothRows } = await supabase.from('contract_booth_brands').select('contract_id').ilike('brand_name', pattern);
+    const boothIds = [...new Set((boothRows ?? []).map((r) => r.contract_id as string))];
+    const parts = [
+      `exhibitor_company_name.ilike.${pattern}`,
+      `brands_poured.ilike.${pattern}`,
+      `signer_1_name.ilike.${pattern}`,
+      `signer_1_email.ilike.${pattern}`,
+    ];
+    if (boothIds.length > 0) {
+      parts.push(`id.in.(${boothIds.join(',')})`);
+    }
+    query = query.or(parts.join(','));
     query = query.limit(5);
   } else {
     query = query.limit(200);

@@ -8,7 +8,7 @@ import {
 } from '@/lib/contracts';
 import { formatCurrency } from '@/lib/utils';
 import { formatEventDateForMerge, getAgreementDatePartsInDisplayZone } from '@/lib/datetime';
-import { formatBoothBrandsMergeDetail } from '@/lib/contract-booth-brands';
+import { formatBoothBrandsBlock } from '@/lib/contract-booth-brands';
 import type { ContractBoothBrand, ContractWithTotals, Event } from '@/types/db';
 
 /** Draft PDFs use blank lines; DocuSign send uses literal anchor strings in the PDF. */
@@ -97,6 +97,8 @@ export function buildContractMergeMap(
     listSubtotalDisplay = formatCurrency(calculateListSubtotalCents(contract.booth_count));
   }
 
+  const boothBlock = formatBoothBrandsBlock(boothBrands ?? []);
+
   const anchors =
     mode === 'draft'
       ? {
@@ -124,8 +126,9 @@ export function buildContractMergeMap(
     '{{exhibitor_legal_name}}': contract.exhibitor_legal_name,
     '{{exhibitor_company_name}}': contract.exhibitor_company_name,
     '{{exhibitor_address}}': formatExhibitorAddressBlock(contract),
-    '{{brands_poured}}': contract.brands_poured ?? '',
-    '{{booth_brands_detail}}': formatBoothBrandsMergeDetail(boothBrands ?? []),
+    '{{brands_poured}}': boothBlock.length > 0 ? boothBlock : (contract.brands_poured ?? ''),
+    '{{booth_brands_block}}': boothBlock,
+    '{{booth_brands_detail}}': boothBlock,
     '{{booth_count}}': String(contract.booth_count),
     '{{booth_rate}}': formatCurrency(contract.booth_rate_cents).replace('$', '').trim(),
     '{{booth_subtotal}}': formatCurrency(contract.booth_subtotal_cents).replace('$', '').trim(),

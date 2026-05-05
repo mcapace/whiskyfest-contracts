@@ -19,6 +19,10 @@ const VALID: Set<string> = new Set([
   'error',
 ]);
 
+function escapeIlikePattern(raw: string): string {
+  return raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_').replace(/,/g, ' ');
+}
+
 async function loadContracts(
   actor: Awaited<ReturnType<typeof requireContractActorForPage>>,
   searchParams: { status?: string; q?: string },
@@ -54,12 +58,22 @@ async function loadContracts(
   }
 
   const q = searchParams.q?.trim();
+  let boothBrandContractIds: string[] = [];
   if (q) {
-    const safe = q.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_').replace(/,/g, ' ');
+    const safe = escapeIlikePattern(q);
     const pattern = `%${safe}%`;
-    query = query.or(
-      `exhibitor_company_name.ilike.${pattern},brands_poured.ilike.${pattern},signer_1_name.ilike.${pattern},signer_1_email.ilike.${pattern}`,
-    );
+    const { data: boothRows } = await supabase.from('contract_booth_brands').select('contract_id').ilike('brand_name', pattern);
+    boothBrandContractIds = [...new Set((boothRows ?? []).map((r) => r.contract_id as string))];
+    const parts = [
+      `exhibitor_company_name.ilike.${pattern}`,
+      `brands_poured.ilike.${pattern}`,
+      `signer_1_name.ilike.${pattern}`,
+      `signer_1_email.ilike.${pattern}`,
+    ];
+    if (boothBrandContractIds.length > 0) {
+      parts.push(`id.in.(${boothBrandContractIds.join(',')})`);
+    }
+    query = query.or(parts.join(','));
   }
 
   const [{ data: contracts }, { data: events }] = await Promise.all([

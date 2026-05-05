@@ -304,22 +304,43 @@ export default async function ContractDetailPage({ params }: { params: { id: str
             </div>
             <Detail label="Legal Name" value={contract.exhibitor_legal_name} />
             <Detail label="Display Name" value={contract.exhibitor_company_name} />
-            <Detail label="Brands" value={contract.brands_poured} />
-            {boothBrands.length > 0 && (
-              <div className="rounded-md border border-border/60 bg-muted/20 p-4">
-                <p className="wf-label-caps mb-3 text-[0.65rem] text-muted-foreground">Brands by booth</p>
-                <ul className="space-y-2.5 text-foreground">
+            {boothBrands.length > 0 ? (
+              <section aria-labelledby="brands-expressions-heading">
+                <h3 id="brands-expressions-heading" className="font-serif text-xl font-semibold tracking-tight text-foreground">
+                  Brands &amp; Expressions
+                </h3>
+                <div className="mt-4 space-y-3">
                   {boothBrands.map((b) => (
-                    <li key={b.id}>
-                      <span className="font-medium">Booth {b.booth_index}:</span>{' '}
-                      {b.brand_name.trim() || <span className="text-muted-foreground">—</span>}
-                      {b.expressions && b.expressions.length > 0 ? (
-                        <span className="text-muted-foreground"> — {b.expressions.join(', ')}</span>
-                      ) : null}
-                    </li>
+                    <Card key={b.id} className="border-border/70 bg-parchment-50/80 shadow-none dark:bg-card">
+                      <CardContent className="space-y-2 p-4">
+                        <p className="text-[0.65rem] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                          Booth {b.booth_index}
+                        </p>
+                        <p className="font-serif text-lg font-semibold text-foreground">{b.brand_name.trim() || '—'}</p>
+                        {b.expressions && b.expressions.length > 0 ? (
+                          <div>
+                            <p className="mb-1.5 text-[0.65rem] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                              Expressions
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {b.expressions.map((exp, ei) => (
+                                <span
+                                  key={`${b.id}-${ei}-${exp}`}
+                                  className="rounded-md bg-parchment-100 px-2 py-1 text-xs text-foreground dark:bg-muted"
+                                >
+                                  {exp}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                      </CardContent>
+                    </Card>
                   ))}
-                </ul>
-              </div>
+                </div>
+              </section>
+            ) : (
+              <Detail label="Brands" value={contract.brands_poured} />
             )}
             <Detail label="Sales Rep" value={contract.sales_rep_name ?? contract.sales_rep_email ?? '—'} />
             {(contract.status === 'signed' || contract.status === 'executed') &&

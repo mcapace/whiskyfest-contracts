@@ -86,7 +86,8 @@ export function CommandPaletteTrigger() {
 function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const router = useRouter();
   const { data: session, update } = useSession();
-  const [contracts, setContracts] = useState<ContractWithTotals[] | null>(null);
+  const [allContracts, setAllContracts] = useState<ContractWithTotals[] | null>(null);
+  const [searchContracts, setSearchContracts] = useState<ContractWithTotals[] | null>(null);
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [impersonation, setImpersonation] = useState<ImpersonationCand[] | null>(null);
   const [paletteQuery, setPaletteQuery] = useState('');
@@ -135,13 +136,33 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
       const res = await fetch('/api/contracts');
       const body = await res.json().catch(() => ({}));
       if (!cancelled && res.ok && Array.isArray(body.contracts)) {
-        setContracts(body.contracts as ContractWithTotals[]);
+        setAllContracts(body.contracts as ContractWithTotals[]);
       }
     })();
     return () => {
       cancelled = true;
     };
   }, [open, canSearchContracts]);
+
+  useEffect(() => {
+    if (!open || !canSearchContracts) return;
+    const t = debouncedPaletteQuery.trim();
+    if (!t) {
+      setSearchContracts(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const res = await fetch(`/api/contracts?q=${encodeURIComponent(t)}`);
+      const body = await res.json().catch(() => ({}));
+      if (!cancelled && res.ok && Array.isArray(body.contracts)) {
+        setSearchContracts(body.contracts as ContractWithTotals[]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, canSearchContracts, debouncedPaletteQuery]);
 
   useEffect(() => {
     if (!open || !canImpersonate) return;
@@ -169,26 +190,11 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
   const flatImpersonation = impersonation ?? [];
 
   const contractHits = useMemo(() => {
-    if (!contracts) return [];
-    const t = debouncedPaletteQuery.trim().toLowerCase();
-    if (!t) return contracts.slice(0, 5);
-    return contracts
-      .filter((c) => {
-        const blob = [
-          c.exhibitor_company_name,
-          c.brands_poured,
-          c.signer_1_name,
-          c.signer_1_email,
-          c.sales_rep_name,
-          c.sales_rep_email,
-        ]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
-        return blob.includes(t);
-      })
-      .slice(0, 5);
-  }, [contracts, debouncedPaletteQuery]);
+    const t = debouncedPaletteQuery.trim();
+    const source =
+      t.length > 0 ? (searchContracts ?? []) : (allContracts ?? []);
+    return source.slice(0, 5);
+  }, [allContracts, searchContracts, debouncedPaletteQuery]);
 
   function go(href: string) {
     onOpenChange(false);
@@ -308,12 +314,12 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 </div>
               </Command.Item>
             ) : null}
-            {contracts?.some((c) => requiresDiscountApproval(c)) ? (
+            {allContracts?.some((c) => requiresDiscountApproval(c)) ? (
               isAdmin ? (
                 <Command.Item
                   value="approve discount contract"
                   onSelect={() => {
-                    const target = contracts.find((c) => requiresDiscountApproval(c));
+                    const target = allContracts.find((c) => requiresDiscountApproval(c));
                     if (target) go(`/contracts/${target.id}`);
                   }}
                   className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
@@ -340,12 +346,12 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 </Command.Item>
               )
             )}
-            {contracts?.some((c) => c.status === 'pending_events_review') ? (
+            {allContracts?.some((c) => c.status === 'pending_events_review') ? (
               isEventsTeam ? (
                 <Command.Item
                   value="send back pending review"
                   onSelect={() => {
-                    const target = contracts.find((c) => c.status === 'pending_events_review');
+                    const target = allContracts.find((c) => c.status === 'pending_events_review');
                     if (target) go(`/contracts/${target.id}`);
                   }}
                   className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
@@ -358,12 +364,12 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 </Command.Item>
               ) : null
             ) : null}
-            {contracts?.some((c) => c.status === 'signed') ? (
+            {allContracts?.some((c) => c.status === 'signed') ? (
               isAdmin || isEventsTeam ? (
                 <Command.Item
                   value="release signed contract accounting"
                   onSelect={() => {
-                    const target = contracts.find((c) => c.status === 'signed');
+                    const target = allContracts.find((c) => c.status === 'signed');
                     if (target) go(`/contracts/${target.id}`);
                   }}
                   className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
@@ -376,12 +382,12 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 </Command.Item>
               ) : null
             ) : null}
-            {contracts?.some((c) => c.status === 'executed') ? (
+            {allContracts?.some((c) => c.status === 'executed') ? (
               isAdmin || isAccounting ? (
                 <Command.Item
                   value="mark invoice sent executed"
                   onSelect={() => {
-                    const target = contracts.find((c) => c.status === 'executed');
+                    const target = allContracts.find((c) => c.status === 'executed');
                     if (target) go(`/accounting/${target.id}`);
                   }}
                   className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
@@ -561,12 +567,12 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
             </Command.Group>
           )}
 
-          {contracts && recentIds.length > 0 && (
+          {allContracts && recentIds.length > 0 && (
             <Command.Group
               heading={<span className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Recent</span>}
             >
               {recentIds
-                .map((id) => contracts.find((c) => c.id === id))
+                .map((id) => allContracts.find((c) => c.id === id))
                 .filter((c): c is ContractWithTotals => Boolean(c))
                 .filter((c) => {
                   const t = debouncedPaletteQuery.trim().toLowerCase();

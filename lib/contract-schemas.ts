@@ -54,6 +54,18 @@ export const newContractBodySchema = z
         return;
       }
     }
+    const byIndex = new Map((data.booth_brands ?? []).map((r) => [r.booth_index, r]));
+    for (let i = 1; i <= data.booth_count; i++) {
+      const row = byIndex.get(i);
+      if (!row?.brand_name?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Brand name is required for booth ${i}.`,
+          path: ['booth_brands'],
+        });
+        return;
+      }
+    }
   });
 
 export type NewContractBody = z.infer<typeof newContractBodySchema>;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { emitContractActionSuccessFeedback } from '@/lib/contract-action-feedback';
@@ -18,9 +18,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input, Label, Textarea } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { SalesRepSelect } from '@/components/contracts/sales-rep-select';
+import { BoothBrandInput, type BoothBrandValue } from '@/components/contracts/booth-brand-input';
 import type { ContractWithTotals, Event } from '@/types/db';
+import { findReturningSponsor, medianBoothCountForCompany } from '@/lib/new-contract-hints';
 
-type BoothBrandDraft = { brand_name: string; expressionsRaw: string };
+type BoothBrandDraft = BoothBrandValue;
 
 function boothBrandDraftsForCount(
   boothCount: number,
@@ -32,12 +34,11 @@ function boothBrandDraftsForCount(
     const r = map.get(i);
     rows.push({
       brand_name: r?.brand_name ?? '',
-      expressionsRaw: (r?.expressions ?? []).join(', '),
+      expressions: [...(r?.expressions ?? [])],
     });
   }
   return rows;
 }
-import { findReturningSponsor, medianBoothCountForCompany } from '@/lib/new-contract-hints';
 
 export type ContractFormValues = {
   event_id: string;
@@ -214,18 +215,45 @@ export function NewContractForm({
     return Math.max(1, form.booth_count);
   }, [boothCountInput, form.booth_count]);
 
+  /** Grow-only: shrinking booth count is confirmed on blur / submit (drops excess booth data). */
   useEffect(() => {
     setBoothBrandRows((prev) => {
+      if (effectiveBoothCount <= prev.length) return prev;
       const next = [...prev];
       while (next.length < effectiveBoothCount) {
-        next.push({ brand_name: '', expressionsRaw: '' });
-      }
-      if (next.length > effectiveBoothCount) {
-        next.length = effectiveBoothCount;
+        next.push({ brand_name: '', expressions: [] });
       }
       return next;
     });
   }, [effectiveBoothCount]);
+
+  function boothTailHasData(rows: BoothBrandDraft[], fromIndex: number): boolean {
+    return rows.slice(fromIndex).some(
+      (r) => r.brand_name.trim().length > 0 || (r.expressions?.length ?? 0) > 0,
+    );
+  }
+
+  function normalizeBoothCountOnBlur() {
+    const n = Math.max(1, parseInt(boothCountInput.trim(), 10) || 1);
+    if (n < boothBrandRows.length && boothTailHasData(boothBrandRows, n)) {
+      const label =
+        boothBrandRows.length === n + 1
+          ? `Booth ${n + 1}`
+          : `Booth ${n + 1}–${boothBrandRows.length}`;
+      if (
+        !window.confirm(
+          `This will remove ${label} brand information. Continue?`,
+        )
+      ) {
+        setBoothCountInput(String(boothBrandRows.length));
+        setForm((f) => ({ ...f, booth_count: boothBrandRows.length }));
+        return;
+      }
+      setBoothBrandRows((rows) => rows.slice(0, n));
+    }
+    setBoothCountInput(String(n));
+    setForm((f) => ({ ...f, booth_count: n }));
+  }
 
   useEffect(() => {
     if (!selectedEvent) return;
@@ -255,6 +283,33 @@ export function NewContractForm({
     }
 
     const boothCountNorm = Math.max(1, parseInt(boothCountInput.trim(), 10) || 1);
+
+    if (boothBrandRows.length > boothCountNorm && boothTailHasData(boothBrandRows, boothCountNorm)) {
+      const rest = boothBrandRows.length;
+      const label =
+        rest === boothCountNorm + 1 ? `Booth ${boothCountNorm + 1}` : `Booth ${boothCountNorm + 1}–${rest}`;
+      if (
+        !window.confirm(
+          `This will remove ${label} brand information. Continue?`,
+        )
+      ) {
+        return;
+      }
+    }
+
+    const rowsForSave = Array.from({ length: boothCountNorm }, (_, i) => boothBrandRows[i] ?? {
+      brand_name: '',
+      expressions: [],
+    });
+
+    for (let i = 0; i < boothCountNorm; i++) {
+      if (!rowsForSave[i].brand_name.trim()) {
+        setErr(`Brand name is required for booth ${i + 1}.`);
+        return;
+      }
+    }
+
+    setBoothBrandRows(rowsForSave.slice(0, boothCountNorm));
     setBoothCountInput(String(boothCountNorm));
     setForm((f) => ({ ...f, booth_count: boothCountNorm }));
 
@@ -263,13 +318,10 @@ export function NewContractForm({
       const method = editContractId ? 'PATCH' : 'POST';
 
       const formForSave = { ...form, booth_count: boothCountNorm };
-      const booth_brands = boothBrandRows.slice(0, boothCountNorm).map((row, i) => ({
+      const booth_brands = rowsForSave.map((row, i) => ({
         booth_index: i + 1,
-        brand_name: row.brand_name,
-        expressions: row.expressionsRaw
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean),
+        brand_name: row.brand_name.trim(),
+        expressions: row.expressions.filter(Boolean),
       }));
       const payload = { ...formForSave, line_items: parsedLines.rows, booth_brands };
 
@@ -379,6 +431,7 @@ export function NewContractForm({
                         set('brands_poured', matchedSponsor.brandsPoured || form.brands_poured);
                         set('booth_count', matchedSponsor.boothCount);
                         setBoothCountInput(String(matchedSponsor.boothCount));
+                        setBoothBrandRows(boothBrandDraftsForCount(matchedSponsor.boothCount, undefined));
                         set('booth_rate_cents', matchedSponsor.boothRateCents);
                         setBoothRateInput((matchedSponsor.boothRateCents / 100).toFixed(2));
                         set(
@@ -402,6 +455,7 @@ export function NewContractForm({
                   onClick={() => {
                     set('booth_count', medianBooths);
                     setBoothCountInput(String(medianBooths));
+                    setBoothBrandRows(boothBrandDraftsForCount(medianBooths, undefined));
                   }}
                 >
                   Use {medianBooths} booths
@@ -416,49 +470,12 @@ export function NewContractForm({
               the exhibitor at signing.
             </div>
 
-            <Field label="Brands Poured" hint="Comma-separated list; printed on the 'List brand(s) here' line">
+            <Field
+              label="Brands Poured (legacy)"
+              hint="Optional summary line for older templates. Per-booth brands below replace {{booth_brands_block}} / {{brands_poured}} in Google Docs when filled."
+            >
               <Input value={form.brands_poured} onChange={e => set('brands_poured', e.target.value)} placeholder="Sample Bourbon, Sample Rye" />
             </Field>
-
-            <div className="space-y-4 rounded-lg border border-border/60 bg-muted/10 p-4">
-              <div>
-                <p className="text-sm font-medium text-foreground">Brands by booth</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  One brand per booth; list expressions (specific products) comma-separated. Used for operations and optional{' '}
-                  <code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.65rem]">{'{{booth_brands_detail}}'}</code> in the contract template.
-                </p>
-              </div>
-              {boothBrandRows.map((row, idx) => (
-                <div key={idx} className="grid gap-3 border-t border-border/40 pt-4 first:border-t-0 first:pt-0 sm:grid-cols-2 sm:gap-4">
-                  <Field label={`Booth ${idx + 1} — brand`}>
-                    <Input
-                      value={row.brand_name}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setBoothBrandRows((list) =>
-                          list.map((r, j) => (j === idx ? { ...r, brand_name: v } : r)),
-                        );
-                      }}
-                      placeholder="e.g. Don Julio"
-                      autoComplete="off"
-                    />
-                  </Field>
-                  <Field label="Expressions (comma-separated)" hint="Products poured at this booth">
-                    <Input
-                      value={row.expressionsRaw}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setBoothBrandRows((list) =>
-                          list.map((r, j) => (j === idx ? { ...r, expressionsRaw: v } : r)),
-                        );
-                      }}
-                      placeholder="Blanco, Reposado, Añejo"
-                      autoComplete="off"
-                    />
-                  </Field>
-                </div>
-              ))}
-            </div>
           </CardContent>
         </Card>
 
@@ -486,11 +503,7 @@ export function NewContractForm({
                       set('booth_count', n);
                     }
                   }}
-                  onBlur={() => {
-                    const n = Math.max(1, parseInt(boothCountInput.trim(), 10) || 1);
-                    setBoothCountInput(String(n));
-                    set('booth_count', n);
-                  }}
+                  onBlur={() => normalizeBoothCountOnBlur()}
                 />
               </Field>
               <Field label="Booth Rate (USD)" hint="Editable for custom booth pricing">
@@ -526,6 +539,36 @@ export function NewContractForm({
                   </p>
                 )}
               </Field>
+            </div>
+
+            <div className="space-y-4 rounded-lg border border-border/60 bg-muted/10 p-4">
+              <div>
+                <p className="text-sm font-medium text-foreground">Brands by booth</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  One brand per booth (required). Expressions are optional. Merges to{' '}
+                  <code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.65rem]">{'{{booth_brands_block}}'}</code>{' '}
+                  (and legacy <code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.65rem]">{'{{brands_poured}}'}</code>
+                  ) in the contract template.
+                </p>
+              </div>
+              <div className="space-y-4">
+                {Array.from({ length: effectiveBoothCount }).map((_, idx) => (
+                  <BoothBrandInput
+                    key={idx}
+                    boothNumber={idx + 1}
+                    value={boothBrandRows[idx] ?? { brand_name: '', expressions: [] }}
+                    onChange={(next) => {
+                      setBoothBrandRows((rows) => {
+                        const copy = [...rows];
+                        while (copy.length <= idx) copy.push({ brand_name: '', expressions: [] });
+                        copy[idx] = next;
+                        return copy;
+                      });
+                    }}
+                    disabled={busy}
+                  />
+                ))}
+              </div>
             </div>
 
             <div className="border-t border-border/60 pt-6">
