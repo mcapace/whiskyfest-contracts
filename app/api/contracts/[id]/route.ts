@@ -6,6 +6,7 @@ import { notifyAdminsIfNewlyRequiresDiscountApproval } from '@/lib/discount-patc
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { assertContractAccess } from '@/lib/auth-contract';
 import { clearedRepEnteredBilling, newContractBodySchema, signerContactPatchSchema } from '@/lib/contract-schemas';
+import { replaceContractBoothBrandsForContract } from '@/lib/contract-booth-brands';
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
 import type { Contract, ContractStatus } from '@/types/db';
 
@@ -89,6 +90,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     try {
       await replaceContractLineItemsForContract(supabase, params.id, p.line_items ?? []);
+      await replaceContractBoothBrandsForContract(supabase, params.id, p.booth_count, p.booth_brands ?? []);
     } catch (e) {
       console.error('Failed to save contract line items:', e);
       return NextResponse.json({ error: e instanceof Error ? e.message : 'Failed to save line items' }, { status: 500 });

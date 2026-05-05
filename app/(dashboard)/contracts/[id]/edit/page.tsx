@@ -19,12 +19,19 @@ export default async function EditDraftContractPage({ params }: { params: { id: 
 
   const c = viewed.contract;
 
-  const { data: lineItemRows } = await supabase
-    .from('contract_line_items')
-    .select('description, amount_cents')
-    .eq('contract_id', c.id)
-    .order('display_order', { ascending: true })
-    .order('created_at', { ascending: true });
+  const [{ data: lineItemRows }, { data: boothBrandRows }] = await Promise.all([
+    supabase
+      .from('contract_line_items')
+      .select('description, amount_cents')
+      .eq('contract_id', c.id)
+      .order('display_order', { ascending: true })
+      .order('created_at', { ascending: true }),
+    supabase
+      .from('contract_booth_brands')
+      .select('booth_index, brand_name, expressions')
+      .eq('contract_id', c.id)
+      .order('booth_index', { ascending: true }),
+  ]);
 
   const initialLineItems = (lineItemRows ?? []).map((r) => {
     const row = r as Pick<ContractLineItem, 'description' | 'amount_cents'>;
@@ -52,6 +59,7 @@ export default async function EditDraftContractPage({ params }: { params: { id: 
           sales_rep_id: c.sales_rep_id ?? '',
           notes: c.notes ?? '',
         }}
+        initialBoothBrands={(boothBrandRows ?? []) as { booth_index: number; brand_name: string; expressions: string[] }[]}
       />
     </div>
   );

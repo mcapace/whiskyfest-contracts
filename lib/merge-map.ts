@@ -8,7 +8,8 @@ import {
 } from '@/lib/contracts';
 import { formatCurrency } from '@/lib/utils';
 import { formatEventDateForMerge, getAgreementDatePartsInDisplayZone } from '@/lib/datetime';
-import type { ContractWithTotals, Event } from '@/types/db';
+import { formatBoothBrandsMergeDetail } from '@/lib/contract-booth-brands';
+import type { ContractBoothBrand, ContractWithTotals, Event } from '@/types/db';
 
 /** Draft PDFs use blank lines; DocuSign send uses literal anchor strings in the PDF. */
 export type MergePlaceholderMode = 'draft' | 'docusign';
@@ -78,6 +79,7 @@ export function buildContractMergeMap(
   contract: ContractWithTotals,
   event: Event,
   mode: MergePlaceholderMode,
+  boothBrands?: ContractBoothBrand[],
 ): Record<string, string> {
   const agreement = getAgreementDatePartsInDisplayZone();
 
@@ -123,6 +125,7 @@ export function buildContractMergeMap(
     '{{exhibitor_company_name}}': contract.exhibitor_company_name,
     '{{exhibitor_address}}': formatExhibitorAddressBlock(contract),
     '{{brands_poured}}': contract.brands_poured ?? '',
+    '{{booth_brands_detail}}': formatBoothBrandsMergeDetail(boothBrands ?? []),
     '{{booth_count}}': String(contract.booth_count),
     '{{booth_rate}}': formatCurrency(contract.booth_rate_cents).replace('$', '').trim(),
     '{{booth_subtotal}}': formatCurrency(contract.booth_subtotal_cents).replace('$', '').trim(),

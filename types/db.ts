@@ -124,6 +124,16 @@ export interface ContractLineItem {
   updated_at: string;
 }
 
+/** One brand per booth index; expressions are the specific products poured at that booth. */
+export interface ContractBoothBrand {
+  id: string;
+  contract_id: string;
+  booth_index: number;
+  brand_name: string;
+  expressions: string[];
+  created_at: string;
+}
+
 export interface ContractWithTotals extends Contract {
   booth_subtotal_cents: number;
   additional_brand_fee_cents: number;

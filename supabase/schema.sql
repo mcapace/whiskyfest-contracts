@@ -180,6 +180,20 @@ create table if not exists contract_line_items (
 create index if not exists contract_line_items_contract_id_display_order_idx
   on contract_line_items (contract_id, display_order);
 
+-- Per-booth brand + expressions (migration 033_booth_brands.sql)
+create table if not exists contract_booth_brands (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references contracts(id) on delete cascade,
+  booth_index integer not null check (booth_index > 0),
+  brand_name text not null,
+  expressions text[] not null default array[]::text[],
+  created_at timestamptz not null default now(),
+  unique (contract_id, booth_index)
+);
+
+create index if not exists idx_contract_booth_brands_contract_id
+  on contract_booth_brands (contract_id);
+
 -- Accounting / AR (mirrors migration 018_add_accounting_layer.sql)
 alter table contracts add column if not exists invoice_status text not null default 'pending';
 alter table contracts add column if not exists invoice_sent_at timestamptz;

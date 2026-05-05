@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { resolveContractActor } from '@/lib/auth-contract';
 import { clearedRepEnteredBilling, newContractBodySchema } from '@/lib/contract-schemas';
+import { replaceContractBoothBrandsForContract } from '@/lib/contract-booth-brands';
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
 import { isDiscountedRate } from '@/lib/contracts';
 import { notifyAdminsOfDiscountRequest } from '@/lib/notifications';
@@ -144,6 +145,7 @@ export async function POST(req: Request) {
 
   try {
     await replaceContractLineItemsForContract(supabase, row.id, p.line_items ?? []);
+    await replaceContractBoothBrandsForContract(supabase, row.id, p.booth_count, p.booth_brands ?? []);
   } catch (e) {
     console.error('Failed to save contract line items:', e);
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Failed to save line items' }, { status: 500 });

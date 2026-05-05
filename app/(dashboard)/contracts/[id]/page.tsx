@@ -21,7 +21,13 @@ import { ActivityTimeline } from '@/components/contracts/activity-timeline';
 import { PdfPreview } from '@/components/contracts/pdf-preview';
 import { ContractProgressionTimeline } from '@/components/contract/progression-timeline';
 import { ContractSummarySection } from '@/components/contract/contract-summary-section';
-import type { ContractLineItem, ContractWithTotals, Event, AuditLogEntry } from '@/types/db';
+import type {
+  AuditLogEntry,
+  ContractBoothBrand,
+  ContractLineItem,
+  ContractWithTotals,
+  Event,
+} from '@/types/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,7 +47,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
 
   const { contract, actor } = viewed;
   const supabase = getSupabaseAdmin();
-  const [{ data: event }, audit, { data: lineItemsRows }] = await Promise.all([
+  const [{ data: event }, audit, { data: lineItemsRows }, { data: boothBrandRows }] = await Promise.all([
     supabase.from('events').select('*').eq('id', contract.event_id).single(),
     loadAudit(contract.id),
     supabase
@@ -50,9 +56,15 @@ export default async function ContractDetailPage({ params }: { params: { id: str
       .eq('contract_id', contract.id)
       .order('display_order', { ascending: true })
       .order('created_at', { ascending: true }),
+    supabase
+      .from('contract_booth_brands')
+      .select('*')
+      .eq('contract_id', contract.id)
+      .order('booth_index', { ascending: true }),
   ]);
 
   const lineItems = (lineItemsRows ?? []) as ContractLineItem[];
+  const boothBrands = (boothBrandRows ?? []) as ContractBoothBrand[];
 
   const isAdmin = actor.isAdmin;
   const isEventsTeam = actor.isEventsTeam;
@@ -293,6 +305,22 @@ export default async function ContractDetailPage({ params }: { params: { id: str
             <Detail label="Legal Name" value={contract.exhibitor_legal_name} />
             <Detail label="Display Name" value={contract.exhibitor_company_name} />
             <Detail label="Brands" value={contract.brands_poured} />
+            {boothBrands.length > 0 && (
+              <div className="rounded-md border border-border/60 bg-muted/20 p-4">
+                <p className="wf-label-caps mb-3 text-[0.65rem] text-muted-foreground">Brands by booth</p>
+                <ul className="space-y-2.5 text-foreground">
+                  {boothBrands.map((b) => (
+                    <li key={b.id}>
+                      <span className="font-medium">Booth {b.booth_index}:</span>{' '}
+                      {b.brand_name.trim() || <span className="text-muted-foreground">—</span>}
+                      {b.expressions && b.expressions.length > 0 ? (
+                        <span className="text-muted-foreground"> — {b.expressions.join(', ')}</span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <Detail label="Sales Rep" value={contract.sales_rep_name ?? contract.sales_rep_email ?? '—'} />
             {(contract.status === 'signed' || contract.status === 'executed') &&
               contract.countersigned_at &&

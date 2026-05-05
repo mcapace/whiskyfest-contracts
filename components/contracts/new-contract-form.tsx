@@ -19,6 +19,24 @@ import { Input, Label, Textarea } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { SalesRepSelect } from '@/components/contracts/sales-rep-select';
 import type { ContractWithTotals, Event } from '@/types/db';
+
+type BoothBrandDraft = { brand_name: string; expressionsRaw: string };
+
+function boothBrandDraftsForCount(
+  boothCount: number,
+  initial?: { booth_index: number; brand_name: string; expressions: string[] }[],
+): BoothBrandDraft[] {
+  const map = new Map((initial ?? []).map((r) => [r.booth_index, r]));
+  const rows: BoothBrandDraft[] = [];
+  for (let i = 1; i <= boothCount; i++) {
+    const r = map.get(i);
+    rows.push({
+      brand_name: r?.brand_name ?? '',
+      expressionsRaw: (r?.expressions ?? []).join(', '),
+    });
+  }
+  return rows;
+}
 import { findReturningSponsor, medianBoothCountForCompany } from '@/lib/new-contract-hints';
 
 export type ContractFormValues = {
@@ -49,6 +67,8 @@ interface Props {
   initialLineItems?: InitialContractLineItem[];
   /** Recent companies + signed/executed contracts for smart defaults (Phase 3). */
   smartHints?: { recentCompanies: string[]; priorContracts: ContractWithTotals[] };
+  /** Per-booth brand + expressions (loaded when editing a draft). */
+  initialBoothBrands?: { booth_index: number; brand_name: string; expressions: string[] }[];
 }
 
 /** Pretty-print USD with commas for line-item amount fields (on blur). */
@@ -97,6 +117,7 @@ export function NewContractForm({
   initialValues,
   initialLineItems,
   smartHints,
+  initialBoothBrands,
 }: Props) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -127,6 +148,11 @@ export function NewContractForm({
 
   /** Separate from `booth_count` so `type="number"` accepts typing and spinner steps without forcing `|| 1` each keystroke. */
   const [boothCountInput, setBoothCountInput] = useState(() => String(initialValues?.booth_count ?? 1));
+
+  const startBooths = Math.max(1, initialValues?.booth_count ?? 1);
+  const [boothBrandRows, setBoothBrandRows] = useState<BoothBrandDraft[]>(() =>
+    boothBrandDraftsForCount(startBooths, initialBoothBrands),
+  );
 
   const [lineItems, setLineItems] = useState<LineItemDraft[]>(() =>
     (initialLineItems ?? []).map((li) => ({
@@ -181,6 +207,26 @@ export function NewContractForm({
   }, 0);
   const grandTotal = boothSubtotal + lineItemsSumCents;
 
+  const effectiveBoothCount = useMemo(() => {
+    const raw = boothCountInput.trim();
+    const n = parseInt(raw, 10);
+    if (raw !== '' && Number.isFinite(n) && n >= 1) return n;
+    return Math.max(1, form.booth_count);
+  }, [boothCountInput, form.booth_count]);
+
+  useEffect(() => {
+    setBoothBrandRows((prev) => {
+      const next = [...prev];
+      while (next.length < effectiveBoothCount) {
+        next.push({ brand_name: '', expressionsRaw: '' });
+      }
+      if (next.length > effectiveBoothCount) {
+        next.length = effectiveBoothCount;
+      }
+      return next;
+    });
+  }, [effectiveBoothCount]);
+
   useEffect(() => {
     if (!selectedEvent) return;
     const cents = selectedEvent.booth_rate_cents ?? 1500000;
@@ -217,7 +263,15 @@ export function NewContractForm({
       const method = editContractId ? 'PATCH' : 'POST';
 
       const formForSave = { ...form, booth_count: boothCountNorm };
-      const payload = { ...formForSave, line_items: parsedLines.rows };
+      const booth_brands = boothBrandRows.slice(0, boothCountNorm).map((row, i) => ({
+        booth_index: i + 1,
+        brand_name: row.brand_name,
+        expressions: row.expressionsRaw
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+      }));
+      const payload = { ...formForSave, line_items: parsedLines.rows, booth_brands };
 
       const res = await fetch(url, {
         method,
@@ -365,6 +419,46 @@ export function NewContractForm({
             <Field label="Brands Poured" hint="Comma-separated list; printed on the 'List brand(s) here' line">
               <Input value={form.brands_poured} onChange={e => set('brands_poured', e.target.value)} placeholder="Sample Bourbon, Sample Rye" />
             </Field>
+
+            <div className="space-y-4 rounded-lg border border-border/60 bg-muted/10 p-4">
+              <div>
+                <p className="text-sm font-medium text-foreground">Brands by booth</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  One brand per booth; list expressions (specific products) comma-separated. Used for operations and optional{' '}
+                  <code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.65rem]">{'{{booth_brands_detail}}'}</code> in the contract template.
+                </p>
+              </div>
+              {boothBrandRows.map((row, idx) => (
+                <div key={idx} className="grid gap-3 border-t border-border/40 pt-4 first:border-t-0 first:pt-0 sm:grid-cols-2 sm:gap-4">
+                  <Field label={`Booth ${idx + 1} — brand`}>
+                    <Input
+                      value={row.brand_name}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setBoothBrandRows((list) =>
+                          list.map((r, j) => (j === idx ? { ...r, brand_name: v } : r)),
+                        );
+                      }}
+                      placeholder="e.g. Don Julio"
+                      autoComplete="off"
+                    />
+                  </Field>
+                  <Field label="Expressions (comma-separated)" hint="Products poured at this booth">
+                    <Input
+                      value={row.expressionsRaw}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setBoothBrandRows((list) =>
+                          list.map((r, j) => (j === idx ? { ...r, expressionsRaw: v } : r)),
+                        );
+                      }}
+                      placeholder="Blanco, Reposado, Añejo"
+                      autoComplete="off"
+                    />
+                  </Field>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
