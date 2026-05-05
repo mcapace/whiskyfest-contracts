@@ -70,6 +70,8 @@ interface Props {
   smartHints?: { recentCompanies: string[]; priorContracts: ContractWithTotals[] };
   /** Per-booth brand + expressions (loaded when editing a draft). */
   initialBoothBrands?: { booth_index: number; brand_name: string; expressions: string[] }[];
+  /** Editing an admin/events import (status imported) — copy differs from draft. */
+  editImportMode?: boolean;
 }
 
 /** Pretty-print USD with commas for line-item amount fields (on blur). */
@@ -119,6 +121,7 @@ export function NewContractForm({
   initialLineItems,
   smartHints,
   initialBoothBrands,
+  editImportMode = false,
 }: Props) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -360,10 +363,14 @@ export function NewContractForm({
         >
           <ArrowLeft className="h-3.5 w-3.5" /> {editContractId ? 'Back to contract' : 'Back to dashboard'}
         </Link>
-        <h1 className="font-serif text-3xl font-semibold tracking-tight">{editContractId ? 'Edit Contract' : 'New Contract'}</h1>
+        <h1 className="font-serif text-3xl font-semibold tracking-tight">
+          {editContractId ? (editImportMode ? 'Edit imported contract' : 'Edit Contract') : 'New Contract'}
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {editContractId
-            ? 'Update draft terms before generating the PDF.'
+            ? editImportMode
+              ? 'Correct typos or financial details on this legacy import before releasing to accounting.'
+              : 'Update draft terms before generating the PDF.'
             : 'Enter deal terms. A draft PDF will be generated for review before anything goes to the exhibitor.'}
         </p>
       </div>

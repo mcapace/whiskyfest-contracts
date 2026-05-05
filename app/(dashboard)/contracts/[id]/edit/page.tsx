@@ -8,7 +8,10 @@ export const dynamic = 'force-dynamic';
 
 export default async function EditDraftContractPage({ params }: { params: { id: string } }) {
   const viewed = await getContractWithTotalsForViewer(params.id);
-  if (!viewed || viewed.contract.status !== 'draft') notFound();
+  if (!viewed) notFound();
+  const canEditImported =
+    viewed.contract.status === 'imported' && (viewed.actor.isAdmin || viewed.actor.isEventsTeam);
+  if (viewed.contract.status !== 'draft' && !canEditImported) notFound();
 
   const supabase = getSupabaseAdmin();
   const { data: events } = await supabase
@@ -45,6 +48,7 @@ export default async function EditDraftContractPage({ params }: { params: { id: 
         currentUserEmail={viewed.actor.email}
         isAdmin={viewed.actor.isAdmin}
         editContractId={c.id}
+        editImportMode={c.status === 'imported'}
         initialLineItems={initialLineItems}
         initialValues={{
           event_id: c.event_id,

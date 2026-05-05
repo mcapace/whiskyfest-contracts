@@ -116,6 +116,16 @@ export function ContractProgressionTimeline({
     [auditChronological, currentIdx, special],
   );
 
+  if (status === 'imported') {
+    return (
+      <p className="text-sm leading-relaxed text-muted-foreground">
+        Standard DocuSign stages do not apply to imported legacy contracts. Use{' '}
+        <span className="font-medium text-foreground">Release to Accounting</span> when accounts receivable should pick
+        this up.
+      </p>
+    );
+  }
+
   if (special === 'cancelled') {
     return <p className="text-sm font-medium text-destructive">Contract cancelled — timeline unavailable</p>;
   }

@@ -23,18 +23,24 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const body = await req.json().catch(() => null);
   const supabase = getSupabaseAdmin();
 
-  if (contract.status === 'draft') {
+  if (contract.status === 'draft' || contract.status === 'imported') {
     const parsed = newContractBodySchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 400 });
     }
 
-    const contractRepId = contract.sales_rep_id;
-    if (
-      !actor.isAdmin &&
-      (!contractRepId || !actor.accessibleSalesRepIds.includes(contractRepId))
-    ) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (contract.status === 'imported') {
+      if (!actor.isAdmin && !actor.isEventsTeam) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    } else {
+      const contractRepId = contract.sales_rep_id;
+      if (
+        !actor.isAdmin &&
+        (!contractRepId || !actor.accessibleSalesRepIds.includes(contractRepId))
+      ) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
     }
 
     const p = parsed.data;

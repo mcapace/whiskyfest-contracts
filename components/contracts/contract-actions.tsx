@@ -212,6 +212,9 @@ export function ContractActions({
     (status === 'sent' || status === 'partially_signed') && (isAdmin || isEventsTeam);
   const canCancelSigned = status === 'signed' && (isAdmin || isEventsTeam);
   const canRelease = status === 'signed' && isAdmin;
+  const canReleaseImported = status === 'imported' && (isAdmin || isEventsTeam) && !discountApprovalPending;
+  const canEditImported = status === 'imported' && (isAdmin || isEventsTeam);
+  const canVoidImported = status === 'imported' && (isAdmin || isEventsTeam);
   const signerWaitLabel = signerName?.trim() || signerEmail?.trim() || 'signer';
 
   const fabVisible = useMemo(() => {
@@ -227,7 +230,8 @@ export function ContractActions({
     if (status === 'approved') return true;
     if (hasDocuSignSecondary) return true;
     if (canCancelInflightDocuSign) return true;
-    if (canRelease || canCancelSigned) return true;
+    if (canRelease || canReleaseImported || canCancelSigned) return true;
+    if (status === 'imported' && (signedPdfHref || canEditImported || canVoidImported)) return true;
     if (status === 'executed' && signedPdfHref) return true;
     if (status === 'error' && isAdmin) return true;
     return false;
@@ -240,6 +244,9 @@ export function ContractActions({
     hasDocuSignSecondary,
     canCancelInflightDocuSign,
     canRelease,
+    canReleaseImported,
+    canEditImported,
+    canVoidImported,
     canCancelSigned,
     signedPdfHref,
   ]);
@@ -256,6 +263,12 @@ export function ContractActions({
   if (status === 'pending_events_review' && !discountApprovalPending && !isEventsTeam && isAdmin && draftPdfHref) actionsCount += 1;
   if (status === 'approved') actionsCount += isAdmin ? 2 : 1;
   if (canRelease) actionsCount += 1;
+  if (canReleaseImported) actionsCount += 1;
+  if (status === 'imported') {
+    if (signedPdfHref) actionsCount += 1;
+    if (canEditImported) actionsCount += 1;
+    if (canVoidImported) actionsCount += 1;
+  }
   if (status === 'executed' && signedPdfHref) actionsCount += 1;
   if (status === 'error' && isAdmin) actionsCount += 2;
   if (hasDocuSignSecondary) {
@@ -536,6 +549,59 @@ export function ContractActions({
                 </Button>
               </ActionWithHelp>
             </WhenDiscountBlocks>
+          )}
+
+          {status === 'imported' && signedPdfHref && (
+            <ActionWithHelp helpText={CONTRACT_ACTION_HELP.viewSignedPdf}>
+              <Button variant="secondary" className={fabBtn} asChild>
+                <a href={signedPdfHref} target="_blank" rel="noreferrer">
+                  <ExternalLink className="h-4 w-4" />
+                  View signed PDF
+                </a>
+              </Button>
+            </ActionWithHelp>
+          )}
+
+          {canReleaseImported && (
+            <WhenDiscountBlocks active={discountApprovalPending}>
+              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.releaseImported}>
+                <Button
+                  className={fabBtn}
+                  onClick={() => runAction('release', 'release', undefined, 'executed')}
+                  disabled={busy || discountApprovalPending}
+                >
+                  {pending && action === 'release' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4" />
+                  )}
+                  Release to Accounting
+                </Button>
+              </ActionWithHelp>
+            </WhenDiscountBlocks>
+          )}
+
+          {canEditImported && (
+            <ActionWithHelp helpText={CONTRACT_ACTION_HELP.editImportedContract}>
+              <Button variant="outline" className={fabBtn} asChild>
+                <Link href={`/contracts/${contractId}/edit`}>Edit imported details</Link>
+              </Button>
+            </ActionWithHelp>
+          )}
+
+          {canVoidImported && (
+            <ActionWithHelp helpText={CONTRACT_ACTION_HELP.voidImportedRecord}>
+              <Button
+                variant="destructive"
+                className={fabBtn}
+                onClick={() => setOpenVoid(true)}
+                disabled={readOnly}
+                title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+              >
+                <AlertTriangle className="h-4 w-4" />
+                Void record
+              </Button>
+            </ActionWithHelp>
           )}
 
           {canCancelSigned && (
@@ -845,11 +911,20 @@ export function ContractActions({
       <Dialog open={openVoid} onOpenChange={setOpenVoid}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Void Contract?</DialogTitle>
+            <DialogTitle>{status === 'imported' ? 'Void imported record?' : 'Void Contract?'}</DialogTitle>
             <DialogDescription>
-              Voiding permanently invalidates this DocuSign envelope and marks the contract <strong>voided</strong>. Use
-              this only when the deal is off and will not be revived. To fix terms and re-send, use{' '}
-              <strong>Recall</strong> instead.
+              {status === 'imported' ? (
+                <>
+                  This permanently marks the imported contract <strong>voided</strong>. Use only when this legacy deal
+                  should not remain in the pipeline. PDFs stay in storage for audit unless removed separately.
+                </>
+              ) : (
+                <>
+                  Voiding permanently invalidates this DocuSign envelope and marks the contract <strong>voided</strong>.
+                  Use this only when the deal is off and will not be revived. To fix terms and re-send, use{' '}
+                  <strong>Recall</strong> instead.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-sm">
@@ -864,15 +939,21 @@ export function ContractActions({
               />
               <p className="text-right text-xs text-muted-foreground">{voidReason.length}/100</p>
             </div>
-            <div className="rounded-md border border-border/60 bg-muted/30 p-3">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Who will be notified</p>
-              <ul className="space-y-1 text-sm text-foreground/90">
-                <li>- {signerName?.trim() || 'Exhibitor signer'} {signerEmail ? `(${signerEmail})` : ''}</li>
-                <li>- {countersignerName?.trim() || 'Countersigner'} {countersignerEmail ? `(${countersignerEmail})` : ''}</li>
-                <li>- Sales rep: {salesRep ?? salesRepEmail ?? '—'}</li>
-                <li>- Events team</li>
-              </ul>
-            </div>
+            {status !== 'imported' ? (
+              <div className="rounded-md border border-border/60 bg-muted/30 p-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Who will be notified</p>
+                <ul className="space-y-1 text-sm text-foreground/90">
+                  <li>- {signerName?.trim() || 'Exhibitor signer'} {signerEmail ? `(${signerEmail})` : ''}</li>
+                  <li>- {countersignerName?.trim() || 'Countersigner'} {countersignerEmail ? `(${countersignerEmail})` : ''}</li>
+                  <li>- Sales rep: {salesRep ?? salesRepEmail ?? '—'}</li>
+                  <li>- Events team</li>
+                </ul>
+              </div>
+            ) : (
+              <p className="rounded-md border border-border/60 bg-muted/30 p-3 text-sm text-foreground/85">
+                Notifications follow the standard void flow (sales rep and events team where configured).
+              </p>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpenVoid(false)}>
@@ -1003,6 +1084,13 @@ function StatusLine({
   }
   if (status === 'signed' && !isAdmin) {
     return <p className="text-sm text-muted-foreground">Awaiting admin release to accounting.</p>;
+  }
+  if (status === 'imported') {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Legacy agreement on file — release to accounting when AR should pick this up for invoicing.
+      </p>
+    );
   }
   if (status === 'executed') {
     return (

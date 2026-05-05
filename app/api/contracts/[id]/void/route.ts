@@ -43,20 +43,23 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   if (!contract) return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
 
-  if (contract.status !== 'sent' && contract.status !== 'partially_signed') {
+  if (contract.status !== 'sent' && contract.status !== 'partially_signed' && contract.status !== 'imported') {
     return NextResponse.json({ error: `Cannot void contract in status: ${contract.status}` }, { status: 403 });
   }
 
-  const envelopeId = contract.docusign_envelope_id?.trim();
-  if (!envelopeId) {
-    return NextResponse.json({ error: 'No DocuSign envelope found for this contract.' }, { status: 409 });
-  }
+  const envelopeId = contract.docusign_envelope_id?.trim() ?? null;
 
-  try {
-    await voidEnvelope(envelopeId, parsed.data.reason);
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: msg }, { status: 502 });
+  if (contract.status !== 'imported') {
+    if (!envelopeId) {
+      return NextResponse.json({ error: 'No DocuSign envelope found for this contract.' }, { status: 409 });
+    }
+
+    try {
+      await voidEnvelope(envelopeId, parsed.data.reason);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return NextResponse.json({ error: msg }, { status: 502 });
+    }
   }
 
   const nowIso = new Date().toISOString();
@@ -80,7 +83,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     action: 'contract_voided',
     from_status: previousStatus,
     to_status: 'voided',
-    metadata: { reason: parsed.data.reason, envelope_id: envelopeId, previous_status: previousStatus },
+    metadata: {
+      reason: parsed.data.reason,
+      envelope_id: envelopeId ?? undefined,
+      previous_status: previousStatus,
+    },
   });
 
   const [{ data: latest }, { data: event }] = await Promise.all([

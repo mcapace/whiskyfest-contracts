@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/api-auth';
+import { auth } from '@/lib/auth';
+import { resolveContractActor } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
 import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
@@ -21,10 +22,11 @@ function appBaseUrl(): string {
   return 'http://localhost:3000';
 }
 
-/** Admin-only release after both parties signed. */
+/** Release to accounting: fully signed (admin) or manually imported legacy PDF (admin or events team). */
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
-  const gate = await requireAdmin();
-  if (!gate.ok) return gate.res;
+  const session = await auth();
+  const gate = await resolveContractActor(session);
+  if (!gate.ok) return gate.response;
 
   const supabase = getSupabaseAdmin();
   const { data: contract } = await supabase
@@ -39,8 +41,21 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       { status: 403 },
     );
   }
-  if (contract.status !== 'signed') {
-    return NextResponse.json({ error: 'Release to Accounting is only available for fully signed contracts.' }, { status: 409 });
+
+  const { actor } = gate;
+  if (contract.status === 'imported') {
+    if (!actor.isAdmin && !actor.isEventsTeam) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+  } else if (contract.status === 'signed') {
+    if (!actor.isAdmin) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+  } else {
+    return NextResponse.json(
+      { error: 'Release to Accounting is only available for fully signed or imported contracts.' },
+      { status: 409 },
+    );
   }
 
   const { data: event } = await supabase.from('events').select('*').eq('id', contract.event_id).single<Event>();
@@ -50,35 +65,51 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: 'SENDGRID_API_KEY is not configured.' }, { status: 500 });
   }
 
-  const envelopeIdRaw = contract.docusign_envelope_id?.trim();
-  if (!envelopeIdRaw) {
-    return NextResponse.json({ error: 'DocuSign contract is missing envelope id.' }, { status: 409 });
-  }
-  const envelopeId = envelopeIdRaw;
-  if (!contract.signed_pdf_url && !contract.pdf_storage_path?.endsWith('signed.pdf')) {
-    return NextResponse.json({ error: 'Signed PDF is not yet available.' }, { status: 409 });
-  }
-
-  const storagePath = contract.pdf_storage_path;
-  async function loadSignedPdfBytes(): Promise<Buffer> {
-    if (storagePath?.endsWith('signed.pdf')) {
-      try {
-        return await downloadContractPdfFromStorage(storagePath);
-      } catch {
-        return downloadCompletedPdf(envelopeId);
-      }
-    }
-    return downloadCompletedPdf(envelopeId);
-  }
-
   let signedPdfBytes: Buffer;
-  try {
-    signedPdfBytes = await loadSignedPdfBytes();
-  } catch (e: unknown) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : String(e) },
-      { status: 502 },
-    );
+
+  if (contract.status === 'imported') {
+    const storagePath = contract.pdf_storage_path;
+    if (!storagePath?.endsWith('signed.pdf')) {
+      return NextResponse.json({ error: 'Imported PDF is missing from storage.' }, { status: 409 });
+    }
+    try {
+      signedPdfBytes = await downloadContractPdfFromStorage(storagePath);
+    } catch (e: unknown) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : String(e) },
+        { status: 502 },
+      );
+    }
+  } else {
+    const envelopeIdRaw = contract.docusign_envelope_id?.trim();
+    if (!envelopeIdRaw) {
+      return NextResponse.json({ error: 'DocuSign contract is missing envelope id.' }, { status: 409 });
+    }
+    const envelopeId = envelopeIdRaw;
+    if (!contract.signed_pdf_url && !contract.pdf_storage_path?.endsWith('signed.pdf')) {
+      return NextResponse.json({ error: 'Signed PDF is not yet available.' }, { status: 409 });
+    }
+
+    const storagePath = contract.pdf_storage_path;
+    async function loadSignedPdfBytes(): Promise<Buffer> {
+      if (storagePath?.endsWith('signed.pdf')) {
+        try {
+          return await downloadContractPdfFromStorage(storagePath);
+        } catch {
+          return downloadCompletedPdf(envelopeId);
+        }
+      }
+      return downloadCompletedPdf(envelopeId);
+    }
+
+    try {
+      signedPdfBytes = await loadSignedPdfBytes();
+    } catch (e: unknown) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : String(e) },
+        { status: 502 },
+      );
+    }
   }
 
   const billingSame = contract.billing_same_as_corporate ?? true;
@@ -123,7 +154,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     grandTotalCents: contract.grand_total_cents,
     salesRepName: contract.sales_rep_name ?? null,
     executedAtFormatted: formatTimestamp(now),
-    countersignedByName: contract.countersigned_by_name,
+    countersignedByName: contract.status === 'imported' ? null : contract.countersigned_by_name,
     signedPdfBytes,
     accountingContractUrl: `${appBaseUrl()}/accounting/${contract.id}`,
     salesRepEmail: contract.sales_rep_email ?? contract.created_by,
@@ -135,9 +166,9 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
   await supabase.from('audit_log').insert({
     contract_id: contract.id,
-    actor_email: gate.session.user.email,
+    actor_email: actor.email,
     action: 'released_to_accounting',
-    from_status: 'signed',
+    from_status: contract.status,
     to_status: 'executed',
   });
 

@@ -138,6 +138,28 @@ export default async function ContractDetailPage({ params }: { params: { id: str
 
       <ContractSummarySection contract={contract} event={event ?? null} />
 
+      {contract.imported_at && (
+        <div className="rounded-md border border-violet-300/80 bg-violet-50/95 p-4 text-violet-950">
+          <p className="text-sm font-semibold">Imported from outside the system</p>
+          <p className="mt-1 text-sm text-violet-950/90">
+            This agreement was entered manually (paper or prior DocuSign).
+            {contract.originally_signed_at && (
+              <>
+                {' '}
+                Originally signed {formatLongDate(contract.originally_signed_at)}.
+              </>
+            )}
+            {contract.imported_by && (
+              <>
+                {' '}
+                Imported by {contract.imported_by}
+                {contract.imported_at ? ` · ${formatTimestamp(contract.imported_at)}` : ''}.
+              </>
+            )}
+          </p>
+        </div>
+      )}
+
       {!canInlinePdf && (
         <section className="space-y-2">
           <p className="wf-label-caps text-[0.6rem]">Contract PDF</p>

@@ -172,9 +172,16 @@ export function ContractsList({
 
   const activeCount = filtered.filter((c) => c.status !== 'cancelled' && c.status !== 'voided').length;
   const pipelineCount = filtered.filter((c) =>
-    ['draft', 'ready_for_review', 'pending_events_review', 'approved', 'sent', 'partially_signed', 'signed'].includes(
-      c.status,
-    ),
+    [
+      'draft',
+      'ready_for_review',
+      'pending_events_review',
+      'approved',
+      'sent',
+      'partially_signed',
+      'signed',
+      'imported',
+    ].includes(c.status),
   ).length;
 
   function saveCurrentView() {
@@ -237,6 +244,7 @@ export function ContractsList({
           { value: 'approved', label: 'Approved' },
           { value: 'sent', label: 'Sent' },
           { value: 'signed', label: 'Signed' },
+          { value: 'imported', label: 'Imported' },
           { value: 'executed', label: 'Executed' },
         ]}
         repOptions={repOptions}

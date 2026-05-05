@@ -4,7 +4,21 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
-import { FileText, LayoutDashboard, Plus, CalendarDays, Users, UserRound, Landmark, ChevronDown, UserPlus, Building2, Settings } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import {
+  FileText,
+  LayoutDashboard,
+  Plus,
+  CalendarDays,
+  Users,
+  UserRound,
+  Landmark,
+  ChevronDown,
+  UserPlus,
+  Building2,
+  Settings,
+  Upload,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -86,10 +100,17 @@ function AccountingNavLink({ pathname }: { pathname: string }) {
   );
 }
 
-const nav = [
+const nav: {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  adminOnly?: boolean;
+  importOnly?: boolean;
+}[] = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/contracts/new', label: 'New Contract', icon: Plus },
   { href: '/contracts', label: 'All Contracts', icon: FileText },
+  { href: '/contracts/import', label: 'Import Contract', icon: Upload, importOnly: true },
   { href: '/sponsors', label: 'Sponsors', icon: Building2 },
   { href: '/settings', label: 'Settings', icon: Settings },
   { href: '/sales-reps', label: 'Sales Reps', icon: UserRound, adminOnly: true },
@@ -117,6 +138,7 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const isAdmin = user.role === 'admin';
+  const isEventsTeam = Boolean(user.isEventsTeam);
   const pipelineAccess = Boolean(user.pipelineAccess);
   const isAccounting = Boolean(user.isAccounting);
   const accountingOnly = isAccounting && !pipelineAccess;
@@ -159,7 +181,11 @@ export function Sidebar({
         ) : (
           <>
             {nav
-              .filter((item) => !item.adminOnly || isAdmin)
+              .filter((item) => {
+                if (item.adminOnly && !isAdmin) return false;
+                if (item.importOnly && !isAdmin && !isEventsTeam) return false;
+                return true;
+              })
               .map((item) => {
                 const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
                 const Icon = item.icon;

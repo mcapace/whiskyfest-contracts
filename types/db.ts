@@ -10,6 +10,7 @@ export type ContractStatus =
   | 'partially_signed'
   | 'signed'
   | 'executed'
+  | 'imported'
   | 'voided'
   | 'cancelled'
   | 'error';
@@ -112,6 +113,11 @@ export interface Contract {
   created_at: string;
   updated_at: string;
   notes: string | null;
+  /** Legacy / off-system contract keyed in by admin or events team. */
+  imported_at: string | null;
+  imported_by: string | null;
+  /** Original signature date (paper or prior DocuSign). */
+  originally_signed_at: string | null;
 }
 
 export interface ContractLineItem {

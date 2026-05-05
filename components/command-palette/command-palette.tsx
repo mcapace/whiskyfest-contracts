@@ -15,6 +15,7 @@ import {
   Plus,
   Search,
   Sun,
+  Upload,
   Users,
 } from 'lucide-react';
 import { STORAGE_KEYS } from '@/lib/design-system';
@@ -261,6 +262,19 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 <div>
                   <p className="font-medium">Create New Contract</p>
                   <p className="text-xs text-muted-foreground">Create a participation contract</p>
+                </div>
+              </Command.Item>
+            )}
+            {(isAdmin || isEventsTeam) && (
+              <Command.Item
+                value="import contract legacy signed pdf"
+                onSelect={() => go('/contracts/import')}
+                className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
+              >
+                <Upload className="h-4 w-4 shrink-0 opacity-70" />
+                <div>
+                  <p className="font-medium">Import contract</p>
+                  <p className="text-xs text-muted-foreground">Pre-existing signed agreement (admin / events)</p>
                 </div>
               </Command.Item>
             )}

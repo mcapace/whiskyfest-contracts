@@ -18,6 +18,7 @@ do $$ begin
     'partially_signed',
     'signed',
     'executed',
+    'imported',
     'voided',
     'cancelled',
     'error'
@@ -41,9 +42,9 @@ create table if not exists events (
   venue           text,                            -- "Marriott Marquis New York"
   year            int  not null,                   -- 2026
   booth_rate_cents int not null default 1500000,   -- $15,000 in cents
-  shanken_signatory_name   text default 'Liz Mott',
+  shanken_signatory_name   text default 'Nicole Mazza',
   shanken_signatory_title  text default 'Vice President, Events',
-  shanken_signatory_email  text default 'lmott@mshanken.com',
+  shanken_signatory_email  text default 'nmazza@mshanken.com',
   is_active       boolean not null default true,
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
@@ -116,6 +117,10 @@ create table if not exists contracts (
   updated_at              timestamptz not null default now(),
   notes                   text
 );
+
+alter table contracts add column if not exists imported_at timestamptz;
+alter table contracts add column if not exists imported_by text;
+alter table contracts add column if not exists originally_signed_at timestamptz;
 
 alter table contracts add column if not exists events_submitted_at timestamptz;
 alter table contracts add column if not exists events_approved_at timestamptz;

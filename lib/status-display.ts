@@ -19,6 +19,8 @@ export function formatStatus(status: ContractStatus | string): string {
       return 'Fully Signed';
     case 'signed':
       return 'Fully Signed';
+    case 'imported':
+      return 'Imported';
     case 'executed':
       return 'Executed';
     case 'cancelled':
@@ -54,6 +56,8 @@ export function statusBadgeClassName(status: ContractStatus | string): string {
     case 'fully_signed':
     case 'signed':
       return 'border border-success-base/30 bg-success-bg text-success-base';
+    case 'imported':
+      return 'border border-violet-600/35 bg-violet-100 text-violet-900';
     case 'executed':
       return 'border border-oak-800 bg-oak-800 text-parchment-50';
     case 'cancelled':

@@ -19,6 +19,14 @@ export const CONTRACT_ACTION_HELP = {
 
   releaseToAccounting: 'Marks contract executed and hands off to AR for invoicing.',
 
+  releaseImported:
+    'Releases this legacy imported agreement to accounting — same AR email handoff as fully signed DocuSign contracts.',
+
+  editImportedContract: 'Fix typos or amounts on an imported record before it is released to accounting.',
+
+  voidImportedRecord:
+    'Permanently marks this imported record void when the deal should not continue in the system. No DocuSign envelope is involved.',
+
   markInvoiceSent: 'Records invoice sent. Sales rep notified.',
 
   markPaid: 'Records payment received. Sales rep notified.',
