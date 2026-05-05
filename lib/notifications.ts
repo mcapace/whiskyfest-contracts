@@ -971,6 +971,46 @@ export async function notifyAccessRequestRejected(email: string, reason?: string
   });
 }
 
+/** Liz + Nicole — optional one-shot email via POST /api/admin/countersigner-announcement after migration. */
+export async function notifyCountersignerRoleAnnouncement(): Promise<void> {
+  const apiKey = process.env['SENDGRID_API_KEY'];
+  if (!apiKey) {
+    console.warn('[notifyCountersignerRoleAnnouncement] SENDGRID_API_KEY not set — skipping email');
+    return;
+  }
+
+  const liz = 'lmott@mshanken.com';
+  const nicole = 'nmazza@mshanken.com';
+
+  sgMail.setApiKey(apiKey);
+
+  const subject = 'WhiskyFest contracts: Nicole Mazza is now the M. Shanken countersignatory';
+  const text = [
+    'Nicole Mazza is now the default M. Shanken countersignatory on WhiskyFest event records.',
+    '',
+    'New DocuSign envelopes will route the Shanken countersignature step to nmazza@mshanken.com.',
+    'Contracts already sent (in-flight or completed) keep their original routing.',
+    '',
+    '— WhiskyFest Contracts',
+  ].join('\n');
+
+  const html = `
+    <div style="font-family: system-ui, sans-serif; max-width: 560px;">
+      <p><strong>Nicole Mazza</strong> is now the default M. Shanken countersignatory for WhiskyFest contracts.</p>
+      <p>New DocuSign envelopes will route the Shanken countersignature step to <a href="mailto:${escapeHtml(nicole)}">${escapeHtml(nicole)}</a>.</p>
+      <p style="color:#555;font-size:14px;">Contracts already sent keep their original countersigner routing.</p>
+    </div>
+  `;
+
+  await sgMail.send({
+    from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
+    to: [nicole, liz],
+    subject,
+    text,
+    html,
+  });
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')

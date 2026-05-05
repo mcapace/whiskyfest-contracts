@@ -25,9 +25,9 @@ function emptyForm() {
     venue: '',
     year: new Date().getFullYear(),
     booth_rate_dollars: 15000,
-    shanken_signatory_name: 'Liz Mott',
+    shanken_signatory_name: 'Nicole Mazza',
     shanken_signatory_title: 'Vice President, Events',
-    shanken_signatory_email: 'lmott@mshanken.com',
+    shanken_signatory_email: 'nmazza@mshanken.com',
     is_active: true,
   };
 }
