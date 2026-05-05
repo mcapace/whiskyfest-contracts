@@ -2,7 +2,7 @@
 
 export const CONTRACT_ACTION_HELP = {
   voidContract:
-    'Use when an error is found after sending. Voids the DocuSign envelope, invalidating signatures. Then create a new contract with corrections.',
+    'Permanently invalidate this contract when the deal is dead. The envelope is voided and the record stays voided — not editable. Use Recall if you only need to fix details and re-send.',
 
   cancel: 'Use when the deal is off. Terminates the contract entirely.',
 
@@ -10,7 +10,8 @@ export const CONTRACT_ACTION_HELP = {
 
   resendWithChanges: 'Recall current envelope, edit contract, send new envelope.',
 
-  recall: 'Pulls back the DocuSign envelope and reverts to draft. Any signatures made are invalidated.',
+  recall:
+    'Pull the envelope back to make edits. Returns the contract to draft so booths, brands, pricing, and signer can change before you generate a new PDF and send again.',
 
   approveContract: 'Approve for sending via DocuSign.',
 

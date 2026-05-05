@@ -140,6 +140,31 @@ export function ContractActions({
   const [nextSignerName, setNextSignerName] = useState(signerName ?? '');
   const [nextSignerEmail, setNextSignerEmail] = useState(signerEmail ?? '');
 
+  async function submitRecall() {
+    setAction('recall');
+    if (contractLive) contractLive.setOptimisticStatus('draft');
+    startTransition(async () => {
+      const res = await fetch(`/api/contracts/${contractId}/recall`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: recallReason.trim() }),
+      });
+      if (res.ok) {
+        contractLive?.setOptimisticStatus(null);
+        emitContractActionSuccessFeedback(Boolean(session?.user?.sound_enabled));
+        setOpenRecall(false);
+        setRecallReason('');
+        router.push(`/contracts/${contractId}/edit`);
+        router.refresh();
+      } else {
+        contractLive?.setOptimisticStatus(null);
+        const j = await res.json().catch(() => ({}));
+        alert(`Recall failed: ${j.error ?? res.status}`);
+      }
+      setAction(null);
+    });
+  }
+
   async function runAction(
     path: string,
     actionName: string,
@@ -171,7 +196,10 @@ export function ContractActions({
   }
 
   const canReminder = isAdmin && (status === 'sent' || status === 'partially_signed') && Boolean(docusignEnvelopeId);
-  const canRecall = canReminder;
+  const canRecall =
+    (isAdmin || isEventsTeam) &&
+    (status === 'sent' || status === 'partially_signed') &&
+    Boolean(docusignEnvelopeId);
   const canResendWithChanges = canReminder && !discountApprovalPending;
   const canVoid =
     (isAdmin || isEventsTeam) &&
@@ -654,7 +682,11 @@ export function ContractActions({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Recall DocuSign contract</DialogTitle>
-            <DialogDescription>This voids the in-flight contract and moves this record back to Approved.</DialogDescription>
+            <DialogDescription>
+              Recalling will invalidate the DocuSign envelope and return this contract to <strong>draft</strong> so you
+              can edit booths, brands, pricing, and signer details. Any signatures already made will not count. Use this
+              when you need to fix details before re-sending.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             <Label htmlFor="recall-reason">Reason (required, 10+ characters)</Label>
@@ -664,15 +696,9 @@ export function ContractActions({
             <Button variant="outline" onClick={() => setOpenRecall(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={() => {
-                runAction('recall', 'recall', { reason: recallReason }, 'approved');
-                setOpenRecall(false);
-              }}
-              disabled={busy || recallReason.trim().length < 10}
-            >
+            <Button onClick={() => void submitRecall()} disabled={busy || recallReason.trim().length < 10}>
               {pending && action === 'recall' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Recall Contract
+              Recall to draft
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -821,7 +847,9 @@ export function ContractActions({
           <DialogHeader>
             <DialogTitle>Void Contract?</DialogTitle>
             <DialogDescription>
-              This will void the DocuSign envelope and notify all parties. This action cannot be undone.
+              Voiding permanently invalidates this DocuSign envelope and marks the contract <strong>voided</strong>. Use
+              this only when the deal is off and will not be revived. To fix terms and re-send, use{' '}
+              <strong>Recall</strong> instead.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-sm">

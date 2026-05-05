@@ -567,6 +567,68 @@ export async function notifySalesRepEventsApproved(
   });
 }
 
+export async function notifySalesRepContractRecalled(params: {
+  contract: Pick<Contract, 'id' | 'exhibitor_company_name' | 'sales_rep_id'>;
+  event: Pick<Event, 'name' | 'year'> | null;
+  recalledBy: { email: string; name?: string | null };
+  reason: string;
+}): Promise<void> {
+  const apiKey = process.env['SENDGRID_API_KEY'];
+  if (!apiKey) {
+    console.warn('[notifySalesRepContractRecalled] SENDGRID_API_KEY not set — skipping email');
+    return;
+  }
+
+  if (!params.contract.sales_rep_id) return;
+
+  const supabase = getSupabaseAdmin();
+  const { data: rep } = await supabase.from('sales_reps').select('email').eq('id', params.contract.sales_rep_id).maybeSingle();
+  const toAddress = rep?.email?.trim();
+  if (!toAddress) return;
+
+  sgMail.setApiKey(apiKey);
+
+  const detailUrl = appContractUrl(params.contract.id);
+  const eventTitle = params.event ? `${params.event.name} ${params.event.year}`.trim() : 'WhiskyFest';
+  const actorLine = params.recalledBy.name
+    ? `${params.recalledBy.name} <${params.recalledBy.email}>`
+    : params.recalledBy.email;
+
+  const subject = `Contract recalled for edits: ${params.contract.exhibitor_company_name}`;
+  const text = [
+    `The ${eventTitle} contract for ${params.contract.exhibitor_company_name} was recalled from DocuSign and returned to draft.`,
+    ``,
+    `Recalled by: ${actorLine}`,
+    ``,
+    params.reason,
+    ``,
+    `Edit and re-send: ${detailUrl}`,
+  ].join('\n');
+
+  const html = `
+    <div style="font-family: system-ui, sans-serif; max-width: 560px;">
+      <p><strong>Contract recalled</strong></p>
+      <p>The in-flight DocuSign envelope was voided and the contract is back in <strong>draft</strong> for revisions.</p>
+      <p>${escapeHtml(actorLine)} noted:</p>
+      <blockquote style="border-left:3px solid #ccc;padding-left:12px;margin:12px 0;">${escapeHtml(params.reason)}</blockquote>
+      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
+    </div>
+  `;
+
+  const ccAssistants = (await getAssistantEmailsForRep(params.contract.sales_rep_id)).filter(
+    (a) => a.toLowerCase() !== toAddress.toLowerCase(),
+  );
+
+  await sgMail.send({
+    from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
+    to: toAddress,
+    ...(ccAssistants.length > 0 ? { cc: ccAssistants } : {}),
+    subject,
+    text,
+    html,
+  });
+}
+
 export async function notifySalesRepContractSentBack(
   contract: Pick<Contract, 'id' | 'exhibitor_company_name' | 'sales_rep_id'>,
   sender: { email: string; name?: string | null },

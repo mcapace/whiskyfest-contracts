@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireAdmin } from '@/lib/api-auth';
+import { auth } from '@/lib/auth';
+import { resolveContractActor } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { clearedRepEnteredBilling } from '@/lib/contract-schemas';
 import { voidEnvelope } from '@/lib/docusign';
+import { notifySalesRepContractRecalled } from '@/lib/notifications';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
+import type { Contract, ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
 
@@ -11,10 +15,18 @@ const schema = z.object({
   reason: z.string().trim().min(10).max(1000),
 });
 
-/** Admin-only: void the active DocuSign contract and return this record to approved. */
+/**
+ * Admin or events team: void the in-flight DocuSign envelope and return the contract to **draft**
+ * so pricing, booths, brands, and signer can be edited before a new send.
+ */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const gate = await requireAdmin();
-  if (!gate.ok) return gate.res;
+  const session = await auth();
+  const gate = await resolveContractActor(session);
+  if (!gate.ok) return gate.response;
+
+  if (!gate.actor.isAdmin && !gate.actor.isEventsTeam) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
@@ -26,11 +38,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }
 
   const supabase = getSupabaseAdmin();
-  const { data: contract } = await supabase
-    .from('contracts')
-    .select('id, status, docusign_envelope_id')
-    .eq('id', params.id)
-    .single();
+  const { data: contract } = await supabase.from('contracts').select('*').eq('id', params.id).single<Contract>();
 
   if (!contract) return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
   if (contract.status !== 'sent' && contract.status !== 'partially_signed') {
@@ -46,18 +54,30 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }
 
   try {
-    await voidEnvelope(oldEnvelopeId, parsed.data.reason);
+    await voidEnvelope(oldEnvelopeId, `Recalled by sender for revisions — ${parsed.data.reason.slice(0, 800)}`);
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: msg }, { status: 502 });
+    console.error('DocuSign void failed during recall, continuing to reset contract state:', e);
   }
+
+  const cleared = clearedRepEnteredBilling();
 
   const { error } = await supabase
     .from('contracts')
     .update({
-      status: 'approved',
+      status: 'draft',
       docusign_envelope_id: null,
       sent_at: null,
+      signed_at: null,
+      countersigned_at: null,
+      countersigned_by_email: null,
+      countersigned_by_name: null,
+      executed_at: null,
+      billing_contact_name: null,
+      billing_contact_email: null,
+      event_contact_name: null,
+      event_contact_email: null,
+      exhibitor_fields_captured_at: null,
+      ...cleared,
     })
     .eq('id', params.id);
 
@@ -65,12 +85,30 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   await supabase.from('audit_log').insert({
     contract_id: params.id,
-    actor_email: gate.session.user.email,
-    action: 'docusign_recalled',
+    actor_email: gate.actor.email,
+    action: 'contract_recalled_to_draft',
     from_status: contract.status,
-    to_status: 'approved',
+    to_status: 'draft',
     metadata: { old_envelope_id: oldEnvelopeId, reason: parsed.data.reason },
   });
+
+  const [{ data: withTotals }, { data: event }] = await Promise.all([
+    supabase.from('contracts_with_totals').select('*').eq('id', params.id).maybeSingle<ContractWithTotals>(),
+    supabase.from('events').select('*').eq('id', contract.event_id).maybeSingle<Event>(),
+  ]);
+
+  if (withTotals) {
+    try {
+      await notifySalesRepContractRecalled({
+        contract: withTotals,
+        event: event ?? null,
+        recalledBy: { email: gate.actor.email, name: gate.actor.appUser.name ?? null },
+        reason: parsed.data.reason,
+      });
+    } catch (err) {
+      console.error('[notifySalesRepContractRecalled]', err);
+    }
+  }
 
   revalidateContractPaths(params.id);
 

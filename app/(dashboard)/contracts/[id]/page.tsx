@@ -676,6 +676,7 @@ function describeAction(entry: AuditLogEntry): { title: string; detail?: string 
     case 'docusign_completed': return { title: 'DocuSign contract completed — signed PDF stored' };
     case 'pdf_sent': return { title: 'Contract sent via DocuSign' };
     case 'docusign_recalled': return { title: 'DocuSign contract recalled — contract unlocked for edit' };
+    case 'contract_recalled_to_draft': return { title: 'Contract recalled from DocuSign — returned to draft for editing' };
     case 'docusign_resend_notification': return { title: 'DocuSign signing email resent' };
     case 'docusign_send_reminder': return { title: 'DocuSign reminder sent' };
     case 'docusign_resent_with_changes': return { title: 'DocuSign contract voided and resent with changes' };
