@@ -6,12 +6,13 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { clearedRepEnteredBilling } from '@/lib/contract-schemas';
 import { replaceContractBoothBrandsForContract } from '@/lib/contract-booth-brands';
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
-import { contractSignedPdfPath, uploadContractPdfToStorage } from '@/lib/contract-pdf-storage';
+import { uploadContractPdfToStorage } from '@/lib/contract-pdf-storage';
 import { isDiscountedRate } from '@/lib/contracts';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import type { Contract } from '@/types/db';
 
 export const runtime = 'nodejs';
+const MAX_IMPORT_PDF_BYTES = 10 * 1024 * 1024; // 10MB
 
 function parseMoneyToCents(raw: string): number | null {
   const t = raw.replace(/[$,]/g, '').trim();
@@ -26,6 +27,14 @@ const boothBrandRowSchema = z.object({
   brand_name: z.string().min(1),
   expressions: z.array(z.string()).optional().default([]),
 });
+
+function sanitizeFileBaseName(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return 'signed-contract';
+  const withoutExt = trimmed.replace(/\.pdf$/i, '');
+  const safe = withoutExt.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  return safe || 'signed-contract';
+}
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -42,6 +51,9 @@ export async function POST(req: Request) {
   const pdf = form.get('signed_pdf');
   if (!(pdf instanceof Blob) || pdf.size === 0) {
     return NextResponse.json({ error: 'A signed PDF file is required.' }, { status: 400 });
+  }
+  if (pdf.size > MAX_IMPORT_PDF_BYTES) {
+    return NextResponse.json({ error: 'PDF must be under 10 MB.' }, { status: 400 });
   }
   if (pdf.type && pdf.type !== 'application/pdf') {
     return NextResponse.json({ error: 'Signed file must be a PDF.' }, { status: 400 });
@@ -249,8 +261,10 @@ export async function POST(req: Request) {
     );
   }
 
+  const pdfFileName = pdf instanceof File ? pdf.name : 'signed-contract.pdf';
+  const safeBase = sanitizeFileBaseName(pdfFileName);
+  const storagePath = `imported-contracts/${contractId}-${Date.now()}-${safeBase}.pdf`;
   const buf = Buffer.from(await pdf.arrayBuffer());
-  const storagePath = contractSignedPdfPath(contractId);
   try {
     await uploadContractPdfToStorage(storagePath, buf);
   } catch (e) {
@@ -261,7 +275,7 @@ export async function POST(req: Request) {
 
   const { error: pdfUpdErr } = await supabase
     .from('contracts')
-    .update({ pdf_storage_path: storagePath })
+    .update({ pdf_storage_path: storagePath, signed_pdf_url: storagePath })
     .eq('id', contractId);
 
   if (pdfUpdErr) {

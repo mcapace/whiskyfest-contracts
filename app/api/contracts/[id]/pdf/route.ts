@@ -51,6 +51,10 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       r = await redirectForPath(contract.pdf_storage_path);
       if (r) return r;
     }
+    if (contract.signed_pdf_url && !/^https?:\/\//i.test(contract.signed_pdf_url)) {
+      r = await redirectForPath(contract.signed_pdf_url);
+      if (r) return r;
+    }
     if (contract.signed_pdf_url) return tryRedirect(contract.signed_pdf_url);
     return NextResponse.json({ error: 'Signed PDF not available' }, { status: 404 });
   }

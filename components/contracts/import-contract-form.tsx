@@ -123,6 +123,14 @@ export function ImportContractForm({
       setErr('Upload the signed PDF.');
       return;
     }
+    if (pdfFile.type && pdfFile.type !== 'application/pdf') {
+      setErr('File must be a PDF.');
+      return;
+    }
+    if (pdfFile.size > 10 * 1024 * 1024) {
+      setErr('PDF must be under 10 MB.');
+      return;
+    }
 
     for (let i = 0; i < boothCount; i++) {
       if (!boothBrandRows[i]?.brand_name?.trim()) {
@@ -381,16 +389,21 @@ export function ImportContractForm({
             <CardDescription>Upload the executed agreement.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Field label="Signed contract PDF" htmlFor="ipdf">
-              <Input
-                id="ipdf"
+            <div className="space-y-1.5">
+              <Label htmlFor="signed_pdf">Signed contract PDF</Label>
+              <input
+                id="signed_pdf"
+                name="signed_pdf"
                 type="file"
                 accept="application/pdf"
                 required
-                className="cursor-pointer font-sans text-sm"
+                className="block w-full cursor-pointer rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-muted/80"
                 onChange={(e) => setPdfFile(e.target.files?.[0] ?? null)}
               />
-            </Field>
+              <p className="text-xs text-muted-foreground">
+                Upload the PDF of the actual signed contract (from email, scan, or DocuSign export).
+              </p>
+            </div>
             <Field label="Date originally signed" htmlFor="isigned">
               <Input
                 id="isigned"
