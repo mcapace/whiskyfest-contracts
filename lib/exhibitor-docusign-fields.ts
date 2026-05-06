@@ -70,6 +70,10 @@ type TextTabDef = {
   anchorUnits: 'inches';
   documentId: string;
   required: 'true' | 'false';
+  width: string;
+  height: string;
+  font: 'Arial';
+  fontSize: 'Size11' | 'Size12';
   validationPattern?: string;
 };
 
@@ -84,6 +88,10 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       anchorYOffset: '-0.06',
       anchorUnits: 'inches',
       documentId: '1',
+      width: '240',
+      height: '20',
+      font: 'Arial',
+      fontSize: 'Size11',
     },
     {
       tabLabel: 'exhibitor_address_line2',
@@ -93,6 +101,10 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       anchorYOffset: '-0.06',
       anchorUnits: 'inches',
       documentId: '1',
+      width: '240',
+      height: '20',
+      font: 'Arial',
+      fontSize: 'Size11',
     },
     {
       tabLabel: 'exhibitor_city',
@@ -102,6 +114,10 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       anchorYOffset: '-0.06',
       anchorUnits: 'inches',
       documentId: '1',
+      width: '180',
+      height: '20',
+      font: 'Arial',
+      fontSize: 'Size11',
     },
     {
       tabLabel: 'exhibitor_state',
@@ -111,6 +127,10 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       anchorYOffset: '-0.06',
       anchorUnits: 'inches',
       documentId: '1',
+      width: '60',
+      height: '20',
+      font: 'Arial',
+      fontSize: 'Size11',
     },
     {
       tabLabel: 'exhibitor_zip',
@@ -120,6 +140,10 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       anchorYOffset: '-0.06',
       anchorUnits: 'inches',
       documentId: '1',
+      width: '100',
+      height: '20',
+      font: 'Arial',
+      fontSize: 'Size11',
     },
     {
       tabLabel: 'exhibitor_country',
@@ -129,6 +153,10 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       anchorYOffset: '-0.06',
       anchorUnits: 'inches',
       documentId: '1',
+      width: '140',
+      height: '20',
+      font: 'Arial',
+      fontSize: 'Size11',
     },
     {
       tabLabel: 'exhibitor_telephone',
@@ -138,6 +166,10 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       anchorYOffset: '-0.06',
       anchorUnits: 'inches',
       documentId: '1',
+      width: '160',
+      height: '20',
+      font: 'Arial',
+      fontSize: 'Size11',
     },
     {
       tabLabel: 'billing_contact_name',
@@ -147,16 +179,24 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       anchorYOffset: '-0.08',
       anchorUnits: 'inches',
       documentId: '1',
+      width: '220',
+      height: '20',
+      font: 'Arial',
+      fontSize: 'Size11',
     },
     {
       tabLabel: 'billing_contact_email',
       required: 'true',
       validationPattern: '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$',
       anchorString: ANCHOR.billing_contact_email,
-      anchorXOffset: '0.15',
+      anchorXOffset: '0.2',
       anchorYOffset: '-0.08',
       anchorUnits: 'inches',
       documentId: '1',
+      width: '260',
+      height: '20',
+      font: 'Arial',
+      fontSize: 'Size11',
     },
     {
       tabLabel: 'billing_address_line1',
@@ -166,6 +206,10 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       anchorYOffset: '-0.06',
       anchorUnits: 'inches',
       documentId: '1',
+      width: '240',
+      height: '20',
+      font: 'Arial',
+      fontSize: 'Size11',
     },
     {
       tabLabel: 'billing_address_line2',
@@ -175,6 +219,10 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       anchorYOffset: '-0.06',
       anchorUnits: 'inches',
       documentId: '1',
+      width: '240',
+      height: '20',
+      font: 'Arial',
+      fontSize: 'Size11',
     },
     {
       tabLabel: 'billing_city',
@@ -184,6 +232,10 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       anchorYOffset: '-0.06',
       anchorUnits: 'inches',
       documentId: '1',
+      width: '180',
+      height: '20',
+      font: 'Arial',
+      fontSize: 'Size11',
     },
     {
       tabLabel: 'billing_state',
@@ -193,6 +245,10 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       anchorYOffset: '-0.06',
       anchorUnits: 'inches',
       documentId: '1',
+      width: '60',
+      height: '20',
+      font: 'Arial',
+      fontSize: 'Size11',
     },
     {
       tabLabel: 'billing_zip',
@@ -202,6 +258,10 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       anchorYOffset: '-0.06',
       anchorUnits: 'inches',
       documentId: '1',
+      width: '100',
+      height: '20',
+      font: 'Arial',
+      fontSize: 'Size11',
     },
     {
       tabLabel: 'billing_country',
@@ -211,6 +271,10 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       anchorYOffset: '-0.06',
       anchorUnits: 'inches',
       documentId: '1',
+      width: '140',
+      height: '20',
+      font: 'Arial',
+      fontSize: 'Size11',
     },
     {
       tabLabel: 'event_contact_name',
@@ -220,15 +284,23 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       anchorYOffset: '-0.08',
       anchorUnits: 'inches',
       documentId: '1',
+      width: '220',
+      height: '20',
+      font: 'Arial',
+      fontSize: 'Size11',
     },
     {
       tabLabel: 'event_contact_email',
       required: 'false',
       anchorString: ANCHOR.event_contact_email,
-      anchorXOffset: '0.15',
+      anchorXOffset: '0.2',
       anchorYOffset: '-0.08',
       anchorUnits: 'inches',
       documentId: '1',
+      width: '260',
+      height: '20',
+      font: 'Arial',
+      fontSize: 'Size11',
     },
   ];
   return { textTabs: tabs };
