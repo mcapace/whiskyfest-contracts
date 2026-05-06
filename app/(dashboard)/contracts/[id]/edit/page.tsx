@@ -9,9 +9,11 @@ export const dynamic = 'force-dynamic';
 export default async function EditDraftContractPage({ params }: { params: { id: string } }) {
   const viewed = await getContractWithTotalsForViewer(params.id);
   if (!viewed) notFound();
+  const canEditVoided =
+    viewed.contract.status === 'voided' && (viewed.actor.isAdmin || viewed.actor.isEventsTeam);
   const canEditImported =
     viewed.contract.status === 'imported' && (viewed.actor.isAdmin || viewed.actor.isEventsTeam);
-  if (viewed.contract.status !== 'draft' && !canEditImported) notFound();
+  if (viewed.contract.status !== 'draft' && !canEditImported && !canEditVoided) notFound();
 
   const supabase = getSupabaseAdmin();
   const { data: events } = await supabase

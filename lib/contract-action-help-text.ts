@@ -23,6 +23,7 @@ export const CONTRACT_ACTION_HELP = {
     'Releases this legacy imported agreement to accounting — same AR email handoff as fully signed DocuSign contracts.',
 
   editImportedContract: 'Fix typos or amounts on an imported record before it is released to accounting.',
+  editVoidedContract: 'Reopen this voided deal for edits. Saving moves it back to draft so you can regenerate and re-send.',
 
   voidImportedRecord:
     'Permanently marks this imported record void when the deal should not continue in the system. No DocuSign envelope is involved.',

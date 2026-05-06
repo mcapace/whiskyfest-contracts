@@ -214,6 +214,7 @@ export function ContractActions({
   const canRelease = status === 'signed' && isAdmin;
   const canReleaseImported = status === 'imported' && (isAdmin || isEventsTeam) && !discountApprovalPending;
   const canEditImported = status === 'imported' && (isAdmin || isEventsTeam);
+  const canEditVoided = status === 'voided' && (isAdmin || isEventsTeam);
   const canVoidImported = status === 'imported' && (isAdmin || isEventsTeam);
   const signerWaitLabel = signerName?.trim() || signerEmail?.trim() || 'signer';
 
@@ -231,6 +232,7 @@ export function ContractActions({
     if (hasDocuSignSecondary) return true;
     if (canCancelInflightDocuSign) return true;
     if (canRelease || canReleaseImported || canCancelSigned) return true;
+    if (canEditVoided) return true;
     if (status === 'imported' && (signedPdfHref || canEditImported || canVoidImported)) return true;
     if (status === 'executed' && signedPdfHref) return true;
     if (status === 'error' && isAdmin) return true;
@@ -246,6 +248,7 @@ export function ContractActions({
     canRelease,
     canReleaseImported,
     canEditImported,
+    canEditVoided,
     canVoidImported,
     canCancelSigned,
     signedPdfHref,
@@ -269,6 +272,7 @@ export function ContractActions({
     if (canEditImported) actionsCount += 1;
     if (canVoidImported) actionsCount += 1;
   }
+  if (canEditVoided) actionsCount += 1;
   if (status === 'executed' && signedPdfHref) actionsCount += 1;
   if (status === 'error' && isAdmin) actionsCount += 2;
   if (hasDocuSignSecondary) {
@@ -614,6 +618,14 @@ export function ContractActions({
                 title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
               >
                 Cancel Contract
+              </Button>
+            </ActionWithHelp>
+          )}
+
+          {canEditVoided && (
+            <ActionWithHelp helpText={CONTRACT_ACTION_HELP.editVoidedContract}>
+              <Button variant="outline" className={fabBtn} asChild>
+                <Link href={`/contracts/${contractId}/edit`}>Edit and re-send</Link>
               </Button>
             </ActionWithHelp>
           )}

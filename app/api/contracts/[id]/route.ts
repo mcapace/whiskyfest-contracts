@@ -23,13 +23,13 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const body = await req.json().catch(() => null);
   const supabase = getSupabaseAdmin();
 
-  if (contract.status === 'draft' || contract.status === 'imported') {
+  if (contract.status === 'draft' || contract.status === 'imported' || contract.status === 'voided') {
     const parsed = newContractBodySchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 400 });
     }
 
-    if (contract.status === 'imported') {
+    if (contract.status === 'imported' || contract.status === 'voided') {
       if (!actor.isAdmin && !actor.isEventsTeam) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
@@ -77,6 +77,16 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         signer_1_email: p.signer_1_email ?? null,
         sales_rep_id: effectiveSalesRepId,
         notes: p.notes ?? null,
+        ...(contract.status === 'voided'
+          ? {
+              status: 'draft',
+              docusign_envelope_id: null,
+              sent_at: null,
+              voided_at: null,
+              voided_by: null,
+              voided_reason: null,
+            }
+          : {}),
         ...bill,
         ...(shouldResetDiscountApproval
           ? {
@@ -123,6 +133,15 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     });
 
     revalidateContractPaths(params.id);
+    if (contract.status === 'voided') {
+      await supabase.from('audit_log').insert({
+        contract_id: params.id,
+        actor_email: actor.email,
+        action: 'voided_contract_reopened_for_edit',
+        from_status: 'voided',
+        to_status: 'draft',
+      });
+    }
     return NextResponse.json({ ok: true });
   }
 
