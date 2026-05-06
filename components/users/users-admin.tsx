@@ -5,7 +5,11 @@ import { useRouter } from 'next/navigation';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useImpersonationReadOnly } from '@/hooks/use-impersonation-read-only';
 import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
-import { formatLastLoginRelative, lastLoginFullTooltip } from '@/lib/last-login-display';
+import {
+  formatLastLoginRelative,
+  lastActiveFullTooltip,
+  lastActiveIso,
+} from '@/lib/last-login-display';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -16,11 +20,13 @@ interface Props {
   currentEmail: string;
 }
 
-type LastLoginSort = 'default' | 'asc' | 'desc';
+type LastActiveSort = 'default' | 'asc' | 'desc';
 
-function compareByLastLogin(a: AppUser, b: AppUser, dir: 'asc' | 'desc'): number {
-  const ta = a.last_login_at ? new Date(a.last_login_at).getTime() : Number.POSITIVE_INFINITY;
-  const tb = b.last_login_at ? new Date(b.last_login_at).getTime() : Number.POSITIVE_INFINITY;
+function compareByLastActive(a: AppUser, b: AppUser, dir: 'asc' | 'desc'): number {
+  const ia = lastActiveIso(a);
+  const ib = lastActiveIso(b);
+  const ta = ia ? new Date(ia).getTime() : Number.POSITIVE_INFINITY;
+  const tb = ib ? new Date(ib).getTime() : Number.POSITIVE_INFINITY;
   if (ta === Number.POSITIVE_INFINITY && tb === Number.POSITIVE_INFINITY) return 0;
   if (ta === Number.POSITIVE_INFINITY) return 1;
   if (tb === Number.POSITIVE_INFINITY) return -1;
@@ -33,23 +39,23 @@ export function UsersAdmin({ initialUsers, currentEmail }: Props) {
   const [pending, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
-  const [lastLoginSort, setLastLoginSort] = useState<LastLoginSort>('default');
-  const [neverLoggedOnly, setNeverLoggedOnly] = useState(false);
+  const [lastActiveSort, setLastActiveSort] = useState<LastActiveSort>('default');
+  const [neverActiveOnly, setNeverActiveOnly] = useState(false);
   const [bubblePending, setBubblePending] = useState(false);
   const [bubbleMsg, setBubbleMsg] = useState<string | null>(null);
 
   const displayedUsers = useMemo(() => {
-    const base = neverLoggedOnly ? initialUsers.filter((u) => !u.last_login_at) : [...initialUsers];
-    if (lastLoginSort === 'default') {
+    const base = neverActiveOnly ? initialUsers.filter((u) => !lastActiveIso(u)) : [...initialUsers];
+    if (lastActiveSort === 'default') {
       base.sort((a, b) => a.email.localeCompare(b.email));
       return base;
     }
-    base.sort((a, b) => compareByLastLogin(a, b, lastLoginSort));
+    base.sort((a, b) => compareByLastActive(a, b, lastActiveSort));
     return base;
-  }, [initialUsers, lastLoginSort, neverLoggedOnly]);
+  }, [initialUsers, lastActiveSort, neverActiveOnly]);
 
-  function cycleLastLoginSort() {
-    setLastLoginSort((s) => (s === 'default' ? 'desc' : s === 'desc' ? 'asc' : 'default'));
+  function cycleLastActiveSort() {
+    setLastActiveSort((s) => (s === 'default' ? 'desc' : s === 'desc' ? 'asc' : 'default'));
   }
 
   function updateRole(email: string, role: UserRole) {
@@ -133,10 +139,10 @@ export function UsersAdmin({ initialUsers, currentEmail }: Props) {
           <input
             type="checkbox"
             className="h-4 w-4 rounded border-input text-primary focus:ring-ring"
-            checked={neverLoggedOnly}
-            onChange={(e) => setNeverLoggedOnly(e.target.checked)}
+            checked={neverActiveOnly}
+            onChange={(e) => setNeverActiveOnly(e.target.checked)}
           />
-          Show only users who have never logged in
+          Show only users with no recorded activity
         </label>
         <div className="overflow-x-auto rounded-md border border-border/50">
           <table className="w-full text-sm">
@@ -147,14 +153,14 @@ export function UsersAdmin({ initialUsers, currentEmail }: Props) {
                 <th className="px-4 py-3 font-medium">
                   <button
                     type="button"
-                    onClick={cycleLastLoginSort}
+                    onClick={cycleLastActiveSort}
                     className="inline-flex items-center gap-1 font-medium text-muted-foreground transition-colors hover:text-foreground"
-                    title="Sort by last login (newest first, oldest first, then default)"
+                    title="Sort by last activity (newest first, oldest first, then default)"
                   >
-                    Last Login
-                    {lastLoginSort === 'desc' ? (
+                    Last active
+                    {lastActiveSort === 'desc' ? (
                       <ChevronDown className="h-3.5 w-3.5" aria-hidden />
-                    ) : lastLoginSort === 'asc' ? (
+                    ) : lastActiveSort === 'asc' ? (
                       <ChevronUp className="h-3.5 w-3.5" aria-hidden />
                     ) : null}
                   </button>
@@ -168,14 +174,15 @@ export function UsersAdmin({ initialUsers, currentEmail }: Props) {
                 const rowPending = pending && pendingEmail === u.email;
                 const isSelf = u.email.toLowerCase() === currentEmail.toLowerCase();
                 const rowDisabled = rowPending || readOnly;
-                const rel = formatLastLoginRelative(u.last_login_at ?? null);
-                const tip = lastLoginFullTooltip(u.last_login_at ?? null);
+                const activeIso = lastActiveIso(u);
+                const rel = formatLastLoginRelative(activeIso);
+                const tip = lastActiveFullTooltip(activeIso);
                 return (
                   <tr key={u.email}>
                     <td className="px-4 py-3 font-mono text-xs">{u.email}</td>
                     <td className="px-4 py-3 text-muted-foreground">{u.name ?? '—'}</td>
                     <td
-                      className={`px-4 py-3 tabular-nums ${u.last_login_at ? 'text-foreground' : 'text-muted-foreground'}`}
+                      className={`px-4 py-3 tabular-nums ${activeIso ? 'text-foreground' : 'text-muted-foreground'}`}
                       title={tip}
                     >
                       {rel}

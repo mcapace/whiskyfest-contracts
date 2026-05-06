@@ -20,6 +20,7 @@ erDiagram
     bool can_impersonate
     date last_dismissed_bubble_date
     timestamptz last_login_at
+    timestamptz last_seen_at
   }
 
   sales_reps {
@@ -94,7 +95,7 @@ See table sections below for **`daily_bubbles`** and **`access_requests`** (no d
 
 ## `app_users`
 - **Purpose**: access control + feature flags for authenticated users
-- **Key columns**: `role`, `is_active`, `is_events_team`, `is_accounting`, `can_impersonate`, `theme_preference`, tour fields, **`last_login_at`**, **`last_dismissed_bubble_date`**
+- **Key columns**: `role`, `is_active`, `is_events_team`, `is_accounting`, `can_impersonate`, `theme_preference`, tour fields, **`last_login_at`**, **`last_seen_at`** (throttled session activity), **`last_dismissed_bubble_date`**
 - **Indexes**: email PK
 - **RLS**: table protected; service role and app-layer auth used for administrative changes
 
@@ -156,6 +157,7 @@ See table sections below for **`daily_bubbles`** and **`access_requests`** (no d
 - `025_contract_line_items.sql`: per-contract line items
 - `026_contract_line_items_view_rename.sql`: view column alignment
 - `027_add_last_login.sql`: `app_users.last_login_at`
+- `036_last_seen_at.sql`: `app_users.last_seen_at`
 - `028_daily_bubbles.sql`: `daily_bubbles` + dismiss column + RLS
 - `029_daily_bubble_fetch_fn.sql`: `get_active_daily_bubble_eastern_today` RPC
 - `030_exhibitor_provided_fields.sql`: `exhibitor_fields_captured_at` + exhibitor billing/contact columns for DocuSign capture

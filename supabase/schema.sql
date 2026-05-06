@@ -223,6 +223,7 @@ alter table app_users add column if not exists theme_preference text
 alter table app_users add column if not exists tour_completed_at timestamptz;
 alter table app_users add column if not exists tour_last_role text;
 alter table app_users add column if not exists last_login_at timestamptz;
+alter table app_users add column if not exists last_seen_at timestamptz;
 alter table app_users add column if not exists last_dismissed_bubble_date date null;
 
 alter table app_users add column if not exists sound_enabled boolean not null default false;

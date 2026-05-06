@@ -1,9 +1,26 @@
 import { differenceInDays, differenceInHours, differenceInMinutes, differenceInSeconds } from 'date-fns';
 import { DISPLAY_TIMEZONE, formatTimestamp } from '@/lib/datetime';
 
+/** Prefer session activity; fall back to OAuth sign-in time for older rows. */
+export function lastActiveIso(user: {
+  last_seen_at?: string | null;
+  last_login_at?: string | null;
+}): string | null {
+  const s = user.last_seen_at?.trim();
+  if (s) return s;
+  const l = user.last_login_at?.trim();
+  return l || null;
+}
+
 /** Tooltip: full instant in display timezone (e.g. "Apr 24, 2026, 10:45:23 AM EDT"). */
 export function lastLoginFullTooltip(iso: string | null | undefined): string {
   if (!iso) return 'Never signed in';
+  return formatTimestamp(iso);
+}
+
+/** Tooltip for the combined "last active" column. */
+export function lastActiveFullTooltip(iso: string | null | undefined): string {
+  if (!iso) return 'No recorded activity';
   return formatTimestamp(iso);
 }
 

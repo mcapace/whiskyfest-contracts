@@ -8,6 +8,8 @@ import { ensureAccessRequestForUnknownUser } from '@/lib/access-requests';
 import type { UserRole } from '@/types/db';
 
 const IMPERSONATION_TTL_MS = 30 * 60 * 1000;
+/** Min interval between `last_seen_at` writes per user (JWT refreshes often). */
+const LAST_SEEN_THROTTLE_MS = 5 * 60 * 1000;
 
 async function computeAccessFlagsForEmail(
   email: string,
@@ -71,7 +73,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   callbacks: {
     async signIn({ user }) {
-      const email = user.email?.toLowerCase();
+      const email = user.email?.trim().toLowerCase();
       if (!email) return false;
       if (!email.endsWith('@mshanken.com')) return false;
 
@@ -93,10 +95,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async jwt({ token, user, trigger, session }) {
       const supabase = getSupabaseAdmin();
-      const loginEmail = (
-        (user?.email as string | undefined)?.toLowerCase() ??
-        (token.email as string | undefined)?.toLowerCase()
-      )?.toLowerCase();
+      const raw =
+        (user?.email as string | undefined) ?? (token.email as string | undefined);
+      const loginEmail = raw?.trim().toLowerCase();
 
       if (!loginEmail) return token;
 
@@ -223,6 +224,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.effective_role_description = d.role_description;
       }
 
+      try {
+        const lastBump = token.last_seen_bumped_at as number | undefined;
+        const now = Date.now();
+        if (!lastBump || now - lastBump >= LAST_SEEN_THROTTLE_MS) {
+          const iso = new Date(now).toISOString();
+          const { error } = await supabase
+            .from('app_users')
+            .update({ last_seen_at: iso })
+            .eq('email', loginEmail);
+          if (error) console.error('[auth] last_seen_at update failed:', error.message);
+          else token.last_seen_bumped_at = now;
+        }
+      } catch (e) {
+        console.error('[auth] last_seen_at update failed:', e);
+      }
+
       return token;
     },
     async session({ session, token }) {
@@ -270,9 +287,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (!email) return;
       try {
         const supabase = getSupabaseAdmin();
+        const iso = new Date().toISOString();
         const { error } = await supabase
           .from('app_users')
-          .update({ last_login_at: new Date().toISOString() })
+          .update({ last_login_at: iso, last_seen_at: iso })
           .eq('email', email);
         if (error) console.error('[auth] last_login_at update failed:', error.message);
       } catch (e) {

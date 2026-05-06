@@ -182,6 +182,8 @@ export interface AppUser {
   sound_enabled?: boolean;
   /** Set on each successful Google sign-in. Omitted until migration `027_add_last_login` is applied. */
   last_login_at?: string | null;
+  /** Throttled updates while the user has an active session (migration `036_last_seen_at`). */
+  last_seen_at?: string | null;
   /** Eastern `YYYY-MM-DD` when user dismissed the daily bubble; same-day bubble stays hidden for them. */
   last_dismissed_bubble_date?: string | null;
   created_at: string;
