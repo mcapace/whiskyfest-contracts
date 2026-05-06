@@ -44,7 +44,6 @@ export type ContractFormValues = {
   event_id: string;
   exhibitor_legal_name: string;
   exhibitor_company_name: string;
-  brands_poured: string;
   booth_count: number;
   booth_rate_cents: number;
   signer_1_name: string;
@@ -137,7 +136,6 @@ export function NewContractForm({
     event_id:               initialValues?.event_id ?? defaultEvent?.id ?? '',
     exhibitor_legal_name:   initialValues?.exhibitor_legal_name ?? '',
     exhibitor_company_name: initialValues?.exhibitor_company_name ?? '',
-    brands_poured:          initialValues?.brands_poured ?? '',
     booth_count:            initialValues?.booth_count ?? 1,
     booth_rate_cents:       defaultBoothRateCents,
     signer_1_name:          initialValues?.signer_1_name ?? '',
@@ -435,7 +433,6 @@ export function NewContractForm({
                       variant="link"
                       className="mt-1 h-auto p-0 text-amber-800 underline"
                       onClick={() => {
-                        set('brands_poured', matchedSponsor.brandsPoured || form.brands_poured);
                         set('booth_count', matchedSponsor.boothCount);
                         setBoothCountInput(String(matchedSponsor.boothCount));
                         setBoothBrandRows(boothBrandDraftsForCount(matchedSponsor.boothCount, undefined));
@@ -476,13 +473,6 @@ export function NewContractForm({
               Mailing address, telephone, billing address, billing contact, and event contact will be collected from
               the exhibitor at signing.
             </div>
-
-            <Field
-              label="Brands Poured (legacy)"
-              hint="Optional summary line for older templates. Per-booth brands below replace {{booth_brands_block}} / {{brands_poured}} in Google Docs when filled."
-            >
-              <Input value={form.brands_poured} onChange={e => set('brands_poured', e.target.value)} placeholder="Sample Bourbon, Sample Rye" />
-            </Field>
           </CardContent>
         </Card>
 
@@ -554,8 +544,7 @@ export function NewContractForm({
                 <p className="mt-1 text-xs text-muted-foreground">
                   One brand per booth (required). Expressions are optional. Merges to{' '}
                   <code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.65rem]">{'{{booth_brands_block}}'}</code>{' '}
-                  (and legacy <code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.65rem]">{'{{brands_poured}}'}</code>
-                  ) in the contract template.
+                  in the contract template.
                 </p>
               </div>
               <div className="space-y-4">

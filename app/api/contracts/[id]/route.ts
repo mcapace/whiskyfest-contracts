@@ -70,7 +70,6 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         event_id: p.event_id,
         exhibitor_legal_name: p.exhibitor_legal_name,
         exhibitor_company_name: p.exhibitor_company_name,
-        brands_poured: p.brands_poured ?? null,
         booth_count: p.booth_count,
         booth_rate_cents: incomingBoothRate,
         signer_1_name: p.signer_1_name ?? null,

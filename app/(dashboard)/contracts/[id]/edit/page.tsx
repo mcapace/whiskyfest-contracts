@@ -54,7 +54,6 @@ export default async function EditDraftContractPage({ params }: { params: { id: 
           event_id: c.event_id,
           exhibitor_legal_name: c.exhibitor_legal_name,
           exhibitor_company_name: c.exhibitor_company_name,
-          brands_poured: c.brands_poured ?? '',
           booth_count: c.booth_count,
           booth_rate_cents: c.booth_rate_cents,
           signer_1_name: c.signer_1_name ?? '',
