@@ -4,6 +4,11 @@ export type ExhibitorFieldMergeMode = 'draft' | 'docusign';
  * Google Doc merge tokens for exhibitor-captured fields. In `docusign` mode each resolves to a
  * unique anchor string (same as DocuSign text tab `anchorString`).
  *
+ * Tab `anchorXOffset` / `anchorYOffset` are kept at (or near) zero so fields sit on the anchor
+ * text the template places at the start of each fill line. Large positive X offsets were
+ * shifting tabs into a staircase / overlap when the PDF layout did not match an older inline
+ * mock-up.
+ *
  * Add to contract Google Doc (alongside existing billing/event blocks):
  *   MAILING / CORPORATE ADDRESS
  *   {{exhibitor_address_line1}}
@@ -123,7 +128,7 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       tabLabel: 'exhibitor_state',
       required: 'true',
       anchorString: ANCHOR.exhibitor_state,
-      anchorXOffset: '0.12',
+      anchorXOffset: '0',
       anchorYOffset: '0.01',
       anchorUnits: 'inches',
       documentId: '1',
@@ -136,7 +141,7 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       tabLabel: 'exhibitor_zip',
       required: 'true',
       anchorString: ANCHOR.exhibitor_zip,
-      anchorXOffset: '0.12',
+      anchorXOffset: '0',
       anchorYOffset: '0.01',
       anchorUnits: 'inches',
       documentId: '1',
@@ -162,7 +167,7 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       tabLabel: 'exhibitor_telephone',
       required: 'true',
       anchorString: ANCHOR.exhibitor_telephone,
-      anchorXOffset: '0.12',
+      anchorXOffset: '0',
       anchorYOffset: '0.01',
       anchorUnits: 'inches',
       documentId: '1',
@@ -175,8 +180,8 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       tabLabel: 'billing_contact_name',
       required: 'true',
       anchorString: ANCHOR.billing_contact_name,
-      anchorXOffset: '0.15',
-      anchorYOffset: '0.03',
+      anchorXOffset: '0',
+      anchorYOffset: '0.01',
       anchorUnits: 'inches',
       documentId: '1',
       width: '220',
@@ -189,8 +194,8 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       required: 'true',
       validationPattern: '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$',
       anchorString: ANCHOR.billing_contact_email,
-      anchorXOffset: '0.2',
-      anchorYOffset: '0.03',
+      anchorXOffset: '0',
+      anchorYOffset: '0.01',
       anchorUnits: 'inches',
       documentId: '1',
       width: '260',
@@ -241,7 +246,7 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       tabLabel: 'billing_state',
       required: 'true',
       anchorString: ANCHOR.billing_state,
-      anchorXOffset: '0.12',
+      anchorXOffset: '0',
       anchorYOffset: '0.01',
       anchorUnits: 'inches',
       documentId: '1',
@@ -254,7 +259,7 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       tabLabel: 'billing_zip',
       required: 'true',
       anchorString: ANCHOR.billing_zip,
-      anchorXOffset: '0.12',
+      anchorXOffset: '0',
       anchorYOffset: '0.01',
       anchorUnits: 'inches',
       documentId: '1',
@@ -280,8 +285,8 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       tabLabel: 'event_contact_name',
       required: 'false',
       anchorString: ANCHOR.event_contact_name,
-      anchorXOffset: '0.15',
-      anchorYOffset: '0.03',
+      anchorXOffset: '0',
+      anchorYOffset: '0.01',
       anchorUnits: 'inches',
       documentId: '1',
       width: '220',
@@ -293,8 +298,8 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
       tabLabel: 'event_contact_email',
       required: 'false',
       anchorString: ANCHOR.event_contact_email,
-      anchorXOffset: '0.2',
-      anchorYOffset: '0.03',
+      anchorXOffset: '0',
+      anchorYOffset: '0.01',
       anchorUnits: 'inches',
       documentId: '1',
       width: '260',
