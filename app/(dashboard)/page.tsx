@@ -13,6 +13,11 @@ import {
   parseDashboardFilter,
   type DashboardFilterKey,
 } from '@/lib/dashboard-filters';
+import {
+  dashboardExcludedAccountEmails,
+  filterAuditForDashboard,
+  filterContractsForDashboard,
+} from '@/lib/dashboard-exclusions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { DashboardHero } from '@/components/dashboard/hero';
@@ -82,8 +87,8 @@ async function getDashboardData(actor: Awaited<ReturnType<typeof requireContract
     supabase.from('events').select('*').eq('is_active', true),
     getSupportedRepNames(actor.email),
   ]);
-  const contracts = (contractsRes.data ?? []) as ContractWithTotals[];
-  const contractIds = contracts.map((c) => c.id);
+  const contractsRaw = (contractsRes.data ?? []) as ContractWithTotals[];
+  const contractIds = contractsRaw.map((c) => c.id);
   let auditQuery = supabase.from('audit_log').select('*').order('occurred_at', { ascending: false }).limit(200);
   if (visibility.filter === 'own') {
     if (contractIds.length === 0) {
@@ -94,10 +99,14 @@ async function getDashboardData(actor: Awaited<ReturnType<typeof requireContract
   }
   const { data: auditRows } = await auditQuery;
 
+  const events = (eventsRes.data ?? []) as Event[];
+  const excludedAccountEmails = dashboardExcludedAccountEmails();
+  const contracts = filterContractsForDashboard(contractsRaw, excludedAccountEmails);
+
   return {
     contracts,
-    events: (eventsRes.data ?? []) as Event[],
-    audit: (auditRows ?? []) as AuditLogEntry[],
+    events,
+    audit: filterAuditForDashboard((auditRows ?? []) as AuditLogEntry[], excludedAccountEmails),
     actor,
     supportedRepNames,
     canViewAllSales: canViewAllSales({
