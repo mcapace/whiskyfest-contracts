@@ -60,7 +60,7 @@ function accountingToRecipients(): string[] {
   const raw =
     process.env['ACCOUNTING_EMAILS']?.trim() ||
     process.env['ACCOUNTING_EMAIL']?.trim() ||
-    'accountsreceivable@mshanken.com,dbixler@mshanken.com';
+    'accountsreceivable@mshanken.com,dbixler@mshanken.com,aanderson@mshanken.com';
   return raw
     .split(',')
     .map((s) => s.trim().toLowerCase())
