@@ -6,7 +6,10 @@ import { formatCurrency, formatTimestamp } from '@/lib/utils';
 import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { calculateDiscountCents, isDiscountedRate } from '@/lib/contracts';
 import { downloadCompletedPdf } from '@/lib/docusign';
-import { downloadContractPdfFromStorage } from '@/lib/contract-pdf-storage';
+import {
+  downloadContractPdfFromStorage,
+  downloadImportedContractPdf,
+} from '@/lib/contract-pdf-storage';
 import { sendAccountingEmail } from '@/lib/email';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
@@ -68,17 +71,12 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   let signedPdfBytes: Buffer;
 
   if (contract.status === 'imported') {
-    const storagePath = contract.pdf_storage_path;
-    if (!storagePath?.endsWith('signed.pdf')) {
-      return NextResponse.json({ error: 'Imported PDF is missing from storage.' }, { status: 409 });
-    }
     try {
-      signedPdfBytes = await downloadContractPdfFromStorage(storagePath);
+      signedPdfBytes = await downloadImportedContractPdf(contract);
     } catch (e: unknown) {
-      return NextResponse.json(
-        { error: e instanceof Error ? e.message : String(e) },
-        { status: 502 },
-      );
+      const msg = e instanceof Error ? e.message : String(e);
+      const status = msg.includes('missing') ? 409 : 502;
+      return NextResponse.json({ error: msg }, { status });
     }
   } else {
     const envelopeIdRaw = contract.docusign_envelope_id?.trim();

@@ -6,7 +6,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { clearedRepEnteredBilling } from '@/lib/contract-schemas';
 import { replaceContractBoothBrandsForContract } from '@/lib/contract-booth-brands';
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
-import { uploadContractPdfToStorage } from '@/lib/contract-pdf-storage';
+import { persistContractSignedPdf } from '@/lib/contract-pdf-storage';
 import { isDiscountedRate } from '@/lib/contracts';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import type { Contract } from '@/types/db';
@@ -27,14 +27,6 @@ const boothBrandRowSchema = z.object({
   brand_name: z.string().min(1),
   expressions: z.array(z.string()).optional().default([]),
 });
-
-function sanitizeFileBaseName(raw: string): string {
-  const trimmed = raw.trim();
-  if (!trimmed) return 'signed-contract';
-  const withoutExt = trimmed.replace(/\.pdf$/i, '');
-  const safe = withoutExt.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-  return safe || 'signed-contract';
-}
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -271,12 +263,10 @@ export async function POST(req: Request) {
     );
   }
 
-  const pdfFileName = pdf instanceof File ? pdf.name : 'signed-contract.pdf';
-  const safeBase = sanitizeFileBaseName(pdfFileName);
-  const storagePath = `imported-contracts/${contractId}-${Date.now()}-${safeBase}.pdf`;
   const buf = Buffer.from(await pdf.arrayBuffer());
+  let signedStoragePath: string;
   try {
-    await uploadContractPdfToStorage(storagePath, buf);
+    ({ signedStoragePath } = await persistContractSignedPdf(contractId, buf));
   } catch (e) {
     console.error('import pdf upload:', e);
     await supabase.from('contracts').delete().eq('id', contractId);
@@ -285,7 +275,7 @@ export async function POST(req: Request) {
 
   const { error: pdfUpdErr } = await supabase
     .from('contracts')
-    .update({ pdf_storage_path: storagePath, signed_pdf_url: storagePath })
+    .update({ pdf_storage_path: signedStoragePath, signed_pdf_url: signedStoragePath })
     .eq('id', contractId);
 
   if (pdfUpdErr) {

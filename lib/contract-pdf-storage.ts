@@ -43,3 +43,44 @@ export async function persistContractDraftPdf(
   await uploadContractPdfToStorage(draftStoragePath, pdfBytes);
   return { draftStoragePath, drafted_at: new Date().toISOString() };
 }
+
+/** Upsert signed/imported PDF at canonical `{contractId}/signed.pdf`. */
+export async function persistContractSignedPdf(
+  contractId: string,
+  pdfBytes: Buffer,
+): Promise<{ signedStoragePath: string }> {
+  const signedStoragePath = contractSignedPdfPath(contractId);
+  await uploadContractPdfToStorage(signedStoragePath, pdfBytes);
+  return { signedStoragePath };
+}
+
+/** Load imported legacy PDF — supports canonical path and older `imported-contracts/…` keys. */
+export async function downloadImportedContractPdf(contract: {
+  id: string;
+  pdf_storage_path: string | null;
+  signed_pdf_url: string | null;
+}): Promise<Buffer> {
+  const candidates: string[] = [];
+  const push = (p: string | null | undefined) => {
+    const t = p?.trim();
+    if (!t || candidates.includes(t)) return;
+    candidates.push(t);
+  };
+
+  push(contract.pdf_storage_path);
+  push(contractSignedPdfPath(contract.id));
+  if (contract.signed_pdf_url && !/^https?:\/\//i.test(contract.signed_pdf_url)) {
+    push(contract.signed_pdf_url);
+  }
+
+  let lastErr: unknown;
+  for (const path of candidates) {
+    try {
+      return await downloadContractPdfFromStorage(path);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+
+  throw lastErr instanceof Error ? lastErr : new Error('Imported PDF is missing from storage.');
+}
