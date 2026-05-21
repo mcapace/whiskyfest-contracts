@@ -390,13 +390,7 @@ export async function resendEnvelopeNotifications(envelopeId: string): Promise<v
   }
 }
 
-export async function downloadCompletedPdf(envelopeId: string): Promise<Buffer> {
-  const accessToken = await getAccessToken();
-  const { accountId, restApiBase } = await resolveApiContext(accessToken);
-
-  const q = new URLSearchParams({ certificate: 'true' });
-  const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}/documents/combined?${q}`;
-
+async function downloadEnvelopePdfFromUrl(url: string, accessToken: string): Promise<Buffer> {
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -411,4 +405,33 @@ export async function downloadCompletedPdf(envelopeId: string): Promise<Buffer> 
 
   const ab = await res.arrayBuffer();
   return Buffer.from(ab);
+}
+
+/** Fully executed envelope (combined PDF with certificate). */
+export async function downloadCompletedPdf(envelopeId: string): Promise<Buffer> {
+  const accessToken = await getAccessToken();
+  const { accountId, restApiBase } = await resolveApiContext(accessToken);
+
+  const q = new URLSearchParams({ certificate: 'true' });
+  const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}/documents/combined?${q}`;
+
+  return downloadEnvelopePdfFromUrl(url, accessToken);
+}
+
+/** Contract PDF from an in-flight or completed envelope (document 1 = sent agreement). */
+export async function downloadEnvelopeContractPdf(envelopeId: string): Promise<Buffer> {
+  const accessToken = await getAccessToken();
+  const { accountId, restApiBase } = await resolveApiContext(accessToken);
+
+  const { status } = await fetchEnvelopeStatus(envelopeId);
+  if (status.toLowerCase() === 'completed') {
+    try {
+      return await downloadCompletedPdf(envelopeId);
+    } catch {
+      /* fall through to document 1 */
+    }
+  }
+
+  const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}/documents/1`;
+  return downloadEnvelopePdfFromUrl(url, accessToken);
 }

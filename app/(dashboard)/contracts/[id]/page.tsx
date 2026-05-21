@@ -26,6 +26,7 @@ import {
   contractPdfPreviewVersion,
   contractPrefersSignedPdf,
 } from '@/lib/contract-pdf-preview';
+import { syncDraftPdfFromDocuSign } from '@/lib/contract-pdf-sync-docusign';
 import { ContractProgressionTimeline } from '@/components/contract/progression-timeline';
 import { ContractSummarySection } from '@/components/contract/contract-summary-section';
 import type {
@@ -91,17 +92,30 @@ export default async function ContractDetailPage({ params }: { params: { id: str
       ? `/api/contracts/${contract.id}/pdf?variant=signed`
       : null;
 
+  let contractForPreview = contract;
+  if (contract.docusign_envelope_id) {
+    try {
+      const { synced, drafted_at } = await syncDraftPdfFromDocuSign(supabase, contract);
+      if (synced && drafted_at) {
+        contractForPreview = { ...contract, drafted_at, pdf_storage_path: `${contract.id}/draft.pdf` };
+      }
+    } catch (err) {
+      console.error('[contract detail] DocuSign PDF preview sync failed', err);
+    }
+  }
+
   const hasPdfSource = Boolean(
-    contract.drafted_at ||
-      contract.draft_pdf_url ||
-      contract.pdf_storage_path ||
-      contract.signed_pdf_url ||
-      contract.signed_at,
+    contractForPreview.drafted_at ||
+      contractForPreview.draft_pdf_url ||
+      contractForPreview.pdf_storage_path ||
+      contractForPreview.signed_pdf_url ||
+      contractForPreview.signed_at ||
+      contract.docusign_envelope_id,
   );
   const canInlinePdf = hasPdfSource;
-  const pdfPreviewVersion = contractPdfPreviewVersion(contract);
+  const pdfPreviewVersion = contractPdfPreviewVersion(contractForPreview);
   const pdfPreviewUrl = contractPdfPreviewUrl(contract.id, pdfPreviewVersion);
-  const pdfPreviewCaption = contractPrefersSignedPdf(contract.status)
+  const pdfPreviewCaption = contractPrefersSignedPdf(contractForPreview.status)
     ? 'Signed agreement (latest stored copy)'
     : contract.status === 'sent' || contract.status === 'partially_signed'
       ? 'Draft sent to DocuSign (matches latest envelope)'
