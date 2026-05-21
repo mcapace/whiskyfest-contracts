@@ -105,12 +105,13 @@ const nav: {
   label: string;
   icon: LucideIcon;
   adminOnly?: boolean;
-  importOnly?: boolean;
+  /** Hidden for accounting-only users; visible to sales reps, events, and admins. */
+  legacyImport?: boolean;
 }[] = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/contracts/new', label: 'New Contract', icon: Plus },
   { href: '/contracts', label: 'All Contracts', icon: FileText },
-  { href: '/contracts/import', label: 'Import Contract', icon: Upload, importOnly: true },
+  { href: '/contracts/import', label: 'Import Contract', icon: Upload, legacyImport: true },
   { href: '/sponsors', label: 'Sponsors', icon: Building2 },
   { href: '/settings', label: 'Settings', icon: Settings },
   { href: '/sales-reps', label: 'Sales Reps', icon: UserRound, adminOnly: true },
@@ -183,7 +184,7 @@ export function Sidebar({
             {nav
               .filter((item) => {
                 if (item.adminOnly && !isAdmin) return false;
-                if (item.importOnly && !isAdmin && !isEventsTeam) return false;
+                if (item.legacyImport && accountingOnly) return false;
                 return true;
               })
               .map((item) => {

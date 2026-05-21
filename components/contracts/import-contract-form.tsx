@@ -25,11 +25,14 @@ export function ImportContractForm({
   events,
   currentUserEmail,
   isAdmin,
+  isEventsTeam = false,
 }: {
   events: Event[];
   currentUserEmail: string | null;
   isAdmin: boolean;
+  isEventsTeam?: boolean;
 }) {
+  const canPickAnySalesRep = isAdmin || isEventsTeam;
   const router = useRouter();
   const { data: session } = useSession();
   const [pending, startTransition] = useTransition();
@@ -197,8 +200,9 @@ export function ImportContractForm({
         </Link>
         <h1 className="font-serif text-3xl font-semibold tracking-tight">Import contract</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Enter a sponsor agreement that was signed outside this app (paper or legacy DocuSign). Accounting release
-          works the same as fully signed contracts.
+          Upload a sponsor agreement that was signed before this platform launched (paper, email PDF, or legacy
+          DocuSign). {canPickAnySalesRep ? 'Assign the deal to the correct sales rep.' : 'The contract will be assigned to your rep account.'}{' '}
+          Events or admin can release it to accounting when ready.
         </p>
       </div>
 
@@ -317,7 +321,7 @@ export function ImportContractForm({
               currentUserEmail={currentUserEmail}
               value={salesRepId}
               onChange={setSalesRepId}
-              isAdmin={isAdmin}
+              isAdmin={canPickAnySalesRep}
               required
             />
             <Field label="Booth count" htmlFor="ibc">

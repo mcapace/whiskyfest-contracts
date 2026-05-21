@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
-import { resolveContractActor } from '@/lib/auth-contract';
+import { canImportLegacyContracts, resolveContractActor } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { clearedRepEnteredBilling } from '@/lib/contract-schemas';
 import { replaceContractBoothBrandsForContract } from '@/lib/contract-booth-brands';
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
   const gate = await resolveContractActor(session);
   if (!gate.ok) return gate.response;
 
-  if (!gate.actor.isAdmin && !gate.actor.isEventsTeam) {
+  if (!canImportLegacyContracts(gate.actor)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -126,6 +126,16 @@ export async function POST(req: Request) {
   }
 
   const p = parsed.data;
+
+  if (!gate.actor.isAdmin && !gate.actor.isEventsTeam) {
+    if (!gate.actor.accessibleSalesRepIds.includes(p.sales_rep_id)) {
+      return NextResponse.json(
+        { error: 'You can only import contracts assigned to yourself or reps you assist.' },
+        { status: 403 },
+      );
+    }
+  }
+
   const booth_rate_cents = parseMoneyToCents(p.booth_rate_dollars);
   const grand_total_cents = parseMoneyToCents(p.grand_total_dollars);
   if (booth_rate_cents === null || grand_total_cents === null) {

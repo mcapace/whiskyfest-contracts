@@ -46,9 +46,9 @@ export function SalesRepSelect({
 
         if (list.length === 1 && !isAdmin) {
           onChange(list[0].id);
-        } else if (!value && currentUserEmail && list.length > 1) {
+        } else if (!value && currentUserEmail) {
           const match = list.find((r) => r.email.toLowerCase() === currentUserEmail.toLowerCase());
-          if (match && isAdmin) onChange(match.id);
+          if (match) onChange(match.id);
         }
       } catch (err) {
         console.error('Sales reps load failed:', err);

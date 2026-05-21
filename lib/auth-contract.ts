@@ -187,6 +187,13 @@ export async function assertContractPdfAccess(
   return jsonErr(403, 'Forbidden');
 }
 
+/** Upload pre-platform signed PDFs (legacy / paper / off-app DocuSign). */
+export function canImportLegacyContracts(
+  actor: Pick<PageContractActor, 'isAdmin' | 'isEventsTeam' | 'accessibleSalesRepIds'>,
+): boolean {
+  return actor.isAdmin || actor.isEventsTeam || actor.accessibleSalesRepIds.length > 0;
+}
+
 /** Server pages: login redirect for inactive; non-admins must have ≥1 accessible rep id. */
 export interface PageContractActor {
   email: string;

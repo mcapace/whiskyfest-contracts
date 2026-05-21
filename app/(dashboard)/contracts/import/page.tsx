@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { requireContractActorForPage } from '@/lib/auth-contract';
+import { canImportLegacyContracts, requireContractActorForPage } from '@/lib/auth-contract';
 import { ImportContractForm } from '@/components/contracts/import-contract-form';
 import type { Event } from '@/types/db';
 
@@ -8,8 +8,8 @@ export const dynamic = 'force-dynamic';
 
 export default async function ImportContractPage() {
   const actor = await requireContractActorForPage();
-  if (!actor.isAdmin && !actor.isEventsTeam) {
-    redirect('/contracts');
+  if (!canImportLegacyContracts(actor)) {
+    redirect(actor.isAccounting ? '/accounting' : '/contracts');
   }
 
   const supabase = getSupabaseAdmin();
@@ -24,6 +24,7 @@ export default async function ImportContractPage() {
       events={(events ?? []) as Event[]}
       currentUserEmail={actor.email}
       isAdmin={actor.isAdmin}
+      isEventsTeam={actor.isEventsTeam}
     />
   );
 }

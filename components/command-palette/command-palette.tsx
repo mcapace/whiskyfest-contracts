@@ -265,7 +265,7 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 </div>
               </Command.Item>
             )}
-            {(isAdmin || isEventsTeam) && (
+            {canCreateContract && (
               <Command.Item
                 value="import contract legacy signed pdf"
                 onSelect={() => go('/contracts/import')}
@@ -274,7 +274,7 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 <Upload className="h-4 w-4 shrink-0 opacity-70" />
                 <div>
                   <p className="font-medium">Import contract</p>
-                  <p className="text-xs text-muted-foreground">Pre-existing signed agreement (admin / events)</p>
+                  <p className="text-xs text-muted-foreground">Pre-platform signed agreement + PDF upload</p>
                 </div>
               </Command.Item>
             )}
