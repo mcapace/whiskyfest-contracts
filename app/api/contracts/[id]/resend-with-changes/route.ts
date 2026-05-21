@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAdmin } from '@/lib/api-auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { renderContractPdfFromTemplate } from '@/lib/google';
+import { persistContractDraftPdf } from '@/lib/contract-pdf-storage';
 import { fetchContractBoothBrandsOrdered } from '@/lib/contract-booth-brands';
 import { fetchContractLineItemsOrdered } from '@/lib/contract-line-items';
 import { buildContractMergeMap } from '@/lib/merge-map';
@@ -113,6 +114,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
 
     const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileName, lineItems);
+    const { draftStoragePath, drafted_at } = await persistContractDraftPdf(contract.id, pdfBytes);
 
     const sent = await sendEnvelope({
       pdfBase64: pdfBytes.toString('base64'),
@@ -123,22 +125,24 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       countersigner: { name: countersignerName, email: countersignerEmail },
     });
     newEnvelopeId = sent.envelopeId;
+
+    const sentAt = new Date().toISOString();
+    const { error: updateError } = await supabase
+      .from('contracts')
+      .update({
+        status: 'sent',
+        docusign_envelope_id: newEnvelopeId,
+        sent_at: sentAt,
+        pdf_storage_path: draftStoragePath,
+        drafted_at,
+      })
+      .eq('id', contract.id);
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: msg }, { status: 502 });
-  }
-
-  const sentAt = new Date().toISOString();
-  const { error: updateError } = await supabase
-    .from('contracts')
-    .update({
-      status: 'sent',
-      docusign_envelope_id: newEnvelopeId,
-      sent_at: sentAt,
-    })
-    .eq('id', contract.id);
-  if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
   await supabase.from('audit_log').insert({

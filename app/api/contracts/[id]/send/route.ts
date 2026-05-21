@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { assertContractAccess } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { renderContractPdfFromTemplate } from '@/lib/google';
+import { persistContractDraftPdf } from '@/lib/contract-pdf-storage';
 import { sendEnvelope } from '@/lib/docusign';
 import { fetchContractBoothBrandsOrdered } from '@/lib/contract-booth-brands';
 import { fetchContractLineItemsOrdered } from '@/lib/contract-line-items';
@@ -92,6 +93,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     const fileName = `${contract.exhibitor_company_name.replace(/[^\w\s-]/g, '')} — WhiskyFest ${event.year} Contract (DocuSign)`;
 
     const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileName, lineItems);
+    const { draftStoragePath, drafted_at } = await persistContractDraftPdf(contract.id, pdfBytes);
 
     const pdfBase64 = pdfBytes.toString('base64');
 
@@ -110,6 +112,8 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
         status: 'sent',
         docusign_envelope_id: envelopeId,
         sent_at: new Date().toISOString(),
+        pdf_storage_path: draftStoragePath,
+        drafted_at,
       })
       .eq('id', contract.id);
 

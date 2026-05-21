@@ -33,3 +33,13 @@ export async function createContractPdfSignedUrl(objectPath: string, expiresSec 
   if (error || !data?.signedUrl) throw error ?? new Error('Failed to create signed URL for contract PDF');
   return data.signedUrl;
 }
+
+/** Upsert draft PDF in storage (canonical `{contractId}/draft.pdf`). */
+export async function persistContractDraftPdf(
+  contractId: string,
+  pdfBytes: Buffer,
+): Promise<{ draftStoragePath: string; drafted_at: string }> {
+  const draftStoragePath = contractDraftPdfPath(contractId);
+  await uploadContractPdfToStorage(draftStoragePath, pdfBytes);
+  return { draftStoragePath, drafted_at: new Date().toISOString() };
+}

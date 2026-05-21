@@ -6,11 +6,15 @@ import {
   contractSignedPdfPath,
   createContractPdfSignedUrl,
 } from '@/lib/contract-pdf-storage';
+import { contractPrefersSignedPdf } from '@/lib/contract-pdf-preview';
+import type { ContractStatus } from '@/types/db';
 
 export const runtime = 'nodejs';
 
-function tryRedirect(url: string) {
-  return NextResponse.redirect(url);
+function redirectNoCache(url: string) {
+  const res = NextResponse.redirect(url);
+  res.headers.set('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+  return res;
 }
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
@@ -25,13 +29,14 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   async function redirectForPath(path: string): Promise<NextResponse | null> {
     try {
       const signed = await createContractPdfSignedUrl(path);
-      return tryRedirect(signed);
+      return redirectNoCache(signed);
     } catch {
       return null;
     }
   }
 
   const id = contract.id;
+  const status = contract.status as ContractStatus;
 
   if (variant === 'draft') {
     let r = await redirectForPath(contractDraftPdfPath(id));
@@ -40,7 +45,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       r = await redirectForPath(contract.pdf_storage_path);
       if (r) return r;
     }
-    if (contract.draft_pdf_url) return tryRedirect(contract.draft_pdf_url);
+    if (contract.draft_pdf_url) return redirectNoCache(contract.draft_pdf_url);
     return NextResponse.json({ error: 'Draft PDF not available' }, { status: 404 });
   }
 
@@ -55,17 +60,39 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       r = await redirectForPath(contract.signed_pdf_url);
       if (r) return r;
     }
-    if (contract.signed_pdf_url) return tryRedirect(contract.signed_pdf_url);
+    if (contract.signed_pdf_url) return redirectNoCache(contract.signed_pdf_url);
     return NextResponse.json({ error: 'Signed PDF not available' }, { status: 404 });
   }
 
-  if (contract.pdf_storage_path) {
-    const r = await redirectForPath(contract.pdf_storage_path);
+  // auto / latest: pick by lifecycle, always prefer canonical storage paths (upserted in place)
+  const preferSigned = contractPrefersSignedPdf(status);
+
+  if (preferSigned) {
+    let r = await redirectForPath(contractSignedPdfPath(id));
     if (r) return r;
+    if (contract.pdf_storage_path?.endsWith('signed.pdf')) {
+      r = await redirectForPath(contract.pdf_storage_path);
+      if (r) return r;
+    }
+    if (contract.signed_pdf_url && !/^https?:\/\//i.test(contract.signed_pdf_url)) {
+      r = await redirectForPath(contract.signed_pdf_url);
+      if (r) return r;
+    }
+    if (contract.signed_pdf_url) return redirectNoCache(contract.signed_pdf_url);
   }
 
-  const legacy = contract.signed_pdf_url ?? contract.draft_pdf_url;
-  if (legacy) return tryRedirect(legacy);
+  let r = await redirectForPath(contractDraftPdfPath(id));
+  if (r) return r;
+  if (contract.pdf_storage_path?.endsWith('draft.pdf')) {
+    r = await redirectForPath(contract.pdf_storage_path);
+    if (r) return r;
+  }
+  if (contract.draft_pdf_url) return redirectNoCache(contract.draft_pdf_url);
+
+  if (preferSigned) {
+    r = await redirectForPath(contractSignedPdfPath(id));
+    if (r) return r;
+  }
 
   return NextResponse.json({ error: 'PDF not available' }, { status: 404 });
 }

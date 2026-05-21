@@ -21,6 +21,11 @@ import { ActivityTimeline } from '@/components/contracts/activity-timeline';
 import { ContractActivityLogger } from '@/components/contracts/contract-activity-logger';
 import { buildContractActivityTimeline } from '@/lib/contract-activity-timeline';
 import { PdfPreview } from '@/components/contracts/pdf-preview';
+import {
+  contractPdfPreviewUrl,
+  contractPdfPreviewVersion,
+  contractPrefersSignedPdf,
+} from '@/lib/contract-pdf-preview';
 import { ContractProgressionTimeline } from '@/components/contract/progression-timeline';
 import { ContractSummarySection } from '@/components/contract/contract-summary-section';
 import type {
@@ -94,6 +99,13 @@ export default async function ContractDetailPage({ params }: { params: { id: str
       contract.signed_at,
   );
   const canInlinePdf = hasPdfSource;
+  const pdfPreviewVersion = contractPdfPreviewVersion(contract);
+  const pdfPreviewUrl = contractPdfPreviewUrl(contract.id, pdfPreviewVersion);
+  const pdfPreviewCaption = contractPrefersSignedPdf(contract.status)
+    ? 'Signed agreement (latest stored copy)'
+    : contract.status === 'sent' || contract.status === 'partially_signed'
+      ? 'Draft sent to DocuSign (matches latest envelope)'
+      : 'Latest generated draft';
 
   return (
     <ContractLiveProvider>
@@ -465,7 +477,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
           <hr className="my-2 border-parchment-300" />
           <section id="pdf-preview" className="space-y-4">
             <p className="wf-label-caps text-[0.6rem] text-ink-500">Inline PDF Preview</p>
-            <PdfPreview fileUrl={`/api/contracts/${contract.id}/pdf?variant=auto`} />
+            <PdfPreview fileUrl={pdfPreviewUrl} caption={pdfPreviewCaption} />
             {legacyPdfUrl ? (
               <p className="font-sans text-xs text-muted-foreground">
                 <a
