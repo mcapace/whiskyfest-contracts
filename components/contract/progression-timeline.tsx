@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { formatStatus } from '@/lib/status-display';
+import { formatStatus, progressionStageColor } from '@/lib/status-display';
 import { cn, formatRelative } from '@/lib/utils';
 import type { AuditLogEntry, ContractStatus } from '@/types/db';
 
@@ -46,14 +46,19 @@ function auditForStage(stage: (typeof STAGE_ORDER)[number], auditChronological: 
       return pick(
         (e) =>
           e.action === 'exhibitor_signed' ||
-          (e.action === 'status_changed' && e.to_status === 'partially_signed'),
+          (e.action === 'status_changed' && e.to_status === 'partially_signed') ||
+          (e.action === 'docusign_synced' &&
+            (e.metadata as Record<string, unknown> | null)?.to_status === 'partially_signed'),
       );
     case 'signed':
       return pick(
         (e) =>
           e.action === 'signed' ||
           e.action === 'docusign_completed' ||
-          (e.action === 'status_changed' && e.to_status === 'signed'),
+          e.action === 'countersigner_signed' ||
+          (e.action === 'status_changed' && e.to_status === 'signed') ||
+          (e.action === 'docusign_synced' &&
+            (e.metadata as Record<string, unknown> | null)?.to_status === 'signed'),
       );
     case 'executed':
       return pick(
@@ -156,6 +161,7 @@ export function ContractProgressionTimeline({
           <div key={stage} className="flex gap-3">
             <div className="flex flex-col items-center">
               <Node
+                stage={stage}
                 done={done}
                 current={current}
                 tooltip={stageTooltip(stage, entry, done, current)}
@@ -166,8 +172,9 @@ export function ContractProgressionTimeline({
                 <div
                   className={cn(
                     'my-0.5 h-8 w-px shrink-0',
-                    idx < currentIdx ? 'bg-accent-brand' : 'border-l border-dashed border-muted-foreground/40',
+                    idx < currentIdx ? '' : 'border-l border-dashed border-muted-foreground/40',
                   )}
+                  style={idx < currentIdx ? { backgroundColor: progressionStageColor(stage) } : undefined}
                   aria-hidden
                 />
               )}
@@ -188,6 +195,7 @@ export function ContractProgressionTimeline({
           <div key={stage} className="flex min-w-0 flex-1 items-center last:flex-none">
             <div className="flex shrink-0 flex-col items-center">
               <Node
+                stage={stage}
                 done={done}
                 current={current}
                 tooltip={stageTooltip(stage, entry, done, current)}
@@ -202,8 +210,9 @@ export function ContractProgressionTimeline({
               <div
                 className={cn(
                   'mx-1 h-0.5 min-w-[8px] flex-1 rounded-full',
-                  idx < currentIdx ? 'bg-accent-brand' : 'border-t border-dashed border-muted-foreground/40 bg-transparent',
+                  idx < currentIdx ? '' : 'border-t border-dashed border-muted-foreground/40 bg-transparent',
                 )}
+                style={idx < currentIdx ? { backgroundColor: progressionStageColor(stage) } : undefined}
                 aria-hidden
               />
             )}
@@ -218,36 +227,42 @@ export function ContractProgressionTimeline({
 }
 
 function Node({
+  stage,
   done,
   current,
   tooltip,
   onActivate,
   staggerMs,
 }: {
+  stage: (typeof STAGE_ORDER)[number];
   done: boolean;
   current: boolean;
   tooltip: string;
   onActivate: () => void;
   staggerMs: number;
 }) {
+  const color = progressionStageColor(stage);
+
   return (
     <button
       type="button"
       title={tooltip}
       onClick={onActivate}
       className={cn(
-        'relative h-[14px] w-[14px] shrink-0 rounded-full border transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-        done && 'border-accent-brand bg-accent-brand shadow-sm',
+        'relative h-[14px] w-[14px] shrink-0 rounded-full border-2 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         !done && !current && 'border-muted-foreground/45 bg-transparent',
-        current && 'border-accent-brand bg-background',
+        current && 'bg-background shadow-sm',
       )}
       style={{
+        borderColor: done || current ? color : undefined,
+        backgroundColor: done ? color : current ? undefined : undefined,
         animation: staggerMs ? `wf-stagger-node 0.45s ease-out ${staggerMs}ms both` : undefined,
       }}
     >
       {current && (
         <span
-          className="pointer-events-none absolute inset-0 rounded-full border border-accent-brand motion-safe:animate-wf-node-pulse"
+          className="pointer-events-none absolute inset-0 rounded-full motion-safe:animate-wf-node-pulse"
+          style={{ border: `2px solid ${color}` }}
           aria-hidden
         />
       )}

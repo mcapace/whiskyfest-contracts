@@ -12,6 +12,7 @@ import { uploadPdfBufferToFolder } from '@/lib/google';
 import { contractSignedPdfPath, uploadContractPdfToStorage } from '@/lib/contract-pdf-storage';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { appendContractRow, updateContractRow } from '@/lib/sheets-tracker';
+import { insertContractAudit } from '@/lib/audit-log';
 import { notifyContractFullySigned, notifyPartialSignature } from '@/lib/notifications';
 import type { ContractWithTotals, Event } from '@/types/db';
 
@@ -71,13 +72,21 @@ export async function applyExhibitorPartialSignature(
     throw new Error(partialUpdateErr.message);
   }
 
-  await supabase.from('audit_log').insert({
+  await insertContractAudit(supabase, {
     contract_id: contract.id,
     actor_email: options?.actorEmail ?? null,
     action: 'exhibitor_signed',
     from_status: 'sent',
     to_status: 'partially_signed',
     metadata: { envelope_id: envelopeId, source: options?.actorEmail ? 'manual_sync' : 'webhook' },
+  });
+  await insertContractAudit(supabase, {
+    contract_id: contract.id,
+    actor_email: options?.actorEmail ?? null,
+    action: 'status_changed',
+    from_status: 'sent',
+    to_status: 'partially_signed',
+    metadata: { envelope_id: envelopeId },
   });
 
   revalidateContractPaths(contract.id);
@@ -153,7 +162,23 @@ export async function applyEnvelopeFullySigned(
     })
     .eq('id', contract.id);
 
-  await supabase.from('audit_log').insert({
+  if (countersigner?.email) {
+    await insertContractAudit(supabase, {
+      contract_id: contract.id,
+      actor_email: countersigner.email,
+      action: 'countersigner_signed',
+      from_status: fromStatus === 'partially_signed' ? 'partially_signed' : fromStatus,
+      to_status: 'signed',
+      metadata: {
+        envelope_id: envelopeId,
+        countersigner_name: countersigner.name,
+        countersigner_email: countersigner.email,
+        signed_at: countersigner.signedDateTime,
+      },
+    });
+  }
+
+  await insertContractAudit(supabase, {
     contract_id: contract.id,
     actor_email: options?.actorEmail ?? null,
     action: 'docusign_completed',
@@ -167,6 +192,14 @@ export async function applyEnvelopeFullySigned(
       countersigned_by_name: countersigner?.name ?? null,
       source: options?.actorEmail ? 'manual_sync' : 'webhook',
     },
+  });
+  await insertContractAudit(supabase, {
+    contract_id: contract.id,
+    actor_email: options?.actorEmail ?? null,
+    action: 'status_changed',
+    from_status: fromStatus,
+    to_status: 'signed',
+    metadata: { envelope_id: envelopeId },
   });
 
   revalidateContractPaths(contract.id);

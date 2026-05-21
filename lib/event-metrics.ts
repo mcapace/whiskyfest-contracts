@@ -156,36 +156,7 @@ export function getSalesLeaderboard(contracts: ContractWithTotals[]): Leaderboar
   return [...byRep.values()].sort((a, b) => b.totalValueCents - a.totalValueCents);
 }
 
-export function describeAuditAction(action: string): string {
-  switch (action) {
-    case 'contract_created':
-      return 'created';
-    case 'contract_submitted':
-      return 'submitted for review';
-    case 'events_approved':
-      return 'approved';
-    case 'docusign_sent':
-      return 'sent via DocuSign';
-    case 'exhibitor_signed':
-      return 'was signed by exhibitor';
-    case 'countersigner_signed':
-      return 'was countersigned';
-    case 'released_to_accounting':
-      return 'was released to accounting';
-    case 'voided':
-      return 'voided';
-    case 'cancelled':
-      return 'cancelled';
-    case 'discount_approved':
-      return 'approved a discount on';
-    case 'invoice_sent':
-      return 'marked invoice sent for';
-    case 'paid':
-      return 'marked paid';
-    default:
-      return action.replaceAll('_', ' ');
-  }
-}
+export { describeAuditActionShort as describeAuditAction } from '@/lib/audit-log-display';
 
 export function getRecentActivity(audit: AuditLogEntry[], contracts: ContractWithTotals[]): ActivityRow[] {
   const contractNameById = new Map(contracts.map((c) => [c.id, c.exhibitor_company_name]));

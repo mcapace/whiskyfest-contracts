@@ -18,16 +18,22 @@ function ActivityIcon({ action }: { action: string }) {
     case 'events_approved':
     case 'discount_approved':
       return <ShieldCheck className={className} aria-hidden />;
+    case 'pdf_sent':
     case 'docusign_sent':
       return <Send className={className} aria-hidden />;
+    case 'contract_viewed':
+      return <Clock3 className={className} aria-hidden />;
     case 'exhibitor_signed':
     case 'countersigner_signed':
+    case 'docusign_completed':
       return <FileCheck2 className={className} aria-hidden />;
     case 'voided':
     case 'cancelled':
       return <FileX2 className={className} aria-hidden />;
     case 'released_to_accounting':
+    case 'invoice_marked_sent':
     case 'invoice_sent':
+    case 'invoice_marked_paid':
     case 'paid':
       return <CheckCircle2 className={className} aria-hidden />;
     default:

@@ -8,6 +8,7 @@ import { fetchContractBoothBrandsOrdered } from '@/lib/contract-booth-brands';
 import { fetchContractLineItemsOrdered } from '@/lib/contract-line-items';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import { requiresDiscountApproval } from '@/lib/contracts';
+import { insertContractAudit } from '@/lib/audit-log';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import type { ContractWithTotals, Event } from '@/types/db';
 
@@ -112,7 +113,15 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       })
       .eq('id', contract.id);
 
-    await supabase.from('audit_log').insert({
+    await insertContractAudit(supabase, {
+      contract_id: contract.id,
+      actor_email: access.actor.email,
+      action: 'status_changed',
+      from_status: 'approved',
+      to_status: 'sent',
+      metadata: { envelope_id: envelopeId },
+    });
+    await insertContractAudit(supabase, {
       contract_id: contract.id,
       actor_email: access.actor.email,
       action: 'pdf_sent',
@@ -122,7 +131,6 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
         exhibitor_signer: contract.signer_1_email,
         countersigner_email: countersignerEmail,
         countersigner_name: countersignerName,
-        docusign_pdf_file: null,
       },
     });
 

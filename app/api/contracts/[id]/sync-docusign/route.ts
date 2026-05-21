@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { assertContractAccess } from '@/lib/auth-contract';
+import { insertContractAudit } from '@/lib/audit-log';
 import { syncContractFromDocuSign } from '@/lib/docusign-envelope-sync';
+import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { ContractWithTotals, Event } from '@/types/db';
 
@@ -41,6 +43,18 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 502 });
+  }
+
+  if (result.changed) {
+    await insertContractAudit(supabase, {
+      contract_id: params.id,
+      actor_email: gate.actor.email,
+      action: 'docusign_synced',
+      from_status: result.fromStatus as ContractWithTotals['status'],
+      to_status: result.toStatus as ContractWithTotals['status'],
+      metadata: { message: result.message },
+    });
+    revalidateContractPaths(params.id);
   }
 
   return NextResponse.json(result);

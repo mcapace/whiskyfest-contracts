@@ -3,7 +3,9 @@ import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { getEffectiveUserEmail } from '@/lib/effective-user';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { insertContractAudit } from '@/lib/audit-log';
 import { notifySalesRepInvoicePaid, notifySalesRepInvoiceSent } from '@/lib/notifications';
+import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { formatTimestamp } from '@/lib/utils';
 import { revalidatePath } from 'next/cache';
 import type { ContractWithTotals, InvoiceStatus } from '@/types/db';
@@ -95,6 +97,14 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       .eq('id', contract.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+    await insertContractAudit(supabase, {
+      contract_id: contract.id,
+      actor_email: actor.email,
+      action: 'invoice_marked_sent',
+      metadata: { invoice_sent_at: now },
+    });
+    revalidateContractPaths(contract.id);
+
     void notifySalesRepInvoiceSent({
       contractId: contract.id,
       companyName: contract.exhibitor_company_name,
@@ -123,6 +133,14 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       })
       .eq('id', contract.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    await insertContractAudit(supabase, {
+      contract_id: contract.id,
+      actor_email: actor.email,
+      action: 'invoice_marked_paid',
+      metadata: { paid_at: now },
+    });
+    revalidateContractPaths(contract.id);
 
     void notifySalesRepInvoicePaid({
       contractId: contract.id,

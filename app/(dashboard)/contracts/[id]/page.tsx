@@ -18,6 +18,8 @@ import { ContractLiveProvider } from '@/components/contracts/contract-live-conte
 import { ContractDetailRealtime } from '@/components/contracts/contract-detail-realtime';
 import { ContractTableOfContents } from '@/components/contracts/table-of-contents';
 import { ActivityTimeline } from '@/components/contracts/activity-timeline';
+import { ContractActivityLogger } from '@/components/contracts/contract-activity-logger';
+import { buildContractActivityTimeline } from '@/lib/contract-activity-timeline';
 import { PdfPreview } from '@/components/contracts/pdf-preview';
 import { ContractProgressionTimeline } from '@/components/contract/progression-timeline';
 import { ContractSummarySection } from '@/components/contract/contract-summary-section';
@@ -65,6 +67,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
 
   const lineItems = (lineItemsRows ?? []) as ContractLineItem[];
   const boothBrands = (boothBrandRows ?? []) as ContractBoothBrand[];
+  const activityTimeline = buildContractActivityTimeline(audit, contract);
 
   const isAdmin = actor.isAdmin;
   const isEventsTeam = actor.isEventsTeam;
@@ -448,9 +451,13 @@ export default async function ContractDetailPage({ params }: { params: { id: str
 
       <hr className="my-2 border-parchment-300" />
 
+      <ContractActivityLogger contractId={contract.id} />
       <section id="activity" className="space-y-4">
         <p className="wf-label-caps text-[0.6rem] text-ink-500">Activity Timeline</p>
-        <ActivityTimeline audit={audit} />
+        <p className="font-sans text-xs text-muted-foreground">
+          Creation, reviews, DocuSign signing, views, accounting steps, and other changes — newest at the bottom.
+        </p>
+        <ActivityTimeline audit={activityTimeline} />
       </section>
 
       {canInlinePdf ? (
@@ -665,95 +672,4 @@ function Detail({
       </span>
     </div>
   );
-}
-
-function describeAction(entry: AuditLogEntry): { title: string; detail?: string } {
-  const money = (v: unknown) => {
-    const n = typeof v === 'number' ? v : Number(v);
-    return Number.isFinite(n) ? formatCurrency(n) : '$0.00';
-  };
-
-  switch (entry.action) {
-    case 'created':
-      return { title: 'Contract created' };
-    case 'contract_created': {
-      const meta = entry.metadata as Record<string, unknown> | null;
-      const rep = String(meta?.rep_name ?? meta?.sales_rep_name ?? '');
-      const creatorName = meta?.created_by_name ? String(meta.created_by_name) : '';
-      if (meta?.on_behalf_of && creatorName && rep) {
-        return {
-          title: `Contract created by ${creatorName} on behalf of ${rep}`,
-        };
-      }
-      const ob = meta?.on_behalf_of ? ' (on behalf of sales rep)' : '';
-      return { title: `Contract created${ob}`, detail: rep ? `Sales rep: ${rep}` : undefined };
-    }
-    case 'status_changed': {
-      const fromLabel = entry.from_status ? formatStatus(entry.from_status) : 'Unknown';
-      const toLabel = entry.to_status ? formatStatus(entry.to_status) : 'Unknown';
-      return { title: `Status changed from ${fromLabel} to ${toLabel}` };
-    }
-    case 'pdf_generated': return { title: 'Draft PDF generated' };
-    case 'docusign_sent': return { title: 'Sent via DocuSign' };
-    case 'docusign_completed': return { title: 'DocuSign contract completed — signed PDF stored' };
-    case 'pdf_sent': return { title: 'Contract sent via DocuSign' };
-    case 'docusign_recalled': return { title: 'DocuSign contract recalled — contract unlocked for edit' };
-    case 'contract_recalled_to_draft': return { title: 'Contract recalled from DocuSign — returned to draft for editing' };
-    case 'docusign_resend_notification': return { title: 'DocuSign signing email resent' };
-    case 'docusign_send_reminder': return { title: 'DocuSign reminder sent' };
-    case 'docusign_resent_with_changes': return { title: 'DocuSign contract voided and resent with changes' };
-    case 'released_to_accounting': return { title: 'Released to accounting' };
-    case 'signer_contact_updated': return { title: 'Exhibitor signer contact updated' };
-    case 'discount_approved': {
-      const approver = entry.metadata?.approver_email ? String(entry.metadata.approver_email) : 'admin';
-      const reason = entry.metadata?.reason ? String(entry.metadata.reason) : '';
-      return {
-        title: `Discounted rate approved by ${approver}`,
-        detail: reason || undefined,
-      };
-    }
-    case 'discount_approval_reset':
-      return {
-        title: `Discount approval reset — booth rate changed from ${money(entry.metadata?.old_rate)} to ${money(entry.metadata?.new_rate)}`,
-      };
-    case 'events_submitted':
-      return { title: 'Submitted for events team review' };
-    case 'events_approved': {
-      const meta = entry.metadata as Record<string, unknown> | null;
-      const approver = meta?.approver ? String(meta.approver) : '';
-      const reason = meta?.reason ? String(meta.reason) : '';
-      return {
-        title: approver ? `Events approval granted by ${approver}` : 'Events approval granted',
-        detail: reason || undefined,
-      };
-    }
-    case 'events_sent_back': {
-      const meta = entry.metadata as Record<string, unknown> | null;
-      const sender = meta?.sender ? String(meta.sender) : '';
-      const reason = meta?.reason ? String(meta.reason) : '';
-      return {
-        title: sender ? `Sent back for changes by ${sender}` : 'Sent back for changes',
-        detail: reason || undefined,
-      };
-    }
-    case 'events_approval_reset': {
-      const meta = entry.metadata as Record<string, unknown> | null;
-      const oldApprover = meta?.old_approver ? String(meta.old_approver) : '';
-      const reason = meta?.reason ? String(meta.reason) : '';
-      return {
-        title: oldApprover
-          ? `Events approval cleared after PDF regeneration (was ${oldApprover})`
-          : 'Events approval cleared after PDF regeneration',
-        detail: reason || undefined,
-      };
-    }
-    case 'signed': return { title: 'Signed by exhibitor' };
-    case 'executed': return { title: 'Fully executed' };
-    case 'cancelled':
-      return { title: `Contract cancelled${entry.metadata?.reason ? ': ' + String(entry.metadata.reason) : ''}` };
-    case 'error_reset_to_draft':
-      return { title: 'Error cleared — contract reset to draft' };
-    default:
-      return { title: entry.action };
-  }
 }
