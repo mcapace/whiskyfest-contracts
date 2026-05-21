@@ -12,3 +12,9 @@ export {
   contractActionBtnPrimary,
   contractActionBtnSecondary,
 } from '@/components/contract/contract-action-bar';
+
+export {
+  ContractActionsSidebar,
+  ContractActionsSidebarGroup,
+  useContractActionsSidebar,
+} from '@/components/contract/contract-actions-sidebar';

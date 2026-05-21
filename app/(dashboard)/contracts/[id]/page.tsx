@@ -97,7 +97,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
 
   return (
     <ContractLiveProvider>
-    <div className="space-y-6 pb-28 md:pb-32">
+    <div className="space-y-6">
       <ContractDetailRealtime contractId={contract.id} />
       <div className="sticky top-0 z-30 -mx-4 border-b border-parchment-200/80 bg-parchment-50/95 px-4 py-3 backdrop-blur-sm supports-[backdrop-filter]:bg-parchment-50/85 md:-mx-6 md:px-6">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-sans text-sm text-muted-foreground">

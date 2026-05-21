@@ -19,15 +19,15 @@ import {
 } from 'lucide-react';
 import { ActionWithHelp } from '@/components/contract/action-with-help';
 import {
-  BottomActionBar,
-  ContractActionBarCell,
-  ContractActionBarGrid,
-  ContractActionBarRow,
-  ContractActionBarSection,
   contractActionBtnDanger,
   contractActionBtnPrimary,
   contractActionBtnSecondary,
 } from '@/components/contract/contract-action-bar';
+import {
+  ContractActionsSidebar,
+  ContractActionsSidebarGroup,
+  useContractActionsSidebar,
+} from '@/components/contract/contract-actions-sidebar';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { CONTRACT_ACTION_HELP } from '@/lib/contract-action-help-text';
@@ -291,38 +291,17 @@ export function ContractActions({
   const btnPrimary = contractActionBtnPrimary;
   const btnSecondary = contractActionBtnSecondary;
   const btnDanger = contractActionBtnDanger;
-
-  let actionsCount = 0;
-  if (status === 'draft') actionsCount += isAdmin ? 3 : 2;
-  if ((status === 'ready_for_review' || status === 'pending_events_review') && discountApprovalPending && isAdmin) actionsCount += 3;
-  if ((status === 'ready_for_review' || status === 'pending_events_review') && discountApprovalPending && !isAdmin) actionsCount += 2;
-  if (status === 'ready_for_review' && !discountApprovalPending) actionsCount += isAdmin ? 2 : 1;
-  if (status === 'pending_events_review' && !discountApprovalPending && isEventsTeam) actionsCount += draftPdfHref ? 3 : 2;
-  if (status === 'pending_events_review' && !discountApprovalPending && !isEventsTeam && isAdmin && draftPdfHref) actionsCount += 1;
-  if (status === 'approved') actionsCount += isAdmin ? 2 : 1;
-  if (canRelease) actionsCount += 1;
-  if (canReleaseImported) actionsCount += 1;
-  if (status === 'imported') {
-    if (signedPdfHref) actionsCount += 1;
-    if (canEditImported) actionsCount += 1;
-    if (canVoidImported) actionsCount += 1;
-  }
-  if (canEditVoided) actionsCount += 1;
-  if (status === 'executed' && signedPdfHref) actionsCount += 1;
-  if (status === 'error' && isAdmin) actionsCount += 2;
-  if (hasDocuSignSecondary) {
-    // Grouped section — always use stacked card layout
-    actionsCount = Math.max(actionsCount, 4);
-  } else if (canCancelInflightDocuSign) {
-    actionsCount += 1;
-  }
-  if (canCancelSigned) actionsCount += 1;
+  const { open: sidebarOpen, setOpen: setSidebarOpen } = useContractActionsSidebar(false);
 
   return (
     <>
       <div className="space-y-5">
         <TooltipProvider delayDuration={300} skipDelayDuration={200}>
-          <BottomActionBar visible={fabVisible} actionsCount={actionsCount}>
+          <ContractActionsSidebar
+            visible={fabVisible}
+            open={sidebarOpen}
+            onOpenChange={setSidebarOpen}
+          >
           {status === 'draft' && (
             <>
               <WhenDiscountBlocks active={discountApprovalPending}>
@@ -687,102 +666,88 @@ export function ContractActions({
             </>
           )}
           {hasDocuSignSecondary && (
-            <ContractActionBarSection>
-              <ContractActionBarGrid>
-                {canReminder && (
-                  <ContractActionBarCell>
-                    <ActionWithHelp helpText={CONTRACT_ACTION_HELP.sendReminder} className="w-full">
-                      <Button
-                        className={btnPrimary}
-                        onClick={() => runAction('send-reminder', 'reminder')}
-                        disabled={busy}
-                      >
-                        {pending && action === 'reminder' ? (
-                          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-                        ) : null}
-                        Send Reminder
-                      </Button>
-                    </ActionWithHelp>
-                  </ContractActionBarCell>
-                )}
-                {canSyncDocuSign && (
-                  <ContractActionBarCell>
-                    <ActionWithHelp helpText={CONTRACT_ACTION_HELP.syncFromDocusign} className="w-full">
-                      <Button
-                        className={btnSecondary}
-                        onClick={() => syncFromDocuSign()}
-                        disabled={busy || readOnly}
-                        title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
-                      >
-                        {pending && action === 'sync-docusign' ? (
-                          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-                        ) : null}
-                        Sync from DocuSign
-                      </Button>
-                    </ActionWithHelp>
-                  </ContractActionBarCell>
-                )}
-                {canResendWithChanges && (
-                  <ContractActionBarCell>
-                    <ActionWithHelp helpText={CONTRACT_ACTION_HELP.resendWithChanges} className="w-full">
-                      <Button
-                        className={btnSecondary}
-                        onClick={() => setOpenResendWithChanges(true)}
-                        disabled={readOnly}
-                        title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
-                      >
-                        Resend with Changes
-                      </Button>
-                    </ActionWithHelp>
-                  </ContractActionBarCell>
-                )}
-                {canRecall && (
-                  <ContractActionBarCell>
-                    <ActionWithHelp helpText={CONTRACT_ACTION_HELP.recall} className="w-full">
-                      <Button
-                        className={btnSecondary}
-                        onClick={() => setOpenRecall(true)}
-                        disabled={readOnly}
-                        title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
-                      >
-                        Recall Contract
-                      </Button>
-                    </ActionWithHelp>
-                  </ContractActionBarCell>
-                )}
-                {canVoid && (
-                  <ContractActionBarCell>
-                    <ActionWithHelp helpText={CONTRACT_ACTION_HELP.voidContract} className="w-full">
-                      <Button
-                        data-tour="contract-void-btn"
-                        className={btnDanger}
-                        onClick={() => setOpenVoid(true)}
-                        disabled={readOnly}
-                        title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
-                      >
-                        Void Contract
-                      </Button>
-                    </ActionWithHelp>
-                  </ContractActionBarCell>
-                )}
-                {canCancelInflightDocuSign && (
-                  <ContractActionBarCell>
-                    <ActionWithHelp helpText={CONTRACT_ACTION_HELP.cancel} className="w-full">
-                      <Button
-                        className={btnDanger}
-                        onClick={() => setOpenCancel(true)}
-                        disabled={readOnly}
-                        title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
-                      >
-                        Cancel Contract
-                      </Button>
-                    </ActionWithHelp>
-                  </ContractActionBarCell>
-                )}
-              </ContractActionBarGrid>
-            </ContractActionBarSection>
+            <ContractActionsSidebarGroup label="DocuSign">
+              {canReminder && (
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.sendReminder} className="w-full">
+                  <Button
+                    className={btnPrimary}
+                    onClick={() => runAction('send-reminder', 'reminder')}
+                    disabled={busy}
+                  >
+                    {pending && action === 'reminder' ? (
+                      <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                    ) : null}
+                    Send Reminder
+                  </Button>
+                </ActionWithHelp>
+              )}
+              {canSyncDocuSign && (
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.syncFromDocusign} className="w-full">
+                  <Button
+                    className={btnSecondary}
+                    onClick={() => syncFromDocuSign()}
+                    disabled={busy || readOnly}
+                    title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                  >
+                    {pending && action === 'sync-docusign' ? (
+                      <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                    ) : null}
+                    Sync from DocuSign
+                  </Button>
+                </ActionWithHelp>
+              )}
+              {canResendWithChanges && (
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.resendWithChanges} className="w-full">
+                  <Button
+                    className={btnSecondary}
+                    onClick={() => setOpenResendWithChanges(true)}
+                    disabled={readOnly}
+                    title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                  >
+                    Resend with Changes
+                  </Button>
+                </ActionWithHelp>
+              )}
+              {canRecall && (
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.recall} className="w-full">
+                  <Button
+                    className={btnSecondary}
+                    onClick={() => setOpenRecall(true)}
+                    disabled={readOnly}
+                    title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                  >
+                    Recall Contract
+                  </Button>
+                </ActionWithHelp>
+              )}
+              {canVoid && (
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.voidContract} className="w-full">
+                  <Button
+                    data-tour="contract-void-btn"
+                    className={btnDanger}
+                    onClick={() => setOpenVoid(true)}
+                    disabled={readOnly}
+                    title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                  >
+                    Void Contract
+                  </Button>
+                </ActionWithHelp>
+              )}
+              {canCancelInflightDocuSign && (
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.cancel} className="w-full">
+                  <Button
+                    className={btnDanger}
+                    onClick={() => setOpenCancel(true)}
+                    disabled={readOnly}
+                    title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                  >
+                    Cancel Contract
+                  </Button>
+                </ActionWithHelp>
+              )}
+            </ContractActionsSidebarGroup>
           )}
-        </BottomActionBar>
+        </ContractActionsSidebar>
         </TooltipProvider>
 
         {/* Status messages when there are no primary row buttons */}
@@ -1131,7 +1096,7 @@ function StatusLine({
       <p className="text-sm italic text-muted-foreground">
         {sentAt ? `Sent ${formatRelative(sentAt)}` : 'Sent'} · Waiting for {signerEmail ?? 'signer'} to sign
         {(isAdmin || isEventsTeam) && docusignEnvelopeId ? (
-          <> · If they already signed in DocuSign, use <span className="font-medium text-foreground">Sync from DocuSign</span>.</>
+          <> · If they already signed in DocuSign, open <span className="font-medium text-foreground">Actions</span> and use Sync from DocuSign.</>
         ) : null}
       </p>
     );
@@ -1187,7 +1152,7 @@ function StatusLine({
         <p>{errorDetails ?? 'Contract is in an error state. Check activity for details.'}</p>
         {(isAdmin || isEventsTeam) && docusignEnvelopeId ? (
           <p className="mt-1 text-xs text-red-700/90">
-            If DocuSign shows signatures completed, use <span className="font-medium">Sync from DocuSign</span>.
+            If DocuSign shows signatures completed, open Actions and use Sync from DocuSign.
           </p>
         ) : null}
       </div>
