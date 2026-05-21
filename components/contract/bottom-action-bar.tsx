@@ -7,6 +7,7 @@ export {
   ContractActionBarGrid,
   ContractActionBarRow,
   ContractActionBarSection,
+  ContractActionButtonLabel,
   contractActionBtn,
   contractActionBtnDanger,
   contractActionBtnPrimary,

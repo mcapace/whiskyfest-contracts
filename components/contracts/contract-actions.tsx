@@ -10,15 +10,21 @@ import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
 import {
   AlertTriangle,
   CheckCircle2,
+  CircleAlert,
   ExternalLink,
   FileText,
   Loader2,
+  Mail,
+  Pencil,
   RefreshCw,
+  Repeat2,
   Send,
   Undo2,
+  XCircle,
 } from 'lucide-react';
 import { ActionWithHelp } from '@/components/contract/action-with-help';
 import {
+  ContractActionButtonLabel,
   contractActionBtnDanger,
   contractActionBtnPrimary,
   contractActionBtnSecondary,
@@ -311,12 +317,11 @@ export function ContractActions({
                     onClick={() => runAction('generate', 'generate')}
                     disabled={busy || discountApprovalPending}
                   >
-                    {pending && action === 'generate' ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <FileText className="h-4 w-4" />
-                    )}
-                    Generate Draft PDF
+                    <ContractActionButtonLabel
+                      icon={FileText}
+                      label="Generate Draft PDF"
+                      spinning={pending && action === 'generate'}
+                    />
                   </Button>
                 </ActionWithHelp>
               </WhenDiscountBlocks>
@@ -328,13 +333,15 @@ export function ContractActions({
                     disabled
                     title={IMPERSONATION_BUTTON_TOOLTIP}
                   >
-                    Edit Contract
+                    <ContractActionButtonLabel icon={Pencil} label="Edit Contract" />
                   </Button>
                 </ActionWithHelp>
               ) : (
                 <ActionWithHelp helpText={CONTRACT_ACTION_HELP.editContract}>
                   <Button className={btnSecondary} asChild>
-                    <Link href={`/contracts/${contractId}/edit`}>Edit Contract</Link>
+                    <Link href={`/contracts/${contractId}/edit`}>
+                      <ContractActionButtonLabel icon={Pencil} label="Edit Contract" />
+                    </Link>
                   </Button>
                 </ActionWithHelp>
               )}
@@ -346,7 +353,7 @@ export function ContractActions({
                     disabled={readOnly}
                     title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
                   >
-                    Cancel Contract
+                    <ContractActionButtonLabel icon={XCircle} label="Cancel Contract" />
                   </Button>
                 </ActionWithHelp>
               )}
@@ -364,8 +371,7 @@ export function ContractActions({
                   disabled={readOnly}
                   title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
                 >
-                  <AlertTriangle className="h-4 w-4" />
-                  Approve Discount
+                  <ContractActionButtonLabel icon={AlertTriangle} label="Approve Discount" />
                 </Button>
               </ActionWithHelp>
               <WhenDiscountBlocks active={discountApprovalPending}>
@@ -375,12 +381,11 @@ export function ContractActions({
                     onClick={() => runAction('generate', 'regenerate')}
                     disabled={busy || discountApprovalPending}
                   >
-                    {pending && action === 'regenerate' ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4" />
-                    )}
-                    Re-generate PDF
+                    <ContractActionButtonLabel
+                      icon={RefreshCw}
+                      label="Re-generate PDF"
+                      spinning={pending && action === 'regenerate'}
+                    />
                   </Button>
                 </ActionWithHelp>
               </WhenDiscountBlocks>
@@ -391,7 +396,7 @@ export function ContractActions({
                   disabled={readOnly}
                   title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
                 >
-                  Cancel Contract
+                  <ContractActionButtonLabel icon={XCircle} label="Cancel Contract" />
                 </Button>
               </ActionWithHelp>
             </>
@@ -408,12 +413,11 @@ export function ContractActions({
                     onClick={() => runAction('generate', 'regenerate')}
                     disabled={busy || discountApprovalPending}
                   >
-                    {pending && action === 'regenerate' ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4" />
-                    )}
-                    Re-generate PDF
+                    <ContractActionButtonLabel
+                      icon={RefreshCw}
+                      label="Re-generate PDF"
+                      spinning={pending && action === 'regenerate'}
+                    />
                   </Button>
                 </ActionWithHelp>
               </WhenDiscountBlocks>
@@ -423,7 +427,7 @@ export function ContractActions({
                     disabled
                   title={DISCOUNT_ACTION_BLOCKED}
                 >
-                  Approve for Sending
+                  <ContractActionButtonLabel icon={Send} label="Approve for Sending" />
                 </Button>
               </ActionWithHelp>
             </>
@@ -437,8 +441,7 @@ export function ContractActions({
                   onClick={() => runAction('generate', 'regenerate')}
                   disabled={busy}
                 >
-                  <RefreshCw className="h-4 w-4" />
-                  Re-generate PDF (submit for events review)
+                  <ContractActionButtonLabel icon={RefreshCw} label="Re-generate PDF (submit for events review)" />
                 </Button>
               </ActionWithHelp>
               {isAdmin && (
@@ -449,7 +452,7 @@ export function ContractActions({
                     disabled={readOnly}
                     title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
                   >
-                    Cancel Contract
+                    <ContractActionButtonLabel icon={XCircle} label="Cancel Contract" />
                   </Button>
                 </ActionWithHelp>
               )}
@@ -464,31 +467,28 @@ export function ContractActions({
                   onClick={() => runAction('events-approve', 'events-approve', {}, 'approved')}
                   disabled={busy}
                 >
-                  {pending && action === 'events-approve' ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4" />
-                  )}
-                  Approve Contract
+                  <ContractActionButtonLabel
+                    icon={CheckCircle2}
+                    label="Approve Contract"
+                    spinning={pending && action === 'events-approve'}
+                  />
                 </Button>
               </ActionWithHelp>
               <ActionWithHelp helpText={CONTRACT_ACTION_HELP.sendBack}>
                 <Button
-                  variant="secondary"
-                  className={btnPrimary}
+                  className={btnSecondary}
                   onClick={() => setOpenSendBack(true)}
                   disabled={readOnly}
                   title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
                 >
-                  Send Back for Changes
+                  <ContractActionButtonLabel icon={Undo2} label="Send Back for Changes" />
                 </Button>
               </ActionWithHelp>
               {draftPdfHref && (
                 <ActionWithHelp helpText={CONTRACT_ACTION_HELP.viewDraftPdf}>
                   <Button className={btnSecondary} asChild>
                     <a href={draftPdfHref} target="_blank" rel="noreferrer">
-                      <ExternalLink className="h-4 w-4" />
-                      View Draft PDF
+                      <ContractActionButtonLabel icon={ExternalLink} label="View Draft PDF" />
                     </a>
                   </Button>
                 </ActionWithHelp>
@@ -500,8 +500,7 @@ export function ContractActions({
             <ActionWithHelp helpText={CONTRACT_ACTION_HELP.viewDraftPdf}>
               <Button className={btnSecondary} asChild>
                 <a href={draftPdfHref} target="_blank" rel="noreferrer">
-                  <ExternalLink className="h-4 w-4" />
-                  View Draft PDF
+                  <ContractActionButtonLabel icon={ExternalLink} label="View Draft PDF" />
                 </a>
               </Button>
             </ActionWithHelp>
@@ -516,12 +515,11 @@ export function ContractActions({
                     onClick={() => runAction('send', 'send', undefined, 'sent')}
                     disabled={busy || discountApprovalPending}
                   >
-                    {pending && action === 'send' ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                    Send via DocuSign
+                    <ContractActionButtonLabel
+                      icon={Send}
+                      label="Send via DocuSign"
+                      spinning={pending && action === 'send'}
+                    />
                   </Button>
                 </ActionWithHelp>
               </WhenDiscountBlocks>
@@ -533,7 +531,7 @@ export function ContractActions({
                     disabled={readOnly}
                     title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
                   >
-                    Cancel Contract
+                    <ContractActionButtonLabel icon={XCircle} label="Cancel Contract" />
                   </Button>
                 </ActionWithHelp>
               )}
@@ -548,12 +546,11 @@ export function ContractActions({
                   onClick={() => runAction('release', 'release', undefined, 'executed')}
                   disabled={busy || discountApprovalPending}
                 >
-                  {pending && action === 'release' ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4" />
-                  )}
-                  Release to Accounting
+                  <ContractActionButtonLabel
+                    icon={CheckCircle2}
+                    label="Release to Accounting"
+                    spinning={pending && action === 'release'}
+                  />
                 </Button>
               </ActionWithHelp>
             </WhenDiscountBlocks>
@@ -563,8 +560,7 @@ export function ContractActions({
             <ActionWithHelp helpText={CONTRACT_ACTION_HELP.viewSignedPdf}>
               <Button className={btnSecondary} asChild>
                 <a href={signedPdfHref} target="_blank" rel="noreferrer">
-                  <ExternalLink className="h-4 w-4" />
-                  View signed PDF
+                  <ContractActionButtonLabel icon={ExternalLink} label="View signed PDF" />
                 </a>
               </Button>
             </ActionWithHelp>
@@ -578,12 +574,11 @@ export function ContractActions({
                   onClick={() => runAction('release', 'release', undefined, 'executed')}
                   disabled={busy || discountApprovalPending}
                 >
-                  {pending && action === 'release' ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4" />
-                  )}
-                  Release to Accounting
+                  <ContractActionButtonLabel
+                    icon={CheckCircle2}
+                    label="Release to Accounting"
+                    spinning={pending && action === 'release'}
+                  />
                 </Button>
               </ActionWithHelp>
             </WhenDiscountBlocks>
@@ -592,7 +587,9 @@ export function ContractActions({
           {canEditImported && (
             <ActionWithHelp helpText={CONTRACT_ACTION_HELP.editImportedContract}>
               <Button className={btnSecondary} asChild>
-                <Link href={`/contracts/${contractId}/edit`}>Edit imported details</Link>
+                <Link href={`/contracts/${contractId}/edit`}>
+                  <ContractActionButtonLabel icon={Pencil} label="Edit imported details" />
+                </Link>
               </Button>
             </ActionWithHelp>
           )}
@@ -605,8 +602,7 @@ export function ContractActions({
                 disabled={readOnly}
                 title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
               >
-                <AlertTriangle className="h-4 w-4" />
-                Void record
+                <ContractActionButtonLabel icon={AlertTriangle} label="Void record" />
               </Button>
             </ActionWithHelp>
           )}
@@ -619,7 +615,7 @@ export function ContractActions({
                 disabled={readOnly}
                 title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
               >
-                Cancel Contract
+                <ContractActionButtonLabel icon={XCircle} label="Cancel Contract" />
               </Button>
             </ActionWithHelp>
           )}
@@ -627,7 +623,9 @@ export function ContractActions({
           {canEditVoided && (
             <ActionWithHelp helpText={CONTRACT_ACTION_HELP.editVoidedContract}>
               <Button className={btnSecondary} asChild>
-                <Link href={`/contracts/${contractId}/edit`}>Edit and re-send</Link>
+                <Link href={`/contracts/${contractId}/edit`}>
+                  <ContractActionButtonLabel icon={Repeat2} label="Edit and re-send" />
+                </Link>
               </Button>
             </ActionWithHelp>
           )}
@@ -636,8 +634,7 @@ export function ContractActions({
             <ActionWithHelp helpText={CONTRACT_ACTION_HELP.viewSignedPdf}>
               <Button className={btnSecondary} asChild>
                 <a href={signedPdfHref} target="_blank" rel="noreferrer">
-                  <ExternalLink className="h-4 w-4" />
-                  View Signed PDF
+                  <ContractActionButtonLabel icon={ExternalLink} label="View Signed PDF" />
                 </a>
               </Button>
             </ActionWithHelp>
@@ -647,7 +644,7 @@ export function ContractActions({
             <>
               <ActionWithHelp helpText={CONTRACT_ACTION_HELP.viewErrorDetails}>
                 <Button className={btnSecondary} onClick={() => setOpenErrorDetails(true)}>
-                  View Error Details
+                  <ContractActionButtonLabel icon={CircleAlert} label="View Error Details" />
                 </Button>
               </ActionWithHelp>
               <ActionWithHelp helpText={CONTRACT_ACTION_HELP.resetToDraft}>
@@ -659,8 +656,11 @@ export function ContractActions({
                   }}
                   disabled={busy}
                 >
-                  {pending && action === 'reset-error' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Undo2 className="h-4 w-4" />}
-                  Reset to Draft
+                  <ContractActionButtonLabel
+                    icon={Undo2}
+                    label="Reset to Draft"
+                    spinning={pending && action === 'reset-error'}
+                  />
                 </Button>
               </ActionWithHelp>
             </>
@@ -674,10 +674,11 @@ export function ContractActions({
                     onClick={() => runAction('send-reminder', 'reminder')}
                     disabled={busy}
                   >
-                    {pending && action === 'reminder' ? (
-                      <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-                    ) : null}
-                    Send Reminder
+                    <ContractActionButtonLabel
+                      icon={Mail}
+                      label="Send Reminder"
+                      spinning={pending && action === 'reminder'}
+                    />
                   </Button>
                 </ActionWithHelp>
               )}
@@ -689,10 +690,11 @@ export function ContractActions({
                     disabled={busy || readOnly}
                     title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
                   >
-                    {pending && action === 'sync-docusign' ? (
-                      <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-                    ) : null}
-                    Sync from DocuSign
+                    <ContractActionButtonLabel
+                      icon={RefreshCw}
+                      label="Sync from DocuSign"
+                      spinning={pending && action === 'sync-docusign'}
+                    />
                   </Button>
                 </ActionWithHelp>
               )}
@@ -704,7 +706,7 @@ export function ContractActions({
                     disabled={readOnly}
                     title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
                   >
-                    Resend with Changes
+                    <ContractActionButtonLabel icon={Repeat2} label="Resend with Changes" />
                   </Button>
                 </ActionWithHelp>
               )}
@@ -716,7 +718,7 @@ export function ContractActions({
                     disabled={readOnly}
                     title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
                   >
-                    Recall Contract
+                    <ContractActionButtonLabel icon={Undo2} label="Recall Contract" />
                   </Button>
                 </ActionWithHelp>
               )}
@@ -729,7 +731,7 @@ export function ContractActions({
                     disabled={readOnly}
                     title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
                   >
-                    Void Contract
+                    <ContractActionButtonLabel icon={AlertTriangle} label="Void Contract" />
                   </Button>
                 </ActionWithHelp>
               )}
@@ -741,7 +743,7 @@ export function ContractActions({
                     disabled={readOnly}
                     title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
                   >
-                    Cancel Contract
+                    <ContractActionButtonLabel icon={XCircle} label="Cancel Contract" />
                   </Button>
                 </ActionWithHelp>
               )}

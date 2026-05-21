@@ -114,7 +114,7 @@ export function ContractActionsSidebar({
           className={cn(
             'min-h-0 flex-1 overflow-y-auto px-3 py-3',
             'flex flex-col gap-2',
-            '[&_span]:flex [&_span]:w-full [&_button]:w-full',
+            '[&_span]:flex [&_span]:w-full [&_button]:w-full [&_a]:inline-flex [&_a]:w-full',
           )}
         >
           {children}
