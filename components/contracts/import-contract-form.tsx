@@ -40,6 +40,13 @@ export function ImportContractForm({
 
   const defaultEvent = events[0];
   const [eventId, setEventId] = useState(defaultEvent?.id ?? '');
+
+  const resolvedEventId =
+    eventId && events.some((ev) => ev.id === eventId) ? eventId : (events[0]?.id ?? undefined);
+
+  useEffect(() => {
+    if (!eventId && events[0]?.id) setEventId(events[0].id);
+  }, [eventId, events]);
   const [exhibitorCompany, setExhibitorCompany] = useState('');
   const [exhibitorLegal, setExhibitorLegal] = useState('');
   const [signerName, setSignerName] = useState('');
@@ -98,7 +105,7 @@ export function ImportContractForm({
     e.preventDefault();
     setErr(null);
 
-    if (!eventId) {
+    if (!resolvedEventId) {
       setErr('Select an event.');
       return;
     }
@@ -142,15 +149,18 @@ export function ImportContractForm({
       }
     }
 
-    const booth_brands = Array.from({ length: boothCount }, (_, i) => ({
-      booth_index: i + 1,
-      brand_name: boothBrandRows[i]!.brand_name.trim(),
-      expressions: (boothBrandRows[i]!.expressions ?? []).filter(Boolean),
-    }));
+    const booth_brands = Array.from({ length: boothCount }, (_, i) => {
+      const row = boothBrandRows[i] ?? { brand_name: '', expressions: [] };
+      return {
+        booth_index: i + 1,
+        brand_name: row.brand_name.trim(),
+        expressions: (row.expressions ?? []).filter(Boolean),
+      };
+    });
 
     startTransition(async () => {
       const fd = new FormData();
-      fd.set('event_id', eventId);
+      fd.set('event_id', resolvedEventId);
       fd.set('exhibitor_company_name', exhibitorCompany.trim());
       fd.set('exhibitor_legal_name', exhibitorLegal.trim());
       fd.set('signer_1_name', signerName.trim());
@@ -206,7 +216,20 @@ export function ImportContractForm({
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-6"
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' || e.defaultPrevented) return;
+          const t = e.target as HTMLElement;
+          if (t.tagName === 'TEXTAREA' || t.tagName === 'BUTTON') return;
+          if (t.tagName === 'INPUT') {
+            const inp = t as HTMLInputElement;
+            if (inp.type === 'submit' || inp.type === 'file') return;
+            e.preventDefault();
+          }
+        }}
+      >
         {err ? (
           <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {err}
@@ -220,18 +243,26 @@ export function ImportContractForm({
           </CardHeader>
           <CardContent>
             <Label htmlFor="import-event">Event</Label>
-            <Select value={eventId} onValueChange={setEventId}>
-              <SelectTrigger id="import-event" className="mt-1.5">
-                <SelectValue placeholder="Select event" />
-              </SelectTrigger>
-              <SelectContent>
-                {events.map((ev) => (
-                  <SelectItem key={ev.id} value={ev.id}>
-                    {ev.name} — {formatLongDate(ev.event_date)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {events.length === 0 ? (
+              <p className="mt-1.5 text-sm text-destructive">No active events — contact an admin.</p>
+            ) : (
+              <Select
+                value={resolvedEventId}
+                onValueChange={setEventId}
+                required
+              >
+                <SelectTrigger id="import-event" className="mt-1.5">
+                  <SelectValue placeholder="Select event" />
+                </SelectTrigger>
+                <SelectContent>
+                  {events.map((ev) => (
+                    <SelectItem key={ev.id} value={ev.id}>
+                      {ev.name} — {formatLongDate(ev.event_date)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </CardContent>
         </Card>
 

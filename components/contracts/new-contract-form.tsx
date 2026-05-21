@@ -198,7 +198,16 @@ export function NewContractForm({
     return medianBoothCountForCompany(priorContracts, n);
   }, [priorContracts, form.exhibitor_company_name]);
 
-  const selectedEvent = events.find(e => e.id === form.event_id);
+  const resolvedEventId =
+    form.event_id && events.some((e) => e.id === form.event_id) ? form.event_id : events[0]?.id;
+
+  useEffect(() => {
+    if (!form.event_id && events[0]?.id) {
+      setForm((f) => ({ ...f, event_id: events[0]!.id }));
+    }
+  }, [events, form.event_id]);
+
+  const selectedEvent = events.find((e) => e.id === (resolvedEventId ?? form.event_id));
   const boothSubtotal = form.booth_count * form.booth_rate_cents;
   const lineItemsSumCents = lineItems.reduce((acc, row) => {
     const raw = row.amountInput.trim().replace(/[$,]/g, '');
@@ -272,7 +281,7 @@ export function NewContractForm({
     setErr(null);
     if (readOnly) return;
 
-    if (!form.event_id) { setErr('Please select an event'); return; }
+    if (!resolvedEventId) { setErr('Please select an event'); return; }
     if (!form.exhibitor_company_name) { setErr('Company name required'); return; }
     if (!form.exhibitor_legal_name)   { setErr('Legal name required'); return; }
     if (!form.sales_rep_id) { setErr('Sales rep is required'); return; }
@@ -318,7 +327,7 @@ export function NewContractForm({
       const url = editContractId ? `/api/contracts/${editContractId}` : '/api/contracts';
       const method = editContractId ? 'PATCH' : 'POST';
 
-      const formForSave = { ...form, booth_count: boothCountNorm };
+      const formForSave = { ...form, event_id: resolvedEventId, booth_count: boothCountNorm };
       const booth_brands = rowsForSave.map((row, i) => ({
         booth_index: i + 1,
         brand_name: row.brand_name.trim(),
@@ -373,7 +382,20 @@ export function NewContractForm({
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-6"
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' || e.defaultPrevented) return;
+          const t = e.target as HTMLElement;
+          if (t.tagName === 'TEXTAREA' || t.tagName === 'BUTTON') return;
+          if (t.tagName === 'INPUT') {
+            const inp = t as HTMLInputElement;
+            if (inp.type === 'submit' || inp.type === 'file') return;
+            e.preventDefault();
+          }
+        }}
+      >
         {/* Event */}
         <Card>
           <CardHeader>
@@ -381,16 +403,24 @@ export function NewContractForm({
             <CardDescription>Which WhiskyFest is this for?</CardDescription>
           </CardHeader>
           <CardContent>
-            <Select value={form.event_id} onValueChange={v => set('event_id', v)}>
-              <SelectTrigger><SelectValue placeholder="Select event" /></SelectTrigger>
-              <SelectContent>
-                {events.map(e => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.name} — {formatLongDate(e.event_date)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {events.length === 0 ? (
+              <p className="text-sm text-destructive">No active events — contact an admin.</p>
+            ) : (
+              <Select
+                value={resolvedEventId}
+                onValueChange={(v) => set('event_id', v)}
+                required
+              >
+                <SelectTrigger><SelectValue placeholder="Select event" /></SelectTrigger>
+                <SelectContent>
+                  {events.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.name} — {formatLongDate(e.event_date)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </CardContent>
         </Card>
 

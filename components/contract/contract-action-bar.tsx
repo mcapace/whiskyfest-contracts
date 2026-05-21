@@ -20,14 +20,14 @@ export function ContractActionButtonLabel({
   spinning?: boolean;
 }) {
   return (
-    <>
+    <span className="inline-flex w-full min-w-0 items-center justify-start gap-2">
       {spinning ? (
         <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
       ) : (
         <Icon className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
       )}
       <span className="truncate">{label}</span>
-    </>
+    </span>
   );
 }
 

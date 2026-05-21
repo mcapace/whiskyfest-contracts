@@ -45,8 +45,10 @@ export function findReturningSponsor(
       c.exhibitor_company_name?.trim().toLowerCase() === q,
   );
   if (!prior) return null;
+  const company = prior.exhibitor_company_name?.trim() ?? '';
+  if (!company) return null;
   return {
-    company: prior.exhibitor_company_name.trim(),
+    company,
     brandsPoured: prior.brands_poured?.trim() ?? '',
     boothCount: prior.booth_count,
     boothRateCents: prior.booth_rate_cents,

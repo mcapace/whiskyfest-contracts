@@ -66,6 +66,12 @@ export function BoothBrandInput({ boothNumber, value, onChange, disabled }: Prop
           id={`booth-brand-name-${boothNumber}`}
           value={value.brand_name}
           onChange={(e) => onChange({ ...value, brand_name: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          }}
           placeholder="e.g. Don Julio"
           autoComplete="off"
           disabled={disabled}
@@ -123,6 +129,7 @@ export function BoothBrandInput({ boothNumber, value, onChange, disabled }: Prop
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault();
+              e.stopPropagation();
               if (draft.trim()) commitTokens(draft);
             } else if (e.key === 'Backspace' && draft === '' && value.expressions.length > 0) {
               removeExpression(value.expressions.length - 1);
