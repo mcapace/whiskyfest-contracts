@@ -195,6 +195,27 @@ export function ContractActions({
     });
   }
 
+  async function syncFromDocuSign() {
+    setAction('sync-docusign');
+    startTransition(async () => {
+      const res = await fetch(`/api/contracts/${contractId}/sync-docusign`, { method: 'POST' });
+      const j = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        message?: string;
+        changed?: boolean;
+      };
+      if (res.ok) {
+        emitContractActionSuccessFeedback(Boolean(session?.user?.sound_enabled));
+        alert(j.message ?? (j.changed ? 'Synced from DocuSign.' : 'No change needed.'));
+        router.refresh();
+        queueMicrotask(() => router.refresh());
+      } else {
+        alert(`Sync failed: ${j.error ?? res.status}`);
+      }
+      setAction(null);
+    });
+  }
+
   const canReminder = isAdmin && (status === 'sent' || status === 'partially_signed') && Boolean(docusignEnvelopeId);
   const canRecall =
     (isAdmin || isEventsTeam) &&
@@ -205,8 +226,13 @@ export function ContractActions({
     (isAdmin || isEventsTeam) &&
     (status === 'sent' || status === 'partially_signed') &&
     Boolean(docusignEnvelopeId);
-  /** In-flight DocuSign: reminder / recall / resend-with-changes / void */
-  const hasDocuSignSecondary = canReminder || canResendWithChanges || canRecall || canVoid;
+  const canSyncDocuSign =
+    (isAdmin || isEventsTeam) &&
+    Boolean(docusignEnvelopeId) &&
+    (status === 'sent' || status === 'partially_signed' || status === 'error');
+  /** In-flight DocuSign: reminder / recall / resend-with-changes / void / sync */
+  const hasDocuSignSecondary =
+    canReminder || canResendWithChanges || canRecall || canVoid || canSyncDocuSign;
   /** Cancel contract while envelope is out (API allows cancel except executed/cancelled). */
   const canCancelInflightDocuSign =
     (status === 'sent' || status === 'partially_signed') && (isAdmin || isEventsTeam);
@@ -280,6 +306,7 @@ export function ContractActions({
     if (canResendWithChanges) actionsCount += 1;
     if (canRecall) actionsCount += 1;
     if (canVoid) actionsCount += 1;
+    if (canSyncDocuSign) actionsCount += 1;
   }
   if (canCancelInflightDocuSign) actionsCount += 1;
   if (canCancelSigned) actionsCount += 1;
@@ -719,6 +746,24 @@ export function ContractActions({
                 </Button>
               </ActionWithHelp>
             )}
+            {canSyncDocuSign && (
+              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.syncFromDocusign}>
+                <Button
+                  variant="outline"
+                  className={fabBtn}
+                  onClick={() => syncFromDocuSign()}
+                  disabled={busy || readOnly}
+                  title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                >
+                  {pending && action === 'sync-docusign' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  Sync from DocuSign
+                </Button>
+              </ActionWithHelp>
+            )}
             </>
           )}
 
@@ -749,6 +794,8 @@ export function ContractActions({
           releasedBy={releasedBy}
           releasedAt={releasedAt}
           isAdmin={isAdmin}
+          isEventsTeam={isEventsTeam}
+          docusignEnvelopeId={docusignEnvelopeId}
           cancelledReason={cancelledReason}
           cancelledAt={cancelledAt}
           cancelledBy={cancelledBy}
@@ -1046,6 +1093,8 @@ function StatusLine({
   releasedBy,
   releasedAt,
   isAdmin,
+  isEventsTeam,
+  docusignEnvelopeId,
   cancelledReason,
   cancelledAt,
   cancelledBy,
@@ -1060,6 +1109,8 @@ function StatusLine({
   releasedBy: string | null;
   releasedAt: string | null;
   isAdmin: boolean;
+  isEventsTeam: boolean;
+  docusignEnvelopeId: string | null;
   cancelledReason: string | null;
   cancelledAt: string | null;
   cancelledBy: string | null;
@@ -1077,6 +1128,9 @@ function StatusLine({
     return (
       <p className="text-sm italic text-muted-foreground">
         {sentAt ? `Sent ${formatRelative(sentAt)}` : 'Sent'} · Waiting for {signerEmail ?? 'signer'} to sign
+        {(isAdmin || isEventsTeam) && docusignEnvelopeId ? (
+          <> · If they already signed in DocuSign, use <span className="font-medium text-foreground">Sync from DocuSign</span>.</>
+        ) : null}
       </p>
     );
   }
@@ -1129,6 +1183,11 @@ function StatusLine({
       <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
         <p className="font-medium">Error sending contract</p>
         <p>{errorDetails ?? 'Contract is in an error state. Check activity for details.'}</p>
+        {(isAdmin || isEventsTeam) && docusignEnvelopeId ? (
+          <p className="mt-1 text-xs text-red-700/90">
+            If DocuSign shows signatures completed, use <span className="font-medium">Sync from DocuSign</span>.
+          </p>
+        ) : null}
       </div>
     );
   }

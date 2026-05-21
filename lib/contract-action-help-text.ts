@@ -8,6 +8,9 @@ export const CONTRACT_ACTION_HELP = {
 
   sendReminder: 'Follow-up email to unsigned recipients.',
 
+  syncFromDocusign:
+    'Pull the latest signature status from DocuSign and update this contract if a webhook was missed (exhibitor signed or fully executed).',
+
   resendWithChanges: 'Recall current envelope, edit contract, send new envelope.',
 
   recall:

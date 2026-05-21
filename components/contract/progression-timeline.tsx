@@ -43,9 +43,18 @@ function auditForStage(stage: (typeof STAGE_ORDER)[number], auditChronological: 
           (e.action === 'status_changed' && e.to_status === 'sent'),
       );
     case 'partially_signed':
-      return pick((e) => e.action === 'status_changed' && e.to_status === 'partially_signed');
+      return pick(
+        (e) =>
+          e.action === 'exhibitor_signed' ||
+          (e.action === 'status_changed' && e.to_status === 'partially_signed'),
+      );
     case 'signed':
-      return pick((e) => e.action === 'signed' || (e.action === 'status_changed' && e.to_status === 'signed'));
+      return pick(
+        (e) =>
+          e.action === 'signed' ||
+          e.action === 'docusign_completed' ||
+          (e.action === 'status_changed' && e.to_status === 'signed'),
+      );
     case 'executed':
       return pick(
         (e) =>

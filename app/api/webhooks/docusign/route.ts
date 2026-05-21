@@ -1,18 +1,13 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { fetchEnvelopeSigners } from '@/lib/docusign';
 import {
-  downloadCompletedPdf,
-  extractCountersignerFromSigners,
-  fetchEnvelopeSigners,
-  fetchRecipientTextTabs,
-} from '@/lib/docusign';
-import { buildExhibitorCaptureDbPatch, textTabsToLabelMap } from '@/lib/docusign-exhibitor-capture';
-import { uploadPdfBufferToFolder } from '@/lib/google';
-import { contractSignedPdfPath, uploadContractPdfToStorage } from '@/lib/contract-pdf-storage';
+  applyEnvelopeFullySigned,
+  applyExhibitorPartialSignature,
+} from '@/lib/docusign-envelope-sync';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
-import { appendContractRow, updateContractRow } from '@/lib/sheets-tracker';
-import { notifyContractFullySigned, notifyPartialSignature } from '@/lib/notifications';
+import { updateContractRow } from '@/lib/sheets-tracker';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
@@ -83,6 +78,17 @@ function verifyHmac(rawBody: string, signatureHeader: string | null, secret: str
   } catch {
     return false;
   }
+}
+
+function isFirstSignerEvent(
+  recipientId: string | null,
+  routingOrder: string | null,
+  signers: Awaited<ReturnType<typeof fetchEnvelopeSigners>>,
+): boolean {
+  if (routingOrder === '1' || recipientId === '1') return true;
+  const r1 = signers.find((s) => s.routingOrder === '1') ?? signers[0];
+  if (!r1?.recipientId || !recipientId) return routingOrder !== '2' && recipientId !== '2';
+  return r1.recipientId === recipientId;
 }
 
 export async function POST(req: Request) {
@@ -162,163 +168,51 @@ export async function POST(req: Request) {
     return new NextResponse(null, { status: 200 });
   }
 
-  // --- Exhibitor (routing order 1) completed → partially_signed; countersign invite goes to event signatory (routing 2) ---
-  const firstSigner = recipientId === '1' || routingOrder === '1';
-  if (
-    eventType.includes('recipient-completed') &&
-    firstSigner &&
-    contract.status === 'sent'
-  ) {
-    let exhibitorCapture: ReturnType<typeof buildExhibitorCaptureDbPatch> = null;
-    try {
-      const signersForTabs = await fetchEnvelopeSigners(envelopeId);
-      const exhibitorRecipientId =
-        signersForTabs.find((s) => s.routingOrder === '1')?.recipientId?.trim() || '1';
-      const tabs = await fetchRecipientTextTabs(envelopeId, exhibitorRecipientId);
-      const map = textTabsToLabelMap(tabs);
-      exhibitorCapture = buildExhibitorCaptureDbPatch(map);
-      if (!exhibitorCapture) {
-        console.warn('[docusign-webhook] exhibitor text tabs missing or incomplete (legacy envelope or template)', {
-          contractId: contract.id,
-          envelopeId,
-          tabLabelsReceived: tabs.map((t) => t.tabLabel),
-        });
-      }
-    } catch (e) {
-      console.error('[docusign-webhook] fetchRecipientTextTabs failed', {
-        contractId: contract.id,
-        envelopeId,
-        error: e instanceof Error ? e.message : String(e),
-      });
-    }
-
-    const { error: partialUpdateErr } = await supabase
-      .from('contracts')
-      .update({
-        status: 'partially_signed',
-        ...(exhibitorCapture ?? {}),
-      })
-      .eq('id', contract.id);
-    if (partialUpdateErr) {
-      console.error('[docusign-webhook] partially_signed update failed', partialUpdateErr);
-    }
-    revalidateContractPaths(contract.id);
-
-    const { data: afterPartial } = await supabase
-      .from('contracts_with_totals')
-      .select('*')
-      .eq('id', contract.id)
-      .maybeSingle<ContractWithTotals>();
-    if (afterPartial) {
-      try {
-        await appendContractRow(afterPartial);
-      } catch (err) {
-        console.error('Failed to append to Sheets tracker', err);
-      }
-    }
-
-    void notifyPartialSignature(contract, event ?? null).catch((err) =>
-      console.error('[notifyPartialSignature]', err),
-    );
-
-    return new NextResponse(null, { status: 200 });
-  }
-
-  // --- Fully completed ---
+  // --- Fully completed (check before partial — countersigner may finish without a separate partial event) ---
   const completed =
     eventType.includes('envelope-completed') ||
     eventType.includes('envelope_completed') ||
     envelopeStatus === 'completed';
 
-  if (!completed) {
-    return new NextResponse(null, { status: 200 });
-  }
-
-  if (contract.status === 'signed' || contract.status === 'executed') {
-    return new NextResponse(null, { status: 200 });
-  }
-
-  try {
-    let countersigner = null as ReturnType<typeof extractCountersignerFromSigners>;
+  if (completed && contract.status !== 'signed' && contract.status !== 'executed') {
     try {
-      const signers = await fetchEnvelopeSigners(envelopeId);
-      countersigner = extractCountersignerFromSigners(signers);
-    } catch (recErr) {
-      console.error('DocuSign webhook: fetchEnvelopeSigners failed', recErr);
+      await applyEnvelopeFullySigned(supabase, contract, event ?? null, envelopeId);
+    } catch (err) {
+      console.error('DocuSign completion handling failed:', err);
+      await supabase
+        .from('contracts')
+        .update({
+          status: 'error',
+          notes: `DocuSign webhook error: ${err instanceof Error ? err.message : String(err)}`,
+        })
+        .eq('id', contract.id);
+      revalidateContractPaths(contract.id);
+      return new NextResponse(null, { status: 500 });
     }
+    return new NextResponse(null, { status: 200 });
+  }
 
-    const pdfBytes = await downloadCompletedPdf(envelopeId);
-    const signedFolderId = process.env.GOOGLE_SIGNED_FOLDER_ID!;
-    const safeName = contract.exhibitor_company_name.replace(/[^\w\s-]/g, '');
-    const year = event?.year ?? new Date().getFullYear();
-    const fileBase = `${safeName} — WhiskyFest ${year} Contract (SIGNED)`;
-
-    const { fileId, webViewLink } = await uploadPdfBufferToFolder(pdfBytes, fileBase, signedFolderId);
-
-    const signedStoragePath = contractSignedPdfPath(contract.id);
-    await uploadContractPdfToStorage(signedStoragePath, pdfBytes);
-
-    const now = new Date().toISOString();
-
-    await supabase
-      .from('contracts')
-      .update({
-        status: 'signed',
-        signed_pdf_drive_id: fileId,
-        signed_pdf_url: webViewLink,
-        pdf_storage_path: signedStoragePath,
-        signed_at: now,
-        countersigned_by_email: countersigner?.email ?? null,
-        countersigned_by_name: countersigner?.name ?? null,
-        countersigned_at: countersigner?.signedDateTime ?? null,
-      })
-      .eq('id', contract.id);
-
-    await supabase.from('audit_log').insert({
-      contract_id: contract.id,
-      actor_email: null,
-      action: 'docusign_completed',
-      metadata: {
-        envelope_id: envelopeId,
-        signed_pdf_url: webViewLink,
-        release_required: true,
-        countersigned_by_email: countersigner?.email ?? null,
-        countersigned_by_name: countersigner?.name ?? null,
-      },
-    });
-
-    revalidateContractPaths(contract.id);
-
-    const { data: afterSigned } = await supabase
-      .from('contracts_with_totals')
-      .select('*')
-      .eq('id', contract.id)
-      .maybeSingle<ContractWithTotals>();
-    if (afterSigned) {
+  // --- Exhibitor (routing order 1) completed → partially_signed ---
+  if (eventType.includes('recipient-completed') && contract.status === 'sent') {
+    let firstSigner = routingOrder === '1' || recipientId === '1';
+    if (!firstSigner) {
       try {
-        await updateContractRow(afterSigned);
-      } catch (err) {
-        console.error('Failed to update Sheets tracker', err);
+        const signers = await fetchEnvelopeSigners(envelopeId);
+        firstSigner = isFirstSignerEvent(recipientId, routingOrder, signers);
+      } catch (e) {
+        console.error('[docusign-webhook] fetchEnvelopeSigners for routing', e);
+        firstSigner = routingOrder !== '2' && recipientId !== '2';
       }
     }
 
-    const countersignerDisplayName =
-      countersigner?.name?.trim() || event?.shanken_signatory_name?.trim() || 'Countersigner';
-
-    void notifyContractFullySigned(contract, event ?? null, countersignerDisplayName).catch((err) =>
-      console.error('[notifyContractFullySigned]', err),
-    );
-  } catch (err) {
-    console.error('DocuSign completion handling failed:', err);
-    await supabase
-      .from('contracts')
-      .update({
-        status: 'error',
-        notes: `DocuSign webhook error: ${err instanceof Error ? err.message : String(err)}`,
-      })
-      .eq('id', contract.id);
-    revalidateContractPaths(contract.id);
-    return new NextResponse(null, { status: 500 });
+    if (firstSigner) {
+      try {
+        await applyExhibitorPartialSignature(supabase, contract, event ?? null, envelopeId);
+      } catch (e) {
+        console.error('[docusign-webhook] partially_signed apply failed', e);
+      }
+      return new NextResponse(null, { status: 200 });
+    }
   }
 
   return new NextResponse(null, { status: 200 });

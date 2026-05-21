@@ -266,6 +266,27 @@ export async function fetchRecipientTextTabs(
     .filter((x) => x.tabLabel.length > 0);
 }
 
+/** Current envelope status from DocuSign (e.g. sent, delivered, completed, voided). */
+export async function fetchEnvelopeStatus(envelopeId: string): Promise<{ status: string }> {
+  const accessToken = await getAccessToken();
+  const { accountId, restApiBase } = await resolveApiContext(accessToken);
+  const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/json',
+    },
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`DocuSign getEnvelope ${res.status}: ${text}`);
+  }
+  const data = JSON.parse(text) as { status?: string; Status?: string };
+  const status = String(data.status ?? data.Status ?? '').trim();
+  if (!status) throw new Error('DocuSign getEnvelope: missing status');
+  return { status };
+}
+
 export async function fetchEnvelopeSigners(envelopeId: string): Promise<DocuSignSignerRow[]> {
   const accessToken = await getAccessToken();
   const { accountId, restApiBase } = await resolveApiContext(accessToken);
