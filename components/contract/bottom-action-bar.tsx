@@ -3,11 +3,12 @@
  */
 export {
   BottomActionBar,
+  ContractActionBarCell,
+  ContractActionBarGrid,
   ContractActionBarRow,
   ContractActionBarSection,
   contractActionBtn,
   contractActionBtnDanger,
-  contractActionBtnDangerSolid,
   contractActionBtnPrimary,
   contractActionBtnSecondary,
 } from '@/components/contract/contract-action-bar';

@@ -3,39 +3,32 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-/** Shared button sizing for the contract bottom action bar. */
+/** Compact, equal-width controls for the contract bottom bar. */
 export const contractActionBtn =
-  'h-9 shrink-0 gap-2 rounded-lg px-3.5 text-sm font-medium motion-safe:transition-colors';
+  'h-8 w-full gap-1.5 rounded-md px-2 text-xs font-medium motion-safe:transition-colors';
 
 export const contractActionBtnPrimary =
-  `${contractActionBtn} bg-fest-700 text-parchment-50 shadow-sm hover:bg-fest-800`;
+  `${contractActionBtn} border border-fest-600/20 bg-background text-fest-800 hover:bg-fest-50/80`;
 
 export const contractActionBtnSecondary =
-  `${contractActionBtn} border border-border bg-background text-foreground hover:bg-muted/60`;
+  `${contractActionBtn} border border-border/60 bg-background text-foreground hover:bg-muted/50`;
 
-/** Outline — cancel, secondary destructive */
 export const contractActionBtnDanger =
-  `${contractActionBtn} border border-danger-base/35 bg-background text-danger-base hover:bg-danger-bg/50`;
-
-/** Solid — void and other irreversible actions */
-export const contractActionBtnDangerSolid =
-  `${contractActionBtn} bg-danger-base text-white shadow-sm hover:bg-danger-base/90`;
+  `${contractActionBtn} border border-danger-base/25 bg-background text-danger-base hover:bg-danger-bg/40`;
 
 /**
- * Fixed bottom action bar — card layout with optional grouped sections.
+ * Fixed bottom action bar — compact, centered, low visual weight.
  */
 export function BottomActionBar({
   visible,
   children,
-  actionsCount,
 }: {
   visible: boolean;
   children: ReactNode;
-  actionsCount: number;
+  /** @deprecated Layout no longer depends on action count. */
+  actionsCount?: number;
 }) {
   if (!visible) return null;
-
-  const stacked = actionsCount >= 4;
 
   return (
     <div
@@ -44,19 +37,19 @@ export function BottomActionBar({
         'lg:left-64',
       )}
     >
-      <div className="pointer-events-auto mx-auto w-full max-w-3xl lg:max-w-4xl">
+      <div className="pointer-events-auto mx-auto flex w-full max-w-md justify-center sm:max-w-lg">
         <div
           className={cn(
-            'overflow-hidden rounded-xl border border-border/70',
-            'bg-card/95 shadow-xl backdrop-blur-md',
-            stacked ? '' : 'px-3 py-2.5',
+            'w-full rounded-lg border border-border/40',
+            'bg-background/92 px-2 py-2 shadow-sm backdrop-blur-sm',
           )}
         >
           <div
             className={cn(
-              stacked
-                ? 'flex flex-col divide-y divide-border/60'
-                : 'flex flex-wrap items-center justify-end gap-2',
+              'flex w-full flex-wrap items-stretch justify-center gap-1.5',
+              '[&>div]:w-full',
+              '[&>span]:min-w-0 [&>span]:flex-1 [&>span]:basis-[calc(50%-0.375rem)] sm:[&>span]:min-w-[7.25rem] sm:[&>span]:max-w-[9.5rem]',
+              '[&_button]:w-full',
             )}
           >
             {children}
@@ -67,45 +60,26 @@ export function BottomActionBar({
   );
 }
 
-/**
- * Grouped block inside the action bar (e.g. DocuSign controls).
- */
-export function ContractActionBarSection({
-  title,
-  description,
-  children,
-  tone = 'default',
-}: {
-  title?: string;
-  description?: string;
-  children: ReactNode;
-  tone?: 'default' | 'danger';
-}) {
+/** Wrapper for grouped actions (e.g. DocuSign). */
+export function ContractActionBarSection({ children }: { children: ReactNode }) {
+  return <div className="w-full min-w-0">{children}</div>;
+}
+
+/** Two-column grid — equal cell widths for symmetrical layout. */
+export function ContractActionBarGrid({ children }: { children: ReactNode }) {
   return (
-    <div
-      className={cn(
-        'px-4 py-3',
-        tone === 'danger' && 'bg-danger-bg/30',
-      )}
-    >
-      {(title || description) && (
-        <div className="mb-2.5 space-y-0.5">
-          {title ? (
-            <p className="font-sans text-xs font-semibold uppercase tracking-wide text-foreground">
-              {title}
-            </p>
-          ) : null}
-          {description ? (
-            <p className="font-sans text-xs leading-snug text-muted-foreground">{description}</p>
-          ) : null}
-        </div>
-      )}
-      {children}
-    </div>
+    <div className="grid w-full grid-cols-2 gap-1.5">{children}</div>
   );
 }
 
-/** Row of actions within a section. */
+/** One grid cell; stretches the action control to full cell width. */
+export function ContractActionBarCell({ children }: { children: ReactNode }) {
+  return (
+    <div className="min-w-0 [&_button]:w-full [&_span]:flex [&_span]:w-full">{children}</div>
+  );
+}
+
+/** Horizontal row with equal flex widths (fewer than ~4 actions). */
 export function ContractActionBarRow({
   children,
   className,
@@ -116,8 +90,10 @@ export function ContractActionBarRow({
   return (
     <div
       className={cn(
-        'flex flex-wrap items-center gap-2',
-        'max-sm:[&_button]:min-h-10 max-sm:[&_button]:flex-1 max-sm:[&_button]:justify-center',
+        'flex w-full flex-wrap items-stretch justify-center gap-1.5',
+        '[&_span]:min-w-0 [&_span]:flex-1 [&_span]:basis-[calc(50%-0.25rem)]',
+        '[&_button]:w-full',
+        'sm:[&_span]:basis-auto sm:[&_span]:min-w-[7.5rem]',
         className,
       )}
     >

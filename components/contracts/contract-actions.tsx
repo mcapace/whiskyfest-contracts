@@ -13,7 +13,6 @@ import {
   ExternalLink,
   FileText,
   Loader2,
-  Mail,
   RefreshCw,
   Send,
   Undo2,
@@ -21,10 +20,11 @@ import {
 import { ActionWithHelp } from '@/components/contract/action-with-help';
 import {
   BottomActionBar,
+  ContractActionBarCell,
+  ContractActionBarGrid,
   ContractActionBarRow,
   ContractActionBarSection,
   contractActionBtnDanger,
-  contractActionBtnDangerSolid,
   contractActionBtnPrimary,
   contractActionBtnSecondary,
 } from '@/components/contract/contract-action-bar';
@@ -291,7 +291,6 @@ export function ContractActions({
   const btnPrimary = contractActionBtnPrimary;
   const btnSecondary = contractActionBtnSecondary;
   const btnDanger = contractActionBtnDanger;
-  const btnDangerSolid = contractActionBtnDangerSolid;
 
   let actionsCount = 0;
   if (status === 'draft') actionsCount += isAdmin ? 3 : 2;
@@ -622,7 +621,7 @@ export function ContractActions({
           {canVoidImported && (
             <ActionWithHelp helpText={CONTRACT_ACTION_HELP.voidImportedRecord}>
               <Button
-                className={btnDangerSolid}
+                className={btnDanger}
                 onClick={() => setOpenVoid(true)}
                 disabled={readOnly}
                 title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
@@ -688,45 +687,44 @@ export function ContractActions({
             </>
           )}
           {hasDocuSignSecondary && (
-            <ContractActionBarSection
-              title="DocuSign envelope"
-              description="Contract is out for signature. Hover a button for details."
-            >
-              <ContractActionBarRow>
+            <ContractActionBarSection>
+              <ContractActionBarGrid>
                 {canReminder && (
-                  <ActionWithHelp helpText={CONTRACT_ACTION_HELP.sendReminder}>
-                    <Button
-                      className={btnPrimary}
-                      onClick={() => runAction('send-reminder', 'reminder')}
-                      disabled={busy}
-                    >
-                      <Mail className="h-4 w-4" />
-                      Send Reminder
-                    </Button>
-                  </ActionWithHelp>
+                  <ContractActionBarCell>
+                    <ActionWithHelp helpText={CONTRACT_ACTION_HELP.sendReminder} className="w-full">
+                      <Button
+                        className={btnPrimary}
+                        onClick={() => runAction('send-reminder', 'reminder')}
+                        disabled={busy}
+                      >
+                        {pending && action === 'reminder' ? (
+                          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                        ) : null}
+                        Send Reminder
+                      </Button>
+                    </ActionWithHelp>
+                  </ContractActionBarCell>
                 )}
                 {canSyncDocuSign && (
-                  <ActionWithHelp helpText={CONTRACT_ACTION_HELP.syncFromDocusign}>
-                    <Button
-                      className={btnSecondary}
-                      onClick={() => syncFromDocuSign()}
-                      disabled={busy || readOnly}
-                      title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
-                    >
-                      {pending && action === 'sync-docusign' ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-4 w-4" />
-                      )}
-                      Sync from DocuSign
-                    </Button>
-                  </ActionWithHelp>
+                  <ContractActionBarCell>
+                    <ActionWithHelp helpText={CONTRACT_ACTION_HELP.syncFromDocusign} className="w-full">
+                      <Button
+                        className={btnSecondary}
+                        onClick={() => syncFromDocuSign()}
+                        disabled={busy || readOnly}
+                        title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                      >
+                        {pending && action === 'sync-docusign' ? (
+                          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                        ) : null}
+                        Sync from DocuSign
+                      </Button>
+                    </ActionWithHelp>
+                  </ContractActionBarCell>
                 )}
-              </ContractActionBarRow>
-              {(canResendWithChanges || canRecall) && (
-                <ContractActionBarRow className="border-t border-border/50 pt-2 mt-2">
-                  {canResendWithChanges && (
-                    <ActionWithHelp helpText={CONTRACT_ACTION_HELP.resendWithChanges}>
+                {canResendWithChanges && (
+                  <ContractActionBarCell>
+                    <ActionWithHelp helpText={CONTRACT_ACTION_HELP.resendWithChanges} className="w-full">
                       <Button
                         className={btnSecondary}
                         onClick={() => setOpenResendWithChanges(true)}
@@ -736,9 +734,11 @@ export function ContractActions({
                         Resend with Changes
                       </Button>
                     </ActionWithHelp>
-                  )}
-                  {canRecall && (
-                    <ActionWithHelp helpText={CONTRACT_ACTION_HELP.recall}>
+                  </ContractActionBarCell>
+                )}
+                {canRecall && (
+                  <ContractActionBarCell>
+                    <ActionWithHelp helpText={CONTRACT_ACTION_HELP.recall} className="w-full">
                       <Button
                         className={btnSecondary}
                         onClick={() => setOpenRecall(true)}
@@ -748,27 +748,26 @@ export function ContractActions({
                         Recall Contract
                       </Button>
                     </ActionWithHelp>
-                  )}
-                </ContractActionBarRow>
-              )}
-              {(canVoid || canCancelInflightDocuSign) && (
-                <ContractActionBarRow className="border-t border-border/50 pt-2 mt-2">
-                  {canVoid && (
-                    <ActionWithHelp helpText={CONTRACT_ACTION_HELP.voidContract}>
+                  </ContractActionBarCell>
+                )}
+                {canVoid && (
+                  <ContractActionBarCell>
+                    <ActionWithHelp helpText={CONTRACT_ACTION_HELP.voidContract} className="w-full">
                       <Button
                         data-tour="contract-void-btn"
-                        className={btnDangerSolid}
+                        className={btnDanger}
                         onClick={() => setOpenVoid(true)}
                         disabled={readOnly}
                         title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
                       >
-                        <AlertTriangle className="h-4 w-4" />
                         Void Contract
                       </Button>
                     </ActionWithHelp>
-                  )}
-                  {canCancelInflightDocuSign && (
-                    <ActionWithHelp helpText={CONTRACT_ACTION_HELP.cancel}>
+                  </ContractActionBarCell>
+                )}
+                {canCancelInflightDocuSign && (
+                  <ContractActionBarCell>
+                    <ActionWithHelp helpText={CONTRACT_ACTION_HELP.cancel} className="w-full">
                       <Button
                         className={btnDanger}
                         onClick={() => setOpenCancel(true)}
@@ -778,9 +777,9 @@ export function ContractActions({
                         Cancel Contract
                       </Button>
                     </ActionWithHelp>
-                  )}
-                </ContractActionBarRow>
-              )}
+                  </ContractActionBarCell>
+                )}
+              </ContractActionBarGrid>
             </ContractActionBarSection>
           )}
         </BottomActionBar>
