@@ -20,95 +20,99 @@ function norm(input: string): string {
   return input.trim().toLowerCase();
 }
 
+/** Ordered rules: first match wins. */
+const CATEGORY_RULES: { category: BrandCategory; pattern: RegExp }[] = [
+  {
+    category: 'Cigar',
+    pattern:
+      /\b(cigar(s)?|oliva|padron|drew\s*estate|macanudo|cohiba|davidoff|rocky\s*patel|arturo\s*fuente|ashton|perdomo|la\s*gloria\s*cubana)\b/i,
+  },
+  {
+    category: 'Tequila',
+    pattern:
+      /\b(tequila|mezcal|don\s*julio|patr[oó]n|casamigos|hornitos|el\s*jimador|clase\s*azul|herradura|espol[oó]n|fortaleza|teremana|1800|herradura)\b/i,
+  },
+  {
+    category: 'Vodka',
+    pattern: /\b(vodka|grey\s*goose|belvedere|ketel\s*one|tito'?s|ciroc|stolichnaya|absolut|chopin)\b/i,
+  },
+  {
+    category: 'Gin',
+    pattern: /\b(gin|bombay|tanqueray|hendrick'?s|beefeater|plymouth\s*gin|aviation\s*gin)\b/i,
+  },
+  {
+    category: 'Rum',
+    pattern: /\b(\brum\b|bacardi|zacapa|mount\s*gay|appleton|diplomatico|plantation\s*rum|havana\s*club)\b/i,
+  },
+  {
+    category: 'Bourbon',
+    pattern:
+      /\b(bourbon|maker'?s\s*mark|buffalo\s*trace|woodford|wild\s*turkey|jim\s*beam|knob\s*creek|four\s*roses|bulleit(?!\s*rye)|eagle\s*rare|basil\s*hayden|booker'?s|blanton'?s|angel'?s\s*envy|old\s*forester|willett|heaven\s*hill|evan\s*williams|elijah\s*craig)\b/i,
+  },
+  {
+    category: 'Scotch',
+    pattern:
+      /\b(scotch|single\s*malt|highland|speyside|islay|macallan|glenfiddich|glenlivet|laphroaig|lagavulin|ardbeg|bowmore|talisker|oban|springbank|bruichladdich|balvenie|dalmore|auchentoshan|johnnie\s*walker|chivas|dewar'?s)\b/i,
+  },
+  {
+    category: 'Irish',
+    pattern: /\b(irish|jameson|redbreast|bushmills|tullamore|powers|green\s*spot|yellow\s*spot|midleton)\b/i,
+  },
+  {
+    category: 'Japanese',
+    pattern:
+      /\b(japanese|japan|suntory|nikka|yamazaki|hakushu|hibiki|miyagikyo|yoichi|chichibu|kaiyo|shinshu)\b/i,
+  },
+  {
+    category: 'Rye',
+    pattern: /\b(\brye\b|rye\s*whisk(e)?y|whistlepig|bulleit\s*rye|rittenhouse|pikesville|sazerac\s*rye|templeton)\b/i,
+  },
+  {
+    category: 'World Whiskies',
+    pattern:
+      /\b(world\s*whisk(e)?y|canadian|canada\s*club|crown\s*royal|seagram|taiwan|kavalan|indian|amrut|australia|sullivan'?s\s*cove|pendleton)\b/i,
+  },
+];
+
 /**
- * Classify a poured brand (and optional exhibitor company) into a dashboard category.
- * Uses brand name first; company name helps when the booth brand omits category words (e.g. Oliva).
+ * Classify from brand name, exhibitor company, expressions, and optional saved category.
  */
-export function categorizeBrandFromName(brandName: string, exhibitorCompany?: string | null): BrandCategory {
-  const brand = norm(brandName);
-  const company = norm(exhibitorCompany ?? '');
-  const blob = `${brand} ${company}`.trim();
+export function resolveBrandCategory(input: {
+  brandName: string;
+  exhibitorCompany?: string | null;
+  expressions?: string[];
+  savedCategory?: string | null;
+}): BrandCategory {
+  const saved = input.savedCategory?.trim();
+  if (saved && BRAND_CATEGORIES.includes(saved as BrandCategory)) {
+    return saved as BrandCategory;
+  }
+
+  const blob = [
+    input.brandName,
+    input.exhibitorCompany ?? '',
+    ...(input.expressions ?? []),
+  ]
+    .map(norm)
+    .filter(Boolean)
+    .join(' ');
+
   if (!blob) return 'Other';
 
-  if (
-    /\bcigar(s)?\b/.test(blob) ||
-    /\boliva\b/.test(blob) ||
-    /\bpadron\b/.test(blob) ||
-    /\bdrew\s*estate\b/.test(blob) ||
-    /\bmacanudo\b/.test(blob) ||
-    /\bcohiba\b/.test(blob) ||
-    /\bdavidoff\b/.test(blob) ||
-    /\brocky\s*patel\b/.test(blob) ||
-    /\barturo\s*fuente\b/.test(blob)
-  ) {
-    return 'Cigar';
-  }
-
-  if (
-    /\btequila\b/.test(blob) ||
-    /\bmezcal\b/.test(blob) ||
-    /\bdon\s*julio\b/.test(blob) ||
-    /\bpatr[oó]n\b/.test(blob) ||
-    /\bcasamigos\b/.test(blob) ||
-    /\bhornitos\b/.test(blob) ||
-    /\bel\s*jimador\b/.test(blob) ||
-    /\bclase\s*azul\b/.test(blob)
-  ) {
-    return 'Tequila';
-  }
-
-  if (/\bvodka\b/.test(blob) || /\bgrey\s*goose\b/.test(blob) || /\bbelvedere\b/.test(blob) || /\bketel\s*one\b/.test(blob)) {
-    return 'Vodka';
-  }
-
-  if (/\bgin\b/.test(blob) || /\bbombay\b/.test(blob) || /\btanqueray\b/.test(blob) || /\bhendrick'?s\b/.test(blob)) {
-    return 'Gin';
-  }
-
-  if (/\brum\b/.test(blob) || /\bbacardi\b/.test(blob) || /\bzacapa\b/.test(blob) || /\bmount\s*gay\b/.test(blob)) {
-    return 'Rum';
-  }
-
-  if (/\bbourbon\b/.test(blob) || /\bmaker'?s\s*mark\b/.test(blob) || /\bbuffalo\s*trace\b/.test(blob) || /\bwoodford\b/.test(blob)) {
-    return 'Bourbon';
-  }
-
-  if (
-    /\bscotch\b/.test(blob) ||
-    /\bhighland\b/.test(blob) ||
-    /\bspeyside\b/.test(blob) ||
-    /\bislay\b/.test(blob) ||
-    /\bmacallan\b/.test(blob) ||
-    /\bglenfiddich\b/.test(blob) ||
-    /\blaphroaig\b/.test(blob)
-  ) {
-    return 'Scotch';
-  }
-
-  if (/\birish\b/.test(blob) || /\b(jameson|redbreast|bushmills)\b/.test(blob)) {
-    return 'Irish';
-  }
-
-  if (/\bjapanese\b/.test(blob) || /\bjapan\b/.test(blob) || /\bsuntory\b/.test(blob) || /\bnikka\b/.test(blob) || /\byamazaki\b/.test(blob)) {
-    return 'Japanese';
-  }
-
-  if (/\brye\b/.test(blob) || /\b(whistlepig|bulleit\s*rye)\b/.test(blob)) {
-    return 'Rye';
-  }
-
-  if (
-    /\bworld\b/.test(blob) ||
-    /\bcanad(a|ian)\b/.test(blob) ||
-    /\btaiwan\b/.test(blob) ||
-    /\bindia(n)?\b/.test(blob) ||
-    /\baustralia(n)?\b/.test(blob) ||
-    /\bcrown\s*royal\b/.test(blob)
-  ) {
-    return 'World Whiskies';
+  for (const { category, pattern } of CATEGORY_RULES) {
+    if (pattern.test(blob)) return category;
   }
 
   return 'Other';
+}
+
+/** @deprecated Use resolveBrandCategory */
+export function categorizeBrandFromName(
+  brandName: string,
+  exhibitorCompany?: string | null,
+  expressions?: string[],
+): BrandCategory {
+  return resolveBrandCategory({ brandName, exhibitorCompany, expressions });
 }
 
 /** Legacy free-text brands_poured field (comma/newline separated). */
@@ -125,24 +129,38 @@ export function categorizeBrandsPoured(
   exhibitorCompany?: string | null,
 ): BrandCategory {
   const names = parseBrandNamesFromBrandsPoured(brandsPoured);
-  if (names.length === 0) return categorizeBrandFromName('', exhibitorCompany);
-  return categorizeBrandFromName(names[0]!, exhibitorCompany);
+  if (names.length === 0) return resolveBrandCategory({ brandName: '', exhibitorCompany });
+  return resolveBrandCategory({ brandName: names[0]!, exhibitorCompany });
 }
 
 /** Category for a contract using booth brand rows when present, else brands_poured. */
 export function categorizeContractBrands(
   contract: { brands_poured?: string | null; exhibitor_company_name?: string | null },
-  boothBrandNames: string[],
+  boothRows: { brand_name: string; brand_category?: string | null; expressions?: string[] }[],
 ): BrandCategory {
-  const names = boothBrandNames.map((n) => n.trim()).filter(Boolean);
-  if (names.length === 0) {
+  const rows = boothRows.filter((r) => r.brand_name?.trim());
+  if (rows.length === 0) {
     return categorizeBrandsPoured(contract.brands_poured, contract.exhibitor_company_name);
   }
-  return categorizeBrandFromName(names[0]!, contract.exhibitor_company_name);
+  const first = rows[0]!;
+  return resolveBrandCategory({
+    brandName: first.brand_name,
+    exhibitorCompany: contract.exhibitor_company_name,
+    expressions: first.expressions,
+    savedCategory: first.brand_category,
+  });
 }
 
 export function brandsPouredSummaryFromBoothBrandNames(brandNames: string[]): string | null {
   const names = brandNames.map((n) => n.trim()).filter(Boolean);
   if (names.length === 0) return null;
   return names.join(', ');
+}
+
+export function suggestBrandCategory(
+  brandName: string,
+  exhibitorCompany?: string | null,
+  expressions?: string[],
+): BrandCategory {
+  return resolveBrandCategory({ brandName, exhibitorCompany, expressions });
 }

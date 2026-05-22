@@ -33,7 +33,7 @@ export default async function EditDraftContractPage({ params }: { params: { id: 
       .order('created_at', { ascending: true }),
     supabase
       .from('contract_booth_brands')
-      .select('booth_index, brand_name, expressions')
+      .select('booth_index, brand_name, brand_category, expressions')
       .eq('contract_id', c.id)
       .order('booth_index', { ascending: true }),
   ]);
@@ -64,7 +64,14 @@ export default async function EditDraftContractPage({ params }: { params: { id: 
           sales_rep_id: c.sales_rep_id ?? '',
           notes: c.notes ?? '',
         }}
-        initialBoothBrands={(boothBrandRows ?? []) as { booth_index: number; brand_name: string; expressions: string[] }[]}
+        initialBoothBrands={
+          (boothBrandRows ?? []) as {
+            booth_index: number;
+            brand_name: string;
+            brand_category?: string | null;
+            expressions: string[];
+          }[]
+        }
       />
     </div>
   );

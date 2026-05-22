@@ -136,6 +136,7 @@ export interface ContractBoothBrand {
   contract_id: string;
   booth_index: number;
   brand_name: string;
+  brand_category: string | null;
   expressions: string[];
   created_at: string;
 }

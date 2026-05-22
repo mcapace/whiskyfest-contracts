@@ -24,7 +24,7 @@ export async function replaceContractBoothBrandsForContract(
   supabase: SupabaseClient,
   contractId: string,
   boothCount: number,
-  rows: { booth_index: number; brand_name: string; expressions: string[] }[],
+  rows: { booth_index: number; brand_name: string; brand_category?: string | null; expressions: string[] }[],
 ): Promise<void> {
   const { error: delErr } = await supabase.from('contract_booth_brands').delete().eq('contract_id', contractId);
   if (delErr) throw new Error(delErr.message);
@@ -34,6 +34,7 @@ export async function replaceContractBoothBrandsForContract(
     contract_id: string;
     booth_index: number;
     brand_name: string;
+    brand_category: string | null;
     expressions: string[];
   }[] = [];
 
@@ -43,10 +44,12 @@ export async function replaceContractBoothBrandsForContract(
     const expressions = (row?.expressions ?? [])
       .map((e) => e.trim())
       .filter((e) => e.length > 0);
+    const brand_category = row?.brand_category?.trim() || null;
     payload.push({
       contract_id: contractId,
       booth_index: i,
       brand_name: brand,
+      brand_category,
       expressions,
     });
   }

@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth';
 import { canImportLegacyContracts, resolveContractActor } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { clearedRepEnteredBilling } from '@/lib/contract-schemas';
+import { suggestBrandCategory } from '@/lib/brand-category';
 import { replaceContractBoothBrandsForContract } from '@/lib/contract-booth-brands';
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
 import { persistContractSignedPdf } from '@/lib/contract-pdf-storage';
@@ -25,6 +26,7 @@ function parseMoneyToCents(raw: string): number | null {
 const boothBrandRowSchema = z.object({
   booth_index: z.number().int().min(1),
   brand_name: z.string().min(1),
+  brand_category: z.string().optional(),
   expressions: z.array(z.string()).optional().default([]),
 });
 
@@ -251,6 +253,9 @@ export async function POST(req: Request) {
       boothBrandsParsed.map((r) => ({
         booth_index: r.booth_index,
         brand_name: r.brand_name.trim(),
+        brand_category:
+          r.brand_category?.trim() ||
+          suggestBrandCategory(r.brand_name, p.exhibitor_company_name, r.expressions ?? []),
         expressions: r.expressions ?? [],
       })),
     );

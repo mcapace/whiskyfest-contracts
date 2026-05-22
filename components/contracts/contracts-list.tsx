@@ -19,7 +19,7 @@ import { ContractCard } from '@/components/contracts/contract-card';
 import { ContractsFilterBar } from '@/components/contracts/filter-bar';
 import { SavedViewsDropdown, type ContractViewFilters } from '@/components/contracts/saved-views-dropdown';
 import { categorizeContractBrands } from '@/lib/brand-category';
-import type { BoothBrandNamesByContract } from '@/lib/sponsors';
+import type { BoothBrandRowsByContract } from '@/lib/sponsors';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 const STORAGE_KEY = 'wf.contracts.savedViews.v1';
@@ -37,9 +37,9 @@ const STUCK_STATUSES = new Set(['sent', 'pending_events_review', 'draft', 'ready
 
 function categorizeContractForFilter(
   contract: { id: string; brands_poured: string | null; exhibitor_company_name: string },
-  boothNamesByContract: BoothBrandNamesByContract,
+  boothRowsByContract: BoothBrandRowsByContract,
 ): string {
-  return categorizeContractBrands(contract, boothNamesByContract[contract.id] ?? []);
+  return categorizeContractBrands(contract, boothRowsByContract[contract.id] ?? []);
 }
 
 function firstBrandPill(brandsPoured: string | null): string | null {
@@ -56,12 +56,12 @@ export function ContractsList({
   contracts,
   events,
   currentRepId,
-  boothNamesByContract = {},
+  boothRowsByContract = {},
 }: {
   contracts: ContractWithTotals[];
   events: Event[];
   currentRepId: string | null;
-  boothNamesByContract?: BoothBrandNamesByContract;
+  boothRowsByContract?: BoothBrandRowsByContract;
 }) {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
@@ -121,9 +121,9 @@ export function ContractsList({
 
   const brandOptions = useMemo(() => {
     const set = new Set<string>();
-    contracts.forEach((c) => set.add(categorizeContractForFilter(c, boothNamesByContract)));
+    contracts.forEach((c) => set.add(categorizeContractForFilter(c, boothRowsByContract)));
     return [{ value: 'all', label: 'All' }, ...[...set].sort().map((value) => ({ value, label: value }))];
-  }, [contracts, boothNamesByContract]);
+  }, [contracts, boothRowsByContract]);
 
   const filtered = useMemo(() => {
     return contracts.filter((c) => {
@@ -150,7 +150,7 @@ export function ContractsList({
         const matchMine = filters.rep === 'mine' ? currentRepId : filters.rep;
         if (!matchMine || c.sales_rep_id !== matchMine) return false;
       }
-      if (filters.brand !== 'all' && categorizeContractForFilter(c, boothNamesByContract) !== filters.brand)
+      if (filters.brand !== 'all' && categorizeContractForFilter(c, boothRowsByContract) !== filters.brand)
         return false;
       const q = filters.search.trim().toLowerCase();
       if (q) {

@@ -2,11 +2,20 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { X } from 'lucide-react';
+import { BRAND_CATEGORIES, suggestBrandCategory, type BrandCategory } from '@/lib/brand-category';
 import { cn } from '@/lib/utils';
 import { Input, Label } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export type BoothBrandValue = {
   brand_name: string;
+  brand_category: BrandCategory;
   expressions: string[];
 };
 
@@ -14,6 +23,7 @@ type Props = {
   boothNumber: number;
   value: BoothBrandValue;
   onChange: (next: BoothBrandValue) => void;
+  exhibitorCompany?: string | null;
   disabled?: boolean;
 };
 
@@ -25,27 +35,42 @@ function tokensFromText(raw: string): string[] {
     .filter(Boolean);
 }
 
-export function BoothBrandInput({ boothNumber, value, onChange, disabled }: Props) {
+export function BoothBrandInput({ boothNumber, value, onChange, exhibitorCompany, disabled }: Props) {
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const applyBrandName = useCallback(
+    (brand_name: string) => {
+      onChange({
+        ...value,
+        brand_name,
+        brand_category: suggestBrandCategory(brand_name, exhibitorCompany, value.expressions),
+      });
+    },
+    [exhibitorCompany, onChange, value],
+  );
 
   const commitTokens = useCallback(
     (extra: string) => {
       const extraTokens = tokensFromText(extra);
       if (extraTokens.length === 0) return;
+      const expressions = [...value.expressions, ...extraTokens];
       onChange({
         brand_name: value.brand_name,
-        expressions: [...value.expressions, ...extraTokens],
+        brand_category: suggestBrandCategory(value.brand_name, exhibitorCompany, expressions),
+        expressions,
       });
       setDraft('');
     },
-    [onChange, value.brand_name, value.expressions],
+    [exhibitorCompany, onChange, value.brand_name, value.expressions],
   );
 
   function removeExpression(idx: number) {
+    const expressions = value.expressions.filter((_, i) => i !== idx);
     onChange({
       brand_name: value.brand_name,
-      expressions: value.expressions.filter((_, i) => i !== idx),
+      brand_category: suggestBrandCategory(value.brand_name, exhibitorCompany, expressions),
+      expressions,
     });
   }
 
@@ -58,26 +83,51 @@ export function BoothBrandInput({ boothNumber, value, onChange, disabled }: Prop
         Booth {boothNumber}
       </h3>
 
-      <div className="mt-4 space-y-1.5">
-        <Label htmlFor={`booth-brand-name-${boothNumber}`}>
-          Brand name <span className="text-destructive">*</span>
-        </Label>
-        <Input
-          id={`booth-brand-name-${boothNumber}`}
-          value={value.brand_name}
-          onChange={(e) => onChange({ ...value, brand_name: e.target.value })}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              e.stopPropagation();
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label htmlFor={`booth-brand-name-${boothNumber}`}>
+            Brand name <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id={`booth-brand-name-${boothNumber}`}
+            value={value.brand_name}
+            onChange={(e) => applyBrandName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            }}
+            placeholder="e.g. Don Julio"
+            autoComplete="off"
+            disabled={disabled}
+            required
+            aria-required="true"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor={`booth-brand-category-${boothNumber}`}>Category</Label>
+          <Select
+            value={value.brand_category}
+            onValueChange={(brand_category) =>
+              onChange({ ...value, brand_category: brand_category as BrandCategory })
             }
-          }}
-          placeholder="e.g. Don Julio"
-          autoComplete="off"
-          disabled={disabled}
-          required
-          aria-required="true"
-        />
+            disabled={disabled}
+          >
+            <SelectTrigger id={`booth-brand-category-${boothNumber}`}>
+              <SelectValue placeholder="Select category" />
+            </SelectTrigger>
+            <SelectContent>
+              {BRAND_CATEGORIES.map((cat) => (
+                <SelectItem key={cat} value={cat}>
+                  {cat}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">Used for brand mix on the dashboard. Auto-suggested from brand name.</p>
+        </div>
       </div>
 
       <div className="mt-4 space-y-1.5">

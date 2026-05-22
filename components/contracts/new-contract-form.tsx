@@ -20,22 +20,27 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { SalesRepSelect } from '@/components/contracts/sales-rep-select';
 import { BoothBrandInput, type BoothBrandValue } from '@/components/contracts/booth-brand-input';
 import type { ContractWithTotals, Event } from '@/types/db';
+import { BRAND_CATEGORIES, suggestBrandCategory, type BrandCategory } from '@/lib/brand-category';
 import { findReturningSponsor, medianBoothCountForCompany } from '@/lib/new-contract-hints';
 
 type BoothBrandDraft = BoothBrandValue;
 
 function boothBrandDraftsForCount(
   boothCount: number,
-  initial?: { booth_index: number; brand_name: string; expressions: string[] }[],
+  initial?: { booth_index: number; brand_name: string; brand_category?: string | null; expressions: string[] }[],
+  exhibitorCompany?: string,
 ): BoothBrandDraft[] {
   const map = new Map((initial ?? []).map((r) => [r.booth_index, r]));
   const rows: BoothBrandDraft[] = [];
   for (let i = 1; i <= boothCount; i++) {
     const r = map.get(i);
-    rows.push({
-      brand_name: r?.brand_name ?? '',
-      expressions: [...(r?.expressions ?? [])],
-    });
+    const brand_name = r?.brand_name ?? '';
+    const expressions = [...(r?.expressions ?? [])];
+    const saved = r?.brand_category?.trim();
+    const brand_category = (saved && BRAND_CATEGORIES.includes(saved as BrandCategory)
+      ? saved
+      : suggestBrandCategory(brand_name, exhibitorCompany, expressions)) as BrandCategory;
+    rows.push({ brand_name, brand_category, expressions });
   }
   return rows;
 }
@@ -68,7 +73,12 @@ interface Props {
   /** Recent companies + signed/executed contracts for smart defaults (Phase 3). */
   smartHints?: { recentCompanies: string[]; priorContracts: ContractWithTotals[] };
   /** Per-booth brand + expressions (loaded when editing a draft). */
-  initialBoothBrands?: { booth_index: number; brand_name: string; expressions: string[] }[];
+  initialBoothBrands?: {
+    booth_index: number;
+    brand_name: string;
+    brand_category?: string | null;
+    expressions: string[];
+  }[];
   /** Editing an admin/events import (status imported) — copy differs from draft. */
   editImportMode?: boolean;
 }
@@ -231,7 +241,7 @@ export function NewContractForm({
       if (effectiveBoothCount <= prev.length) return prev;
       const next = [...prev];
       while (next.length < effectiveBoothCount) {
-        next.push({ brand_name: '', expressions: [] });
+        next.push({ brand_name: '', brand_category: 'Other', expressions: [] });
       }
       return next;
     });
@@ -309,6 +319,7 @@ export function NewContractForm({
 
     const rowsForSave = Array.from({ length: boothCountNorm }, (_, i) => boothBrandRows[i] ?? {
       brand_name: '',
+      brand_category: 'Other' as BrandCategory,
       expressions: [],
     });
 
@@ -331,6 +342,7 @@ export function NewContractForm({
       const booth_brands = rowsForSave.map((row, i) => ({
         booth_index: i + 1,
         brand_name: row.brand_name.trim(),
+        brand_category: row.brand_category,
         expressions: row.expressions.filter(Boolean),
       }));
       const payload = { ...formForSave, line_items: parsedLines.rows, booth_brands };
@@ -582,11 +594,19 @@ export function NewContractForm({
                   <BoothBrandInput
                     key={idx}
                     boothNumber={idx + 1}
-                    value={boothBrandRows[idx] ?? { brand_name: '', expressions: [] }}
+                    value={
+                      boothBrandRows[idx] ?? {
+                        brand_name: '',
+                        brand_category: 'Other',
+                        expressions: [],
+                      }
+                    }
+                    exhibitorCompany={form.exhibitor_company_name}
                     onChange={(next) => {
                       setBoothBrandRows((rows) => {
                         const copy = [...rows];
-                        while (copy.length <= idx) copy.push({ brand_name: '', expressions: [] });
+                        while (copy.length <= idx)
+                          copy.push({ brand_name: '', brand_category: 'Other', expressions: [] });
                         copy[idx] = next;
                         return copy;
                       });

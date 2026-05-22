@@ -1,7 +1,7 @@
 import {
   BRAND_CATEGORIES,
-  categorizeBrandFromName,
   parseBrandNamesFromBrandsPoured,
+  resolveBrandCategory,
   type BrandCategory,
 } from '@/lib/brand-category';
 import { requiresDiscountApproval } from '@/lib/contracts';
@@ -86,6 +86,7 @@ export interface DeadlineRow {
 export interface BrandMixRow {
   name: string;
   count: number;
+  revenueCents: number;
   percentage: number;
 }
 
@@ -263,40 +264,78 @@ export function getDeadlines(contracts: ContractWithTotals[]): DeadlineRow[] {
     .slice(0, 12);
 }
 
-export type BoothBrandMixInput = { contract_id: string; brand_name: string };
+export type BoothBrandMixInput = {
+  contract_id: string;
+  brand_name: string;
+  brand_category?: string | null;
+  expressions?: string[];
+};
+
+const BRAND_MIX_STATUSES = new Set([
+  'sent',
+  'partially_signed',
+  'signed',
+  'executed',
+  'imported',
+  'approved',
+  'pending_events_review',
+  'ready_for_review',
+  'draft',
+]);
 
 export function getBrandMix(
   contracts: ContractWithTotals[],
   boothBrands: BoothBrandMixInput[] = [],
 ): BrandMixRow[] {
   const counts = new Map<BrandCategory, number>(BRAND_CATEGORIES.map((c) => [c, 0]));
+  const revenue = new Map<BrandCategory, number>(BRAND_CATEGORIES.map((c) => [c, 0]));
 
-  const boothByContract = new Map<string, string[]>();
+  const boothByContract = new Map<string, BoothBrandMixInput[]>();
   for (const row of boothBrands) {
     const name = row.brand_name?.trim();
     if (!name) continue;
     const list = boothByContract.get(row.contract_id) ?? [];
-    list.push(name);
+    list.push(row);
     boothByContract.set(row.contract_id, list);
   }
 
   for (const contract of contracts) {
     if (contract.status === 'cancelled' || contract.status === 'voided') continue;
+    if (!BRAND_MIX_STATUSES.has(contract.status)) continue;
 
-    const boothNames = boothByContract.get(contract.id) ?? [];
-    const brandNames =
-      boothNames.length > 0 ? boothNames : parseBrandNamesFromBrandsPoured(contract.brands_poured);
+    const boothRows = boothByContract.get(contract.id) ?? [];
+    const entries: { brandName: string; expressions?: string[]; savedCategory?: string | null }[] =
+      boothRows.length > 0
+        ? boothRows.map((r) => ({
+            brandName: r.brand_name.trim(),
+            expressions: r.expressions,
+            savedCategory: r.brand_category,
+          }))
+        : parseBrandNamesFromBrandsPoured(contract.brands_poured).map((brandName) => ({ brandName }));
 
-    for (const brand of brandNames) {
-      const category = categorizeBrandFromName(brand, contract.exhibitor_company_name);
+    if (entries.length === 0) continue;
+
+    const share = Math.round(contract.grand_total_cents / entries.length);
+
+    for (const entry of entries) {
+      const category = resolveBrandCategory({
+        brandName: entry.brandName,
+        exhibitorCompany: contract.exhibitor_company_name,
+        expressions: entry.expressions,
+        savedCategory: entry.savedCategory,
+      });
       counts.set(category, (counts.get(category) ?? 0) + 1);
+      revenue.set(category, (revenue.get(category) ?? 0) + share);
     }
   }
 
-  const total = [...counts.values()].reduce((sum, count) => sum + count, 0);
+  const totalRevenue = [...revenue.values()].reduce((sum, n) => sum + n, 0);
   return BRAND_CATEGORIES.map((name) => {
     const count = counts.get(name) ?? 0;
-    const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
-    return { name, count, percentage };
-  }).sort((a, b) => b.count - a.count);
+    const revenueCents = revenue.get(name) ?? 0;
+    const percentage = totalRevenue > 0 ? Math.round((revenueCents / totalRevenue) * 100) : 0;
+    return { name, count, revenueCents, percentage };
+  })
+    .filter((row) => row.revenueCents > 0 || row.count > 0)
+    .sort((a, b) => b.revenueCents - a.revenueCents);
 }

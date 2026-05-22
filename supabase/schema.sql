@@ -191,6 +191,7 @@ create table if not exists contract_booth_brands (
   contract_id uuid not null references contracts(id) on delete cascade,
   booth_index integer not null check (booth_index > 0),
   brand_name text not null,
+  brand_category text,
   expressions text[] not null default array[]::text[],
   created_at timestamptz not null default now(),
   unique (contract_id, booth_index)

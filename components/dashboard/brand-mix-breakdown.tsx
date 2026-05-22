@@ -1,15 +1,18 @@
 import type { BrandMixRow } from '@/lib/event-metrics';
+import { formatCurrency } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 
 export function BrandMixBreakdown({ categories, title }: { categories: BrandMixRow[]; title?: string }) {
-  const hasData = categories.some((c) => c.count > 0);
+  const hasData = categories.some((c) => c.revenueCents > 0 || c.count > 0);
 
   return (
     <Card className="bg-parchment-50">
       <CardContent className="p-6">
         <h3 className="font-display text-xl font-medium text-oak-800">{title ?? 'Brand Mix'}</h3>
         {!hasData ? (
-          <p className="mt-4 text-sm text-ink-500">Brand mix will appear once exhibitors are confirmed.</p>
+          <p className="mt-4 text-sm text-ink-500">
+            Brand mix will appear once contracts include booth brands (or legacy brands poured).
+          </p>
         ) : (
           <div className="mt-4 space-y-3">
             {categories.map((cat) => (
@@ -17,11 +20,18 @@ export function BrandMixBreakdown({ categories, title }: { categories: BrandMixR
                 <div className="mb-1 flex items-center justify-between gap-3">
                   <span className="font-sans text-sm text-oak-800">{cat.name}</span>
                   <span className="font-sans text-xs tabular-nums text-ink-500">
-                    {cat.count} {cat.count === 1 ? 'brand' : 'brands'}
+                    {formatCurrency(cat.revenueCents)}
+                    <span className="text-ink-400">
+                      {' '}
+                      · {cat.count} {cat.count === 1 ? 'booth' : 'booths'}
+                    </span>
                   </span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-parchment-100">
-                  <div className="h-full bg-amber-500 transition-[width] duration-500" style={{ width: `${cat.percentage}%` }} />
+                  <div
+                    className="h-full bg-amber-500 transition-[width] duration-500"
+                    style={{ width: `${cat.percentage}%` }}
+                  />
                 </div>
               </div>
             ))}

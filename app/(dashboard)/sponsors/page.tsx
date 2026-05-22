@@ -1,5 +1,5 @@
 import { requireContractActorForPage } from '@/lib/auth-contract';
-import { boothBrandNamesRecordFromMap, getConfirmedSponsors } from '@/lib/sponsors';
+import { boothBrandRowsRecordFromMap, getConfirmedSponsors } from '@/lib/sponsors';
 import { SponsorsDirectory } from '@/components/sponsors/sponsors-directory';
 
 export const dynamic = 'force-dynamic';
@@ -7,7 +7,7 @@ export const revalidate = 60;
 
 export default async function SponsorsPage() {
   const actor = await requireContractActorForPage();
-  const { sponsors, boothNamesByContract } = await getConfirmedSponsors();
+  const { sponsors, boothRowsByContract } = await getConfirmedSponsors();
 
   return (
     <div className="space-y-8">
@@ -18,7 +18,7 @@ export default async function SponsorsPage() {
 
       <SponsorsDirectory
         sponsors={sponsors}
-        boothNamesByContract={boothBrandNamesRecordFromMap(boothNamesByContract)}
+        boothRowsByContract={boothBrandRowsRecordFromMap(boothRowsByContract)}
         viewer={{
           role: actor.role,
           is_events_team: actor.isEventsTeam,

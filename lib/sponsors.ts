@@ -30,7 +30,10 @@ export type SponsorRecord = Pick<
 
 export async function getConfirmedSponsors(): Promise<{
   sponsors: SponsorRecord[];
-  boothNamesByContract: Map<string, string[]>;
+  boothRowsByContract: Map<
+    string,
+    { brand_name: string; brand_category?: string | null; expressions?: string[] }[]
+  >;
 }> {
   const supabase = getSupabaseAdmin();
   const { data } = await supabase
@@ -43,16 +46,26 @@ export async function getConfirmedSponsors(): Promise<{
   const rows = (data ?? []) as Omit<SponsorRecord, 'activity'>[];
   const ids = rows.map((r) => r.id);
   const { data: boothBrandRows } = ids.length
-    ? await supabase.from('contract_booth_brands').select('contract_id, brand_name').in('contract_id', ids)
+    ? await supabase
+        .from('contract_booth_brands')
+        .select('contract_id, brand_name, brand_category, expressions')
+        .in('contract_id', ids)
     : { data: [] };
-  const boothNamesByContract = new Map<string, string[]>();
+  const boothRowsByContract = new Map<
+    string,
+    { brand_name: string; brand_category?: string | null; expressions?: string[] }[]
+  >();
   for (const row of boothBrandRows ?? []) {
     const cid = (row as { contract_id: string }).contract_id;
     const name = ((row as { brand_name?: string }).brand_name ?? '').trim();
     if (!name) continue;
-    const list = boothNamesByContract.get(cid) ?? [];
-    list.push(name);
-    boothNamesByContract.set(cid, list);
+    const list = boothRowsByContract.get(cid) ?? [];
+    list.push({
+      brand_name: name,
+      brand_category: (row as { brand_category?: string | null }).brand_category,
+      expressions: (row as { expressions?: string[] }).expressions,
+    });
+    boothRowsByContract.set(cid, list);
   }
   const { data: activityRows } = ids.length
     ? await supabase
@@ -77,35 +90,42 @@ export async function getConfirmedSponsors(): Promise<{
 
   return {
     sponsors: rows.map((row) => ({ ...row, activity: byContract.get(row.id) ?? [] })),
-    boothNamesByContract: boothNamesByContract,
+    boothRowsByContract,
   };
 }
 
-export type BoothBrandNamesByContract = Record<string, string[]>;
+export type BoothBrandRowSnapshot = {
+  brand_name: string;
+  brand_category?: string | null;
+  expressions?: string[];
+};
+
+export type BoothBrandRowsByContract = Record<string, BoothBrandRowSnapshot[]>;
 
 /** Sponsor directory category using booth brands when available. */
 export function sponsorCategoryForRecord(
   sponsor: Pick<SponsorRecord, 'id' | 'brands_poured' | 'exhibitor_company_name'>,
-  boothNamesByContract: BoothBrandNamesByContract,
+  boothRowsByContract: BoothBrandRowsByContract,
 ): string {
-  return sponsorCategoryFromBrands(
-    sponsor.brands_poured,
-    sponsor.exhibitor_company_name,
-    boothNamesByContract[sponsor.id] ?? [],
+  return categorizeContractBrands(
+    { brands_poured: sponsor.brands_poured, exhibitor_company_name: sponsor.exhibitor_company_name },
+    boothRowsByContract[sponsor.id] ?? [],
   );
 }
 
-export function boothBrandNamesRecordFromMap(map: Map<string, string[]>): BoothBrandNamesByContract {
+export function boothBrandRowsRecordFromMap(
+  map: Map<string, BoothBrandRowSnapshot[]>,
+): BoothBrandRowsByContract {
   return Object.fromEntries(map);
 }
 
 export function sponsorCategoryFromBrands(
   brandsPoured: string | null,
   exhibitorCompany?: string | null,
-  boothBrandNames: string[] = [],
+  boothRows: BoothBrandRowSnapshot[] = [],
 ): string {
   return categorizeContractBrands(
     { brands_poured: brandsPoured, exhibitor_company_name: exhibitorCompany },
-    boothBrandNames,
+    boothRows,
   );
 }

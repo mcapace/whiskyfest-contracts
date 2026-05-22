@@ -11,13 +11,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input, Label, Textarea } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SalesRepSelect } from '@/components/contracts/sales-rep-select';
+import { suggestBrandCategory, type BrandCategory } from '@/lib/brand-category';
 import { BoothBrandInput, type BoothBrandValue } from '@/components/contracts/booth-brand-input';
 import { formatLongDate } from '@/lib/utils';
 import type { Event } from '@/types/db';
 
 function boothRowsForCount(count: number, prev: BoothBrandValue[]): BoothBrandValue[] {
   const next = [...prev];
-  while (next.length < count) next.push({ brand_name: '', expressions: [] });
+  while (next.length < count) next.push({ brand_name: '', brand_category: 'Other', expressions: [] });
   return next.slice(0, count);
 }
 
@@ -70,7 +71,9 @@ export function ImportContractForm({
   const [signedAt, setSignedAt] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
 
-  const [boothBrandRows, setBoothBrandRows] = useState<BoothBrandValue[]>([{ brand_name: '', expressions: [] }]);
+  const [boothBrandRows, setBoothBrandRows] = useState<BoothBrandValue[]>([
+    { brand_name: '', brand_category: 'Other', expressions: [] },
+  ]);
 
   const boothCount = useMemo(() => {
     const n = parseInt(boothCountInput.trim(), 10);
@@ -150,10 +153,11 @@ export function ImportContractForm({
     }
 
     const booth_brands = Array.from({ length: boothCount }, (_, i) => {
-      const row = boothBrandRows[i] ?? { brand_name: '', expressions: [] };
+      const row = boothBrandRows[i] ?? { brand_name: '', brand_category: 'Other' as BrandCategory, expressions: [] };
       return {
         booth_index: i + 1,
         brand_name: row.brand_name.trim(),
+        brand_category: row.brand_category,
         expressions: (row.expressions ?? []).filter(Boolean),
       };
     });
@@ -405,7 +409,14 @@ export function ImportContractForm({
               <BoothBrandInput
                 key={idx}
                 boothNumber={idx + 1}
-                value={boothBrandRows[idx] ?? { brand_name: '', expressions: [] }}
+                value={
+                  boothBrandRows[idx] ?? {
+                    brand_name: '',
+                    brand_category: 'Other',
+                    expressions: [],
+                  }
+                }
+                exhibitorCompany={exhibitorCompany}
                 onChange={(next) =>
                   setBoothBrandRows((rows) => {
                     const copy = [...rows];

@@ -91,7 +91,10 @@ async function getDashboardData(actor: Awaited<ReturnType<typeof requireContract
   const contractIds = contractsRaw.map((c) => c.id);
   const { data: boothBrandRows } =
     contractIds.length > 0
-      ? await supabase.from('contract_booth_brands').select('contract_id, brand_name').in('contract_id', contractIds)
+      ? await supabase
+          .from('contract_booth_brands')
+          .select('contract_id, brand_name, brand_category, expressions')
+          .in('contract_id', contractIds)
       : { data: [] };
   let auditQuery = supabase.from('audit_log').select('*').order('occurred_at', { ascending: false }).limit(200);
   if (visibility.filter === 'own') {
@@ -109,7 +112,12 @@ async function getDashboardData(actor: Awaited<ReturnType<typeof requireContract
 
   return {
     contracts,
-    boothBrandMixRows: (boothBrandRows ?? []) as { contract_id: string; brand_name: string }[],
+    boothBrandMixRows: (boothBrandRows ?? []) as {
+      contract_id: string;
+      brand_name: string;
+      brand_category?: string | null;
+      expressions?: string[];
+    }[],
     events,
     audit: filterAuditForDashboard((auditRows ?? []) as AuditLogEntry[], excludedAccountEmails),
     actor,

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BRAND_CATEGORIES } from '@/lib/brand-category';
 import { MAX_LINE_ITEM_AMOUNT_CENTS } from '@/lib/contract-line-items';
 
 const lineItemInputSchema = z.object({
@@ -9,6 +10,7 @@ const lineItemInputSchema = z.object({
 const boothBrandInputSchema = z.object({
   booth_index: z.number().int().min(1),
   brand_name: z.string().max(500),
+  brand_category: z.enum(BRAND_CATEGORIES).optional().default('Other'),
   expressions: z.array(z.string().max(200)).optional().default([]),
 });
 
