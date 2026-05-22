@@ -4,14 +4,16 @@ import { useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { SponsorCard } from '@/components/sponsors/sponsor-card';
 import { SponsorProfileDrawer } from '@/components/sponsors/sponsor-profile-drawer';
-import { sponsorCategoryFromBrands, type SponsorRecord } from '@/lib/sponsors';
+import { sponsorCategoryForRecord, type BoothBrandNamesByContract, type SponsorRecord } from '@/lib/sponsors';
 import { canViewSponsorDetails } from '@/lib/permissions';
 
 export function SponsorsDirectory({
   sponsors,
+  boothNamesByContract,
   viewer,
 }: {
   sponsors: SponsorRecord[];
+  boothNamesByContract: BoothBrandNamesByContract;
   viewer: {
     role?: string | null;
     is_events_team?: boolean | null;
@@ -26,19 +28,19 @@ export function SponsorsDirectory({
 
   const categories = useMemo(() => {
     const set = new Set<string>(['all']);
-    sponsors.forEach((s) => set.add(sponsorCategoryFromBrands(s.brands_poured)));
+    sponsors.forEach((s) => set.add(sponsorCategoryForRecord(s, boothNamesByContract)));
     return [...set];
-  }, [sponsors]);
+  }, [sponsors, boothNamesByContract]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return sponsors.filter((s) => {
-      if (category !== 'all' && sponsorCategoryFromBrands(s.brands_poured) !== category) return false;
+      if (category !== 'all' && sponsorCategoryForRecord(s, boothNamesByContract) !== category) return false;
       if (!q) return true;
       const blob = `${s.exhibitor_company_name} ${s.brands_poured ?? ''}`.toLowerCase();
       return blob.includes(q);
     });
-  }, [sponsors, query, category]);
+  }, [sponsors, query, category, boothNamesByContract]);
 
   const canViewSensitive = selected ? canViewSponsorDetails(viewer, selected) : false;
 

@@ -18,6 +18,8 @@ import {
 import { ContractCard } from '@/components/contracts/contract-card';
 import { ContractsFilterBar } from '@/components/contracts/filter-bar';
 import { SavedViewsDropdown, type ContractViewFilters } from '@/components/contracts/saved-views-dropdown';
+import { categorizeContractBrands } from '@/lib/brand-category';
+import type { BoothBrandNamesByContract } from '@/lib/sponsors';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 const STORAGE_KEY = 'wf.contracts.savedViews.v1';
@@ -33,15 +35,11 @@ const PENDING_ACTION_STATUSES = new Set([
 
 const STUCK_STATUSES = new Set(['sent', 'pending_events_review', 'draft', 'ready_for_review', 'approved']);
 
-function categorizeBrands(brandsPoured: string | null): string {
-  const n = (brandsPoured ?? '').toLowerCase();
-  if (!n) return 'Other';
-  if (n.includes('bourbon')) return 'Bourbon';
-  if (n.includes('scotch') || n.includes('islay') || n.includes('speyside') || n.includes('highland')) return 'Scotch';
-  if (n.includes('irish')) return 'Irish';
-  if (n.includes('japanese') || n.includes('japan')) return 'Japanese';
-  if (n.includes('rye')) return 'Rye';
-  return 'Other';
+function categorizeContractForFilter(
+  contract: { id: string; brands_poured: string | null; exhibitor_company_name: string },
+  boothNamesByContract: BoothBrandNamesByContract,
+): string {
+  return categorizeContractBrands(contract, boothNamesByContract[contract.id] ?? []);
 }
 
 function firstBrandPill(brandsPoured: string | null): string | null {
@@ -58,10 +56,12 @@ export function ContractsList({
   contracts,
   events,
   currentRepId,
+  boothNamesByContract = {},
 }: {
   contracts: ContractWithTotals[];
   events: Event[];
   currentRepId: string | null;
+  boothNamesByContract?: BoothBrandNamesByContract;
 }) {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
@@ -121,9 +121,9 @@ export function ContractsList({
 
   const brandOptions = useMemo(() => {
     const set = new Set<string>();
-    contracts.forEach((c) => set.add(categorizeBrands(c.brands_poured)));
+    contracts.forEach((c) => set.add(categorizeContractForFilter(c, boothNamesByContract)));
     return [{ value: 'all', label: 'All' }, ...[...set].sort().map((value) => ({ value, label: value }))];
-  }, [contracts]);
+  }, [contracts, boothNamesByContract]);
 
   const filtered = useMemo(() => {
     return contracts.filter((c) => {
@@ -150,7 +150,8 @@ export function ContractsList({
         const matchMine = filters.rep === 'mine' ? currentRepId : filters.rep;
         if (!matchMine || c.sales_rep_id !== matchMine) return false;
       }
-      if (filters.brand !== 'all' && categorizeBrands(c.brands_poured) !== filters.brand) return false;
+      if (filters.brand !== 'all' && categorizeContractForFilter(c, boothNamesByContract) !== filters.brand)
+        return false;
       const q = filters.search.trim().toLowerCase();
       if (q) {
         const blob = [

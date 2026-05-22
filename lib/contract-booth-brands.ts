@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { brandsPouredSummaryFromBoothBrandNames } from '@/lib/brand-category';
 import type { ContractBoothBrand } from '@/types/db';
 
 export async function fetchContractBoothBrandsOrdered(
@@ -54,6 +55,9 @@ export async function replaceContractBoothBrandsForContract(
 
   const { error: insErr } = await supabase.from('contract_booth_brands').insert(payload);
   if (insErr) throw new Error(insErr.message);
+
+  const brandsPoured = brandsPouredSummaryFromBoothBrandNames(payload.map((p) => p.brand_name));
+  await supabase.from('contracts').update({ brands_poured: brandsPoured }).eq('id', contractId);
 }
 
 /**

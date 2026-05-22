@@ -89,6 +89,10 @@ async function getDashboardData(actor: Awaited<ReturnType<typeof requireContract
   ]);
   const contractsRaw = (contractsRes.data ?? []) as ContractWithTotals[];
   const contractIds = contractsRaw.map((c) => c.id);
+  const { data: boothBrandRows } =
+    contractIds.length > 0
+      ? await supabase.from('contract_booth_brands').select('contract_id, brand_name').in('contract_id', contractIds)
+      : { data: [] };
   let auditQuery = supabase.from('audit_log').select('*').order('occurred_at', { ascending: false }).limit(200);
   if (visibility.filter === 'own') {
     if (contractIds.length === 0) {
@@ -105,6 +109,7 @@ async function getDashboardData(actor: Awaited<ReturnType<typeof requireContract
 
   return {
     contracts,
+    boothBrandMixRows: (boothBrandRows ?? []) as { contract_id: string; brand_name: string }[],
     events,
     audit: filterAuditForDashboard((auditRows ?? []) as AuditLogEntry[], excludedAccountEmails),
     actor,
@@ -167,7 +172,14 @@ export default async function DashboardPage({
 }) {
   const session = await auth();
   const actor = await requireContractActorForPage();
-  const { contracts: allScoped, events, audit, supportedRepNames, canViewAllSales: hasGlobalVisibility } = await getDashboardData(actor);
+  const {
+    contracts: allScoped,
+    boothBrandMixRows,
+    events,
+    audit,
+    supportedRepNames,
+    canViewAllSales: hasGlobalVisibility,
+  } = await getDashboardData(actor);
 
   const rawFilter =
     typeof searchParams?.filter === 'string' ? searchParams.filter : undefined;
@@ -204,7 +216,7 @@ export default async function DashboardPage({
   const leaderboard = getSalesLeaderboard(allScoped);
   const recentActivity = getRecentActivity(audit, allScoped);
   const deadlines = getDeadlines(allScoped);
-  const brandMix = getBrandMix(allScoped);
+  const brandMix = getBrandMix(allScoped, boothBrandMixRows);
 
   const pillDefs: { key: DashboardFilterKey; label: string }[] = [
     { key: 'all', label: 'All' },

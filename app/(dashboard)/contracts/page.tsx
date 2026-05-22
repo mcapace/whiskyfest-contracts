@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { requireContractActorForPage } from '@/lib/auth-contract';
 import { getVisibleContractsFilter } from '@/lib/permissions';
 import { ContractsList } from '@/components/contracts/contracts-list';
+import { boothBrandNamesRecordFromMap } from '@/lib/sponsors';
 import type { ContractWithTotals, ContractStatus, Event } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
@@ -82,9 +83,27 @@ async function loadContracts(
     supabase.from('events').select('*'),
   ]);
 
+  const contractRows = (contracts ?? []) as ContractWithTotals[];
+  const contractIds = contractRows.map((c) => c.id);
+  const { data: boothBrandRows } =
+    contractIds.length > 0
+      ? await supabase.from('contract_booth_brands').select('contract_id, brand_name').in('contract_id', contractIds)
+      : { data: [] };
+
+  const boothMap = new Map<string, string[]>();
+  for (const row of boothBrandRows ?? []) {
+    const cid = (row as { contract_id: string }).contract_id;
+    const name = ((row as { brand_name?: string }).brand_name ?? '').trim();
+    if (!name) continue;
+    const list = boothMap.get(cid) ?? [];
+    list.push(name);
+    boothMap.set(cid, list);
+  }
+
   return {
-    contracts: (contracts ?? []) as ContractWithTotals[],
+    contracts: contractRows,
     events: (events ?? []) as Event[],
+    boothNamesByContract: boothBrandNamesRecordFromMap(boothMap),
   };
 }
 
@@ -97,9 +116,14 @@ export default async function ContractsListPage({
   const status = typeof searchParams.status === 'string' ? searchParams.status : undefined;
   const q = typeof searchParams.q === 'string' ? searchParams.q : undefined;
 
-  const { contracts, events } = await loadContracts(actor, { status, q });
+  const { contracts, events, boothNamesByContract } = await loadContracts(actor, { status, q });
 
   return (
-    <ContractsList contracts={contracts} events={events} currentRepId={actor.salesRepId} />
+    <ContractsList
+      contracts={contracts}
+      events={events}
+      currentRepId={actor.salesRepId}
+      boothNamesByContract={boothNamesByContract}
+    />
   );
 }

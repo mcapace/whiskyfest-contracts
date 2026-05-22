@@ -1,3 +1,9 @@
+import {
+  BRAND_CATEGORIES,
+  categorizeBrandFromName,
+  parseBrandNamesFromBrandsPoured,
+  type BrandCategory,
+} from '@/lib/brand-category';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import type { AuditLogEntry, ContractWithTotals, Event } from '@/types/db';
 
@@ -257,43 +263,34 @@ export function getDeadlines(contracts: ContractWithTotals[]): DeadlineRow[] {
     .slice(0, 12);
 }
 
-const BRAND_CATEGORIES = ['Bourbon', 'Scotch', 'Irish', 'Japanese', 'Rye', 'World Whiskies', 'Other'] as const;
-type BrandCategory = (typeof BRAND_CATEGORIES)[number];
+export type BoothBrandMixInput = { contract_id: string; brand_name: string };
 
-function categorizeBrand(brandName: string): BrandCategory {
-  const name = brandName.toLowerCase();
-  if (name.includes('bourbon')) return 'Bourbon';
-  if (name.includes('scotch') || name.includes('highland') || name.includes('speyside') || name.includes('islay')) return 'Scotch';
-  if (name.includes('irish')) return 'Irish';
-  if (name.includes('japanese') || name.includes('japan')) return 'Japanese';
-  if (name.includes('rye')) return 'Rye';
-  if (
-    name.includes('canada') ||
-    name.includes('taiwan') ||
-    name.includes('india') ||
-    name.includes('australia') ||
-    name.includes('world')
-  ) {
-    return 'World Whiskies';
-  }
-  return 'Other';
-}
-
-export function getBrandMix(contracts: ContractWithTotals[]): BrandMixRow[] {
+export function getBrandMix(
+  contracts: ContractWithTotals[],
+  boothBrands: BoothBrandMixInput[] = [],
+): BrandMixRow[] {
   const counts = new Map<BrandCategory, number>(BRAND_CATEGORIES.map((c) => [c, 0]));
 
-  const brands = contracts
-    .filter((c) => c.status !== 'cancelled' && c.status !== 'voided')
-    .flatMap((c) =>
-      (c.brands_poured ?? '')
-        .split(/[\n,;]+/)
-        .map((s) => s.trim())
-        .filter(Boolean)
-    );
+  const boothByContract = new Map<string, string[]>();
+  for (const row of boothBrands) {
+    const name = row.brand_name?.trim();
+    if (!name) continue;
+    const list = boothByContract.get(row.contract_id) ?? [];
+    list.push(name);
+    boothByContract.set(row.contract_id, list);
+  }
 
-  for (const brand of brands) {
-    const category = categorizeBrand(brand);
-    counts.set(category, (counts.get(category) ?? 0) + 1);
+  for (const contract of contracts) {
+    if (contract.status === 'cancelled' || contract.status === 'voided') continue;
+
+    const boothNames = boothByContract.get(contract.id) ?? [];
+    const brandNames =
+      boothNames.length > 0 ? boothNames : parseBrandNamesFromBrandsPoured(contract.brands_poured);
+
+    for (const brand of brandNames) {
+      const category = categorizeBrandFromName(brand, contract.exhibitor_company_name);
+      counts.set(category, (counts.get(category) ?? 0) + 1);
+    }
   }
 
   const total = [...counts.values()].reduce((sum, count) => sum + count, 0);

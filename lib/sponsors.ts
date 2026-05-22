@@ -1,3 +1,4 @@
+import { categorizeContractBrands } from '@/lib/brand-category';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { ContractWithTotals } from '@/types/db';
 
@@ -27,7 +28,10 @@ export type SponsorRecord = Pick<
   }[];
 };
 
-export async function getConfirmedSponsors(): Promise<SponsorRecord[]> {
+export async function getConfirmedSponsors(): Promise<{
+  sponsors: SponsorRecord[];
+  boothNamesByContract: Map<string, string[]>;
+}> {
   const supabase = getSupabaseAdmin();
   const { data } = await supabase
     .from('contracts_with_totals')
@@ -38,6 +42,18 @@ export async function getConfirmedSponsors(): Promise<SponsorRecord[]> {
     .order('exhibitor_company_name');
   const rows = (data ?? []) as Omit<SponsorRecord, 'activity'>[];
   const ids = rows.map((r) => r.id);
+  const { data: boothBrandRows } = ids.length
+    ? await supabase.from('contract_booth_brands').select('contract_id, brand_name').in('contract_id', ids)
+    : { data: [] };
+  const boothNamesByContract = new Map<string, string[]>();
+  for (const row of boothBrandRows ?? []) {
+    const cid = (row as { contract_id: string }).contract_id;
+    const name = ((row as { brand_name?: string }).brand_name ?? '').trim();
+    if (!name) continue;
+    const list = boothNamesByContract.get(cid) ?? [];
+    list.push(name);
+    boothNamesByContract.set(cid, list);
+  }
   const { data: activityRows } = ids.length
     ? await supabase
         .from('audit_log')
@@ -59,16 +75,37 @@ export async function getConfirmedSponsors(): Promise<SponsorRecord[]> {
     byContract.set(cid, list.slice(0, 8));
   }
 
-  return rows.map((row) => ({ ...row, activity: byContract.get(row.id) ?? [] }));
+  return {
+    sponsors: rows.map((row) => ({ ...row, activity: byContract.get(row.id) ?? [] })),
+    boothNamesByContract: boothNamesByContract,
+  };
 }
 
-export function sponsorCategoryFromBrands(brandsPoured: string | null): string {
-  const name = (brandsPoured ?? '').toLowerCase();
-  if (name.includes('bourbon')) return 'Bourbon';
-  if (name.includes('scotch') || name.includes('highland') || name.includes('speyside') || name.includes('islay')) return 'Scotch';
-  if (name.includes('irish')) return 'Irish';
-  if (name.includes('japanese') || name.includes('japan')) return 'Japanese';
-  if (name.includes('rye')) return 'Rye';
-  if (name.includes('world') || name.includes('taiwan') || name.includes('india') || name.includes('australia')) return 'World Whiskies';
-  return 'Other';
+export type BoothBrandNamesByContract = Record<string, string[]>;
+
+/** Sponsor directory category using booth brands when available. */
+export function sponsorCategoryForRecord(
+  sponsor: Pick<SponsorRecord, 'id' | 'brands_poured' | 'exhibitor_company_name'>,
+  boothNamesByContract: BoothBrandNamesByContract,
+): string {
+  return sponsorCategoryFromBrands(
+    sponsor.brands_poured,
+    sponsor.exhibitor_company_name,
+    boothNamesByContract[sponsor.id] ?? [],
+  );
+}
+
+export function boothBrandNamesRecordFromMap(map: Map<string, string[]>): BoothBrandNamesByContract {
+  return Object.fromEntries(map);
+}
+
+export function sponsorCategoryFromBrands(
+  brandsPoured: string | null,
+  exhibitorCompany?: string | null,
+  boothBrandNames: string[] = [],
+): string {
+  return categorizeContractBrands(
+    { brands_poured: brandsPoured, exhibitor_company_name: exhibitorCompany },
+    boothBrandNames,
+  );
 }
