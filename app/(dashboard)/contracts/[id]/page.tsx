@@ -27,6 +27,7 @@ import {
   contractPrefersSignedPdf,
 } from '@/lib/contract-pdf-preview';
 import { syncDraftPdfFromDocuSign } from '@/lib/contract-pdf-sync-docusign';
+import { syncContractFromDocuSign } from '@/lib/docusign-envelope-sync';
 import { ContractProgressionTimeline } from '@/components/contract/progression-timeline';
 import { ContractSummarySection } from '@/components/contract/contract-summary-section';
 import type {
@@ -53,9 +54,10 @@ export default async function ContractDetailPage({ params }: { params: { id: str
   const viewed = await getContractWithTotalsForViewer(params.id);
   if (!viewed) notFound();
 
-  const { contract, actor } = viewed;
+  const { contract: loadedContract, actor } = viewed;
+  let contract = loadedContract;
   const supabase = getSupabaseAdmin();
-  const [{ data: event }, audit, { data: lineItemsRows }, { data: boothBrandRows }] = await Promise.all([
+  const [{ data: event }, auditInitial, { data: lineItemsRows }, { data: boothBrandRows }] = await Promise.all([
     supabase.from('events').select('*').eq('id', contract.event_id).single(),
     loadAudit(contract.id),
     supabase
@@ -73,6 +75,34 @@ export default async function ContractDetailPage({ params }: { params: { id: str
 
   const lineItems = (lineItemsRows ?? []) as ContractLineItem[];
   const boothBrands = (boothBrandRows ?? []) as ContractBoothBrand[];
+
+  if (
+    contract.docusign_envelope_id &&
+    ['sent', 'partially_signed', 'error'].includes(contract.status)
+  ) {
+    try {
+      const sync = await syncContractFromDocuSign(
+        supabase,
+        contract,
+        (event ?? null) as Event | null,
+        null,
+        { notify: false },
+      );
+      if (sync.ok && sync.changed) {
+        const { data: refreshed } = await supabase
+          .from('contracts_with_totals')
+          .select('*')
+          .eq('id', contract.id)
+          .maybeSingle<ContractWithTotals>();
+        if (refreshed) contract = refreshed;
+      }
+    } catch (err) {
+      console.error('[contract detail] DocuSign status sync failed', err);
+    }
+  }
+
+  const audit =
+    contract !== loadedContract ? await loadAudit(contract.id) : (auditInitial ?? []);
   const activityTimeline = buildContractActivityTimeline(audit, contract);
 
   const isAdmin = actor.isAdmin;

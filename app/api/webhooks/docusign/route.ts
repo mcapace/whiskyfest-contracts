@@ -1,10 +1,11 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { fetchEnvelopeSigners } from '@/lib/docusign';
+import { fetchEnvelopeSigners, fetchEnvelopeStatus } from '@/lib/docusign';
 import {
   applyEnvelopeFullySigned,
   applyExhibitorPartialSignature,
+  isDocuSignEnvelopeFullySigned,
 } from '@/lib/docusign-envelope-sync';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { updateContractRow } from '@/lib/sheets-tracker';
@@ -168,15 +169,30 @@ export async function POST(req: Request) {
     return new NextResponse(null, { status: 200 });
   }
 
-  // --- Fully completed (check before partial — countersigner may finish without a separate partial event) ---
-  const completed =
+  const completedEvent =
     eventType.includes('envelope-completed') ||
     eventType.includes('envelope_completed') ||
     envelopeStatus === 'completed';
+  const recipientCompletedEvent =
+    eventType.includes('recipient-completed') || eventType.includes('recipient_completed');
 
-  if (completed && contract.status !== 'signed' && contract.status !== 'executed') {
+  // --- Fully signed (envelope-completed OR countersigner recipient-completed when both parties are done) ---
+  if (
+    contract.status !== 'signed' &&
+    contract.status !== 'executed' &&
+    (completedEvent || recipientCompletedEvent)
+  ) {
     try {
-      await applyEnvelopeFullySigned(supabase, contract, event ?? null, envelopeId);
+      const signers = await fetchEnvelopeSigners(envelopeId);
+      let envStatus = envelopeStatus?.trim() ?? '';
+      if (!envStatus) {
+        const st = await fetchEnvelopeStatus(envelopeId);
+        envStatus = st.status;
+      }
+      if (isDocuSignEnvelopeFullySigned(envStatus, signers)) {
+        await applyEnvelopeFullySigned(supabase, contract, event ?? null, envelopeId);
+        return new NextResponse(null, { status: 200 });
+      }
     } catch (err) {
       console.error('DocuSign completion handling failed:', err);
       await supabase
@@ -189,11 +205,10 @@ export async function POST(req: Request) {
       revalidateContractPaths(contract.id);
       return new NextResponse(null, { status: 500 });
     }
-    return new NextResponse(null, { status: 200 });
   }
 
   // --- Exhibitor (routing order 1) completed → partially_signed ---
-  if (eventType.includes('recipient-completed') && contract.status === 'sent') {
+  if (recipientCompletedEvent && contract.status === 'sent') {
     let firstSigner = routingOrder === '1' || recipientId === '1';
     if (!firstSigner) {
       try {

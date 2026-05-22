@@ -29,6 +29,21 @@ function routing2Signer(signers: DocuSignSignerRow[]): DocuSignSignerRow | undef
   return signers.find((s) => s.routingOrder === '2');
 }
 
+/** True when DocuSign shows all required signatures (envelope completed or both routing orders done). */
+export function isDocuSignEnvelopeFullySigned(
+  envelopeStatus: string,
+  signers: DocuSignSignerRow[],
+): boolean {
+  const envLower = envelopeStatus.toLowerCase();
+  if (envLower === 'voided' || envLower === 'declined') return false;
+  const r1 = routing1Signer(signers);
+  const r2 = routing2Signer(signers);
+  const r1Done = r1 ? signerCompleted(r1) : false;
+  const r2Done = r2 ? signerCompleted(r2) : false;
+  const allSignersDone = signers.length > 0 && signers.every(signerCompleted);
+  return envLower === 'completed' || allSignersDone || (r1Done && r2Done);
+}
+
 export type DocuSignSyncResult =
   | { ok: true; changed: false; message: string; status: string }
   | { ok: true; changed: true; fromStatus: string; toStatus: string; message: string }
@@ -237,7 +252,9 @@ export async function syncContractFromDocuSign(
   contract: ContractWithTotals,
   event: Event | null,
   actorEmail?: string | null,
+  options?: { notify?: boolean },
 ): Promise<DocuSignSyncResult> {
+  const notify = options?.notify !== false;
   const envelopeId = contract.docusign_envelope_id?.trim();
   if (!envelopeId) {
     return { ok: false, error: 'No DocuSign envelope is linked to this contract.' };
@@ -256,10 +273,7 @@ export async function syncContractFromDocuSign(
   const envLower = envelopeStatus.toLowerCase();
   const signers = await fetchEnvelopeSigners(envelopeId);
   const r1 = routing1Signer(signers);
-  const r2 = routing2Signer(signers);
   const r1Done = r1 ? signerCompleted(r1) : false;
-  const r2Done = r2 ? signerCompleted(r2) : false;
-  const allSignersDone = signers.length > 0 && signers.every(signerCompleted);
 
   if (envLower === 'voided' || envLower === 'declined') {
     await supabase
@@ -279,14 +293,11 @@ export async function syncContractFromDocuSign(
     };
   }
 
-  const envelopeCompleted =
-    envLower === 'completed' || allSignersDone || (r1Done && r2Done);
-
-  if (envelopeCompleted) {
+  if (isDocuSignEnvelopeFullySigned(envelopeStatus, signers)) {
     try {
       const { updated } = await applyEnvelopeFullySigned(supabase, contract, event, envelopeId, {
         actorEmail,
-        notify: true,
+        notify,
       });
       if (!updated && (contract.status === 'signed' || contract.status === 'executed')) {
         return {
@@ -321,7 +332,7 @@ export async function syncContractFromDocuSign(
     try {
       await applyExhibitorPartialSignature(supabase, contract, event, envelopeId, {
         actorEmail,
-        notify: true,
+        notify,
       });
       return {
         ok: true,
