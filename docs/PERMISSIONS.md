@@ -31,8 +31,9 @@
 ## Impersonation model
 
 - Only `can_impersonate=true` users can impersonate.
-- Impersonation is read-only (`session.is_read_only_impersonation=true`).
-- Actions are blocked in mutating APIs when impersonating.
+- Impersonation is read-only (`session.is_read_only_impersonation=true`) for pipeline/contract actions.
+- Accounting invoice actions (`/api/accounting/*`) remain available when viewing as a user with `is_accounting=true`.
+- Other mutating APIs are blocked while impersonating.
 - Audit events capture impersonation start/end.
 - Session auto-expires after ~30 minutes.
 

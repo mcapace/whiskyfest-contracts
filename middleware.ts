@@ -29,7 +29,12 @@ export default auth((req) => {
   if (session && READ_ONLY_METHODS.has(req.method)) {
     if (pathname.startsWith('/api/') && !pathname.startsWith('/api/auth') && !pathname.startsWith('/api/webhooks')) {
       if (session.is_read_only_impersonation) {
-        return NextResponse.json({ error: IMPERSONATION_READ_ONLY_MESSAGE }, { status: 403 });
+        const u = session.user as SessionUserFlags | undefined;
+        const accountingImpersonationWrite =
+          pathname.startsWith('/api/accounting/') && Boolean(u?.is_accounting);
+        if (!accountingImpersonationWrite) {
+          return NextResponse.json({ error: IMPERSONATION_READ_ONLY_MESSAGE }, { status: 403 });
+        }
       }
     }
   }

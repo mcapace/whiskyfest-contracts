@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
+import { useSession } from 'next-auth/react';
 import { Banknote, Send } from 'lucide-react';
 import { useImpersonationReadOnly } from '@/hooks/use-impersonation-read-only';
 import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
@@ -33,7 +34,11 @@ export function AccountingDetailActions({
   notesRecordUpdatedLabel: string | null;
 }) {
   const router = useRouter();
-  const readOnly = useImpersonationReadOnly();
+  const { data: session } = useSession();
+  const impersonationReadOnly = useImpersonationReadOnly();
+  const isAccountingUser = Boolean(session?.user?.is_accounting);
+  /** Impersonation is read-only except when viewing as an accounting user (AR can work while impersonated). */
+  const readOnly = impersonationReadOnly && !isAccountingUser;
   const [pending, startTransition] = useTransition();
   const busy = pending || readOnly;
   const [notes, setNotes] = useState(initialNotes ?? '');
@@ -71,6 +76,12 @@ export function AccountingDetailActions({
   return (
     <div className="space-y-6">
       {err && <p className="text-sm text-destructive">{err}</p>}
+      {readOnly && (
+        <p className="text-sm text-amber-800 dark:text-amber-200">
+          View-as mode is read-only for this user. Exit impersonation or view as an accounting user to update invoice
+          status.
+        </p>
+      )}
 
       {showPrimaryAction ? (
         <section

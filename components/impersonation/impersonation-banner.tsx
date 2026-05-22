@@ -12,6 +12,7 @@ export function ImpersonationBanner() {
   if (!imp?.active) return null;
 
   const label = imp.target_name?.trim() || imp.target_email;
+  const accountingUser = Boolean(session?.user?.is_accounting);
 
   async function exit() {
     await update({ impersonationClear: true });
@@ -28,7 +29,7 @@ export function ImpersonationBanner() {
           Viewing as <span className="font-extrabold tracking-tight">{label}</span>
           <span className="mx-1.5 font-medium opacity-90">—</span>
           <span className="text-sm font-bold uppercase tracking-wide text-amber-950/90 dark:text-amber-950">
-            Read-only
+            {accountingUser ? 'Accounting actions enabled' : 'Read-only'}
           </span>
           <span className="mt-0.5 block text-sm font-medium opacity-90">({imp.role_description})</span>
         </p>
