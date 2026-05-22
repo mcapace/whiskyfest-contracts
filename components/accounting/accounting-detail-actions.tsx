@@ -1,11 +1,11 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
+import { Banknote, Send } from 'lucide-react';
 import { useImpersonationReadOnly } from '@/hooks/use-impersonation-read-only';
 import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
 import { ActionWithHelp } from '@/components/contract/action-with-help';
-import { BottomActionBar } from '@/components/contract/bottom-action-bar';
 import { Button } from '@/components/ui/button';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { CONTRACT_ACTION_HELP } from '@/lib/contract-action-help-text';
@@ -66,60 +66,63 @@ export function AccountingDetailActions({
     startTransition(() => void patch({ accounting_notes: notes }));
   }
 
-  const fabVisible = useMemo(
-    () => invoiceStatus === 'pending' || invoiceStatus === 'invoice_sent',
-    [invoiceStatus],
-  );
-  const actionCount = invoiceStatus === 'pending' || invoiceStatus === 'invoice_sent' ? 1 : 0;
-  const fabBtn =
-    'h-10 shrink-0 gap-2 rounded-full px-4 text-sm font-medium motion-safe:transition-transform motion-safe:duration-150 hover:brightness-[1.04] active:scale-[0.98]';
+  const showPrimaryAction = invoiceStatus === 'pending' || invoiceStatus === 'invoice_sent';
 
   return (
     <div className="space-y-6">
       {err && <p className="text-sm text-destructive">{err}</p>}
 
-      <div data-tour="accounting-actions-bar">
-        <TooltipProvider delayDuration={300} skipDelayDuration={200}>
-          <BottomActionBar visible={fabVisible} actionsCount={actionCount}>
-            {invoiceStatus === 'pending' && (
-              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.markInvoiceSent}>
-                <Button
-                  type="button"
-                  data-tour="accounting-mark-invoice-sent"
-                  className={fabBtn}
-                  onClick={markInvoiceSent}
-                  disabled={busy}
-                  title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
-                >
-                  {pending ? 'Saving…' : 'Mark Invoice Sent'}
-                </Button>
-              </ActionWithHelp>
-            )}
-            {invoiceStatus === 'invoice_sent' && (
-              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.markPaid}>
-                <Button
-                  type="button"
-                  data-tour="accounting-mark-paid"
-                  className={fabBtn}
-                  onClick={markPaid}
-                  disabled={busy}
-                  title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
-                >
-                  {pending ? 'Saving…' : 'Mark Paid'}
-                </Button>
-              </ActionWithHelp>
-            )}
-          </BottomActionBar>
-        </TooltipProvider>
-      </div>
+      {showPrimaryAction ? (
+        <section
+          className="rounded-lg border border-border/60 bg-card/40 p-4 md:p-6"
+          data-tour="accounting-actions-bar"
+        >
+          <p className="wf-label-caps text-[0.6rem] text-muted-foreground">AR actions</p>
+          <TooltipProvider delayDuration={300} skipDelayDuration={200}>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              {invoiceStatus === 'pending' && (
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.markInvoiceSent}>
+                  <Button
+                    type="button"
+                    data-tour="accounting-mark-invoice-sent"
+                    className="h-10 gap-2 px-5"
+                    onClick={markInvoiceSent}
+                    disabled={busy}
+                    title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                  >
+                    <Send className="h-4 w-4 shrink-0" aria-hidden />
+                    {pending ? 'Saving…' : 'Mark Invoice Sent'}
+                  </Button>
+                </ActionWithHelp>
+              )}
+              {invoiceStatus === 'invoice_sent' && (
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.markPaid}>
+                  <Button
+                    type="button"
+                    data-tour="accounting-mark-paid"
+                    className="h-10 gap-2 px-5"
+                    onClick={markPaid}
+                    disabled={busy}
+                    title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                  >
+                    <Banknote className="h-4 w-4 shrink-0" aria-hidden />
+                    {pending ? 'Saving…' : 'Mark Paid'}
+                  </Button>
+                </ActionWithHelp>
+              )}
+            </div>
+          </TooltipProvider>
+        </section>
+      ) : null}
 
       {invoiceStatus === 'paid' && (
-        <div className="divide-y divide-border/50 border-b border-border/50 pb-6 text-sm text-muted-foreground">
-          <p>
+        <div className="rounded-lg border border-border/60 bg-card/40 p-4 text-sm text-muted-foreground md:p-6">
+          <p className="wf-label-caps text-[0.6rem] text-muted-foreground">Invoice history</p>
+          <p className="mt-3">
             Invoice sent{invoiceSentLabel ? `: ${invoiceSentLabel}` : ''}
             {invoiceSentBy ? ` · ${invoiceSentBy}` : ''}
           </p>
-          <p className="pt-3">
+          <p className="mt-2">
             Paid{paidLabel ? `: ${paidLabel}` : ''}
             {paidBy ? ` · ${paidBy}` : ''}
           </p>
@@ -132,7 +135,7 @@ export function AccountingDetailActions({
         </p>
       )}
 
-      <div className="rounded-lg border border-border/60 bg-card/40 p-4">
+      <div className="rounded-lg border border-border/60 bg-card/40 p-4 md:p-6">
         <h3 className="font-serif text-lg font-semibold">Accounting notes</h3>
         <Textarea className="mt-3 min-h-[120px]" value={notes} onChange={(e) => setNotes(e.target.value)} />
         <Button
