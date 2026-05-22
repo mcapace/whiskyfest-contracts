@@ -1,3 +1,4 @@
+import { fetchBoothBrandsByContractIds } from '@/lib/contract-booth-brand-queries';
 import { categorizeContractBrands } from '@/lib/brand-category';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { ContractWithTotals } from '@/types/db';
@@ -45,17 +46,12 @@ export async function getConfirmedSponsors(): Promise<{
     .order('exhibitor_company_name');
   const rows = (data ?? []) as Omit<SponsorRecord, 'activity'>[];
   const ids = rows.map((r) => r.id);
-  const { data: boothBrandRows } = ids.length
-    ? await supabase
-        .from('contract_booth_brands')
-        .select('contract_id, brand_name, brand_category, expressions')
-        .in('contract_id', ids)
-    : { data: [] };
+  const boothBrandRows = ids.length ? await fetchBoothBrandsByContractIds(supabase, ids) : [];
   const boothRowsByContract = new Map<
     string,
     { brand_name: string; brand_category?: string | null; expressions?: string[] }[]
   >();
-  for (const row of boothBrandRows ?? []) {
+  for (const row of boothBrandRows) {
     const cid = (row as { contract_id: string }).contract_id;
     const name = ((row as { brand_name?: string }).brand_name ?? '').trim();
     if (!name) continue;

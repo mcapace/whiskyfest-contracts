@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { requireContractActorForPage } from '@/lib/auth-contract';
 import { getVisibleContractsFilter } from '@/lib/permissions';
 import { ContractsList } from '@/components/contracts/contracts-list';
+import { fetchBoothBrandsByContractIds } from '@/lib/contract-booth-brand-queries';
 import { boothBrandRowsRecordFromMap } from '@/lib/sponsors';
 import type { ContractWithTotals, ContractStatus, Event } from '@/types/db';
 
@@ -85,19 +86,14 @@ async function loadContracts(
 
   const contractRows = (contracts ?? []) as ContractWithTotals[];
   const contractIds = contractRows.map((c) => c.id);
-  const { data: boothBrandRows } =
-    contractIds.length > 0
-      ? await supabase
-          .from('contract_booth_brands')
-          .select('contract_id, brand_name, brand_category, expressions')
-          .in('contract_id', contractIds)
-      : { data: [] };
+  const boothBrandRows =
+    contractIds.length > 0 ? await fetchBoothBrandsByContractIds(supabase, contractIds) : [];
 
   const boothMap = new Map<
     string,
     { brand_name: string; brand_category?: string | null; expressions?: string[] }[]
   >();
-  for (const row of boothBrandRows ?? []) {
+  for (const row of boothBrandRows) {
     const cid = (row as { contract_id: string }).contract_id;
     const name = ((row as { brand_name?: string }).brand_name ?? '').trim();
     if (!name) continue;

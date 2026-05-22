@@ -34,6 +34,7 @@ import { UpcomingDeadlines } from '@/components/dashboard/upcoming-deadlines';
 import { BrandMixBreakdown } from '@/components/dashboard/brand-mix-breakdown';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StatusBadge } from '@/components/contracts/status-badge';
+import { fetchBoothBrandsByContractIds } from '@/lib/contract-booth-brand-queries';
 import { getBrandMix, getDeadlines, getEventVitalSigns, getPipelineData, getRecentActivity, getSalesLeaderboard } from '@/lib/event-metrics';
 import type { AuditLogEntry, ContractWithTotals, Event } from '@/types/db';
 
@@ -89,13 +90,8 @@ async function getDashboardData(actor: Awaited<ReturnType<typeof requireContract
   ]);
   const contractsRaw = (contractsRes.data ?? []) as ContractWithTotals[];
   const contractIds = contractsRaw.map((c) => c.id);
-  const { data: boothBrandRows } =
-    contractIds.length > 0
-      ? await supabase
-          .from('contract_booth_brands')
-          .select('contract_id, brand_name, brand_category, expressions')
-          .in('contract_id', contractIds)
-      : { data: [] };
+  const boothBrandRows =
+    contractIds.length > 0 ? await fetchBoothBrandsByContractIds(supabase, contractIds) : [];
   let auditQuery = supabase.from('audit_log').select('*').order('occurred_at', { ascending: false }).limit(200);
   if (visibility.filter === 'own') {
     if (contractIds.length === 0) {
@@ -112,12 +108,7 @@ async function getDashboardData(actor: Awaited<ReturnType<typeof requireContract
 
   return {
     contracts,
-    boothBrandMixRows: (boothBrandRows ?? []) as {
-      contract_id: string;
-      brand_name: string;
-      brand_category?: string | null;
-      expressions?: string[];
-    }[],
+    boothBrandMixRows: boothBrandRows,
     events,
     audit: filterAuditForDashboard((auditRows ?? []) as AuditLogEntry[], excludedAccountEmails),
     actor,

@@ -30,7 +30,7 @@ export async function replaceContractBoothBrandsForContract(
   if (delErr) throw new Error(delErr.message);
 
   const byIndex = new Map(rows.map((r) => [r.booth_index, r]));
-  const payload: {
+  const baseRows: {
     contract_id: string;
     booth_index: number;
     brand_name: string;
@@ -45,7 +45,7 @@ export async function replaceContractBoothBrandsForContract(
       .map((e) => e.trim())
       .filter((e) => e.length > 0);
     const brand_category = row?.brand_category?.trim() || null;
-    payload.push({
+    baseRows.push({
       contract_id: contractId,
       booth_index: i,
       brand_name: brand,
@@ -54,12 +54,16 @@ export async function replaceContractBoothBrandsForContract(
     });
   }
 
-  if (payload.length === 0) return;
+  if (baseRows.length === 0) return;
 
-  const { error: insErr } = await supabase.from('contract_booth_brands').insert(payload);
+  let insErr = (await supabase.from('contract_booth_brands').insert(baseRows)).error;
+  if (insErr?.message?.includes('brand_category') && insErr.message.includes('does not exist')) {
+    const minimal = baseRows.map(({ brand_category: _c, ...rest }) => rest);
+    insErr = (await supabase.from('contract_booth_brands').insert(minimal)).error;
+  }
   if (insErr) throw new Error(insErr.message);
 
-  const brandsPoured = brandsPouredSummaryFromBoothBrandNames(payload.map((p) => p.brand_name));
+  const brandsPoured = brandsPouredSummaryFromBoothBrandNames(baseRows.map((p) => p.brand_name));
   await supabase.from('contracts').update({ brands_poured: brandsPoured }).eq('id', contractId);
 }
 
