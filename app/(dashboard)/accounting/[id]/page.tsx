@@ -75,7 +75,7 @@ export default async function AccountingContractDetailPage({ params }: { params:
   const inv = (contract.invoice_status ?? 'pending') as InvoiceStatus;
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-8 pb-12 lg:pr-8">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
         <Link href="/accounting" className="inline-flex items-center gap-1.5 hover:text-foreground">
           <ArrowLeft className="h-3.5 w-3.5" /> AR Dashboard
@@ -92,17 +92,6 @@ export default async function AccountingContractDetailPage({ params }: { params:
         <p className="wf-label-caps mb-4 text-[0.6rem]">Invoice lifecycle</p>
         <InvoiceLifecycleTimeline status={inv} />
       </section>
-
-      <AccountingDetailActions
-        contractId={contract.id}
-        invoiceStatus={inv}
-        invoiceSentLabel={contract.invoice_sent_at ? formatTimestamp(contract.invoice_sent_at) : null}
-        invoiceSentBy={contract.invoice_sent_by}
-        paidLabel={contract.paid_at ? formatTimestamp(contract.paid_at) : null}
-        paidBy={contract.paid_by}
-        initialNotes={contract.accounting_notes}
-        notesRecordUpdatedLabel={formatTimestamp(contract.updated_at)}
-      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="border-border/60 lg:col-span-2">
@@ -200,6 +189,17 @@ export default async function AccountingContractDetailPage({ params }: { params:
           </CardContent>
         </Card>
       </div>
+
+      <AccountingDetailActions
+        contractId={contract.id}
+        invoiceStatus={inv}
+        invoiceSentLabel={contract.invoice_sent_at ? formatTimestamp(contract.invoice_sent_at) : null}
+        invoiceSentBy={contract.invoice_sent_by}
+        paidLabel={contract.paid_at ? formatTimestamp(contract.paid_at) : null}
+        paidBy={contract.paid_by}
+        initialNotes={contract.accounting_notes}
+        notesRecordUpdatedLabel={formatTimestamp(contract.updated_at)}
+      />
     </div>
   );
 }

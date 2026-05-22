@@ -5,36 +5,43 @@ import { ChevronLeft, PanelRightOpen, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-const STORAGE_KEY = 'wf-contract-actions-sidebar-open';
+export const CONTRACT_ACTIONS_SIDEBAR_STORAGE_KEY = 'wf-contract-actions-sidebar-open';
+export const ACCOUNTING_ACTIONS_SIDEBAR_STORAGE_KEY = 'wf-accounting-actions-sidebar-open';
 
-function readStoredOpen(): boolean | null {
+function readStoredOpen(storageKey: string): boolean | null {
   if (typeof window === 'undefined') return null;
-  const v = localStorage.getItem(STORAGE_KEY);
+  const v = localStorage.getItem(storageKey);
   if (v === 'true') return true;
   if (v === 'false') return false;
   return null;
 }
 
-export function useContractActionsSidebar(defaultOpen = false) {
+export function useContractActionsSidebar(
+  defaultOpen = false,
+  storageKey = CONTRACT_ACTIONS_SIDEBAR_STORAGE_KEY,
+) {
   const [open, setOpenState] = useState(defaultOpen);
 
   useEffect(() => {
-    const stored = readStoredOpen();
+    const stored = readStoredOpen(storageKey);
     if (stored !== null) setOpenState(stored);
-  }, []);
+  }, [storageKey]);
 
-  const setOpen = useCallback((next: boolean) => {
-    setOpenState(next);
-    localStorage.setItem(STORAGE_KEY, String(next));
-  }, []);
+  const setOpen = useCallback(
+    (next: boolean) => {
+      setOpenState(next);
+      localStorage.setItem(storageKey, String(next));
+    },
+    [storageKey],
+  );
 
   const toggle = useCallback(() => {
     setOpenState((prev) => {
       const next = !prev;
-      localStorage.setItem(STORAGE_KEY, String(next));
+      localStorage.setItem(storageKey, String(next));
       return next;
     });
-  }, []);
+  }, [storageKey]);
 
   return { open, setOpen, toggle };
 }
