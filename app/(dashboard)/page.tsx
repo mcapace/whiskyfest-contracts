@@ -201,13 +201,16 @@ export default async function DashboardPage({
     .filter((c) => contractMatchesDashboardFilter(c, filter, scopeIds))
     .slice(0, 50);
 
-  const contractsCount = allScoped.length;
+  const activeScoped = allScoped.filter(
+    (c) => c.status !== 'cancelled' && c.status !== 'voided',
+  );
+  const contractsCount = activeScoped.length;
   const staffPersona = staffPersonaEarly;
 
-  const totalExecutedCents = allScoped
+  const totalExecutedCents = activeScoped
     .filter((c) => c.status === 'executed')
     .reduce((a, c) => a + c.grand_total_cents, 0);
-  const totalInFlightCents = allScoped
+  const totalInFlightCents = activeScoped
     .filter((c) =>
       ['ready_for_review', 'approved', 'sent', 'partially_signed', 'signed', 'pending_events_review'].includes(
         c.status,
@@ -215,16 +218,16 @@ export default async function DashboardPage({
     )
     .reduce((a, c) => a + c.grand_total_cents, 0);
   const totalPipelineCents = totalExecutedCents + totalInFlightCents;
-  const draftCount = allScoped.filter((c) => c.status === 'draft' || c.status === 'ready_for_review').length;
-  const executedCount = allScoped.filter((c) => c.status === 'executed').length;
+  const draftCount = activeScoped.filter((c) => c.status === 'draft' || c.status === 'ready_for_review').length;
+  const executedCount = activeScoped.filter((c) => c.status === 'executed').length;
 
   const eventMap = new Map(events.map((e) => [e.id, e]));
-  const vitalSigns = getEventVitalSigns(allScoped, events);
-  const pipelineData = getPipelineData(allScoped);
-  const leaderboard = getSalesLeaderboard(allScoped);
-  const recentActivity = getRecentActivity(audit, allScoped);
-  const deadlines = getDeadlines(allScoped);
-  const brandMix = getBrandMix(allScoped, boothBrandMixRows);
+  const vitalSigns = getEventVitalSigns(activeScoped, events);
+  const pipelineData = getPipelineData(activeScoped);
+  const leaderboard = getSalesLeaderboard(activeScoped);
+  const recentActivity = getRecentActivity(audit, activeScoped);
+  const deadlines = getDeadlines(activeScoped);
+  const brandMix = getBrandMix(activeScoped, boothBrandMixRows);
 
   const pillDefs: { key: DashboardFilterKey; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -274,7 +277,7 @@ export default async function DashboardPage({
   const greetingSubtitle = buildGreetingSubtitle(actor.role, actor.isEventsTeam, actor.isAdmin, smartMetrics, daysToEvent);
 
   const filterDescription = (() => {
-    if (filter === 'all') return 'Most recent 50 contracts matching your access';
+    if (filter === 'all') return 'Most recent 50 active contracts (cancelled/voided hidden; use Cancelled filter)';
     if (filter.startsWith('staff_') || filter.startsWith('rep_')) {
       return `Filtered by priority · ${visibleContracts.length} of ${allScoped.length} match`;
     }

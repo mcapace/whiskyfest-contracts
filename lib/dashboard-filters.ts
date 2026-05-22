@@ -44,6 +44,11 @@ export function isStaffDashboardPersona(isAdmin: boolean, isEventsTeam: boolean)
   return isAdmin || isEventsTeam;
 }
 
+/** Cancelled/voided contracts are only visible when that status filter is selected. */
+export function isInactiveDashboardContract(status: string): boolean {
+  return status === 'cancelled' || status === 'voided';
+}
+
 export function contractMatchesDashboardFilter(
   c: ContractWithTotals,
   filter: DashboardFilterKey,
@@ -54,7 +59,7 @@ export function contractMatchesDashboardFilter(
 
   switch (filter) {
     case 'all':
-      return true;
+      return !isInactiveDashboardContract(c.status);
     case 'draft':
       return c.status === 'draft' || c.status === 'ready_for_review';
     case 'events_review':
