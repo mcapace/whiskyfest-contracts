@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Layers, LayoutGrid, Sparkles } from 'lucide-react';
+import { Megaphone, PackagePlus, Store } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -12,9 +12,9 @@ import {
 } from '@/lib/contract-deal-kind';
 
 const ICONS: Record<ContractDealKind, LucideIcon> = {
-  booth: LayoutGrid,
-  sponsorship_only: Sparkles,
-  booth_and_sponsorship: Layers,
+  booth: Store,
+  sponsorship_only: Megaphone,
+  booth_and_sponsorship: PackagePlus,
 };
 
 const ACCENT: Record<ContractDealKind, string> = {
