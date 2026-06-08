@@ -113,6 +113,8 @@ export interface Contract {
   created_at: string;
   updated_at: string;
   notes: string | null;
+  /** Printed on the contract PDF via {{exhibitor_notes}}; visible to the sponsor. */
+  exhibitor_notes: string | null;
   /** Legacy / off-system contract keyed in by admin or events team. */
   imported_at: string | null;
   imported_by: string | null;

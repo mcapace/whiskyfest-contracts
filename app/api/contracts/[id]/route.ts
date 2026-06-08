@@ -77,6 +77,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         signer_1_email: p.signer_1_email ?? null,
         sales_rep_id: effectiveSalesRepId,
         notes: p.notes ?? null,
+        exhibitor_notes: p.exhibitor_notes?.trim() || null,
         ...(contract.status === 'voided'
           ? {
               status: 'draft',

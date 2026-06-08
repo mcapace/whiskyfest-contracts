@@ -496,12 +496,27 @@ export default async function ContractDetailPage({ params }: { params: { id: str
       </div>
 
       {/* Notes */}
-      {contract.notes && contract.status !== 'error' && (
+      {(contract.exhibitor_notes || (contract.notes && contract.status !== 'error')) && (
         <Card>
           <div className="border-b border-border/50 px-6 py-4">
-            <h2 className="font-serif text-lg font-semibold">Internal Notes</h2>
+            <h2 className="font-serif text-lg font-semibold">Notes</h2>
           </div>
-          <CardContent className="p-6 text-sm whitespace-pre-wrap">{contract.notes}</CardContent>
+          <CardContent className="space-y-4 p-6 text-sm">
+            {contract.exhibitor_notes ? (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  On contract (sponsor-visible)
+                </p>
+                <p className="mt-2 whitespace-pre-wrap">{contract.exhibitor_notes}</p>
+              </div>
+            ) : null}
+            {contract.notes && contract.status !== 'error' ? (
+              <div className={contract.exhibitor_notes ? 'border-t border-border/50 pt-4' : undefined}>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Internal only</p>
+                <p className="mt-2 whitespace-pre-wrap">{contract.notes}</p>
+              </div>
+            ) : null}
+          </CardContent>
         </Card>
       )}
 

@@ -143,6 +143,7 @@ export async function POST(req: Request) {
       signer_1_email: p.signer_1_email ?? null,
       sales_rep_id: effectiveSalesRepId,
       notes: p.notes ?? null,
+      exhibitor_notes: p.exhibitor_notes?.trim() || null,
       created_by: actor.email,
       status: 'draft',
       ...bill,

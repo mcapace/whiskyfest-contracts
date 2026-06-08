@@ -151,6 +151,7 @@ export function buildContractMergeMap(
     '{{shanken_signatory_name}}': event.shanken_signatory_name,
     '{{shanken_signatory_title}}': event.shanken_signatory_title,
     '{{shanken_signatory_email}}': event.shanken_signatory_email,
+    '{{exhibitor_notes}}': (contract.exhibitor_notes ?? '').trim(),
     ...anchors,
     ...exhibitorFieldMergeTokens(mode),
   };

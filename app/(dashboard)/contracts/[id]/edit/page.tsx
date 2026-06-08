@@ -62,6 +62,7 @@ export default async function EditDraftContractPage({ params }: { params: { id: 
           signer_1_title: c.signer_1_title ?? '',
           signer_1_email: c.signer_1_email ?? '',
           sales_rep_id: c.sales_rep_id ?? '',
+          exhibitor_notes: c.exhibitor_notes ?? '',
           notes: c.notes ?? '',
         }}
         initialBoothBrands={

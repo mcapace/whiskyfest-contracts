@@ -55,6 +55,7 @@ export type ContractFormValues = {
   signer_1_title: string;
   signer_1_email: string;
   sales_rep_id: string;
+  exhibitor_notes: string;
   notes: string;
 };
 
@@ -152,6 +153,7 @@ export function NewContractForm({
     signer_1_title:         initialValues?.signer_1_title ?? '',
     signer_1_email:         initialValues?.signer_1_email ?? '',
     sales_rep_id:           initialValues?.sales_rep_id ?? '',
+    exhibitor_notes:        initialValues?.exhibitor_notes ?? '',
     notes:                  initialValues?.notes ?? '',
   }));
 
@@ -767,11 +769,33 @@ export function NewContractForm({
         {/* Notes */}
         <Card>
           <CardHeader>
-            <CardTitle>Internal Notes</CardTitle>
-            <CardDescription>Only visible to your team. Not printed on the contract.</CardDescription>
+            <CardTitle>Contract Notes</CardTitle>
+            <CardDescription>
+              Notes for the sponsor appear on the generated contract PDF. Internal notes stay in the app only.
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Textarea value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any context for your team…" rows={3} />
+          <CardContent className="space-y-4">
+            <Field
+              label="Notes on contract (visible to sponsor)"
+              hint="Merged into the contract as {{exhibitor_notes}} when you generate the PDF."
+            >
+              <Textarea
+                value={form.exhibitor_notes}
+                onChange={(e) => set('exhibitor_notes', e.target.value)}
+                placeholder="Program benefits, deliverables, scheduling details, etc."
+                rows={4}
+                maxLength={10000}
+              />
+            </Field>
+            <Field label="Internal notes (team only)">
+              <Textarea
+                value={form.notes}
+                onChange={(e) => set('notes', e.target.value)}
+                placeholder="Context for sales, events, or admin — not printed on the contract."
+                rows={3}
+                maxLength={20000}
+              />
+            </Field>
           </CardContent>
         </Card>
 
