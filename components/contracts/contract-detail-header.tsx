@@ -3,7 +3,7 @@
 import { StatusBadge } from '@/components/contracts/status-badge';
 import { formatCurrency } from '@/lib/utils';
 import { useContractLiveOptional } from '@/components/contracts/contract-live-context';
-import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
+import { dealKindFromContract, dealKindLabel } from '@/lib/contract-deal-kind';
 import type { ContractStatus } from '@/types/db';
 
 export function ContractDetailHeader({
@@ -12,6 +12,7 @@ export function ContractDetailHeader({
   status,
   boothCount,
   orderType,
+  lineItemsSubtotalCents,
   totalCents,
   salesRep,
 }: {
@@ -20,10 +21,16 @@ export function ContractDetailHeader({
   status: ContractStatus;
   boothCount: number;
   orderType?: string | null;
+  lineItemsSubtotalCents?: number | null;
   totalCents: number;
   salesRep: string | null;
 }) {
-  const sponsorshipOnly = isSponsorshipOnlyOrder({ order_type: orderType, booth_count: boothCount });
+  const dealKind = dealKindFromContract({
+    order_type: orderType,
+    booth_count: boothCount,
+    line_items_subtotal_cents: lineItemsSubtotalCents,
+  });
+  const packageLabel = dealKindLabel(dealKind);
   const live = useContractLiveOptional();
   const shownStatus = (live?.optimisticStatus ?? status) as ContractStatus;
 
@@ -37,10 +44,14 @@ export function ContractDetailHeader({
       <p className="font-display text-lg italic text-ink-700">{subtitle}</p>
       <div className="flex flex-wrap gap-6 border-t border-parchment-200 pt-3 text-sm text-ink-700">
         <p>
-          <span className="text-ink-500">{sponsorshipOnly ? 'Package' : 'Booths'}</span> ·{' '}
-          <span className="font-semibold text-oak-800">
-            {sponsorshipOnly ? 'Sponsorship only' : boothCount}
-          </span>
+          <span className="text-ink-500">Deal</span> ·{' '}
+          <span className="font-semibold text-oak-800">{packageLabel}</span>
+          {dealKind !== 'sponsorship_only' ? (
+            <span className="text-ink-500">
+              {' '}
+              · <span className="tabular-nums">{boothCount}</span> booth{boothCount === 1 ? '' : 's'}
+            </span>
+          ) : null}
         </p>
         <p>
           <span className="text-ink-500">Total</span> ·{' '}

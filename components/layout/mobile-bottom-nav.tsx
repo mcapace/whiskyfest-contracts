@@ -31,7 +31,7 @@ export function MobileBottomNav({
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t border-border/60 bg-bg-surface-raised/95 px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md lg:hidden">
       <NavIcon href="/" active={pathname === '/'} label="Home" icon={LayoutDashboard} />
-      <NavIcon href="/contracts/new" active={pathname.startsWith('/contracts/new')} label="New" icon={Plus} />
+      <NavIcon href="/#start-deal" active={pathname === '/'} label="Start" icon={Plus} />
       <NavIcon href="/contracts" active={pathname.startsWith('/contracts') && !pathname.includes('/new')} label="Contracts" icon={Home} />
       {showAdminLinks && (
         <NavIcon href="/accounting" active={pathname.startsWith('/accounting')} label="AR" icon={Calculator} />

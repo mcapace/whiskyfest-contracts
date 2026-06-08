@@ -96,8 +96,8 @@ export function DashboardHero({
           </MagneticButton>
           <MagneticButton strength={0.85}>
             <Button asChild className="bg-amber-600 text-parchment-50 shadow-lg shadow-amber-950/25 hover:bg-amber-700">
-              <Link href="/contracts/new" data-tour="new-contract-btn">
-                <Plus className="h-4 w-4" /> New Contract
+              <Link href="/#start-deal" data-tour="new-contract-btn">
+                <Plus className="h-4 w-4" /> Start a deal
               </Link>
             </Button>
           </MagneticButton>

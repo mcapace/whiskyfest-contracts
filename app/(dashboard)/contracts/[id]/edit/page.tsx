@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { getContractWithTotalsForViewer } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { NewContractForm } from '@/components/contracts/new-contract-form';
+import { dealKindFromContract } from '@/lib/contract-deal-kind';
 import type { ContractLineItem, Event } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
@@ -56,7 +57,6 @@ export default async function EditDraftContractPage({ params }: { params: { id: 
           event_id: c.event_id,
           exhibitor_legal_name: c.exhibitor_legal_name,
           exhibitor_company_name: c.exhibitor_company_name,
-          order_type: c.order_type ?? (c.booth_count === 0 ? 'sponsorship_only' : 'booth'),
           sponsor_brand: c.brands_poured ?? '',
           booth_count: c.booth_count,
           booth_rate_cents: c.booth_rate_cents,
@@ -67,6 +67,7 @@ export default async function EditDraftContractPage({ params }: { params: { id: 
           exhibitor_notes: c.exhibitor_notes ?? '',
           notes: c.notes ?? '',
         }}
+        initialDealKind={dealKindFromContract(c)}
         initialBoothBrands={
           (boothBrandRows ?? []) as {
             booth_index: number;

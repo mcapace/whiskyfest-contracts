@@ -109,7 +109,7 @@ const nav: {
   legacyImport?: boolean;
 }[] = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/contracts/new', label: 'New Contract', icon: Plus },
+  { href: '/#start-deal', label: 'Start a deal', icon: Plus },
   { href: '/contracts', label: 'All Contracts', icon: FileText },
   { href: '/contracts/import', label: 'Import Contract', icon: Upload, legacyImport: true },
   { href: '/sponsors', label: 'Sponsors', icon: Building2 },
@@ -190,7 +190,7 @@ export function Sidebar({
               .map((item) => {
                 const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
                 const Icon = item.icon;
-                const isNewContract = item.href === '/contracts/new';
+                const isNewContract = item.href === '/#start-deal';
                 const navDisabled = readOnlyImpersonation && isNewContract;
                 if (navDisabled) {
                   return (

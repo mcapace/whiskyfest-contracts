@@ -13,7 +13,12 @@ import Link from 'next/link';
 
 import { formatCurrency, formatLongDate } from '@/lib/utils';
 import { isDiscountedRate, STANDARD_BOOTH_RATE_CENTS } from '@/lib/contracts';
-import type { ContractOrderType } from '@/lib/contract-order-type';
+import {
+  CONTRACT_DEAL_KINDS,
+  dealKindMeta,
+  orderTypeFromDealKind,
+  type ContractDealKind,
+} from '@/lib/contract-deal-kind';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input, Label, Textarea } from '@/components/ui/input';
@@ -50,7 +55,6 @@ export type ContractFormValues = {
   event_id: string;
   exhibitor_legal_name: string;
   exhibitor_company_name: string;
-  order_type: ContractOrderType;
   booth_count: number;
   booth_rate_cents: number;
   sponsor_brand: string;
@@ -85,6 +89,19 @@ interface Props {
   }[];
   /** Editing an admin/events import (status imported) — copy differs from draft. */
   editImportMode?: boolean;
+  /** From dashboard ?deal= or edit page inference. */
+  initialDealKind?: ContractDealKind;
+}
+
+function resolveInitialDealKind(
+  initialDealKind: ContractDealKind | undefined,
+  initialValues: Partial<ContractFormValues> | undefined,
+  initialLineItems: InitialContractLineItem[] | undefined,
+): ContractDealKind {
+  if (initialDealKind) return initialDealKind;
+  if (initialValues?.booth_count === 0) return 'sponsorship_only';
+  if ((initialLineItems?.length ?? 0) > 0) return 'booth_and_sponsorship';
+  return 'booth';
 }
 
 /** Pretty-print USD with commas for line-item amount fields (on blur). */
@@ -135,6 +152,7 @@ export function NewContractForm({
   smartHints,
   initialBoothBrands,
   editImportMode = false,
+  initialDealKind,
 }: Props) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -144,13 +162,12 @@ export function NewContractForm({
   const [err, setErr] = useState<string | null>(null);
 
   const defaultEvent = events[0];
-  const initialOrderType: ContractOrderType =
-    initialValues?.order_type ??
-    (initialValues?.booth_count === 0 ? 'sponsorship_only' : 'booth');
-  const isSponsorshipOnly = initialOrderType === 'sponsorship_only';
+  const resolvedDealKind = resolveInitialDealKind(initialDealKind, initialValues, initialLineItems);
+  const isSponsorshipOnly = resolvedDealKind === 'sponsorship_only';
   const defaultBoothRateCents = initialValues?.booth_rate_cents ?? defaultEvent?.booth_rate_cents ?? 1500000;
 
-  const [orderType, setOrderType] = useState<ContractOrderType>(initialOrderType);
+  const [dealKind, setDealKind] = useState<ContractDealKind>(resolvedDealKind);
+  const orderType = orderTypeFromDealKind(dealKind);
   const [sponsorBrand, setSponsorBrand] = useState(initialValues?.sponsor_brand ?? '');
 
   const [form, setForm] = useState(() => ({
@@ -180,13 +197,17 @@ export function NewContractForm({
     boothBrandDraftsForCount(startBooths, initialBoothBrands),
   );
 
-  const [lineItems, setLineItems] = useState<LineItemDraft[]>(() =>
-    (initialLineItems ?? []).map((li) => ({
+  const [lineItems, setLineItems] = useState<LineItemDraft[]>(() => {
+    const rows = (initialLineItems ?? []).map((li) => ({
       key: crypto.randomUUID(),
       description: li.description,
       amountInput: (li.amount_cents / 100).toFixed(2),
-    })),
-  );
+    }));
+    if (rows.length === 0 && resolvedDealKind === 'booth_and_sponsorship') {
+      rows.push({ key: crypto.randomUUID(), description: '', amountInput: '' });
+    }
+    return rows;
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -243,12 +264,12 @@ export function NewContractForm({
   const grandTotal = boothSubtotal + lineItemsSumCents;
 
   const effectiveBoothCount = useMemo(() => {
-    if (orderType === 'sponsorship_only') return 0;
+    if (dealKind === 'sponsorship_only') return 0;
     const raw = boothCountInput.trim();
     const n = parseInt(raw, 10);
     if (raw !== '' && Number.isFinite(n) && n >= 1) return n;
     return Math.max(1, form.booth_count);
-  }, [boothCountInput, form.booth_count, orderType]);
+  }, [boothCountInput, form.booth_count, dealKind]);
 
   /** Grow-only: shrinking booth count is confirmed on blur / submit (drops excess booth data). */
   useEffect(() => {
@@ -291,14 +312,14 @@ export function NewContractForm({
   }
 
   useEffect(() => {
-    if (!selectedEvent || orderType === 'sponsorship_only') return;
+    if (!selectedEvent || dealKind === 'sponsorship_only') return;
     const cents = selectedEvent.booth_rate_cents ?? 1500000;
     setForm((f) => ({ ...f, booth_rate_cents: cents }));
     setBoothRateInput((cents / 100).toFixed(2));
-  }, [selectedEvent?.id, orderType]);
+  }, [selectedEvent?.id, dealKind]);
 
-  function switchOrderType(next: ContractOrderType) {
-    if (next === orderType) return;
+  function switchDealKind(next: ContractDealKind) {
+    if (next === dealKind) return;
     if (next === 'sponsorship_only') {
       const hasBoothData = boothBrandRows.some(
         (r) => r.brand_name.trim() || (r.expressions?.length ?? 0) > 0,
@@ -306,7 +327,7 @@ export function NewContractForm({
       if (hasBoothData && !window.confirm('Switch to sponsorship only? Booth brand details will be removed.')) {
         return;
       }
-      setOrderType('sponsorship_only');
+      setDealKind('sponsorship_only');
       setBoothCountInput('0');
       setForm((f) => ({ ...f, booth_count: 0, booth_rate_cents: 0 }));
       setBoothBrandRows([]);
@@ -315,12 +336,15 @@ export function NewContractForm({
       }
       return;
     }
-    setOrderType('booth');
     const rate = selectedEvent?.booth_rate_cents ?? 1500000;
+    setDealKind(next);
     setBoothCountInput('1');
     setForm((f) => ({ ...f, booth_count: 1, booth_rate_cents: rate }));
     setBoothRateInput((rate / 100).toFixed(2));
     setBoothBrandRows(boothBrandDraftsForCount(1, undefined, form.exhibitor_company_name));
+    if (next === 'booth_and_sponsorship' && lineItems.length === 0) {
+      setLineItems([{ key: crypto.randomUUID(), description: '', amountInput: '' }]);
+    }
   }
 
   function set<K extends keyof typeof form>(k: K, v: typeof form[K]) {
@@ -343,7 +367,7 @@ export function NewContractForm({
       return;
     }
 
-    const sponsorshipOnly = orderType === 'sponsorship_only';
+    const sponsorshipOnly = dealKind === 'sponsorship_only';
     let boothCountNorm = 0;
     let rowsForSave: BoothBrandDraft[] = [];
 
@@ -592,35 +616,32 @@ export function NewContractForm({
           <CardHeader>
             <CardTitle>Pricing</CardTitle>
             <CardDescription>
-              {orderType === 'sponsorship_only'
-                ? 'Sponsorship-only deals use line items only — no booth package.'
-                : 'Booth count, booth rate, and optional line items — contract total updates live.'}
+              {dealKind === 'sponsorship_only'
+                ? 'Sponsorship-only — line items only, no booth on the contract.'
+                : dealKind === 'booth_and_sponsorship'
+                  ? 'Booth package plus sponsorship or activation line items on one contract (combo deal).'
+                  : 'Booth package only — add line items if you later need a combo deal.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Order type</Label>
+              <Label>Deal type</Label>
               <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant={orderType === 'booth' ? 'default' : 'outline'}
-                  onClick={() => switchOrderType('booth')}
-                  disabled={busy}
-                >
-                  Booth + add-ons
-                </Button>
-                <Button
-                  type="button"
-                  variant={orderType === 'sponsorship_only' ? 'default' : 'outline'}
-                  onClick={() => switchOrderType('sponsorship_only')}
-                  disabled={busy}
-                >
-                  Sponsorship only (no booth)
-                </Button>
+                {CONTRACT_DEAL_KINDS.map((kind) => (
+                  <Button
+                    key={kind}
+                    type="button"
+                    variant={dealKind === kind ? 'default' : 'outline'}
+                    onClick={() => switchDealKind(kind)}
+                    disabled={busy}
+                  >
+                    {dealKindMeta(kind).title}
+                  </Button>
+                ))}
               </div>
             </div>
 
-            {orderType === 'booth' ? (
+            {dealKind !== 'sponsorship_only' ? (
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Booth Count">
                 <Input
@@ -689,7 +710,7 @@ export function NewContractForm({
               </Field>
             )}
 
-            {orderType === 'booth' ? (
+            {dealKind !== 'sponsorship_only' ? (
             <div className="space-y-4 rounded-lg border border-border/60 bg-muted/10 p-4">
               <div>
                 <p className="text-sm font-medium text-foreground">Brands by booth</p>
@@ -730,12 +751,18 @@ export function NewContractForm({
 
             <div className="border-t border-border/60 pt-6">
               <h3 className="font-serif text-base font-semibold">
-                {orderType === 'sponsorship_only' ? 'Sponsorship charges' : 'Additional Line Items'}
+                {dealKind === 'sponsorship_only'
+                  ? 'Sponsorship charges'
+                  : dealKind === 'booth_and_sponsorship'
+                    ? 'Sponsorships & add-ons'
+                    : 'Additional line items'}
               </h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                {orderType === 'sponsorship_only'
-                  ? 'Required — add each sponsorship or program fee (description + amount).'
-                  : 'Sponsorships, activations, or other custom charges beyond the booth package (optional)'}
+                {dealKind === 'sponsorship_only'
+                  ? 'Required — each sponsorship or program fee (description + amount).'
+                  : dealKind === 'booth_and_sponsorship'
+                    ? 'Add sponsorships, activations, or other charges on the same contract as the booth.'
+                    : 'Optional — switch to Booth + sponsorship if you need booth plus added fees.'}
               </p>
 
               {lineItems.length === 0 ? (
@@ -835,7 +862,7 @@ export function NewContractForm({
 
             {/* Live total */}
             <div className="mt-6 rounded-lg border border-fest-600/20 bg-gradient-to-br from-fest-600/[0.07] to-whisky-50/50 p-5">
-              {orderType === 'booth' ? (
+              {dealKind !== 'sponsorship_only' ? (
               <div className="flex items-baseline justify-between text-sm">
                 <span className="text-muted-foreground">Booth subtotal</span>
                 <span className="font-mono tabular-nums">{formatCurrency(boothSubtotal)}</span>

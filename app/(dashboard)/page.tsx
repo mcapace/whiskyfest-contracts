@@ -32,6 +32,7 @@ import { SuggestedActions } from '@/components/dashboard/suggested-actions';
 import { buildGreetingSubtitle, buildSmartMetrics, greetingHour, greetingWord } from '@/lib/dashboard-greeting';
 import { UpcomingDeadlines } from '@/components/dashboard/upcoming-deadlines';
 import { BrandMixBreakdown } from '@/components/dashboard/brand-mix-breakdown';
+import { StartDealPanel } from '@/components/dashboard/start-deal-panel';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StatusBadge } from '@/components/contracts/status-badge';
 import { fetchBoothBrandsByContractIds } from '@/lib/contract-booth-brand-queries';
@@ -286,6 +287,8 @@ export default async function DashboardPage({
         greetingHeadline={greetingHeadline}
         greetingSubtitle={greetingSubtitle}
       />
+
+      <StartDealPanel readOnly={Boolean(session?.is_read_only_impersonation)} />
 
       <SuggestedActions
         contracts={allScoped}

@@ -6,6 +6,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { getContractWithTotalsForViewer } from '@/lib/auth-contract';
 import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { requiresDiscountApproval, STANDARD_BOOTH_RATE_CENTS } from '@/lib/contracts';
+import { dealKindFromContract, dealKindLabel } from '@/lib/contract-deal-kind';
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import { formatStatus } from '@/lib/status-display';
 import { cn, formatCurrency, formatLongDate, formatTimestamp } from '@/lib/utils';
@@ -110,6 +111,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
   const isEventsTeam = actor.isEventsTeam;
   const releaseAudit = audit.find((entry) => entry.action === 'released_to_accounting' || entry.action === 'executed');
   const discountPending = requiresDiscountApproval(contract);
+  const dealKind = dealKindFromContract(contract);
 
   const legacyPdfUrl = contract.signed_pdf_url ?? contract.draft_pdf_url;
   const draftPdfHref =
@@ -174,6 +176,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
         status={contract.status}
         boothCount={contract.booth_count}
         orderType={contract.order_type}
+        lineItemsSubtotalCents={contract.line_items_subtotal_cents}
         totalCents={contract.grand_total_cents}
         salesRep={contract.sales_rep_name ?? contract.sales_rep_email ?? null}
       />
@@ -443,6 +446,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
             <h2 className="font-serif text-lg font-semibold">Pricing</h2>
           </div>
           <CardContent className="space-y-3 p-6 text-sm">
+            <Detail label="Deal type" value={dealKindLabel(dealKind)} />
             {isSponsorshipOnlyOrder(contract) ? (
               <>
                 <p className="wf-label-caps text-[0.6rem] text-muted-foreground">Sponsorship only</p>

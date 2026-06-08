@@ -4,10 +4,15 @@ import type { ContractWithTotals, Event } from '@/types/db';
 import { requireContractActorForPage } from '@/lib/auth-contract';
 import { getVisibleContractsFilter } from '@/lib/permissions';
 import { recentCompanyNames } from '@/lib/new-contract-hints';
+import { parseDealKindParam } from '@/lib/contract-deal-kind';
 
 export const dynamic = 'force-dynamic';
 
-export default async function NewContractPage() {
+export default async function NewContractPage({
+  searchParams,
+}: {
+  searchParams: { deal?: string };
+}) {
   const actor = await requireContractActorForPage();
   const supabase = getSupabaseAdmin();
 
@@ -49,12 +54,15 @@ export default async function NewContractPage() {
     priorContracts: signedOrExecuted,
   };
 
+  const initialDealKind = parseDealKindParam(searchParams.deal) ?? undefined;
+
   return (
     <NewContractForm
       events={(events ?? []) as Event[]}
       currentUserEmail={actor.email}
       isAdmin={actor.isAdmin}
       smartHints={smartHints}
+      initialDealKind={initialDealKind}
     />
   );
 }
