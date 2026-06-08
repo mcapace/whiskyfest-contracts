@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { BRAND_CATEGORIES } from '@/lib/brand-category';
+import { CONTRACT_ORDER_TYPES } from '@/lib/contract-order-type';
 import { MAX_LINE_ITEM_AMOUNT_CENTS } from '@/lib/contract-line-items';
 
 const lineItemInputSchema = z.object({
@@ -23,8 +24,10 @@ export const newContractBodySchema = z
     event_id: z.string().uuid(),
     exhibitor_legal_name: z.string().min(1),
     exhibitor_company_name: z.string().min(1),
+    order_type: z.enum(CONTRACT_ORDER_TYPES).optional().default('booth'),
     brands_poured: z.string().optional().nullable(),
-    booth_count: z.number().int().min(1),
+    sponsor_brand: z.string().max(500).optional().nullable(),
+    booth_count: z.number().int().min(0),
     booth_rate_cents: z.number().int().min(0),
     additional_brand_count: z.number().int().min(0).optional(),
     signer_1_name: z.string().optional().nullable(),
@@ -37,6 +40,45 @@ export const newContractBodySchema = z
     booth_brands: z.array(boothBrandInputSchema).optional().default([]),
   })
   .superRefine((data, ctx) => {
+    const orderType = data.order_type ?? 'booth';
+
+    if (orderType === 'sponsorship_only') {
+      if (data.booth_count !== 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Sponsorship-only contracts must have booth count 0.',
+          path: ['booth_count'],
+        });
+        return;
+      }
+      if (data.booth_rate_cents !== 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Sponsorship-only contracts must have booth rate 0.',
+          path: ['booth_rate_cents'],
+        });
+        return;
+      }
+      const charged = (data.line_items ?? []).filter((row) => row.amount_cents > 0);
+      if (charged.length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Add at least one sponsorship line item with an amount.',
+          path: ['line_items'],
+        });
+      }
+      return;
+    }
+
+    if (data.booth_count < 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Booth count must be at least 1 for booth contracts.',
+        path: ['booth_count'],
+      });
+      return;
+    }
+
     const seen = new Set<number>();
     for (const row of data.booth_brands ?? []) {
       if (seen.has(row.booth_index)) {
@@ -99,3 +141,9 @@ export const signerContactPatchSchema = z.object({
   signer_1_email: z.string().email(),
   booth_rate_cents: z.number().int().min(0).optional(),
 });
+
+export function sponsorBrandFromBody(p: Pick<NewContractBody, 'order_type' | 'sponsor_brand' | 'brands_poured'>): string | null {
+  if (p.order_type !== 'sponsorship_only') return null;
+  const text = (p.sponsor_brand ?? p.brands_poured ?? '').trim();
+  return text || null;
+}

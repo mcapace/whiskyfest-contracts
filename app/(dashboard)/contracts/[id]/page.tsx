@@ -6,6 +6,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { getContractWithTotalsForViewer } from '@/lib/auth-contract';
 import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { requiresDiscountApproval, STANDARD_BOOTH_RATE_CENTS } from '@/lib/contracts';
+import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import { formatStatus } from '@/lib/status-display';
 import { cn, formatCurrency, formatLongDate, formatTimestamp } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -172,6 +173,7 @@ export default async function ContractDetailPage({ params }: { params: { id: str
         subtitle={`${event?.name ?? 'WhiskyFest'} · ${event ? formatLongDate(event.event_date) : '—'}`}
         status={contract.status}
         boothCount={contract.booth_count}
+        orderType={contract.order_type}
         totalCents={contract.grand_total_cents}
         salesRep={contract.sales_rep_name ?? contract.sales_rep_email ?? null}
       />
@@ -441,10 +443,22 @@ export default async function ContractDetailPage({ params }: { params: { id: str
             <h2 className="font-serif text-lg font-semibold">Pricing</h2>
           </div>
           <CardContent className="space-y-3 p-6 text-sm">
-            <p className="wf-label-caps text-[0.6rem] text-muted-foreground">Booth Package</p>
-            <Detail label="Booth count" value={String(contract.booth_count)} />
-            <Detail label="Rate per booth" value={formatCurrency(contract.booth_rate_cents)} mono />
-            <Detail label="Booth subtotal" value={formatCurrency(contract.booth_subtotal_cents)} mono />
+            {isSponsorshipOnlyOrder(contract) ? (
+              <>
+                <p className="wf-label-caps text-[0.6rem] text-muted-foreground">Sponsorship only</p>
+                <Detail label="Package" value="No booth — line items only" />
+                {contract.brands_poured ? (
+                  <Detail label="Sponsor / brand" value={contract.brands_poured} />
+                ) : null}
+              </>
+            ) : (
+              <>
+                <p className="wf-label-caps text-[0.6rem] text-muted-foreground">Booth Package</p>
+                <Detail label="Booth count" value={String(contract.booth_count)} />
+                <Detail label="Rate per booth" value={formatCurrency(contract.booth_rate_cents)} mono />
+                <Detail label="Booth subtotal" value={formatCurrency(contract.booth_subtotal_cents)} mono />
+              </>
+            )}
             {lineItems.length > 0 && (
               <div className="border-t border-border/50 pt-4">
                 <p className="wf-label-caps text-[0.6rem] text-muted-foreground">Line Items</p>

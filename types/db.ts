@@ -50,6 +50,8 @@ export interface Contract {
   exhibitor_country: string | null;
   exhibitor_telephone: string | null;
   brands_poured: string | null;
+  /** booth = exhibitor booth package; sponsorship_only = line items only (no booth). */
+  order_type: 'booth' | 'sponsorship_only';
   booth_count: number;
   booth_rate_cents: number;
   additional_brand_count: number;

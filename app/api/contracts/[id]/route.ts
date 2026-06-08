@@ -5,7 +5,12 @@ import { STANDARD_BOOTH_RATE_CENTS } from '@/lib/contracts';
 import { notifyAdminsIfNewlyRequiresDiscountApproval } from '@/lib/discount-patch-notify';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { assertContractAccess } from '@/lib/auth-contract';
-import { clearedRepEnteredBilling, newContractBodySchema, signerContactPatchSchema } from '@/lib/contract-schemas';
+import {
+  clearedRepEnteredBilling,
+  newContractBodySchema,
+  signerContactPatchSchema,
+  sponsorBrandFromBody,
+} from '@/lib/contract-schemas';
 import { replaceContractBoothBrandsForContract } from '@/lib/contract-booth-brands';
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
 import type { Contract, ContractStatus } from '@/types/db';
@@ -70,6 +75,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         event_id: p.event_id,
         exhibitor_legal_name: p.exhibitor_legal_name,
         exhibitor_company_name: p.exhibitor_company_name,
+        order_type: p.order_type ?? 'booth',
+        ...(p.order_type === 'sponsorship_only' ? { brands_poured: sponsorBrandFromBody(p) } : {}),
         booth_count: p.booth_count,
         booth_rate_cents: incomingBoothRate,
         signer_1_name: p.signer_1_name ?? null,

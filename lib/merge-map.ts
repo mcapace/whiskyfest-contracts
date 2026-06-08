@@ -1,3 +1,4 @@
+import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import { formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { exhibitorFieldMergeTokens } from '@/lib/exhibitor-docusign-fields';
 import {
@@ -48,6 +49,10 @@ export function buildPricingComposition(contract: ContractWithTotals): {
   pricing_qty: string;
   pricing_amount: string;
 } {
+  if (isSponsorshipOnlyOrder(contract)) {
+    return { pricing_description: '', pricing_qty: '', pricing_amount: '' };
+  }
+
   const lb = GOOGLE_DOCS_CELL_LINE_BREAK;
   const boothCount = contract.booth_count;
   const isDiscounted = isDiscountedRate(contract.booth_rate_cents);
@@ -85,7 +90,7 @@ export function buildContractMergeMap(
 
   const pricing = buildPricingComposition(contract);
 
-  const discounted = isDiscountedRate(contract.booth_rate_cents);
+  const discounted = !isSponsorshipOnlyOrder(contract) && isDiscountedRate(contract.booth_rate_cents);
   const listBoothRateDisplay = formatCurrency(STANDARD_BOOTH_RATE_CENTS);
   let discountDescription = '';
   let discountAmountDisplay = '';
@@ -129,10 +134,16 @@ export function buildContractMergeMap(
     '{{brands_poured}}': boothBlock.length > 0 ? boothBlock : (contract.brands_poured ?? ''),
     '{{booth_brands_block}}': boothBlock,
     '{{booth_brands_detail}}': boothBlock,
-    '{{booth_count}}': String(contract.booth_count),
-    '{{booth_rate}}': formatCurrency(contract.booth_rate_cents).replace('$', '').trim(),
-    '{{booth_subtotal}}': formatCurrency(contract.booth_subtotal_cents).replace('$', '').trim(),
-    '{{booth_total}}': formatCurrency(contract.booth_subtotal_cents).replace('$', '').trim(),
+    '{{booth_count}}': isSponsorshipOnlyOrder(contract) ? '' : String(contract.booth_count),
+    '{{booth_rate}}': isSponsorshipOnlyOrder(contract)
+      ? ''
+      : formatCurrency(contract.booth_rate_cents).replace('$', '').trim(),
+    '{{booth_subtotal}}': isSponsorshipOnlyOrder(contract)
+      ? ''
+      : formatCurrency(contract.booth_subtotal_cents).replace('$', '').trim(),
+    '{{booth_total}}': isSponsorshipOnlyOrder(contract)
+      ? ''
+      : formatCurrency(contract.booth_subtotal_cents).replace('$', '').trim(),
     '{{pricing_description}}': pricing.pricing_description,
     '{{pricing_qty}}': pricing.pricing_qty,
     '{{pricing_amount}}': pricing.pricing_amount,

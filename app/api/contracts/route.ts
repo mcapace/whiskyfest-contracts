@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { resolveContractActor } from '@/lib/auth-contract';
-import { clearedRepEnteredBilling, newContractBodySchema } from '@/lib/contract-schemas';
+import { clearedRepEnteredBilling, newContractBodySchema, sponsorBrandFromBody } from '@/lib/contract-schemas';
 import { replaceContractBoothBrandsForContract } from '@/lib/contract-booth-brands';
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
 import { isDiscountedRate } from '@/lib/contracts';
@@ -135,7 +135,8 @@ export async function POST(req: Request) {
       event_id: p.event_id,
       exhibitor_legal_name: p.exhibitor_legal_name,
       exhibitor_company_name: p.exhibitor_company_name,
-      brands_poured: null,
+      order_type: p.order_type ?? 'booth',
+      brands_poured: p.order_type === 'sponsorship_only' ? sponsorBrandFromBody(p) : null,
       booth_count: p.booth_count,
       booth_rate_cents: p.booth_rate_cents,
       signer_1_name: p.signer_1_name ?? null,
@@ -187,7 +188,7 @@ export async function POST(req: Request) {
 
   revalidateContractPaths(row.id);
 
-  if (isDiscountedRate(row.booth_rate_cents)) {
+  if (p.order_type !== 'sponsorship_only' && isDiscountedRate(row.booth_rate_cents)) {
     try {
       const { data: withTotals } = await supabase
         .from('contracts_with_totals')
