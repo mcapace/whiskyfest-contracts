@@ -59,11 +59,11 @@ export const newContractBodySchema = z
         });
         return;
       }
-      const charged = (data.line_items ?? []).filter((row) => row.amount_cents > 0);
-      if (charged.length === 0) {
+      const sponsorshipLines = (data.line_items ?? []).filter((row) => row.description?.trim());
+      if (sponsorshipLines.length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'Add at least one sponsorship line item with an amount.',
+          message: 'Add at least one sponsorship line item (use $0 for complimentary sponsorships).',
           path: ['line_items'],
         });
       }

@@ -128,8 +128,7 @@ function parseLineItemsForSubmit(items: LineItemDraft[]):
     if (!d && !amtRaw) continue;
     if (!d) return { ok: false, message: 'Each line item needs a description (1–200 characters).' };
     if (d.length > 200) return { ok: false, message: 'Line item descriptions must be at most 200 characters.' };
-    if (!amtRaw) return { ok: false, message: 'Each line item needs an amount.' };
-    const dollars = parseFloat(amtRaw);
+    const dollars = amtRaw === '' ? 0 : parseFloat(amtRaw);
     if (!Number.isFinite(dollars) || dollars < 0) {
       return { ok: false, message: 'Line item amounts must be valid non-negative numbers.' };
     }
@@ -372,9 +371,8 @@ export function NewContractForm({
     let rowsForSave: BoothBrandDraft[] = [];
 
     if (sponsorshipOnly) {
-      const charged = parsedLines.rows.filter((row) => row.amount_cents > 0);
-      if (charged.length === 0) {
-        setErr('Add at least one sponsorship line item with an amount.');
+      if (parsedLines.rows.length === 0) {
+        setErr('Add at least one sponsorship line item (use $0 for complimentary sponsorships).');
         return;
       }
       boothCountNorm = 0;
@@ -759,9 +757,9 @@ export function NewContractForm({
               </h3>
               <p className="mt-1 text-sm text-muted-foreground">
                 {dealKind === 'sponsorship_only'
-                  ? 'Required — each sponsorship or program fee (description + amount).'
+                  ? 'Required — describe each sponsorship; use $0 when the program is complimentary.'
                   : dealKind === 'booth_and_sponsorship'
-                    ? 'Add sponsorships, activations, or other charges on the same contract as the booth.'
+                    ? 'Add sponsorships or activations on the same contract — use $0 when included at no charge.'
                     : 'Optional — switch to Booth + sponsorship if you need booth plus added fees.'}
               </p>
 
@@ -821,7 +819,7 @@ export function NewContractForm({
                                 list.map((r) => (r.key === row.key ? { ...r, amountInput: formatted } : r)),
                               );
                             }}
-                            placeholder="$10,000.00"
+                            placeholder="$0.00 or $10,000.00"
                           />
                         </div>
                         <div className="order-4 flex items-end justify-start sm:order-none sm:col-start-3 sm:row-start-1 sm:justify-end">
