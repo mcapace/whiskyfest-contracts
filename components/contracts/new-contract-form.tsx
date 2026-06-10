@@ -254,9 +254,10 @@ export function NewContractForm({
   const selectedEvent = events.find((e) => e.id === (resolvedEventId ?? form.event_id));
   const boothSubtotal = form.booth_count * form.booth_rate_cents;
   const lineItemsSumCents = lineItems.reduce((acc, row) => {
+    const desc = row.description.trim();
     const raw = row.amountInput.trim().replace(/[$,]/g, '');
-    if (raw === '' || raw === '.') return acc;
-    const dollars = parseFloat(raw);
+    if (!desc && (raw === '' || raw === '.')) return acc;
+    const dollars = raw === '' || raw === '.' ? 0 : parseFloat(raw);
     if (!Number.isFinite(dollars) || dollars < 0) return acc;
     return acc + Math.round(dollars * 100);
   }, 0);
@@ -819,7 +820,7 @@ export function NewContractForm({
                                 list.map((r) => (r.key === row.key ? { ...r, amountInput: formatted } : r)),
                               );
                             }}
-                            placeholder="$0.00 or $10,000.00"
+                            placeholder="Any amount — use 0 if complimentary"
                           />
                         </div>
                         <div className="order-4 flex items-end justify-start sm:order-none sm:col-start-3 sm:row-start-1 sm:justify-end">
@@ -866,7 +867,7 @@ export function NewContractForm({
                 <span className="font-mono tabular-nums">{formatCurrency(boothSubtotal)}</span>
               </div>
               ) : null}
-              {lineItemsSumCents > 0 && (
+              {(lineItems.length > 0 || lineItemsSumCents !== 0) && (
                 <div className="mt-2 flex items-baseline justify-between text-sm">
                   <span className="text-muted-foreground">Line items subtotal</span>
                   <span className="font-mono tabular-nums">{formatCurrency(lineItemsSumCents)}</span>
@@ -924,7 +925,6 @@ export function NewContractForm({
                 onChange={(e) => set('exhibitor_notes', e.target.value)}
                 placeholder="Program benefits, deliverables, scheduling details, etc."
                 rows={4}
-                maxLength={10000}
               />
             </Field>
             <Field label="Internal notes (team only)">
