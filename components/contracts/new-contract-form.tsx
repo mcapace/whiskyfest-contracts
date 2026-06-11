@@ -12,7 +12,8 @@ import { ArrowLeft, Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 
 import { formatCurrency, formatLongDate } from '@/lib/utils';
-import { isDiscountedRate, STANDARD_BOOTH_RATE_CENTS } from '@/lib/contracts';
+import { isEventsManagedWorkflow } from '@/lib/contract-template-profile';
+import { isDiscountedRate, standardBoothRateCentsForEvent } from '@/lib/contracts';
 import {
   CONTRACT_DEAL_KINDS,
   dealKindMeta,
@@ -260,6 +261,9 @@ export function NewContractForm({
   }, [events, form.event_id]);
 
   const selectedEvent = events.find((e) => e.id === (resolvedEventId ?? form.event_id));
+  const eventsManaged = selectedEvent ? isEventsManagedWorkflow(selectedEvent) : false;
+  const boothOnlyEvent = selectedEvent?.contract_template_profile === 'nywe_vendor';
+  const listBoothRateCents = standardBoothRateCentsForEvent(selectedEvent);
   const boothSubtotal = form.booth_count * form.booth_rate_cents;
   const lineItemsSumCents = lineItems.reduce((acc, row) => {
     const desc = row.description.trim();
@@ -367,7 +371,7 @@ export function NewContractForm({
     if (!resolvedEventId) { setErr('Please select an event'); return; }
     if (!form.exhibitor_company_name) { setErr('Company name required'); return; }
     if (!form.exhibitor_legal_name)   { setErr('Legal name required'); return; }
-    if (!form.sales_rep_id) { setErr('Sales rep is required'); return; }
+    if (!eventsManaged && !form.sales_rep_id) { setErr('Sales rep is required'); return; }
 
     const parsedLines = parseLineItemsForSubmit(lineItems);
     if (!parsedLines.ok) {
@@ -411,10 +415,12 @@ export function NewContractForm({
         expressions: [],
       });
 
-      for (let i = 0; i < boothCountNorm; i++) {
-        if (!rowsForSave[i].brand_name.trim()) {
-          setErr(`Brand name is required for booth ${i + 1}.`);
-          return;
+      if (!boothOnlyEvent) {
+        for (let i = 0; i < boothCountNorm; i++) {
+          if (!rowsForSave[i].brand_name.trim()) {
+            setErr(`Brand name is required for booth ${i + 1}.`);
+            return;
+          }
         }
       }
 
@@ -441,6 +447,7 @@ export function NewContractForm({
       }));
       const payload = {
         ...formForSave,
+        sales_rep_id: eventsManaged ? null : form.sales_rep_id,
         order_type: orderType,
         sponsor_brand: sponsorshipOnly ? sponsorBrand.trim() || null : null,
         line_items: parsedLines.rows,
@@ -634,7 +641,7 @@ export function NewContractForm({
             <div className="space-y-2">
               <Label>Deal type</Label>
               <div className="flex flex-wrap gap-2">
-                {CONTRACT_DEAL_KINDS.map((kind) => (
+                {(boothOnlyEvent ? (['booth'] as const) : CONTRACT_DEAL_KINDS).map((kind) => (
                   <Button
                     key={kind}
                     type="button"
@@ -696,9 +703,9 @@ export function NewContractForm({
                     setBoothRateInput((cents / 100).toFixed(2));
                   }}
                 />
-                {isDiscountedRate(form.booth_rate_cents) && (
+                {isDiscountedRate(form.booth_rate_cents, selectedEvent) && (
                   <p className="mt-2 text-xs text-amber-700">
-                    ⚠ Rates below {formatCurrency(STANDARD_BOOTH_RATE_CENTS)} require admin approval before this contract can be approved for sending or sent to DocuSign.
+                    ⚠ Rates below {formatCurrency(listBoothRateCents)} require admin approval before this contract can be approved for sending or sent to DocuSign.
                   </p>
                 )}
               </Field>
@@ -905,13 +912,19 @@ export function NewContractForm({
             <Field label="Email" hint="DocuSign sends the signing request to this address (exhibitor signer).">
               <Input type="email" value={form.signer_1_email} onChange={e => set('signer_1_email', e.target.value)} placeholder="jane@sampledistillery.com" />
             </Field>
-            <SalesRepSelect
-              currentUserEmail={currentUserEmail}
-              value={form.sales_rep_id}
-              onChange={(v) => set('sales_rep_id', v)}
-              required
-              isAdmin={isAdmin}
-            />
+            {!eventsManaged ? (
+              <SalesRepSelect
+                currentUserEmail={currentUserEmail}
+                value={form.sales_rep_id}
+                onChange={(v) => set('sales_rep_id', v)}
+                required
+                isAdmin={isAdmin}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                This event is managed by the events team — no sales rep assignment required.
+              </p>
+            )}
           </CardContent>
         </Card>
 

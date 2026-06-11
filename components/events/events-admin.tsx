@@ -29,6 +29,11 @@ function emptyForm() {
     shanken_signatory_title: 'Vice President, Events',
     shanken_signatory_email: 'nmazza@mshanken.com',
     is_active: true,
+    product_key: 'whiskyfest',
+    contract_template_profile: 'whiskyfest' as 'whiskyfest' | 'nywe_vendor',
+    workflow_profile: 'sales_rep' as 'sales_rep' | 'events_managed',
+    google_template_doc_id: '',
+    contract_document_label: 'Contract',
   };
 }
 
@@ -56,6 +61,11 @@ export function EventsAdmin({ initialEvents }: Props) {
       shanken_signatory_title: ev.shanken_signatory_title,
       shanken_signatory_email: ev.shanken_signatory_email,
       is_active: ev.is_active,
+      product_key: ev.product_key ?? 'whiskyfest',
+      contract_template_profile: (ev.contract_template_profile === 'nywe_vendor' ? 'nywe_vendor' : 'whiskyfest'),
+      workflow_profile: (ev.workflow_profile === 'events_managed' ? 'events_managed' : 'sales_rep'),
+      google_template_doc_id: ev.google_template_doc_id ?? '',
+      contract_document_label: ev.contract_document_label ?? 'Contract',
     });
   }
 
@@ -101,6 +111,11 @@ export function EventsAdmin({ initialEvents }: Props) {
       shanken_signatory_title: form.shanken_signatory_title || null,
       shanken_signatory_email: form.shanken_signatory_email || null,
       is_active: form.is_active,
+      product_key: form.product_key.trim() || 'whiskyfest',
+      contract_template_profile: form.contract_template_profile,
+      workflow_profile: form.workflow_profile,
+      google_template_doc_id: form.google_template_doc_id.trim() || null,
+      contract_document_label: form.contract_document_label.trim() || 'Contract',
     };
 
     startTransition(async () => {
@@ -164,6 +179,50 @@ export function EventsAdmin({ initialEvents }: Props) {
                 value={form.booth_rate_dollars}
                 onChange={e => set('booth_rate_dollars', parseFloat(e.target.value) || 0)}
               />
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Product key">
+                <Input value={form.product_key} onChange={e => set('product_key', e.target.value)} placeholder="whiskyfest" />
+              </Field>
+              <Field label="Document label">
+                <Input
+                  value={form.contract_document_label}
+                  onChange={e => set('contract_document_label', e.target.value)}
+                  placeholder="Contract"
+                />
+              </Field>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Template profile">
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={form.contract_template_profile}
+                  onChange={e => set('contract_template_profile', e.target.value as 'whiskyfest' | 'nywe_vendor')}
+                >
+                  <option value="whiskyfest">WhiskyFest contract</option>
+                  <option value="nywe_vendor">NYWE vendor license</option>
+                </select>
+              </Field>
+              <Field label="Workflow">
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={form.workflow_profile}
+                  onChange={e => set('workflow_profile', e.target.value as 'sales_rep' | 'events_managed')}
+                >
+                  <option value="sales_rep">Sales rep</option>
+                  <option value="events_managed">Events team only</option>
+                </select>
+              </Field>
+            </div>
+            <Field label="Google template doc ID">
+              <Input
+                value={form.google_template_doc_id}
+                onChange={e => set('google_template_doc_id', e.target.value)}
+                placeholder="1rZ7ssXQV3cXnxvwnn4SmRMUljCWcC7XEV7mzQwbNJFw"
+              />
+              <p className="text-xs text-muted-foreground">
+                Per-event booth/vendor Google Doc. Falls back to env when empty.
+              </p>
             </Field>
             <div className="border-t border-border/50 pt-4">
               <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">Shanken signatory</p>
@@ -234,6 +293,7 @@ export function EventsAdmin({ initialEvents }: Props) {
                     </div>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {formatLongDate(ev.event_date)} · {ev.location ?? '—'} · {formatCurrency(ev.booth_rate_cents)} / booth
+                      {ev.product_key ? ` · ${ev.product_key}` : ''}
                     </p>
                   </div>
                   <Button type="button" variant="ghost" size="sm" className="shrink-0" onClick={() => loadEvent(ev)}>

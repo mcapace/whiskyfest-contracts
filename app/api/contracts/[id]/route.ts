@@ -50,15 +50,18 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     const p = parsed.data;
 
-    let effectiveSalesRepId = p.sales_rep_id;
-    if (actor.isAdmin) {
-      const { data: repExists } = await supabase.from('sales_reps').select('id').eq('id', p.sales_rep_id).maybeSingle();
-      if (!repExists) return NextResponse.json({ error: 'Invalid sales rep' }, { status: 400 });
-    } else {
-      if (!actor.accessibleSalesRepIds.includes(p.sales_rep_id)) {
+    let effectiveSalesRepId: string | null = p.sales_rep_id ?? null;
+    if (effectiveSalesRepId) {
+      if (actor.isAdmin) {
+        const { data: repExists } = await supabase
+          .from('sales_reps')
+          .select('id')
+          .eq('id', effectiveSalesRepId)
+          .maybeSingle();
+        if (!repExists) return NextResponse.json({ error: 'Invalid sales rep' }, { status: 400 });
+      } else if (!actor.accessibleSalesRepIds.includes(effectiveSalesRepId)) {
         return NextResponse.json({ error: 'Cannot reassign sales rep' }, { status: 400 });
       }
-      effectiveSalesRepId = p.sales_rep_id;
     }
 
     const incomingBoothRate = p.booth_rate_cents;

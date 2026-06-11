@@ -18,6 +18,12 @@ const patchSchema = z
     shanken_signatory_title: z.string().optional().nullable(),
     shanken_signatory_email: z.string().optional().nullable(),
     is_active: z.boolean().optional(),
+    product_key: z.string().min(1).optional(),
+    contract_template_profile: z.enum(['whiskyfest', 'nywe_vendor']).optional(),
+    workflow_profile: z.enum(['sales_rep', 'events_managed']).optional(),
+    google_template_doc_id: z.string().optional().nullable(),
+    google_sponsorship_template_doc_id: z.string().optional().nullable(),
+    contract_document_label: z.string().min(1).optional(),
   })
   .strict();
 

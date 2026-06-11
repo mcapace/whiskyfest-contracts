@@ -32,6 +32,12 @@ export interface Event {
   shanken_signatory_title: string;
   shanken_signatory_email: string;
   is_active: boolean;
+  product_key: string;
+  contract_template_profile: 'whiskyfest' | 'nywe_vendor' | string;
+  workflow_profile: 'sales_rep' | 'events_managed' | string;
+  google_template_doc_id: string | null;
+  google_sponsorship_template_doc_id: string | null;
+  contract_document_label: string;
   created_at: string;
   updated_at: string;
 }

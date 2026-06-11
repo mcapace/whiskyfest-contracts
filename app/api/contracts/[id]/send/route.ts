@@ -7,6 +7,13 @@ import { persistContractDraftPdf } from '@/lib/contract-pdf-storage';
 import { sendEnvelope } from '@/lib/docusign';
 import { fetchContractBoothBrandsOrdered } from '@/lib/contract-booth-brands';
 import { fetchContractLineItemsOrdered } from '@/lib/contract-line-items';
+import {
+  contractDocuSignEmailBlurb,
+  contractDocuSignEmailSubject,
+  contractDocuSignFileName,
+  contractPdfBaseName,
+} from '@/lib/contract-document-naming';
+import { eventUsesContractOrderTable } from '@/lib/contract-template-profile';
 import { resolveContractTemplateDocId } from '@/lib/contract-template';
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
@@ -31,7 +38,11 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   if (!contract) {
     return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
   }
-  if (requiresDiscountApproval(contract)) {
+
+  const { data: event } = await supabase.from('events').select('*').eq('id', contract.event_id).single<Event>();
+  if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+
+  if (requiresDiscountApproval(contract, event)) {
     return NextResponse.json(
       { error: 'Discount approval required before contract can be sent to DocuSign.' },
       { status: 403 },
@@ -62,15 +73,6 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     );
   }
 
-  const { data: event } = await supabase
-    .from('events')
-    .select('*')
-    .eq('id', contract.event_id)
-    .single<Event>();
-  if (!event) {
-    return NextResponse.json({ error: 'Event not found' }, { status: 404 });
-  }
-
   const countersignerEmail = event.shanken_signatory_email?.trim();
   const countersignerName = event.shanken_signatory_name?.trim();
   if (!countersignerEmail || !countersignerName) {
@@ -83,26 +85,33 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   const signerEmail = contract.signer_1_email.trim();
   const signerName = contract.signer_1_name.trim();
   const safeCompany = contract.exhibitor_company_name.replace(/[^\w\s-]/g, '');
-  const templateDocId = resolveContractTemplateDocId(contract);
+  const templateDocId = resolveContractTemplateDocId(contract, event);
+  const usesOrderTable = eventUsesContractOrderTable(event);
 
   try {
     const lineItems = await fetchContractLineItemsOrdered(supabase, contract.id);
     const boothBrands = await fetchContractBoothBrandsOrdered(supabase, contract.id);
     const mergeMap = buildContractMergeMap(contract, event, 'docusign', boothBrands);
-    const fileName = `${contract.exhibitor_company_name.replace(/[^\w\s-]/g, '')} — WhiskyFest ${event.year} Contract (DocuSign)`;
+    const fileName = `${contractPdfBaseName(contract.exhibitor_company_name, event)} (DocuSign)`;
 
-    const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileName, lineItems, {
-      includeBoothRow: !isSponsorshipOnlyOrder(contract),
-    });
+    const pdfBytes = await renderContractPdfFromTemplate(
+      templateDocId,
+      mergeMap,
+      fileName,
+      usesOrderTable ? lineItems : undefined,
+      {
+        includeBoothRow: usesOrderTable && !isSponsorshipOnlyOrder(contract),
+      },
+    );
     const { draftStoragePath, drafted_at } = await persistContractDraftPdf(contract.id, pdfBytes);
 
     const pdfBase64 = pdfBytes.toString('base64');
 
     const { envelopeId } = await sendEnvelope({
       pdfBase64,
-      documentName: `${safeCompany} — WhiskyFest ${event.year} Contract.pdf`,
-      emailSubject: `Please sign: ${event.name} ${event.year} participation contract — ${contract.exhibitor_company_name}`,
-      emailBlurb: `Attached is the WhiskyFest ${event.year} participation contract for ${contract.exhibitor_company_name}. Please review and sign.`,
+      documentName: contractDocuSignFileName(contract.exhibitor_company_name, event),
+      emailSubject: contractDocuSignEmailSubject(contract.exhibitor_company_name, event),
+      emailBlurb: contractDocuSignEmailBlurb(contract.exhibitor_company_name, event),
       signer1: { name: signerName, email: signerEmail },
       countersigner: { name: countersignerName, email: countersignerEmail },
     });

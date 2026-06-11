@@ -6,6 +6,13 @@ import { renderContractPdfFromTemplate } from '@/lib/google';
 import { persistContractDraftPdf } from '@/lib/contract-pdf-storage';
 import { fetchContractBoothBrandsOrdered } from '@/lib/contract-booth-brands';
 import { fetchContractLineItemsOrdered } from '@/lib/contract-line-items';
+import {
+  contractDocuSignEmailBlurb,
+  contractDocuSignEmailSubject,
+  contractDocuSignFileName,
+  contractPdfBaseName,
+} from '@/lib/contract-document-naming';
+import { eventUsesContractOrderTable } from '@/lib/contract-template-profile';
 import { resolveContractTemplateDocId } from '@/lib/contract-template';
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
@@ -39,7 +46,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const contract = await fetchContractWithTotalsById(supabase, params.id);
 
   if (!contract) return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
-  if (requiresDiscountApproval(contract)) {
+
+  const { data: event } = await supabase.from('events').select('*').eq('id', contract.event_id).single<Event>();
+  if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+
+  if (requiresDiscountApproval(contract, event)) {
     return NextResponse.json(
       { error: 'Discount approval required before contract can be sent to DocuSign.' },
       { status: 403 },
@@ -56,9 +67,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   if (!oldEnvelopeId) {
     return NextResponse.json({ error: 'No DocuSign contract is linked to this record.' }, { status: 409 });
   }
-
-  const { data: event } = await supabase.from('events').select('*').eq('id', contract.event_id).single<Event>();
-  if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
 
   const lineItems = await fetchContractLineItemsOrdered(supabase, contract.id);
   const boothBrands = await fetchContractBoothBrandsOrdered(supabase, contract.id);
@@ -99,10 +107,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     docusign_envelope_id: null,
   };
 
-  const safeCompany = contract.exhibitor_company_name.replace(/[^\w\s-]/g, '');
-  const templateDocId = resolveContractTemplateDocId(mergedContract);
+  const templateDocId = resolveContractTemplateDocId(mergedContract, event);
   const mergeMap = buildContractMergeMap(mergedContract, event, 'docusign', boothBrands);
-  const fileName = `${safeCompany} — WhiskyFest ${event.year} Contract (DocuSign)`;
+  const fileName = `${contractPdfBaseName(contract.exhibitor_company_name, event)} (DocuSign)`;
+  const usesOrderTable = eventUsesContractOrderTable(event);
 
   let newEnvelopeId: string;
   try {
@@ -112,16 +120,22 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ error: 'Event countersigner name and email are required.' }, { status: 500 });
     }
 
-    const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileName, lineItems, {
-      includeBoothRow: !isSponsorshipOnlyOrder(mergedContract),
-    });
+    const pdfBytes = await renderContractPdfFromTemplate(
+      templateDocId,
+      mergeMap,
+      fileName,
+      usesOrderTable ? lineItems : undefined,
+      {
+        includeBoothRow: usesOrderTable && !isSponsorshipOnlyOrder(mergedContract),
+      },
+    );
     const { draftStoragePath, drafted_at } = await persistContractDraftPdf(contract.id, pdfBytes);
 
     const sent = await sendEnvelope({
       pdfBase64: pdfBytes.toString('base64'),
-      documentName: `${safeCompany} — WhiskyFest ${event.year} Contract.pdf`,
-      emailSubject: `Please sign: ${event.name} ${event.year} participation contract — ${contract.exhibitor_company_name}`,
-      emailBlurb: `Attached is the WhiskyFest ${event.year} participation contract for ${contract.exhibitor_company_name}. Please review and sign.`,
+      documentName: contractDocuSignFileName(contract.exhibitor_company_name, event),
+      emailSubject: contractDocuSignEmailSubject(contract.exhibitor_company_name, event),
+      emailBlurb: contractDocuSignEmailBlurb(contract.exhibitor_company_name, event),
       signer1: { name: newSignerName, email: newSignerEmail },
       countersigner: { name: countersignerName, email: countersignerEmail },
     });

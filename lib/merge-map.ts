@@ -9,6 +9,8 @@ import {
 } from '@/lib/contracts';
 import { formatCurrency } from '@/lib/utils';
 import { formatEventDateForMerge, getAgreementDatePartsInDisplayZone } from '@/lib/datetime';
+import { eventTemplateProfile } from '@/lib/contract-template-profile';
+import { buildNyweVendorMergeMap } from '@/lib/merge-map-nywe';
 import { formatBoothBrandsBlock } from '@/lib/contract-booth-brands';
 import type { ContractBoothBrand, ContractWithTotals, Event } from '@/types/db';
 
@@ -44,7 +46,10 @@ function moneyTokenNoDollar(cents: number): string {
 /**
  * Single-order-row pricing copy for the CONTRACT ORDER table (tokens may embed line breaks).
  */
-export function buildPricingComposition(contract: ContractWithTotals): {
+export function buildPricingComposition(
+  contract: ContractWithTotals,
+  event?: Event,
+): {
   pricing_description: string;
   pricing_qty: string;
   pricing_amount: string;
@@ -55,18 +60,19 @@ export function buildPricingComposition(contract: ContractWithTotals): {
 
   const lb = GOOGLE_DOCS_CELL_LINE_BREAK;
   const boothCount = contract.booth_count;
-  const isDiscounted = isDiscountedRate(contract.booth_rate_cents);
+  const listRateCents = event ? event.booth_rate_cents : STANDARD_BOOTH_RATE_CENTS;
+  const isDiscounted = isDiscountedRate(contract.booth_rate_cents, event);
 
   if (!isDiscounted) {
     return {
-      pricing_description: `Booths @ ${formatMoney(STANDARD_BOOTH_RATE_CENTS)}/booth`,
+      pricing_description: `Booths @ ${formatMoney(listRateCents)}/booth`,
       pricing_qty: String(boothCount),
       pricing_amount: formatMoney(boothCount * contract.booth_rate_cents),
     };
   }
 
-  const listSubtotalCents = calculateListSubtotalCents(boothCount);
-  const discountCents = calculateDiscountCents(boothCount, contract.booth_rate_cents);
+  const listSubtotalCents = calculateListSubtotalCents(boothCount, event);
+  const discountCents = calculateDiscountCents(boothCount, contract.booth_rate_cents, event);
 
   return {
     pricing_description: `Booths @ ${formatMoney(STANDARD_BOOTH_RATE_CENTS)}/booth (list)${lb}Negotiated discount`,
@@ -86,20 +92,24 @@ export function buildContractMergeMap(
   mode: MergePlaceholderMode,
   boothBrands?: ContractBoothBrand[],
 ): Record<string, string> {
+  if (eventTemplateProfile(event) === 'nywe_vendor') {
+    return buildNyweVendorMergeMap(contract, event, mode);
+  }
+
   const agreement = getAgreementDatePartsInDisplayZone();
 
-  const pricing = buildPricingComposition(contract);
+  const pricing = buildPricingComposition(contract, event);
 
-  const discounted = !isSponsorshipOnlyOrder(contract) && isDiscountedRate(contract.booth_rate_cents);
-  const listBoothRateDisplay = formatCurrency(STANDARD_BOOTH_RATE_CENTS);
+  const discounted = !isSponsorshipOnlyOrder(contract) && isDiscountedRate(contract.booth_rate_cents, event);
+  const listBoothRateDisplay = formatCurrency(event.booth_rate_cents);
   let discountDescription = '';
   let discountAmountDisplay = '';
   let listSubtotalDisplay = '';
   if (discounted) {
     discountDescription = 'Negotiated discount';
-    const discountCents = calculateDiscountCents(contract.booth_count, contract.booth_rate_cents);
+    const discountCents = calculateDiscountCents(contract.booth_count, contract.booth_rate_cents, event);
     discountAmountDisplay = `-${formatCurrency(discountCents)}`;
-    listSubtotalDisplay = formatCurrency(calculateListSubtotalCents(contract.booth_count));
+    listSubtotalDisplay = formatCurrency(calculateListSubtotalCents(contract.booth_count, event));
   }
 
   const boothBlock = formatBoothBrandsBlock(boothBrands ?? []);

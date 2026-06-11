@@ -33,7 +33,7 @@ export const newContractBodySchema = z
     signer_1_name: z.string().optional().nullable(),
     signer_1_title: z.string().optional().nullable(),
     signer_1_email: z.string().email().optional().or(z.literal('')).nullable(),
-    sales_rep_id: z.string().uuid({ message: 'Sales Rep is required' }),
+    sales_rep_id: z.string().uuid({ message: 'Sales Rep is required' }).optional().nullable(),
     notes: z.string().max(20000).optional().nullable(),
     exhibitor_notes: z.string().max(50000).optional().nullable(),
     line_items: z.array(lineItemInputSchema).optional().default([]),

@@ -6,9 +6,10 @@ import { resolveContractActor } from '@/lib/auth-contract';
 import { clearedRepEnteredBilling, newContractBodySchema, sponsorBrandFromBody } from '@/lib/contract-schemas';
 import { replaceContractBoothBrandsForContract } from '@/lib/contract-booth-brands';
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
+import { isEventsManagedWorkflow } from '@/lib/contract-template-profile';
 import { isDiscountedRate } from '@/lib/contracts';
 import { notifyAdminsOfDiscountRequest } from '@/lib/notifications';
-import type { Contract, ContractWithTotals } from '@/types/db';
+import type { Contract, ContractWithTotals, Event } from '@/types/db';
 import type { ContractStatus } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
@@ -103,30 +104,40 @@ export async function POST(req: Request) {
   const supabase = getSupabaseAdmin();
   const { actor } = gate;
 
-  let effectiveSalesRepId = p.sales_rep_id;
+  const { data: eventRow } = await supabase.from('events').select('*').eq('id', p.event_id).single<Event>();
+  if (!eventRow) {
+    return NextResponse.json({ error: 'Event not found' }, { status: 400 });
+  }
 
-  if (actor.isAdmin) {
-    const { data: repExists } = await supabase.from('sales_reps').select('id').eq('id', p.sales_rep_id).maybeSingle();
-    if (!repExists) {
-      return NextResponse.json({ error: 'Invalid sales rep' }, { status: 400 });
-    }
-  } else {
-    if (!actor.accessibleSalesRepIds.includes(p.sales_rep_id)) {
+  const eventsManaged = isEventsManagedWorkflow(eventRow);
+  if (!eventsManaged && !p.sales_rep_id) {
+    return NextResponse.json({ error: 'Sales rep is required for this event.' }, { status: 400 });
+  }
+  if (eventsManaged && !actor.isEventsTeam && !actor.isAdmin) {
+    return NextResponse.json({ error: 'Only events team can create contracts for this event.' }, { status: 403 });
+  }
+
+  let effectiveSalesRepId: string | null = p.sales_rep_id ?? null;
+
+  if (effectiveSalesRepId) {
+    if (actor.isAdmin) {
+      const { data: repExists } = await supabase.from('sales_reps').select('id').eq('id', effectiveSalesRepId).maybeSingle();
+      if (!repExists) {
+        return NextResponse.json({ error: 'Invalid sales rep' }, { status: 400 });
+      }
+    } else if (!actor.accessibleSalesRepIds.includes(effectiveSalesRepId)) {
       return NextResponse.json({ error: 'Cannot assign contract to that sales rep' }, { status: 400 });
     }
-    effectiveSalesRepId = p.sales_rep_id;
   }
 
   const bill = clearedRepEnteredBilling();
 
-  const { data: assignedRepLookup } = await supabase
-    .from('sales_reps')
-    .select('name, email')
-    .eq('id', effectiveSalesRepId)
-    .single();
+  const { data: assignedRepLookup } = effectiveSalesRepId
+    ? await supabase.from('sales_reps').select('name, email').eq('id', effectiveSalesRepId).single()
+    : { data: null };
 
   const assignedRepEmailNorm = assignedRepLookup?.email?.trim().toLowerCase() ?? '';
-  const creatorIsAssignedRep = assignedRepEmailNorm === actor.email.toLowerCase();
+  const creatorIsAssignedRep = effectiveSalesRepId ? assignedRepEmailNorm === actor.email.toLowerCase() : true;
   const onBehalfMetadata = !creatorIsAssignedRep;
 
   const { data, error } = await supabase
@@ -188,7 +199,7 @@ export async function POST(req: Request) {
 
   revalidateContractPaths(row.id);
 
-  if (p.order_type !== 'sponsorship_only' && isDiscountedRate(row.booth_rate_cents)) {
+  if (p.order_type !== 'sponsorship_only' && isDiscountedRate(row.booth_rate_cents, eventRow)) {
     try {
       const { data: withTotals } = await supabase
         .from('contracts_with_totals')

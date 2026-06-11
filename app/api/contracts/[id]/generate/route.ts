@@ -6,6 +6,8 @@ import { renderContractPdfFromTemplate, uploadPdfBufferToFolder } from '@/lib/go
 import { contractDraftPdfPath, uploadContractPdfToStorage } from '@/lib/contract-pdf-storage';
 import { fetchContractBoothBrandsOrdered } from '@/lib/contract-booth-brands';
 import { fetchContractLineItemsOrdered } from '@/lib/contract-line-items';
+import { contractPdfBaseName } from '@/lib/contract-document-naming';
+import { eventUsesContractOrderTable } from '@/lib/contract-template-profile';
 import { resolveContractTemplateDocId } from '@/lib/contract-template';
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
@@ -30,29 +32,35 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   if (!contract) return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
 
-  if (requiresDiscountApproval(contract)) {
+  const { data: event } = await supabase.from('events').select('*').eq('id', contract.event_id).single<Event>();
+  if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+
+  if (requiresDiscountApproval(contract, event)) {
     return NextResponse.json(
       { error: 'Discount approval is required before generating a PDF for submission.' },
       { status: 400 },
     );
   }
 
-  const { data: event } = await supabase.from('events').select('*').eq('id', contract.event_id).single<Event>();
-
-  if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
-
   const lineItems = await fetchContractLineItemsOrdered(supabase, contract.id);
   const boothBrands = await fetchContractBoothBrandsOrdered(supabase, contract.id);
   const mergeMap = buildContractMergeMap(contract, event, 'draft', boothBrands);
 
-  const templateDocId = resolveContractTemplateDocId(contract);
+  const templateDocId = resolveContractTemplateDocId(contract, event);
   const draftsFolderId = process.env.GOOGLE_DRAFTS_FOLDER_ID!;
-  const fileName = `${contract.exhibitor_company_name.replace(/[^\w\s-]/g, '')} — WhiskyFest ${event.year} Contract`;
+  const fileName = contractPdfBaseName(contract.exhibitor_company_name, event);
+  const usesOrderTable = eventUsesContractOrderTable(event);
 
   try {
-    const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileName, lineItems, {
-      includeBoothRow: !isSponsorshipOnlyOrder(contract),
-    });
+    const pdfBytes = await renderContractPdfFromTemplate(
+      templateDocId,
+      mergeMap,
+      fileName,
+      usesOrderTable ? lineItems : undefined,
+      {
+        includeBoothRow: usesOrderTable && !isSponsorshipOnlyOrder(contract),
+      },
+    );
     const { fileId, webViewLink } = await uploadPdfBufferToFolder(pdfBytes, fileName, draftsFolderId);
 
     const draftStoragePath = contractDraftPdfPath(contract.id);
