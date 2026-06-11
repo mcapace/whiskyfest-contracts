@@ -111,6 +111,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       grandTotalCents: contract.grand_total_cents,
       sentAtLabel: formatTimestamp(now),
       salesRepId: contract.sales_rep_id,
+      eventId: contract.event_id,
+      createdBy: contract.created_by,
     }).catch((e) => console.error('[notifySalesRepInvoiceSent]', e));
 
     revalidatePath('/accounting');
@@ -146,6 +148,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       contractId: contract.id,
       companyName: contract.exhibitor_company_name,
       salesRepId: contract.sales_rep_id,
+      eventId: contract.event_id,
+      createdBy: contract.created_by,
     }).catch((e) => console.error('[notifySalesRepInvoicePaid]', e));
 
     revalidatePath('/accounting');

@@ -155,6 +155,8 @@ export interface SendEnvelopeParams {
   signer1: { email: string; name: string };
   /** Event-level Shanken countersigner recipient (routing order 2). */
   countersigner: { email: string; name: string };
+  /** DocuSign brand id — controls exhibitor-facing signing email sender/branding. */
+  brandId?: string;
 }
 
 export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelopeId: string }> {
@@ -167,7 +169,7 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
   const date2 = anchorOnly(DOCUSIGN_ANCHORS.date2);
   const exhibitorTabs = buildExhibitorDataTextTabs();
 
-  const envelopeDefinition = {
+  const envelopeDefinition: Record<string, unknown> = {
     emailSubject: params.emailSubject,
     emailBlurb: params.emailBlurb,
     status: 'sent',
@@ -206,6 +208,10 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
       ],
     },
   };
+
+  if (params.brandId?.trim()) {
+    envelopeDefinition.brandId = params.brandId.trim();
+  }
 
   const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes`;
   const res = await fetch(url, {

@@ -1,4 +1,6 @@
 import sgMail from '@sendgrid/mail';
+import { sendGridFromForProduct, workspaceLabelForProduct } from '@/lib/product-email';
+import { PRODUCT_WINE_SPECTATOR } from '@/lib/product-portal';
 
 /**
  * Accounting handoff email (SendGrid).
@@ -41,6 +43,8 @@ export interface AccountingEmailPayload {
   accountingContractUrl: string;
   /** Sales rep email for CC (from sales_reps). */
   salesRepEmail?: string | null;
+  /** whiskyfest | wine_spectator — controls SendGrid from-name and PDF label. */
+  productKey?: string;
 }
 
 function formatCents(n: number): string {
@@ -69,8 +73,13 @@ function accountingToRecipients(): string[] {
 
 export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<void> {
   const apiKey = process.env['SENDGRID_API_KEY'];
-  const fromAddress = process.env['ACCOUNTING_FROM_EMAIL'] ?? 'contracts@mshanken.com';
-  const fromName = 'WhiskyFest Contracts';
+  const isWine = p.productKey === PRODUCT_WINE_SPECTATOR;
+  const productFrom = sendGridFromForProduct(p.productKey);
+  const fromAddress = isWine
+    ? productFrom.email
+    : process.env['ACCOUNTING_FROM_EMAIL']?.trim() || productFrom.email;
+  const fromName = productFrom.name;
+  const workspaceLabel = workspaceLabelForProduct(p.productKey);
 
   if (!apiKey) {
     throw new Error('SENDGRID_API_KEY not set — cannot send accounting email');
@@ -134,7 +143,7 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
     `Executed Date: ${p.executedAtFormatted}`,
     `Countersigner: ${p.countersignedByName ?? '—'}`,
     ``,
-    `View in WhiskyFest Contracts: ${p.accountingContractUrl}`,
+    `View in ${workspaceLabel}: ${p.accountingContractUrl}`,
   ].join('\n');
 
   const row = (label: string, value: string) =>
@@ -200,10 +209,10 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
       <p style="margin:24px 0;">
         <a href="${escape(p.accountingContractUrl)}"
            style="display:inline-block;padding:12px 20px;background:#6b3822;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">
-          View in WhiskyFest Contracts
+          View in ${escape(workspaceLabel)}
         </a>
       </p>
-      <p style="color:#666;font-size:13px;">— WhiskyFest Contracts</p>
+      <p style="color:#666;font-size:13px;">— ${escape(workspaceLabel)}</p>
     </div>
   `;
 
@@ -222,7 +231,7 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
     html,
     attachments: [
       {
-        filename: `${p.sponsorCompanyName} — WhiskyFest ${p.eventYear} Contract (SIGNED).pdf`,
+        filename: `${p.sponsorCompanyName} — ${isWine ? p.eventName : `WhiskyFest ${p.eventYear}`} Contract (SIGNED).pdf`,
         content: p.signedPdfBytes.toString('base64'),
         type: 'application/pdf',
         disposition: 'attachment',

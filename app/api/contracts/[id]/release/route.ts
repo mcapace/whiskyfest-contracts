@@ -11,6 +11,7 @@ import {
   downloadImportedContractPdf,
 } from '@/lib/contract-pdf-storage';
 import { sendAccountingEmail } from '@/lib/email';
+import { isEventsManagedWorkflow } from '@/lib/contract-template-profile';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { updateContractRow } from '@/lib/sheets-tracker';
@@ -46,13 +47,18 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     );
   }
 
+  const { data: event } = await supabase.from('events').select('*').eq('id', contract.event_id).single<Event>();
+  if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+
   const { actor } = gate;
+  const eventsManagedRelease = actor.isEventsTeam && isEventsManagedWorkflow(event);
+
   if (contract.status === 'imported') {
     if (!actor.isAdmin && !actor.isEventsTeam) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
   } else if (contract.status === 'signed') {
-    if (!actor.isAdmin) {
+    if (!actor.isAdmin && !eventsManagedRelease) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
   } else {
@@ -61,9 +67,6 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       { status: 409 },
     );
   }
-
-  const { data: event } = await supabase.from('events').select('*').eq('id', contract.event_id).single<Event>();
-  if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
 
   if (!process.env['SENDGRID_API_KEY']) {
     return NextResponse.json({ error: 'SENDGRID_API_KEY is not configured.' }, { status: 500 });
@@ -157,6 +160,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     signedPdfBytes,
     accountingContractUrl: `${appBaseUrl()}/accounting/${contract.id}`,
     salesRepEmail: contract.sales_rep_email ?? contract.created_by,
+    productKey: event.product_key,
   });
   await supabase
     .from('contracts')

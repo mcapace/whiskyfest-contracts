@@ -10,6 +10,7 @@ import {
   INTERNAL_CONTRACT_NOTES_LABEL,
   SPONSOR_CONTRACT_NOTES_LABEL,
 } from '@/lib/contract-notes-copy';
+import { isEventsManagedWorkflow } from '@/lib/contract-template-profile';
 import { dealKindFromContract, dealKindLabel } from '@/lib/contract-deal-kind';
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import { formatStatus } from '@/lib/status-display';
@@ -106,6 +107,7 @@ export async function ContractDetailPage({
   const contractsListHref = `${portalBasePath}/contracts`;
   const dashboardLinkHref = dashboardHref(productKey);
   const clientSendEnabled = eventRow?.client_send_enabled !== false;
+  const eventsManagedWorkflow = eventRow ? isEventsManagedWorkflow(eventRow) : false;
 
   if (
     contract.docusign_envelope_id &&
@@ -387,6 +389,7 @@ export async function ContractDetailPage({
             createdBy={contract.created_by}
             discountApprovalPending={discountPending}
             isEventsTeam={isEventsTeam}
+            eventsManagedWorkflow={eventsManagedWorkflow}
             clientSendEnabled={clientSendEnabled}
           />
       </div>

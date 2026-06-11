@@ -1,7 +1,7 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
+import { NyweLogo } from '@/components/brand/nywe-logo';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CountdownTimer } from '@/components/countdown-timer';
@@ -53,16 +53,12 @@ export function WineSpectatorHero({
 
         <div className="relative flex h-full flex-col justify-end gap-6 p-6 sm:p-10 lg:p-12">
           <div>
-            <div className="mb-6 inline-block max-w-sm rounded-lg bg-black/90 px-4 py-3 shadow-lg backdrop-blur-sm sm:max-w-md">
-              <Image
-                src="/images/nywe-logo.png"
-                alt="Wine Spectator New York Wine Experience"
-                width={514}
-                height={174}
-                priority
-                className="h-auto w-full object-contain"
-              />
-            </div>
+            <NyweLogo
+              onDark
+              priority
+              className="mb-6 max-w-sm sm:max-w-md"
+              imageClassName="max-h-16 sm:max-h-[4.5rem]"
+            />
             {greetingHeadline && greetingSubtitle ? (
               <>
                 <h1 className="font-display text-4xl font-medium tracking-tight text-parchment-50 sm:text-5xl lg:text-6xl">

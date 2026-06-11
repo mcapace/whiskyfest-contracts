@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import type { LucideIcon } from 'lucide-react';
 import { Columns3, Loader2, RefreshCw, Send, FilePlus2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +16,13 @@ import {
   visibleUiColumns,
   type RosterColumnMode,
 } from '@/lib/exhibitor-roster-columns';
-import { rosterListBadgeClass, rosterListRowClass, rosterListStyle } from '@/lib/exhibitor-roster-list-style';
+import {
+  ROSTER_ALL_LISTS_ICON,
+  rosterListBadgeClass,
+  rosterListFilterClass,
+  rosterListIcon,
+  rosterListRowClass,
+} from '@/lib/exhibitor-roster-list-style';
 import type { ContractStatus } from '@/types/db';
 
 type RosterRow = {
@@ -108,8 +115,15 @@ function renderUiCell(row: RosterRow, columnId: string) {
   switch (columnId) {
     case 'winery':
       return <CellText value={row.wineryName} className="font-medium" />;
-    case 'list':
-      return <span className={rosterListBadgeClass(row.listKey)}>{row.listLabel}</span>;
+    case 'list': {
+      const ListIcon = rosterListIcon(row.listKey);
+      return (
+        <span className={rosterListBadgeClass(row.listKey)}>
+          <ListIcon className="h-3 w-3 shrink-0" aria-hidden />
+          {row.listLabel}
+        </span>
+      );
+    }
     case 'wine':
       return <CellText value={[row.wineName, row.vintage].filter(Boolean).join(' · ')} />;
     case 'signer':
@@ -173,6 +187,45 @@ function renderUiCell(row: RosterRow, columnId: string) {
     default:
       return <span className="text-muted-foreground">—</span>;
   }
+}
+
+function RosterListFilterPill({
+  active,
+  icon: Icon,
+  label,
+  count,
+  className,
+  onClick,
+}: {
+  active: boolean;
+  icon: LucideIcon;
+  label: string;
+  count: number;
+  className: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        'inline-flex min-h-8 items-center justify-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors',
+        className,
+      )}
+    >
+      <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      <span className="whitespace-nowrap">{label}</span>
+      <span
+        className={cn(
+          'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums',
+          active ? 'bg-black/15 text-inherit' : 'bg-black/5 text-inherit',
+        )}
+      >
+        {count}
+      </span>
+    </button>
+  );
 }
 
 export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
@@ -370,41 +423,31 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
 
       <div className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Exhibitor list</p>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant={listFilter === 'all' ? 'default' : 'outline'}
+        <div className="flex flex-wrap items-center gap-2">
+          <RosterListFilterPill
+            active={listFilter === 'all'}
+            icon={ROSTER_ALL_LISTS_ICON}
+            label="All lists"
+            count={data.rows.length}
+            className={rosterListFilterClass('all', listFilter === 'all')}
             onClick={() => setListFilter('all')}
-          >
-            All lists ({data.rows.length})
-          </Button>
+          />
           {sheetTabs.map((sheet) => {
-            const accent = rosterListStyle(sheet.key);
+            const Icon = rosterListIcon(sheet.key);
             const active = listFilter === sheet.key;
             return (
-              <Button
+              <RosterListFilterPill
                 key={sheet.key}
-                size="sm"
-                variant="outline"
-                className={cn(active ? accent.buttonActive : accent.buttonIdle)}
+                active={active}
+                icon={Icon}
+                label={sheet.label}
+                count={sheet.count}
+                className={rosterListFilterClass(sheet.key, active)}
                 onClick={() => setListFilter(sheet.key)}
-              >
-                <span className={cn('mr-2 inline-block h-2 w-2 rounded-full', accent.legendDot)} aria-hidden />
-                {sheet.label} ({sheet.count})
-              </Button>
+              />
             );
           })}
         </div>
-        {listFilter === 'all' ? (
-          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-            {sheetTabs.map((sheet) => (
-              <span key={sheet.key} className="inline-flex items-center gap-1.5">
-                <span className={cn('inline-block h-2 w-2 rounded-full', rosterListStyle(sheet.key).legendDot)} aria-hidden />
-                {sheet.label}
-              </span>
-            ))}
-          </div>
-        ) : null}
       </div>
 
       <div className="space-y-2">

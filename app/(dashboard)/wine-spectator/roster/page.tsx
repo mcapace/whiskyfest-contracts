@@ -24,7 +24,7 @@ export default async function WineSpectatorRosterPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <NyweLogo className="max-w-[280px] shrink-0 sm:order-2" imageClassName="max-h-14" />
+        <NyweLogo className="max-w-[280px] shrink-0 sm:order-2" imageClassName="max-h-14 drop-shadow-sm" />
         <div className="min-w-0 sm:order-1">
         <h1 className="font-display text-3xl font-medium text-foreground">Exhibitor roster</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">

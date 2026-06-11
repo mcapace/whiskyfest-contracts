@@ -1,14 +1,69 @@
 import sgMail from '@sendgrid/mail';
 import { contractPricingHtmlFragment, contractPricingTextLines } from '@/lib/contract-email-pricing';
+import {
+  appBaseUrl,
+  appContractUrl,
+  eventEmailContextForContract,
+  loadEventEmailContext,
+  sendGridFromForEvent,
+  sendGridFromForProduct,
+  workspaceLabelForEvent,
+  type EventEmailContext,
+} from '@/lib/product-email';
+import { isEventsManagedWorkflow } from '@/lib/contract-template-profile';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
 import type { Contract, Event } from '@/types/db';
 
-const WF_CONTRACTS_FROM_EMAIL = process.env['DISCOUNT_ALERT_FROM_EMAIL'] ?? 'wfcontracts@whiskyadvocate.com';
-const WF_CONTRACTS_FROM_NAME = 'WhiskyFest Contracts';
+const WHISKYFEST_MAIL_FROM = sendGridFromForProduct('whiskyfest');
+/** Portal-wide emails (access requests, announcements) always use WhiskyFest sender. */
+const WF_CONTRACTS_FROM_EMAIL = WHISKYFEST_MAIL_FROM.email;
+const WF_CONTRACTS_FROM_NAME = WHISKYFEST_MAIL_FROM.name;
+
+async function contractMailMeta(
+  contract: { id: string; event_id?: string | null },
+  event?: EventEmailContext | null,
+) {
+  const eventCtx = await eventEmailContextForContract(contract, event ?? null);
+  return {
+    eventCtx,
+    from: sendGridFromForEvent(eventCtx),
+    workspaceLabel: workspaceLabelForEvent(eventCtx),
+    detailUrl: appContractUrl(contract.id, eventCtx),
+  };
+}
 
 function formatCents(n: number): string {
   return `$${(n / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/** Active events-team inboxes for workflow notifications. */
+async function getActiveEventsTeamEmails(): Promise<string[]> {
+  const supabase = getSupabaseAdmin();
+  const { data: members } = await supabase
+    .from('app_users')
+    .select('email')
+    .eq('is_events_team', true)
+    .eq('is_active', true);
+
+  return [
+    ...new Set(
+      (members ?? [])
+        .map((m) => String((m as { email: string }).email ?? '').trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  ];
+}
+
+async function eventUsesEventsManagedWorkflow(eventId: string | null | undefined): Promise<boolean> {
+  if (!eventId) return false;
+  const supabase = getSupabaseAdmin();
+  const { data: event } = await supabase
+    .from('events')
+    .select('workflow_profile')
+    .eq('id', eventId)
+    .maybeSingle();
+  return isEventsManagedWorkflow((event ?? { workflow_profile: 'sales_rep' }) as Pick<Event, 'workflow_profile'>);
 }
 
 /** Active app_users assistant emails mapped to support this rep's contracts. */
@@ -28,23 +83,11 @@ export async function getAssistantEmailsForRep(repId: string): Promise<string[]>
   return [...new Set((activeUsers ?? []).map((u) => String((u as { email: string }).email).toLowerCase()))];
 }
 
-function appContractUrl(contractId: string): string {
-  const base = appBaseUrl();
-  return `${base}/contracts/${contractId}`;
-}
-
-function appBaseUrl(): string {
-  const explicit = process.env['NEXTAUTH_URL']?.replace(/\/$/, '');
-  if (explicit) return explicit;
-  if (process.env['VERCEL_URL']) return `https://${process.env['VERCEL_URL']}`;
-  return 'http://localhost:3000';
-}
-
 /**
  * Email all active admins when a discounted contract is created (booth rate &lt; standard).
  */
 export async function notifyAdminsOfDiscountRequest(
-  contract: Pick<Contract, 'id' | 'exhibitor_company_name' | 'booth_rate_cents' | 'booth_count'> & {
+  contract: Pick<Contract, 'id' | 'event_id' | 'exhibitor_company_name' | 'booth_rate_cents' | 'booth_count'> & {
     grand_total_cents?: number;
     booth_subtotal_cents?: number;
     line_items_subtotal_cents?: number | null;
@@ -52,8 +95,7 @@ export async function notifyAdminsOfDiscountRequest(
   creator: { email: string; name?: string | null },
 ): Promise<void> {
   const apiKey = process.env['SENDGRID_API_KEY'];
-  const fromEmail = WF_CONTRACTS_FROM_EMAIL;
-  const fromName = WF_CONTRACTS_FROM_NAME;
+  const mail = await contractMailMeta(contract);
 
   if (!apiKey) {
     console.warn('[notifyAdminsOfDiscountRequest] SENDGRID_API_KEY not set — skipping email');
@@ -91,7 +133,7 @@ export async function notifyAdminsOfDiscountRequest(
   sgMail.setApiKey(apiKey);
 
   const subject = `Discount approval needed: ${contract.exhibitor_company_name} at ${formattedRate}`;
-  const detailUrl = appContractUrl(contract.id);
+  const detailUrl = mail.detailUrl;
 
   const creatorLine = creator.name ? `${creator.name} <${creator.email}>` : creator.email;
 
@@ -119,12 +161,12 @@ export async function notifyAdminsOfDiscountRequest(
         line_items_subtotal_cents: contract.line_items_subtotal_cents,
         grand_total_cents: grand,
       })}
-      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
+      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in ${escapeHtml(mail.workspaceLabel)}</a></p>
     </div>
   `;
 
   await sgMail.send({
-    from: { email: fromEmail, name: fromName },
+    from: mail.from,
     to: recipients,
     subject,
     text,
@@ -136,7 +178,7 @@ export async function notifyAdminsOfDiscountRequest(
  * Email the assigned sales rep when an admin approves their discounted booth rate.
  */
 export async function notifySalesRepDiscountApproved(
-  contract: Pick<Contract, 'id' | 'exhibitor_company_name' | 'booth_rate_cents' | 'sales_rep_id'>,
+  contract: Pick<Contract, 'id' | 'event_id' | 'exhibitor_company_name' | 'booth_rate_cents' | 'sales_rep_id'>,
   approver: { email: string; name?: string | null },
   approvalReason: string | null,
 ): Promise<void> {
@@ -161,7 +203,8 @@ export async function notifySalesRepDiscountApproved(
 
   sgMail.setApiKey(apiKey);
 
-  const detailUrl = appContractUrl(contract.id);
+  const mail = await contractMailMeta(contract);
+  const detailUrl = mail.detailUrl;
   const rateLine = formatCents(contract.booth_rate_cents);
   const approverLine = approver.name ? `${approver.name} <${approver.email}>` : approver.email;
   const reasonBlock =
@@ -193,7 +236,7 @@ export async function notifySalesRepDiscountApproved(
       <p style="color:#666;font-size:14px;">Approved by ${escapeHtml(approverLine)}</p>
       ${reasonHtml}
       <p>You can continue from the contract page: generate or refresh the PDF, submit for <strong>Events Review</strong> if needed, and after the status is <strong>Approved</strong>, use <strong>Send via DocuSign</strong>.</p>
-      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
+      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in ${escapeHtml(mail.workspaceLabel)}</a></p>
     </div>
   `;
 
@@ -202,7 +245,7 @@ export async function notifySalesRepDiscountApproved(
   );
 
   await sgMail.send({
-    from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
+    from: mail.from,
     to: toAddress,
     ...(ccAssistants.length > 0 ? { cc: ccAssistants } : {}),
     subject,
@@ -217,14 +260,14 @@ export async function notifySalesRepDiscountApproved(
 export async function notifyPartialSignature(
   contract: Pick<
     Contract,
-    'id' | 'exhibitor_company_name' | 'signer_1_name' | 'sales_rep_id' | 'booth_count' | 'booth_rate_cents'
+    'id' | 'event_id' | 'exhibitor_company_name' | 'signer_1_name' | 'sales_rep_id' | 'booth_count' | 'booth_rate_cents'
   > & {
     sales_rep_email?: string | null;
     booth_subtotal_cents?: number;
     line_items_subtotal_cents?: number | null;
     grand_total_cents?: number;
   },
-  event: Pick<Event, 'name' | 'year' | 'shanken_signatory_name'> | null,
+  event: Pick<Event, 'name' | 'year' | 'shanken_signatory_name' | 'product_key'> | null,
 ): Promise<void> {
   const apiKey = process.env['SENDGRID_API_KEY'];
   if (!apiKey) {
@@ -232,6 +275,7 @@ export async function notifyPartialSignature(
     return;
   }
 
+  const mail = await contractMailMeta(contract, event);
   const supabase = getSupabaseAdmin();
 
   const { data: eventsTeam } = await supabase
@@ -266,7 +310,7 @@ export async function notifyPartialSignature(
   sgMail.setApiKey(apiKey);
 
   const eventTitle = event ? `${event.name} ${event.year}`.trim() : 'WhiskyFest';
-  const detailUrl = appContractUrl(contract.id);
+  const detailUrl = mail.detailUrl;
   const exhibitorPerson = (contract.signer_1_name ?? '').trim() || 'Exhibitor';
   const company = contract.exhibitor_company_name.trim();
   const signatoryName = (event?.shanken_signatory_name ?? '').trim() || 'the Shanken signatory';
@@ -297,12 +341,12 @@ export async function notifyPartialSignature(
         line_items_subtotal_cents: contract.line_items_subtotal_cents,
         grand_total_cents: grand,
       })}
-      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
+      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in ${escapeHtml(mail.workspaceLabel)}</a></p>
     </div>
   `;
 
   await sgMail.send({
-    from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
+    from: mail.from,
     to: recipients,
     subject,
     text,
@@ -316,14 +360,14 @@ export async function notifyPartialSignature(
 export async function notifyContractFullySigned(
   contract: Pick<
     Contract,
-    'id' | 'exhibitor_company_name' | 'signer_1_name' | 'sales_rep_id' | 'booth_count' | 'booth_rate_cents'
+    'id' | 'event_id' | 'exhibitor_company_name' | 'signer_1_name' | 'sales_rep_id' | 'booth_count' | 'booth_rate_cents'
   > & {
     sales_rep_email?: string | null;
     booth_subtotal_cents?: number;
     line_items_subtotal_cents?: number | null;
     grand_total_cents?: number;
   },
-  event: Pick<Event, 'name' | 'year'> | null,
+  event: Pick<Event, 'name' | 'year' | 'product_key'> | null,
   countersignerDisplayName: string,
 ): Promise<void> {
   const apiKey = process.env['SENDGRID_API_KEY'];
@@ -332,6 +376,7 @@ export async function notifyContractFullySigned(
     return;
   }
 
+  const mail = await contractMailMeta(contract, event);
   const supabase = getSupabaseAdmin();
 
   const { data: eventsTeam } = await supabase
@@ -370,7 +415,7 @@ export async function notifyContractFullySigned(
   const countersignerLine = countersignerDisplayName.trim() || 'Countersigner';
 
   const subject = `${company} — fully signed and ready for release`;
-  const detailUrl = appContractUrl(contract.id);
+  const detailUrl = mail.detailUrl;
 
   const boothSub = contract.booth_subtotal_cents ?? contract.booth_count * contract.booth_rate_cents;
   const grand =
@@ -391,7 +436,7 @@ export async function notifyContractFullySigned(
     ``,
     pricingText,
     ``,
-    `Contract is now ready to be released to accounting. Open the contract in WhiskyFest Contracts to release.`,
+    `Contract is now ready to be released to accounting. Open the contract in ${mail.workspaceLabel} to release.`,
     ``,
     `Open contract: ${detailUrl}`,
   ].join('\n');
@@ -408,13 +453,13 @@ export async function notifyContractFullySigned(
         line_items_subtotal_cents: contract.line_items_subtotal_cents,
         grand_total_cents: grand,
       })}
-      <p style="margin-top:14px;">Contract is now ready to be released to accounting. Open the contract in WhiskyFest Contracts to release.</p>
-      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
+      <p style="margin-top:14px;">Contract is now ready to be released to accounting. Open the contract in ${escapeHtml(mail.workspaceLabel)} to release.</p>
+      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in ${escapeHtml(mail.workspaceLabel)}</a></p>
     </div>
   `;
 
   await sgMail.send({
-    from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
+    from: mail.from,
     to: recipients,
     subject,
     text,
@@ -424,7 +469,7 @@ export async function notifyContractFullySigned(
 
 /** Alert events team that a contract PDF is ready for review. */
 export async function notifyEventsTeamOfPendingReview(
-  contract: Pick<Contract, 'id' | 'exhibitor_company_name' | 'booth_rate_cents' | 'booth_count'> & {
+  contract: Pick<Contract, 'id' | 'event_id' | 'exhibitor_company_name' | 'booth_rate_cents' | 'booth_count'> & {
     grand_total_cents?: number;
     booth_subtotal_cents?: number;
     line_items_subtotal_cents?: number | null;
@@ -455,6 +500,7 @@ export async function notifyEventsTeamOfPendingReview(
   }
 
   sgMail.setApiKey(apiKey);
+  const mail = await contractMailMeta(contract);
 
   const boothSubFallback = contract.booth_count * contract.booth_rate_cents;
   const grand =
@@ -467,7 +513,7 @@ export async function notifyEventsTeamOfPendingReview(
   const totalLabel = formatCents(grand);
   const rateLabel = formatCents(contract.booth_rate_cents);
   const repLabel = contract.sales_rep_name ?? contract.sales_rep_email ?? '—';
-  const detailUrl = appContractUrl(contract.id);
+  const detailUrl = mail.detailUrl;
   const subject = `Review needed: ${contract.exhibitor_company_name} — ${totalLabel}`;
   const pricingLines = contractPricingTextLines({
     booth_subtotal_cents: boothSub,
@@ -499,12 +545,12 @@ export async function notifyEventsTeamOfPendingReview(
         line_items_subtotal_cents: contract.line_items_subtotal_cents,
         grand_total_cents: grand,
       })}
-      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
+      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in ${escapeHtml(mail.workspaceLabel)}</a></p>
     </div>
   `;
 
   await sgMail.send({
-    from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
+    from: mail.from,
     to: recipients,
     subject,
     text,
@@ -513,7 +559,7 @@ export async function notifyEventsTeamOfPendingReview(
 }
 
 export async function notifySalesRepEventsApproved(
-  contract: Pick<Contract, 'id' | 'exhibitor_company_name' | 'sales_rep_id'>,
+  contract: Pick<Contract, 'id' | 'event_id' | 'exhibitor_company_name' | 'sales_rep_id'>,
   approver: { email: string; name?: string | null },
 ): Promise<void> {
   const apiKey = process.env['SENDGRID_API_KEY'];
@@ -530,8 +576,9 @@ export async function notifySalesRepEventsApproved(
   if (!toAddress) return;
 
   sgMail.setApiKey(apiKey);
+  const mail = await contractMailMeta(contract);
 
-  const detailUrl = appContractUrl(contract.id);
+  const detailUrl = mail.detailUrl;
   const subject = `Contract approved: ${contract.exhibitor_company_name} — ready to send`;
   const approverLine = approver.name ? `${approver.name} <${approver.email}>` : approver.email;
 
@@ -549,7 +596,7 @@ export async function notifySalesRepEventsApproved(
     <div style="font-family: system-ui, sans-serif; max-width: 560px;">
       <p><strong>Ready to send</strong></p>
       <p>${escapeHtml(contract.exhibitor_company_name)} was approved by the events team (${escapeHtml(approverLine)}).</p>
-      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
+      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in ${escapeHtml(mail.workspaceLabel)}</a></p>
     </div>
   `;
 
@@ -558,7 +605,7 @@ export async function notifySalesRepEventsApproved(
   );
 
   await sgMail.send({
-    from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
+    from: mail.from,
     to: toAddress,
     ...(ccAssistants.length > 0 ? { cc: ccAssistants } : {}),
     subject,
@@ -568,8 +615,8 @@ export async function notifySalesRepEventsApproved(
 }
 
 export async function notifySalesRepContractRecalled(params: {
-  contract: Pick<Contract, 'id' | 'exhibitor_company_name' | 'sales_rep_id'>;
-  event: Pick<Event, 'name' | 'year'> | null;
+  contract: Pick<Contract, 'id' | 'event_id' | 'exhibitor_company_name' | 'sales_rep_id'>;
+  event: Pick<Event, 'name' | 'year' | 'product_key'> | null;
   recalledBy: { email: string; name?: string | null };
   reason: string;
 }): Promise<void> {
@@ -587,8 +634,9 @@ export async function notifySalesRepContractRecalled(params: {
   if (!toAddress) return;
 
   sgMail.setApiKey(apiKey);
+  const mail = await contractMailMeta(params.contract, params.event);
 
-  const detailUrl = appContractUrl(params.contract.id);
+  const detailUrl = mail.detailUrl;
   const eventTitle = params.event ? `${params.event.name} ${params.event.year}`.trim() : 'WhiskyFest';
   const actorLine = params.recalledBy.name
     ? `${params.recalledBy.name} <${params.recalledBy.email}>`
@@ -611,7 +659,7 @@ export async function notifySalesRepContractRecalled(params: {
       <p>The in-flight DocuSign envelope was voided and the contract is back in <strong>draft</strong> for revisions.</p>
       <p>${escapeHtml(actorLine)} noted:</p>
       <blockquote style="border-left:3px solid #ccc;padding-left:12px;margin:12px 0;">${escapeHtml(params.reason)}</blockquote>
-      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
+      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in ${escapeHtml(mail.workspaceLabel)}</a></p>
     </div>
   `;
 
@@ -620,7 +668,7 @@ export async function notifySalesRepContractRecalled(params: {
   );
 
   await sgMail.send({
-    from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
+    from: mail.from,
     to: toAddress,
     ...(ccAssistants.length > 0 ? { cc: ccAssistants } : {}),
     subject,
@@ -630,7 +678,7 @@ export async function notifySalesRepContractRecalled(params: {
 }
 
 export async function notifySalesRepContractSentBack(
-  contract: Pick<Contract, 'id' | 'exhibitor_company_name' | 'sales_rep_id'>,
+  contract: Pick<Contract, 'id' | 'event_id' | 'exhibitor_company_name' | 'sales_rep_id'>,
   sender: { email: string; name?: string | null },
   reason: string,
 ): Promise<void> {
@@ -648,8 +696,9 @@ export async function notifySalesRepContractSentBack(
   if (!toAddress) return;
 
   sgMail.setApiKey(apiKey);
+  const mail = await contractMailMeta(contract);
 
-  const detailUrl = appContractUrl(contract.id);
+  const detailUrl = mail.detailUrl;
   const subject = `Contract needs changes: ${contract.exhibitor_company_name}`;
   const senderLine = sender.name ? `${sender.name} <${sender.email}>` : sender.email;
 
@@ -668,7 +717,7 @@ export async function notifySalesRepContractSentBack(
       <p><strong>Changes requested</strong></p>
       <p>${escapeHtml(senderLine)} requested updates:</p>
       <blockquote style="border-left:3px solid #ccc;padding-left:12px;margin:12px 0;">${escapeHtml(reason)}</blockquote>
-      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
+      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in ${escapeHtml(mail.workspaceLabel)}</a></p>
     </div>
   `;
 
@@ -677,7 +726,7 @@ export async function notifySalesRepContractSentBack(
   );
 
   await sgMail.send({
-    from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
+    from: mail.from,
     to: toAddress,
     ...(ccAssistants.length > 0 ? { cc: ccAssistants } : {}),
     subject,
@@ -691,11 +740,11 @@ export async function notifySalesRepContractSentBack(
  * DocuSign itself notifies exhibitor recipients about the envelope void.
  */
 export async function notifyContractVoided(params: {
-  contract: Pick<Contract, 'id' | 'exhibitor_company_name' | 'sales_rep_id'> & {
+  contract: Pick<Contract, 'id' | 'event_id' | 'exhibitor_company_name' | 'sales_rep_id'> & {
     sales_rep_name?: string | null;
     sales_rep_email?: string | null;
   };
-  event: Pick<Event, 'name' | 'year'> | null;
+  event: Pick<Event, 'name' | 'year' | 'product_key'> | null;
   voidedBy: { email: string; name?: string | null };
   reason: string;
   voidedAtIso: string;
@@ -706,8 +755,9 @@ export async function notifyContractVoided(params: {
     return;
   }
 
+  const mail = await contractMailMeta(params.contract, params.event);
   const supabase = getSupabaseAdmin();
-  const detailUrl = appContractUrl(params.contract.id);
+  const detailUrl = mail.detailUrl;
   const eventTitle = params.event ? `${params.event.name} ${params.event.year}`.trim() : 'WhiskyFest';
   const company = params.contract.exhibitor_company_name;
   const voider = params.voidedBy.name ? `${params.voidedBy.name} <${params.voidedBy.email}>` : params.voidedBy.email;
@@ -752,7 +802,7 @@ export async function notifyContractVoided(params: {
         <strong>Voided at:</strong> ${escapeHtml(atLabel)}
       </p>
       <p style="margin-top:14px;">If you need to resend this contract with corrections, you'll need to create a new contract.</p>
-      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
+      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in ${escapeHtml(mail.workspaceLabel)}</a></p>
     </div>
   `;
 
@@ -761,7 +811,7 @@ export async function notifyContractVoided(params: {
       ? (await getAssistantEmailsForRep(params.contract.sales_rep_id)).filter((a) => a.toLowerCase() !== repEmail!.toLowerCase())
       : [];
     await sgMail.send({
-      from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
+      from: mail.from,
       to: repEmail,
       ...(ccAssistants.length > 0 ? { cc: ccAssistants } : {}),
       subject,
@@ -772,7 +822,7 @@ export async function notifyContractVoided(params: {
 
   if (eventRecipients.length > 0) {
     await sgMail.send({
-      from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
+      from: mail.from,
       to: eventRecipients,
       subject: `${company} contract voided — visibility`,
       text,
@@ -781,28 +831,77 @@ export async function notifyContractVoided(params: {
   }
 }
 
-/** Sales rep notification when AR marks invoice sent. */
+async function invoiceNotificationRecipients(params: {
+  salesRepId: string | null;
+  eventId: string | null | undefined;
+  createdBy?: string | null;
+}): Promise<{ recipients: string[]; eventsManaged: boolean }> {
+  const supabase = getSupabaseAdmin();
+  const eventsManaged = await eventUsesEventsManagedWorkflow(params.eventId);
+  const recipientSet = new Set<string>();
+
+  if (params.salesRepId) {
+    const { data: rep } = await supabase.from('sales_reps').select('email').eq('id', params.salesRepId).maybeSingle();
+    const repEmail = rep?.email?.trim().toLowerCase();
+    if (repEmail) recipientSet.add(repEmail);
+  }
+
+  if (eventsManaged) {
+    for (const email of await getActiveEventsTeamEmails()) recipientSet.add(email);
+    if (recipientSet.size === 0) {
+      const creator = params.createdBy?.trim().toLowerCase();
+      if (creator) recipientSet.add(creator);
+    }
+  }
+
+  return { recipients: [...recipientSet], eventsManaged };
+}
+
+/** Sales rep / events-team notification when AR marks invoice sent. */
 export async function notifySalesRepInvoiceSent(params: {
   contractId: string;
   companyName: string;
   grandTotalCents: number;
   sentAtLabel: string;
   salesRepId: string | null;
+  eventId?: string | null;
+  createdBy?: string | null;
 }): Promise<void> {
   const apiKey = process.env['SENDGRID_API_KEY'];
   if (!apiKey) {
     console.warn('[notifySalesRepInvoiceSent] SENDGRID_API_KEY not set — skipping email');
     return;
   }
-  if (!params.salesRepId) return;
 
   const supabase = getSupabaseAdmin();
-  const { data: rep } = await supabase.from('sales_reps').select('email').eq('id', params.salesRepId).maybeSingle();
-  const toAddress = rep?.email?.trim();
-  if (!toAddress) return;
+  const { data: contractRow } = await supabase
+    .from('contracts')
+    .select('event_id, created_by')
+    .eq('id', params.contractId)
+    .maybeSingle();
+  const eventId = params.eventId ?? (contractRow as { event_id?: string } | null)?.event_id;
+  const createdBy = params.createdBy ?? (contractRow as { created_by?: string } | null)?.created_by ?? null;
+
+  const { recipients, eventsManaged } = await invoiceNotificationRecipients({
+    salesRepId: params.salesRepId,
+    eventId,
+    createdBy,
+  });
+
+  if (recipients.length === 0) {
+    if (!params.salesRepId && !eventsManaged) return;
+    console.warn('[notifySalesRepInvoiceSent] No recipients — skipping');
+    return;
+  }
 
   sgMail.setApiKey(apiKey);
-  const detailUrl = appContractUrl(params.contractId);
+  const eventCtx = await loadEventEmailContext(eventId);
+  const mail = {
+    from: sendGridFromForEvent(eventCtx),
+    workspaceLabel: workspaceLabelForEvent(eventCtx),
+    detailUrl: appContractUrl(params.contractId, eventCtx),
+  };
+  const detailUrl = mail.detailUrl;
   const subject = `Invoice sent for ${params.companyName}`;
   const amt = formatCurrency(params.grandTotalCents);
 
@@ -819,17 +918,20 @@ export async function notifySalesRepInvoiceSent(params: {
     <div style="font-family: system-ui, sans-serif; max-width: 560px;">
       <p><strong>Invoice sent</strong> for ${escapeHtml(params.companyName)}</p>
       <p>Amount: <strong>${escapeHtml(amt)}</strong><br/>Marked: ${escapeHtml(params.sentAtLabel)}</p>
-      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
+      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in ${escapeHtml(mail.workspaceLabel)}</a></p>
     </div>
   `;
 
-  const ccAssistants = (await getAssistantEmailsForRep(params.salesRepId)).filter(
-    (a) => a.toLowerCase() !== toAddress.toLowerCase(),
-  );
+  const ccAssistants =
+    params.salesRepId && !eventsManaged
+      ? (await getAssistantEmailsForRep(params.salesRepId)).filter(
+          (a) => !recipients.map((r) => r.toLowerCase()).includes(a.toLowerCase()),
+        )
+      : [];
 
   await sgMail.send({
-    from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
-    to: toAddress,
+    from: mail.from,
+    to: recipients,
     ...(ccAssistants.length > 0 ? { cc: ccAssistants } : {}),
     subject,
     text,
@@ -837,26 +939,49 @@ export async function notifySalesRepInvoiceSent(params: {
   });
 }
 
-/** Sales rep notification when AR marks invoice paid. */
+/** Sales rep / events-team notification when AR marks invoice paid. */
 export async function notifySalesRepInvoicePaid(params: {
   contractId: string;
   companyName: string;
   salesRepId: string | null;
+  eventId?: string | null;
+  createdBy?: string | null;
 }): Promise<void> {
   const apiKey = process.env['SENDGRID_API_KEY'];
   if (!apiKey) {
     console.warn('[notifySalesRepInvoicePaid] SENDGRID_API_KEY not set — skipping email');
     return;
   }
-  if (!params.salesRepId) return;
 
   const supabase = getSupabaseAdmin();
-  const { data: rep } = await supabase.from('sales_reps').select('email').eq('id', params.salesRepId).maybeSingle();
-  const toAddress = rep?.email?.trim();
-  if (!toAddress) return;
+  const { data: contractRow } = await supabase
+    .from('contracts')
+    .select('event_id, created_by')
+    .eq('id', params.contractId)
+    .maybeSingle();
+  const eventId = params.eventId ?? (contractRow as { event_id?: string } | null)?.event_id;
+  const createdBy = params.createdBy ?? (contractRow as { created_by?: string } | null)?.created_by ?? null;
+
+  const { recipients, eventsManaged } = await invoiceNotificationRecipients({
+    salesRepId: params.salesRepId,
+    eventId,
+    createdBy,
+  });
+
+  if (recipients.length === 0) {
+    if (!params.salesRepId && !eventsManaged) return;
+    console.warn('[notifySalesRepInvoicePaid] No recipients — skipping');
+    return;
+  }
 
   sgMail.setApiKey(apiKey);
-  const detailUrl = appContractUrl(params.contractId);
+  const eventCtx = await loadEventEmailContext(eventId);
+  const mail = {
+    from: sendGridFromForEvent(eventCtx),
+    workspaceLabel: workspaceLabelForEvent(eventCtx),
+    detailUrl: appContractUrl(params.contractId, eventCtx),
+  };
+  const detailUrl = mail.detailUrl;
   const subject = `${params.companyName} — Paid`;
 
   const text = [
@@ -868,17 +993,20 @@ export async function notifySalesRepInvoicePaid(params: {
   const html = `
     <div style="font-family: system-ui, sans-serif; max-width: 560px;">
       <p>Great news — <strong>${escapeHtml(params.companyName)}</strong>'s invoice has been paid. Contract closed out.</p>
-      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in WhiskyFest Contracts</a></p>
+      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in ${escapeHtml(mail.workspaceLabel)}</a></p>
     </div>
   `;
 
-  const ccAssistants = (await getAssistantEmailsForRep(params.salesRepId)).filter(
-    (a) => a.toLowerCase() !== toAddress.toLowerCase(),
-  );
+  const ccAssistants =
+    params.salesRepId && !eventsManaged
+      ? (await getAssistantEmailsForRep(params.salesRepId)).filter(
+          (a) => !recipients.map((r) => r.toLowerCase()).includes(a.toLowerCase()),
+        )
+      : [];
 
   await sgMail.send({
-    from: { email: WF_CONTRACTS_FROM_EMAIL, name: WF_CONTRACTS_FROM_NAME },
-    to: toAddress,
+    from: mail.from,
+    to: recipients,
     ...(ccAssistants.length > 0 ? { cc: ccAssistants } : {}),
     subject,
     text,

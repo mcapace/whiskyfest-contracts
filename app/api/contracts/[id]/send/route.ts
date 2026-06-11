@@ -22,6 +22,7 @@ import { requiresDiscountApproval } from '@/lib/contracts';
 import { insertContractAudit } from '@/lib/audit-log';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { syncExhibitorRosterWritebackById } from '@/lib/exhibitor-roster-sync-hook';
+import { docusignBrandIdForEvent } from '@/lib/product-email';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
@@ -125,6 +126,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       emailBlurb: contractDocuSignEmailBlurb(contract.exhibitor_company_name, event),
       signer1: { name: signerName, email: signerEmail },
       countersigner: { name: countersignerName, email: countersignerEmail },
+      brandId: docusignBrandIdForEvent(event),
     });
 
     await supabase

@@ -98,6 +98,8 @@ interface Props {
   createdBy: string | null;
   discountApprovalPending: boolean;
   isEventsTeam: boolean;
+  /** NYWE and other events-managed workflows let events team release signed contracts. */
+  eventsManagedWorkflow?: boolean;
   /** When false, DocuSign send is blocked for this event (internal prep). */
   clientSendEnabled?: boolean;
 }
@@ -133,6 +135,7 @@ export function ContractActions({
   createdBy,
   discountApprovalPending,
   isEventsTeam,
+  eventsManagedWorkflow = false,
   clientSendEnabled = true,
 }: Props) {
   const router = useRouter();
@@ -254,7 +257,7 @@ export function ContractActions({
   const canCancelInflightDocuSign =
     (status === 'sent' || status === 'partially_signed') && (isAdmin || isEventsTeam);
   const canCancelSigned = status === 'signed' && (isAdmin || isEventsTeam);
-  const canRelease = status === 'signed' && isAdmin;
+  const canRelease = status === 'signed' && (isAdmin || (isEventsTeam && eventsManagedWorkflow));
   const canReleaseImported = status === 'imported' && (isAdmin || isEventsTeam) && !discountApprovalPending;
   const canEditImported = status === 'imported' && (isAdmin || isEventsTeam);
   const canEditVoided = status === 'voided' && (isAdmin || isEventsTeam);
@@ -773,6 +776,7 @@ export function ContractActions({
           releasedAt={releasedAt}
           isAdmin={isAdmin}
           isEventsTeam={isEventsTeam}
+          eventsManagedWorkflow={eventsManagedWorkflow}
           docusignEnvelopeId={docusignEnvelopeId}
           cancelledReason={cancelledReason}
           cancelledAt={cancelledAt}
@@ -1072,6 +1076,7 @@ function StatusLine({
   releasedAt,
   isAdmin,
   isEventsTeam,
+  eventsManagedWorkflow,
   docusignEnvelopeId,
   cancelledReason,
   cancelledAt,
@@ -1088,6 +1093,7 @@ function StatusLine({
   releasedAt: string | null;
   isAdmin: boolean;
   isEventsTeam: boolean;
+  eventsManagedWorkflow: boolean;
   docusignEnvelopeId: string | null;
   cancelledReason: string | null;
   cancelledAt: string | null;
@@ -1126,7 +1132,7 @@ function StatusLine({
       </p>
     );
   }
-  if (status === 'signed' && !isAdmin) {
+  if (status === 'signed' && !isAdmin && !(isEventsTeam && eventsManagedWorkflow)) {
     return <p className="text-sm text-muted-foreground">Awaiting admin release to accounting.</p>;
   }
   if (status === 'imported') {
