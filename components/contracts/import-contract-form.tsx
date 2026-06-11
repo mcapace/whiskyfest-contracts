@@ -13,8 +13,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SalesRepSelect } from '@/components/contracts/sales-rep-select';
 import { suggestBrandCategory, type BrandCategory } from '@/lib/brand-category';
 import { BoothBrandInput, type BoothBrandValue } from '@/components/contracts/booth-brand-input';
+import { dealKindMeta, type ContractDealKind } from '@/lib/contract-deal-kind';
 import { formatLongDate } from '@/lib/utils';
 import type { Event } from '@/types/db';
+
+type ImportDealKind = Extract<ContractDealKind, 'booth' | 'sponsorship_only'>;
+type SponsorshipLineDraft = { key: string; description: string; amountInput: string };
+
+function parseDollarsToNumber(raw: string): number | null {
+  const t = raw.replace(/[$,]/g, '').trim();
+  if (!t) return null;
+  const n = parseFloat(t);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
 
 function boothRowsForCount(count: number, prev: BoothBrandValue[]): BoothBrandValue[] {
   const next = [...prev];
@@ -71,6 +82,11 @@ export function ImportContractForm({
   const [signedAt, setSignedAt] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
 
+  const [importKind, setImportKind] = useState<ImportDealKind>('booth');
+  const [sponsorBrand, setSponsorBrand] = useState('');
+  const [sponsorshipLines, setSponsorshipLines] = useState<SponsorshipLineDraft[]>([
+    { key: crypto.randomUUID(), description: '', amountInput: '' },
+  ]);
   const [boothBrandRows, setBoothBrandRows] = useState<BoothBrandValue[]>([
     { brand_name: '', brand_category: 'Other', expressions: [] },
   ]);
@@ -124,9 +140,31 @@ export function ImportContractForm({
       setErr('Sales rep is required.');
       return;
     }
-    if (!boothRateInput.trim() || !grandTotalInput.trim()) {
+    const sponsorshipOnly = importKind === 'sponsorship_only';
+
+    if (!sponsorshipOnly && (!boothRateInput.trim() || !grandTotalInput.trim())) {
       setErr('Booth rate and grand total are required.');
       return;
+    }
+
+    if (sponsorshipOnly) {
+      if (!sponsorBrand.trim()) {
+        setErr('Sponsor / brand name is required.');
+        return;
+      }
+      const parsedLines = sponsorshipLines
+        .map((row) => {
+          const amount = parseDollarsToNumber(row.amountInput);
+          return {
+            description: row.description.trim(),
+            amount,
+          };
+        })
+        .filter((row) => row.description.length > 0 || row.amount !== null);
+      if (parsedLines.length === 0 || parsedLines.some((row) => !row.description || row.amount === null)) {
+        setErr('Add at least one sponsorship line item with description and amount.');
+        return;
+      }
     }
     if (!signedAt) {
       setErr('Original signature date is required.');
@@ -145,14 +183,18 @@ export function ImportContractForm({
       return;
     }
 
-    for (let i = 0; i < boothCount; i++) {
-      if (!boothBrandRows[i]?.brand_name?.trim()) {
-        setErr(`Brand name is required for booth ${i + 1}.`);
-        return;
+    if (!sponsorshipOnly) {
+      for (let i = 0; i < boothCount; i++) {
+        if (!boothBrandRows[i]?.brand_name?.trim()) {
+          setErr(`Brand name is required for booth ${i + 1}.`);
+          return;
+        }
       }
     }
 
-    const booth_brands = Array.from({ length: boothCount }, (_, i) => {
+    const booth_brands = sponsorshipOnly
+      ? []
+      : Array.from({ length: boothCount }, (_, i) => {
       const row = boothBrandRows[i] ?? { brand_name: '', brand_category: 'Other' as BrandCategory, expressions: [] };
       return {
         booth_index: i + 1,
@@ -162,8 +204,22 @@ export function ImportContractForm({
       };
     });
 
+    const sponsorshipLinePayload = sponsorshipOnly
+      ? sponsorshipLines
+          .map((row) => ({
+            description: row.description.trim(),
+            amount_dollars: row.amountInput.trim(),
+          }))
+          .filter((row) => row.description && row.amount_dollars)
+      : [];
+
+    const sponsorshipGrandTotal = sponsorshipOnly
+      ? sponsorshipLinePayload.reduce((sum, row) => sum + (parseDollarsToNumber(row.amount_dollars) ?? 0), 0)
+      : 0;
+
     startTransition(async () => {
       const fd = new FormData();
+      fd.set('order_type', sponsorshipOnly ? 'sponsorship_only' : 'booth');
       fd.set('event_id', resolvedEventId);
       fd.set('exhibitor_company_name', exhibitorCompany.trim());
       fd.set('exhibitor_legal_name', exhibitorLegal.trim());
@@ -178,9 +234,16 @@ export function ImportContractForm({
       fd.set('exhibitor_zip', zip.trim());
       fd.set('exhibitor_country', country.trim());
       fd.set('sales_rep_id', salesRepId);
-      fd.set('booth_count', String(boothCount));
-      fd.set('booth_rate_dollars', boothRateInput.trim());
-      fd.set('grand_total_dollars', grandTotalInput.trim());
+      fd.set('booth_count', sponsorshipOnly ? '0' : String(boothCount));
+      fd.set('booth_rate_dollars', sponsorshipOnly ? '0' : boothRateInput.trim());
+      fd.set(
+        'grand_total_dollars',
+        sponsorshipOnly ? String(sponsorshipGrandTotal) : grandTotalInput.trim(),
+      );
+      if (sponsorshipOnly) {
+        fd.set('sponsor_brand', sponsorBrand.trim());
+        fd.set('line_items_json', JSON.stringify(sponsorshipLinePayload));
+      }
       fd.set('originally_signed_at', signedAt);
       fd.set('notes', notes.trim());
       fd.set('billing_contact_name', billingName.trim());
@@ -350,8 +413,22 @@ export function ImportContractForm({
         <Card>
           <CardHeader>
             <CardTitle>Sales rep & financials</CardTitle>
+            <CardDescription>Choose booth import or sponsorship-only (no booth on the agreement).</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {(['booth', 'sponsorship_only'] as const).map((kind) => (
+                <Button
+                  key={kind}
+                  type="button"
+                  variant={importKind === kind ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setImportKind(kind)}
+                >
+                  {dealKindMeta(kind).title}
+                </Button>
+              ))}
+            </div>
             <SalesRepSelect
               currentUserEmail={currentUserEmail}
               value={salesRepId}
@@ -359,75 +436,145 @@ export function ImportContractForm({
               isAdmin={canPickAnySalesRep}
               required
             />
-            <Field label="Booth count" htmlFor="ibc">
-              <Input
-                id="ibc"
-                type="number"
-                min={1}
-                inputMode="numeric"
-                value={boothCountInput}
-                onChange={(e) => setBoothCountInput(e.target.value)}
-                onBlur={normalizeBoothCountOnBlur}
-                required
-              />
-            </Field>
-            <Field label="Rate per booth ($)" hint="Numbers only; decimals allowed.">
-              <Input
-                id="ibr"
-                inputMode="decimal"
-                value={boothRateInput}
-                onChange={(e) => setBoothRateInput(e.target.value)}
-                required
-                aria-describedby="ibr-hint"
-              />
-              <p id="ibr-hint" className="mt-1 text-xs text-muted-foreground">
-                Example: 15000 or 15000.00
-              </p>
-            </Field>
-            <Field label="Grand total ($)" hint="Must be at least booth count × rate.">
-              <Input
-                id="igt"
-                inputMode="decimal"
-                value={grandTotalInput}
-                onChange={(e) => setGrandTotalInput(e.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Notes (line items, additional charges)" htmlFor="inotes">
+            {importKind === 'booth' ? (
+              <>
+                <Field label="Booth count" htmlFor="ibc">
+                  <Input
+                    id="ibc"
+                    type="number"
+                    min={1}
+                    inputMode="numeric"
+                    value={boothCountInput}
+                    onChange={(e) => setBoothCountInput(e.target.value)}
+                    onBlur={normalizeBoothCountOnBlur}
+                    required
+                  />
+                </Field>
+                <Field label="Rate per booth ($)" hint="Numbers only; decimals allowed.">
+                  <Input
+                    id="ibr"
+                    inputMode="decimal"
+                    value={boothRateInput}
+                    onChange={(e) => setBoothRateInput(e.target.value)}
+                    required
+                    aria-describedby="ibr-hint"
+                  />
+                  <p id="ibr-hint" className="mt-1 text-xs text-muted-foreground">
+                    Example: 15000 or 15000.00
+                  </p>
+                </Field>
+                <Field label="Grand total ($)" hint="Must be at least booth count × rate.">
+                  <Input
+                    id="igt"
+                    inputMode="decimal"
+                    value={grandTotalInput}
+                    onChange={(e) => setGrandTotalInput(e.target.value)}
+                    required
+                  />
+                </Field>
+              </>
+            ) : (
+              <>
+                <Field label="Sponsor / brand on agreement" htmlFor="isponsor-brand">
+                  <Input
+                    id="isponsor-brand"
+                    value={sponsorBrand}
+                    onChange={(e) => setSponsorBrand(e.target.value)}
+                    required
+                  />
+                </Field>
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-foreground">Sponsorship line items</p>
+                  {sponsorshipLines.map((row, idx) => (
+                    <div key={row.key} className="grid gap-2 sm:grid-cols-[1fr_140px_auto] sm:items-end">
+                      <Field label={idx === 0 ? 'Description' : ''} htmlFor={`sli-desc-${row.key}`}>
+                        <Input
+                          id={`sli-desc-${row.key}`}
+                          value={row.description}
+                          onChange={(e) =>
+                            setSponsorshipLines((list) =>
+                              list.map((r) => (r.key === row.key ? { ...r, description: e.target.value } : r)),
+                            )
+                          }
+                        />
+                      </Field>
+                      <Field label={idx === 0 ? 'Amount ($)' : ''} htmlFor={`sli-amt-${row.key}`}>
+                        <Input
+                          id={`sli-amt-${row.key}`}
+                          inputMode="decimal"
+                          value={row.amountInput}
+                          onChange={(e) =>
+                            setSponsorshipLines((list) =>
+                              list.map((r) => (r.key === row.key ? { ...r, amountInput: e.target.value } : r)),
+                            )
+                          }
+                        />
+                      </Field>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive"
+                        disabled={sponsorshipLines.length <= 1}
+                        onClick={() => setSponsorshipLines((list) => list.filter((r) => r.key !== row.key))}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setSponsorshipLines((list) => [
+                        ...list,
+                        { key: crypto.randomUUID(), description: '', amountInput: '' },
+                      ])
+                    }
+                  >
+                    Add line item
+                  </Button>
+                </div>
+              </>
+            )}
+            <Field label="Notes (optional)" htmlFor="inotes">
               <Textarea id="inotes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} />
             </Field>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Brands & expressions</CardTitle>
-            <CardDescription>One brand per booth. List specific expressions you pour (optional).</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {Array.from({ length: boothCount }).map((_, idx) => (
-              <BoothBrandInput
-                key={idx}
-                boothNumber={idx + 1}
-                value={
-                  boothBrandRows[idx] ?? {
-                    brand_name: '',
-                    brand_category: 'Other',
-                    expressions: [],
+        {importKind === 'booth' ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Brands & expressions</CardTitle>
+              <CardDescription>One brand per booth. List specific expressions you pour (optional).</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {Array.from({ length: boothCount }).map((_, idx) => (
+                <BoothBrandInput
+                  key={idx}
+                  boothNumber={idx + 1}
+                  value={
+                    boothBrandRows[idx] ?? {
+                      brand_name: '',
+                      brand_category: 'Other',
+                      expressions: [],
+                    }
                   }
-                }
-                exhibitorCompany={exhibitorCompany}
-                onChange={(next) =>
-                  setBoothBrandRows((rows) => {
-                    const copy = [...rows];
-                    copy[idx] = next;
-                    return copy;
-                  })
-                }
-              />
-            ))}
-          </CardContent>
-        </Card>
+                  exhibitorCompany={exhibitorCompany}
+                  onChange={(next) =>
+                    setBoothBrandRows((rows) => {
+                      const copy = [...rows];
+                      copy[idx] = next;
+                      return copy;
+                    })
+                  }
+                />
+              ))}
+            </CardContent>
+          </Card>
+        ) : null}
 
         <Card>
           <CardHeader>
@@ -507,7 +654,7 @@ function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={htmlFor}>{label}</Label>
+      {label ? <Label htmlFor={htmlFor}>{label}</Label> : null}
       {children}
       {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
     </div>

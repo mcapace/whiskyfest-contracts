@@ -76,7 +76,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         exhibitor_legal_name: p.exhibitor_legal_name,
         exhibitor_company_name: p.exhibitor_company_name,
         order_type: p.order_type ?? 'booth',
-        ...(p.order_type === 'sponsorship_only' ? { brands_poured: sponsorBrandFromBody(p) } : {}),
+        brands_poured:
+          p.order_type === 'sponsorship_only' ? sponsorBrandFromBody(p) : null,
         booth_count: p.booth_count,
         booth_rate_cents: incomingBoothRate,
         signer_1_name: p.signer_1_name ?? null,

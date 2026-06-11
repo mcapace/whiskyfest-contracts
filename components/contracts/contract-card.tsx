@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { listPackageLabel } from '@/lib/contract-deal-kind';
 import { formatCurrency, formatRelative } from '@/lib/utils';
 import { StatusBadge } from '@/components/contracts/status-badge';
 import type { ContractWithTotals } from '@/types/db';
@@ -37,8 +38,8 @@ export function ContractCard({ contract }: { contract: ContractWithTotals }) {
           <p className="font-sans text-lg font-semibold tabular-nums text-oak-800">{formatCurrency(contract.grand_total_cents)}</p>
         </div>
         <div>
-          <p className="text-[11px] uppercase tracking-wide text-ink-500">Booths</p>
-          <p className="font-sans text-lg font-semibold tabular-nums text-oak-800">{contract.booth_count}</p>
+          <p className="text-[11px] uppercase tracking-wide text-ink-500">Package</p>
+          <p className="font-sans text-sm font-semibold leading-snug text-oak-800">{listPackageLabel(contract)}</p>
         </div>
       </div>
       <p className="mt-4 text-xs text-ink-500">

@@ -49,7 +49,7 @@ export function orderTypeFromDealKind(kind: ContractDealKind): ContractOrderType
 
 export function dealKindFromContract(contract: {
   order_type?: string | null;
-  booth_count?: number;
+  booth_count?: number | null;
   line_items_subtotal_cents?: number | null;
 }): ContractDealKind {
   if (isSponsorshipOnlyOrder(contract)) return 'sponsorship_only';
@@ -59,4 +59,18 @@ export function dealKindFromContract(contract: {
 
 export function dealKindLabel(kind: ContractDealKind): string {
   return DEAL_KIND_META[kind].title;
+}
+
+/** Compact label for contracts list / cards (replaces raw booth count). */
+export function listPackageLabel(contract: {
+  order_type?: string | null;
+  booth_count?: number | null;
+  line_items_subtotal_cents?: number | null;
+}): string {
+  const kind = dealKindFromContract(contract);
+  if (kind === 'sponsorship_only') return 'Sponsorship only';
+  const n = contract.booth_count ?? 1;
+  const boothLabel = `${n} booth${n === 1 ? '' : 's'}`;
+  if (kind === 'booth_and_sponsorship') return `${boothLabel} + sponsorship`;
+  return boothLabel;
 }

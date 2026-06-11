@@ -30,6 +30,13 @@ const boothBrandRowSchema = z.object({
   expressions: z.array(z.string()).optional().default([]),
 });
 
+const importLineItemSchema = z.object({
+  description: z.string().trim().min(1),
+  amount_dollars: z.string().min(1),
+});
+
+const IMPORT_ORDER_TYPES = ['booth', 'sponsorship_only'] as const;
+
 export async function POST(req: Request) {
   const session = await auth();
   const gate = await resolveContractActor(session);
@@ -53,6 +60,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Signed file must be a PDF.' }, { status: 400 });
   }
 
+  const orderTypeRaw = String(form.get('order_type') ?? 'booth').trim();
+  if (!IMPORT_ORDER_TYPES.includes(orderTypeRaw as (typeof IMPORT_ORDER_TYPES)[number])) {
+    return NextResponse.json({ error: 'Invalid order type.' }, { status: 400 });
+  }
+  const orderType = orderTypeRaw as (typeof IMPORT_ORDER_TYPES)[number];
+  const isSponsorshipOnly = orderType === 'sponsorship_only';
+
   const boothBrandsRaw = String(form.get('booth_brands_json') ?? '').trim();
   let boothBrandsParsed: z.infer<typeof boothBrandRowSchema>[] = [];
   if (boothBrandsRaw) {
@@ -62,6 +76,18 @@ export async function POST(req: Request) {
       boothBrandsParsed = arr.map((row) => boothBrandRowSchema.parse(row));
     } catch {
       return NextResponse.json({ error: 'Invalid booth brands JSON.' }, { status: 400 });
+    }
+  }
+
+  const lineItemsRaw = String(form.get('line_items_json') ?? '').trim();
+  let lineItemsParsed: z.infer<typeof importLineItemSchema>[] = [];
+  if (lineItemsRaw) {
+    try {
+      const arr = JSON.parse(lineItemsRaw) as unknown;
+      if (!Array.isArray(arr)) throw new Error('expected array');
+      lineItemsParsed = arr.map((row) => importLineItemSchema.parse(row));
+    } catch {
+      return NextResponse.json({ error: 'Invalid sponsorship line items JSON.' }, { status: 400 });
     }
   }
 
@@ -80,9 +106,10 @@ export async function POST(req: Request) {
     exhibitor_zip: z.string().optional().nullable(),
     exhibitor_country: z.string().optional().nullable(),
     sales_rep_id: z.string().uuid(),
-    booth_count: z.coerce.number().int().min(1),
-    booth_rate_dollars: z.string().min(1),
+    booth_count: z.coerce.number().int().min(0),
+    booth_rate_dollars: z.string().optional().default('0'),
     grand_total_dollars: z.string().min(1),
+    sponsor_brand: z.string().optional().nullable(),
     originally_signed_at: z.string().min(1),
     notes: z.string().optional().nullable(),
     billing_contact_name: z.string().optional().nullable(),
@@ -105,9 +132,10 @@ export async function POST(req: Request) {
     exhibitor_zip: form.get('exhibitor_zip') ? String(form.get('exhibitor_zip')) : null,
     exhibitor_country: form.get('exhibitor_country') ? String(form.get('exhibitor_country')) : null,
     sales_rep_id: String(form.get('sales_rep_id') ?? ''),
-    booth_count: form.get('booth_count'),
-    booth_rate_dollars: String(form.get('booth_rate_dollars') ?? ''),
+    booth_count: form.get('booth_count') ?? (isSponsorshipOnly ? 0 : 1),
+    booth_rate_dollars: String(form.get('booth_rate_dollars') ?? (isSponsorshipOnly ? '0' : '')),
     grand_total_dollars: String(form.get('grand_total_dollars') ?? ''),
+    sponsor_brand: form.get('sponsor_brand') ? String(form.get('sponsor_brand')) : null,
     originally_signed_at: String(form.get('originally_signed_at') ?? ''),
     notes: form.get('notes') ? String(form.get('notes')) : null,
     billing_contact_name: form.get('billing_contact_name') ? String(form.get('billing_contact_name')) : null,
@@ -130,10 +158,144 @@ export async function POST(req: Request) {
     }
   }
 
-  const booth_rate_cents = parseMoneyToCents(p.booth_rate_dollars);
+  const booth_rate_cents = parseMoneyToCents(p.booth_rate_dollars ?? '0');
   const grand_total_cents = parseMoneyToCents(p.grand_total_dollars);
   if (booth_rate_cents === null || grand_total_cents === null) {
     return NextResponse.json({ error: 'Booth rate and grand total must be valid dollar amounts.' }, { status: 400 });
+  }
+
+  if (isSponsorshipOnly) {
+    const sponsorBrand = (p.sponsor_brand ?? '').trim();
+    if (!sponsorBrand) {
+      return NextResponse.json({ error: 'Sponsor / brand name is required for sponsorship-only imports.' }, { status: 400 });
+    }
+    if (p.booth_count !== 0 || booth_rate_cents !== 0) {
+      return NextResponse.json({ error: 'Sponsorship-only imports must have booth count 0 and booth rate 0.' }, { status: 400 });
+    }
+    if (lineItemsParsed.length === 0) {
+      return NextResponse.json({ error: 'Add at least one sponsorship line item.' }, { status: 400 });
+    }
+    const lineRows: { description: string; amount_cents: number }[] = [];
+    let lineSum = 0;
+    for (const row of lineItemsParsed) {
+      const cents = parseMoneyToCents(row.amount_dollars);
+      if (cents === null) {
+        return NextResponse.json({ error: `Invalid amount for line item: ${row.description}` }, { status: 400 });
+      }
+      lineRows.push({ description: row.description, amount_cents: cents });
+      lineSum += cents;
+    }
+    if (grand_total_cents !== lineSum) {
+      return NextResponse.json(
+        { error: 'Grand total must equal the sum of sponsorship line items.' },
+        { status: 400 },
+      );
+    }
+
+    const bill = clearedRepEnteredBilling();
+    const nowIso = new Date().toISOString();
+    const actorEmail = gate.actor.email;
+
+    let notesCombined = (p.notes ?? '').trim();
+    if (p.billing_address_notes?.trim()) {
+      notesCombined = `${notesCombined}${notesCombined ? '\n\n' : ''}Billing address (import):\n${p.billing_address_notes.trim()}`;
+    }
+    if (!notesCombined) notesCombined = 'Imported pre-existing signed sponsorship contract.';
+
+    const supabase = getSupabaseAdmin();
+
+    let signedDay = p.originally_signed_at.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(signedDay)) {
+      signedDay = `${signedDay}T12:00:00.000Z`;
+    } else {
+      const d = new Date(p.originally_signed_at);
+      if (Number.isNaN(d.getTime())) {
+        return NextResponse.json({ error: 'Original signature date is invalid.' }, { status: 400 });
+      }
+      signedDay = d.toISOString();
+    }
+
+    const insertPayload: Record<string, unknown> = {
+      event_id: p.event_id,
+      status: 'imported',
+      order_type: 'sponsorship_only',
+      imported_at: nowIso,
+      imported_by: actorEmail,
+      originally_signed_at: signedDay,
+      signed_at: signedDay,
+      exhibitor_legal_name: p.exhibitor_legal_name,
+      exhibitor_company_name: p.exhibitor_company_name,
+      brands_poured: sponsorBrand,
+      booth_count: 0,
+      booth_rate_cents: 0,
+      additional_brand_count: 0,
+      signer_1_name: p.signer_1_name,
+      signer_1_title: p.signer_1_title ?? null,
+      signer_1_email: p.signer_1_email,
+      sales_rep_id: p.sales_rep_id,
+      billing_contact_name: p.billing_contact_name ?? null,
+      billing_contact_email: p.billing_contact_email ?? null,
+      notes: notesCombined,
+      created_by: actorEmail,
+      ...bill,
+      exhibitor_address_line1: p.exhibitor_address_line1 ?? null,
+      exhibitor_address_line2: p.exhibitor_address_line2 ?? null,
+      exhibitor_city: p.exhibitor_city ?? null,
+      exhibitor_state: p.exhibitor_state ?? null,
+      exhibitor_zip: p.exhibitor_zip ?? null,
+      exhibitor_country: p.exhibitor_country ?? null,
+      exhibitor_telephone: p.exhibitor_telephone ?? null,
+    };
+
+    const { data: row, error: insErr } = await supabase.from('contracts').insert(insertPayload).select().single();
+    if (insErr || !row) {
+      console.error('import sponsorship contract insert:', insErr);
+      return NextResponse.json({ error: insErr?.message ?? 'Insert failed' }, { status: 500 });
+    }
+
+    const contract = row as Contract;
+    const contractId = contract.id;
+
+    try {
+      await replaceContractLineItemsForContract(supabase, contractId, lineRows);
+    } catch (e) {
+      console.error('import sponsorship line items:', e);
+      await supabase.from('contracts').delete().eq('id', contractId);
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : 'Failed to save line items.' },
+        { status: 500 },
+      );
+    }
+
+    const buf = Buffer.from(await pdf.arrayBuffer());
+    let signedStoragePath: string;
+    try {
+      ({ signedStoragePath } = await persistContractSignedPdf(contractId, buf));
+    } catch (e) {
+      console.error('import pdf upload:', e);
+      await supabase.from('contracts').delete().eq('id', contractId);
+      return NextResponse.json({ error: 'Failed to upload PDF to storage.' }, { status: 500 });
+    }
+
+    await supabase
+      .from('contracts')
+      .update({ pdf_storage_path: signedStoragePath, signed_pdf_url: signedStoragePath })
+      .eq('id', contractId);
+
+    await supabase.from('audit_log').insert({
+      contract_id: contractId,
+      actor_email: actorEmail,
+      action: 'contract_imported',
+      to_status: 'imported',
+      metadata: { originally_signed_at: signedDay, order_type: 'sponsorship_only' },
+    });
+
+    revalidateContractPaths(contractId);
+    return NextResponse.json({ ok: true, id: contractId });
+  }
+
+  if (p.booth_count < 1) {
+    return NextResponse.json({ error: 'Booth count must be at least 1 for booth imports.' }, { status: 400 });
   }
 
   let signedDay = p.originally_signed_at.trim();
@@ -189,6 +351,7 @@ export async function POST(req: Request) {
   const insertPayload: Record<string, unknown> = {
     event_id: p.event_id,
     status: 'imported',
+    order_type: 'booth',
     imported_at: nowIso,
     imported_by: actorEmail,
     originally_signed_at: signedDay,

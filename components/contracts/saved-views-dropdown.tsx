@@ -7,6 +7,8 @@ export type ContractViewFilters = {
   status: string;
   rep: string;
   brand: string;
+  /** all | booth | sponsorship_only | booth_and_sponsorship */
+  dealType: string;
   search: string;
   /** Advanced saved views beyond a single status chip. */
   listPreset: 'none' | 'pending_action' | 'recent_signed' | 'stuck';
@@ -15,18 +17,18 @@ export type ContractViewFilters = {
 type SavedView = { name: string; filters: ContractViewFilters };
 
 const PRESET_VIEWS: SavedView[] = [
-  { name: 'All contracts', filters: { status: 'all', rep: 'all', brand: 'all', search: '', listPreset: 'none' } },
-  { name: 'My contracts', filters: { status: 'all', rep: 'mine', brand: 'all', search: '', listPreset: 'none' } },
+  { name: 'All contracts', filters: { status: 'all', rep: 'all', brand: 'all', dealType: 'all', search: '', listPreset: 'none' } },
+  { name: 'My contracts', filters: { status: 'all', rep: 'mine', brand: 'all', dealType: 'all', search: '', listPreset: 'none' } },
   {
     name: 'Pending action',
-    filters: { status: 'all', rep: 'all', brand: 'all', search: '', listPreset: 'pending_action' },
+    filters: { status: 'all', rep: 'all', brand: 'all', dealType: 'all', search: '', listPreset: 'pending_action' },
   },
   {
     name: 'Awaiting events review',
-    filters: { status: 'pending_events_review', rep: 'all', brand: 'all', search: '', listPreset: 'none' },
+    filters: { status: 'pending_events_review', rep: 'all', brand: 'all', dealType: 'all', search: '', listPreset: 'none' },
   },
-  { name: 'Recently signed', filters: { status: 'all', rep: 'all', brand: 'all', search: '', listPreset: 'recent_signed' } },
-  { name: 'Stuck contracts', filters: { status: 'all', rep: 'all', brand: 'all', search: '', listPreset: 'stuck' } },
+  { name: 'Recently signed', filters: { status: 'all', rep: 'all', brand: 'all', dealType: 'all', search: '', listPreset: 'recent_signed' } },
+  { name: 'Stuck contracts', filters: { status: 'all', rep: 'all', brand: 'all', dealType: 'all', search: '', listPreset: 'stuck' } },
 ];
 
 export function SavedViewsDropdown({

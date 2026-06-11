@@ -18,6 +18,7 @@ const VALID: Set<string> = new Set([
   'signed',
   'imported',
   'executed',
+  'voided',
   'cancelled',
   'error',
 ]);

@@ -49,6 +49,7 @@ export function ContractsFilterBar({
   statusOptions,
   repOptions,
   brandOptions,
+  dealTypeOptions,
 }: {
   filters: ContractViewFilters;
   searchDraft: string;
@@ -57,6 +58,7 @@ export function ContractsFilterBar({
   statusOptions: Option[];
   repOptions: Option[];
   brandOptions: Option[];
+  dealTypeOptions: Option[];
 }) {
   return (
     <div className="space-y-4 rounded-lg border border-parchment-200 bg-parchment-50 p-4">
@@ -92,14 +94,20 @@ export function ContractsFilterBar({
             variant="outline"
             onClick={() => {
               onSearchDraftChange('');
-              onChange({ status: 'all', rep: 'all', brand: 'all', search: '', listPreset: 'none' });
+              onChange({ status: 'all', rep: 'all', brand: 'all', dealType: 'all', search: '', listPreset: 'none' });
             }}
           >
             Clear
           </Button>
         </div>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <ChipGroup
+          label="Deal type"
+          options={dealTypeOptions}
+          selected={filters.dealType}
+          onSelect={(dealType) => onChange({ ...filters, dealType, listPreset: 'none' })}
+        />
         <ChipGroup
           label="Sales rep"
           options={repOptions}

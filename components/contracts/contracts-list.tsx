@@ -19,6 +19,7 @@ import { ContractCard } from '@/components/contracts/contract-card';
 import { ContractsFilterBar } from '@/components/contracts/filter-bar';
 import { SavedViewsDropdown, type ContractViewFilters } from '@/components/contracts/saved-views-dropdown';
 import { categorizeContractBrands } from '@/lib/brand-category';
+import { CONTRACT_DEAL_KINDS, dealKindFromContract, dealKindLabel, listPackageLabel } from '@/lib/contract-deal-kind';
 import type { BoothBrandRowsByContract } from '@/lib/sponsors';
 import type { ContractWithTotals, Event } from '@/types/db';
 
@@ -70,6 +71,7 @@ export function ContractsList({
     status: 'all',
     rep: 'all',
     brand: 'all',
+    dealType: 'all',
     search: '',
     listPreset: 'none',
   });
@@ -100,6 +102,7 @@ export function ContractsList({
             status: v.filters.status ?? 'all',
             rep: v.filters.rep ?? 'all',
             brand: v.filters.brand ?? 'all',
+            dealType: v.filters.dealType ?? 'all',
             search: v.filters.search ?? '',
             listPreset: v.filters.listPreset ?? 'none',
           },
@@ -152,15 +155,21 @@ export function ContractsList({
       }
       if (filters.brand !== 'all' && categorizeContractForFilter(c, boothRowsByContract) !== filters.brand)
         return false;
+      if (filters.dealType !== 'all' && dealKindFromContract(c) !== filters.dealType) return false;
       const q = filters.search.trim().toLowerCase();
       if (q) {
+        const boothBrandText = (boothRowsByContract[c.id] ?? [])
+          .flatMap((row) => [row.brand_name, ...(row.expressions ?? [])])
+          .join(' ');
         const blob = [
           c.exhibitor_company_name,
           c.signer_1_name,
           c.signer_1_email,
           c.brands_poured,
+          boothBrandText,
           c.sales_rep_name,
           c.sales_rep_email,
+          listPackageLabel(c),
         ]
           .filter(Boolean)
           .join(' ')
@@ -169,7 +178,7 @@ export function ContractsList({
       }
       return true;
     });
-  }, [contracts, filters, currentRepId]);
+  }, [contracts, filters, currentRepId, boothRowsByContract]);
 
   const activeCount = filtered.filter((c) => c.status !== 'cancelled' && c.status !== 'voided').length;
   const pipelineCount = filtered.filter((c) =>
@@ -195,7 +204,7 @@ export function ContractsList({
 
   const resetFilters = () => {
     setSearchInput('');
-    setFilters({ status: 'all', rep: 'all', brand: 'all', search: '', listPreset: 'none' });
+    setFilters({ status: 'all', rep: 'all', brand: 'all', dealType: 'all', search: '', listPreset: 'none' });
   };
 
   return (
@@ -247,6 +256,11 @@ export function ContractsList({
           { value: 'signed', label: 'Signed' },
           { value: 'imported', label: 'Imported' },
           { value: 'executed', label: 'Executed' },
+          { value: 'voided', label: 'Voided' },
+        ]}
+        dealTypeOptions={[
+          { value: 'all', label: 'All' },
+          ...CONTRACT_DEAL_KINDS.map((kind) => ({ value: kind, label: dealKindLabel(kind) })),
         ]}
         repOptions={repOptions}
         brandOptions={brandOptions}
@@ -289,7 +303,7 @@ export function ContractsList({
               <TableRow>
                 <TableHead>Company / Brand</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="tabular-nums">Booths</TableHead>
+                <TableHead>Package</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead>Sales Rep</TableHead>
                 <TableHead className="text-right">Last Activity</TableHead>
@@ -334,7 +348,7 @@ export function ContractsList({
                     <TableCell>
                       <StatusBadge status={c.status} />
                     </TableCell>
-                    <TableCell className="tabular-nums">{c.booth_count}</TableCell>
+                    <TableCell className="text-sm text-foreground">{listPackageLabel(c)}</TableCell>
                     <TableCell className="text-right font-semibold tabular-nums">{formatCurrency(c.grand_total_cents)}</TableCell>
                     <TableCell>{c.sales_rep_name ?? c.sales_rep_email ?? '—'}</TableCell>
                     <TableCell className="text-right text-xs text-muted-foreground tabular-nums">{formatRelative(c.updated_at)}</TableCell>
