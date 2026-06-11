@@ -33,6 +33,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { NyweLogo } from '@/components/brand/nywe-logo';
 import { ImpersonationMenu } from '@/components/impersonation/impersonation-menu';
 import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
 
@@ -189,10 +190,7 @@ export function Sidebar({
       >
         <div className="mx-auto max-w-[220px] px-3 py-2">
           {wineSpectatorPortal ? (
-            <Link href={homeHref} className="block text-center">
-              <p className="font-display text-lg font-semibold tracking-tight text-foreground">Wine Spectator</p>
-              <p className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Events workspace</p>
-            </Link>
+            <NyweLogo href={homeHref} priority subtitle="Vendor licenses workspace" imageClassName="max-h-12" />
           ) : (
             <Link href={homeHref} className="relative mx-auto block h-12 w-full max-w-[200px]">
               <Image

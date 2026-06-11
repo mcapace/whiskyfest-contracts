@@ -14,11 +14,11 @@ type RosterListStyle = {
 const STYLES: Record<string, RosterListStyle> = {
   returning: {
     shortLabel: 'Returning',
-    badge: 'border-rose-300/80 bg-rose-100 text-rose-950 ring-rose-200/60',
-    buttonActive: 'border-rose-700 bg-rose-700 text-white hover:bg-rose-800',
-    buttonIdle: 'border-rose-300/80 bg-rose-50/80 text-rose-900 hover:bg-rose-100',
-    rowAccent: 'border-l-4 border-l-rose-500 bg-rose-50/35',
-    legendDot: 'bg-rose-600',
+    badge: 'border-[#d9a8b0]/80 bg-[#f8ecee] text-[#5c2430] ring-[#e8c4ca]/70',
+    buttonActive: 'border-[#7a2f3b] bg-[#7a2f3b] text-white hover:bg-[#652630]',
+    buttonIdle: 'border-[#d9a8b0]/80 bg-[#faf3f4] text-[#5c2430] hover:bg-[#f8ecee]',
+    rowAccent: 'border-l-4 border-l-[#7a2f3b] bg-[#faf3f4]/90',
+    legendDot: 'bg-[#7a2f3b]',
   },
   champagne: {
     shortLabel: 'Champagne',
@@ -30,11 +30,11 @@ const STYLES: Record<string, RosterListStyle> = {
   },
   new: {
     shortLabel: 'New',
-    badge: 'border-emerald-300/80 bg-emerald-100 text-emerald-950 ring-emerald-200/60',
-    buttonActive: 'border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800',
-    buttonIdle: 'border-emerald-300/80 bg-emerald-50/90 text-emerald-950 hover:bg-emerald-100',
-    rowAccent: 'border-l-4 border-l-emerald-500 bg-emerald-50/35',
-    legendDot: 'bg-emerald-600',
+    badge: 'border-[#b8c4a8]/90 bg-[#eef1e8] text-[#3d4a34] ring-[#d5ddc8]/80',
+    buttonActive: 'border-[#6d7d5c] bg-[#6d7d5c] text-white hover:bg-[#5a684d]',
+    buttonIdle: 'border-[#b8c4a8]/90 bg-[#f4f6f0] text-[#3d4a34] hover:bg-[#eef1e8]',
+    rowAccent: 'border-l-4 border-l-[#8a9a6d] bg-[#f4f6f0]/80',
+    legendDot: 'bg-[#8a9a6d]',
   },
 };
 

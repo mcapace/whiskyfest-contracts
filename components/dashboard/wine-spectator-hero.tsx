@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -38,9 +39,16 @@ export function WineSpectatorHero({
       <div className="relative overflow-hidden px-6 py-10 sm:px-10 sm:py-12 lg:px-12">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(251,191,36,0.12),transparent_55%)]" />
         <div className="relative">
-          <p className="mb-3 font-sans text-xs uppercase tracking-[0.24em] text-amber-400/90">
-            Wine Spectator
-          </p>
+          <div className="mb-6 inline-block max-w-sm rounded-lg bg-black px-4 py-3 shadow-lg sm:max-w-md">
+            <Image
+              src="/images/nywe-logo.png"
+              alt="Wine Spectator New York Wine Experience"
+              width={514}
+              height={174}
+              priority
+              className="h-auto w-full object-contain"
+            />
+          </div>
           {greetingHeadline && greetingSubtitle ? (
             <>
               <h1 className="font-display text-4xl font-medium tracking-tight text-parchment-50 sm:text-5xl lg:text-6xl">
