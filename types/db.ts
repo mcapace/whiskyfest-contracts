@@ -25,6 +25,10 @@ export interface Event {
   tagline: string | null;
   location: string | null;
   event_date: string; // ISO date
+  /** Last day when the event spans multiple dates (optional). */
+  event_end_date: string | null;
+  /** Display start time, e.g. 6:00 PM */
+  event_start_time: string | null;
   venue: string | null;
   year: number;
   booth_rate_cents: number;

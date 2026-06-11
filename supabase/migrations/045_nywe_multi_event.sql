@@ -53,7 +53,7 @@ select
   'New York Wine Experience',
   'New York, NY',
   '2026-10-22'::date,
-  'New York Marriott Marquis, 1535 Broadway, New York, NY 10036',
+  'Marriott Marquis, 1535 Broadway, New York, NY 10036',
   2026,
   1400000,
   'Susannah Nolan',

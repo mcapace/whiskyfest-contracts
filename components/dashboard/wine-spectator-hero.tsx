@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CountdownTimer } from '@/components/countdown-timer';
-import { cn, formatLongDate } from '@/lib/utils';
+import { eventCountdownTargetIso, formatEventScheduleLine } from '@/lib/event-schedule';
+import { cn } from '@/lib/utils';
 import type { Event } from '@/types/db';
 
 export function WineSpectatorHero({
@@ -24,9 +25,14 @@ export function WineSpectatorHero({
   className?: string;
 }) {
   const eventName = event?.name ?? 'New York Wine Experience';
-  const venue = event?.venue ?? 'New York Marriott Marquis';
-  const eventDate = event?.event_date ?? '2026-10-22';
-  const dateLabel = formatLongDate(eventDate);
+  const scheduleEvent = event ?? {
+    event_date: '2026-10-22',
+    event_end_date: '2026-10-24',
+    event_start_time: '6:00 PM',
+    venue: 'Marriott Marquis, 1535 Broadway, New York, NY 10036',
+  };
+  const scheduleLabel = formatEventScheduleLine(scheduleEvent);
+  const countdownIso = eventCountdownTargetIso(scheduleEvent);
 
   return (
     <section
@@ -64,9 +70,13 @@ export function WineSpectatorHero({
             </h1>
           )}
           <p className="mt-3 max-w-2xl font-display text-lg text-parchment-200/95 sm:text-xl">
-            {dateLabel} · {venue}
+            {scheduleLabel}
           </p>
-          <CountdownTimer targetDate={eventDate} className="mt-6" />
+          <CountdownTimer
+            targetDate={scheduleEvent.event_date}
+            targetDateTimeIso={countdownIso}
+            className="mt-6"
+          />
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 import { DOCUSIGN_ANCHORS } from '@/lib/merge-map';
 import { formatCurrency } from '@/lib/utils';
-import { formatEventDateForMerge, getAgreementDatePartsInDisplayZone } from '@/lib/datetime';
+import { getAgreementDatePartsInDisplayZone } from '@/lib/datetime';
+import { formatEventDateForDisplayOrMerge } from '@/lib/event-schedule';
 import type { ContractWithTotals, Event } from '@/types/db';
 import type { MergePlaceholderMode } from '@/lib/merge-map';
 
@@ -37,7 +38,7 @@ export function buildNyweVendorMergeMap(
 
   return {
     '{{event_year}}': String(event.year),
-    '{{event_date}}': formatEventDateForMerge(event.event_date),
+    '{{event_date}}': formatEventDateForDisplayOrMerge(event),
     '{{event_venue}}': event.venue ?? '',
     '{{agreement_day}}': agreement.day,
     '{{agreement_month}}': agreement.monthName,
