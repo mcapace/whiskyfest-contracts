@@ -11,6 +11,12 @@ alter table public.contracts
   drop constraint if exists contracts_booth_count_check;
 
 alter table public.contracts
+  drop constraint if exists contracts_order_type_check;
+
+alter table public.contracts
+  drop constraint if exists contracts_booth_order_check;
+
+alter table public.contracts
   add constraint contracts_order_type_check
   check (order_type in ('booth', 'sponsorship_only'));
 
