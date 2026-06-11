@@ -6,6 +6,8 @@ import { renderContractPdfFromTemplate, uploadPdfBufferToFolder } from '@/lib/go
 import { contractDraftPdfPath, uploadContractPdfToStorage } from '@/lib/contract-pdf-storage';
 import { fetchContractBoothBrandsOrdered } from '@/lib/contract-booth-brands';
 import { fetchContractLineItemsOrdered } from '@/lib/contract-line-items';
+import { resolveContractTemplateDocId } from '@/lib/contract-template';
+import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import { notifyEventsTeamOfPendingReview } from '@/lib/notifications';
 import { requiresDiscountApproval } from '@/lib/contracts';
@@ -46,12 +48,14 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const boothBrands = await fetchContractBoothBrandsOrdered(supabase, contract.id);
   const mergeMap = buildContractMergeMap(contract, event, 'draft', boothBrands);
 
-  const templateDocId = process.env.GOOGLE_TEMPLATE_DOC_ID!;
+  const templateDocId = resolveContractTemplateDocId(contract);
   const draftsFolderId = process.env.GOOGLE_DRAFTS_FOLDER_ID!;
   const fileName = `${contract.exhibitor_company_name.replace(/[^\w\s-]/g, '')} — WhiskyFest ${event.year} Contract`;
 
   try {
-    const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileName, lineItems);
+    const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileName, lineItems, {
+      includeBoothRow: !isSponsorshipOnlyOrder(contract),
+    });
     const { fileId, webViewLink } = await uploadPdfBufferToFolder(pdfBytes, fileName, draftsFolderId);
 
     const draftStoragePath = contractDraftPdfPath(contract.id);

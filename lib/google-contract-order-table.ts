@@ -201,18 +201,20 @@ export async function insertContractLineItemsIntoOrderTable(
  * styles, so we also set `namedStyleType: NORMAL_TEXT` on these paragraphs only.
  *
  * @param lineItemCount — number of custom line item rows inserted above GRAND TOTAL (0 if none).
+ * @param includeBoothRow — false for sponsorship-only templates (no booth pricing row).
  */
 export async function applyContractOrderTableDataRowFormatting(
   docs: DocsClient,
   documentId: string,
   lineItemCount: number,
+  includeBoothRow = true,
 ): Promise<void> {
   const { data: doc } = await docs.documents.get({ documentId });
   const loc = locateContractOrderTable(doc);
   if (!loc) return;
 
   const { tableStartIndex, grandTotalRowIndex: gtRow } = loc;
-  const boothRowIndex = gtRow - lineItemCount - 1;
+  const boothRowIndex = includeBoothRow ? gtRow - lineItemCount - 1 : gtRow - lineItemCount;
   if (boothRowIndex < 0 || boothRowIndex >= gtRow) return;
 
   const table = tableAtStartIndex(doc, tableStartIndex);

@@ -13,7 +13,8 @@
 
 - **Why**: business-maintained contract template with merge tokens.
 - **Flow**: copy template -> replace placeholders -> export as PDF.
-- **Config**: `GOOGLE_TEMPLATE_DOC_ID` + service account credentials.
+- **Config**: `GOOGLE_TEMPLATE_DOC_ID` (booth deals), optional `GOOGLE_SPONSORSHIP_TEMPLATE_DOC_ID` (sponsorship-only — no booth row), plus service account credentials.
+- **Sponsorship-only**: contracts with `order_type = sponsorship_only` use the sponsorship template when the env var is set. Line items are still inserted above a **GRAND TOTAL** row; DocuSign uses the same PDF anchor strings as the booth template.
 
 ## Google Drive
 

@@ -7,6 +7,8 @@ import { persistContractDraftPdf } from '@/lib/contract-pdf-storage';
 import { sendEnvelope } from '@/lib/docusign';
 import { fetchContractBoothBrandsOrdered } from '@/lib/contract-booth-brands';
 import { fetchContractLineItemsOrdered } from '@/lib/contract-line-items';
+import { resolveContractTemplateDocId } from '@/lib/contract-template';
+import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { insertContractAudit } from '@/lib/audit-log';
@@ -84,7 +86,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   const signerEmail = contract.signer_1_email.trim();
   const signerName = contract.signer_1_name.trim();
   const safeCompany = contract.exhibitor_company_name.replace(/[^\w\s-]/g, '');
-  const templateDocId = process.env.GOOGLE_TEMPLATE_DOC_ID!;
+  const templateDocId = resolveContractTemplateDocId(contract);
 
   try {
     const lineItems = await fetchContractLineItemsOrdered(supabase, contract.id);
@@ -92,7 +94,9 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     const mergeMap = buildContractMergeMap(contract, event, 'docusign', boothBrands);
     const fileName = `${contract.exhibitor_company_name.replace(/[^\w\s-]/g, '')} — WhiskyFest ${event.year} Contract (DocuSign)`;
 
-    const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileName, lineItems);
+    const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileName, lineItems, {
+      includeBoothRow: !isSponsorshipOnlyOrder(contract),
+    });
     const { draftStoragePath, drafted_at } = await persistContractDraftPdf(contract.id, pdfBytes);
 
     const pdfBase64 = pdfBytes.toString('base64');

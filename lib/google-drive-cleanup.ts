@@ -1,3 +1,4 @@
+import { configuredContractTemplateDocIds } from '@/lib/contract-template';
 import { getGoogleDrive } from '@/lib/google';
 
 const GOOGLE_DOC_MIME = 'application/vnd.google-apps.document';
@@ -60,7 +61,7 @@ export async function cleanupOrphanTempGoogleDocs(opts: {
 }): Promise<DriveTempCleanupResult> {
   const drive = getGoogleDrive();
   const rootFolderId = await resolveContractsRootFolderId(drive);
-  const templateId = process.env['GOOGLE_TEMPLATE_DOC_ID']?.trim() ?? '';
+  const protectedTemplateIds = new Set(configuredContractTemplateDocIds());
 
   /** Scope list/delete to the correct corpus (Shared Drive vs My Drive). */
   let sharedDriveId: string | undefined;
@@ -124,7 +125,7 @@ export async function cleanupOrphanTempGoogleDocs(opts: {
     if (mime !== GOOGLE_DOC_MIME) {
       continue;
     }
-    if (id === templateId) {
+    if (protectedTemplateIds.has(id)) {
       continue;
     }
     if (tooRecent(f.createdTime) || tooRecent(f.modifiedTime)) {

@@ -48,12 +48,19 @@ export function getGoogleDrive() {
  * Merge template tokens and return PDF bytes (no Drive upload).
  * Used for DocuSign: same merge as draft, but merge map uses anchor strings instead of blank lines.
  */
+export type RenderContractPdfOptions = {
+  /** Sponsorship-only Google Doc has no booth row in CONTRACT ORDER table. */
+  includeBoothRow?: boolean;
+};
+
 export async function renderContractPdfFromTemplate(
   templateDocId: string,
   mergeMap: Record<string, string>,
   tempDocLabel: string,
   lineItems?: ContractLineItem[],
+  options?: RenderContractPdfOptions,
 ): Promise<Buffer> {
+  const includeBoothRow = options?.includeBoothRow !== false;
   const auth = getAuth();
   const drive = google.drive({ version: 'v3', auth });
   const docs = google.docs({ version: 'v1', auth });
@@ -101,7 +108,12 @@ export async function renderContractPdfFromTemplate(
       await insertContractLineItemsIntoOrderTable(docs, tempDocId, lineItems);
     }
 
-    await applyContractOrderTableDataRowFormatting(docs, tempDocId, lineItems?.length ?? 0);
+    await applyContractOrderTableDataRowFormatting(
+      docs,
+      tempDocId,
+      lineItems?.length ?? 0,
+      includeBoothRow,
+    );
 
     // supportsAllDrives is required for Shared Drive files (REST); googleapis Params type omits it.
     const pdfResp = await drive.files.export(
@@ -153,7 +165,14 @@ export async function mergeAndExportPdf(
   outputFileName: string,
   destinationFolderId: string,
   lineItems?: ContractLineItem[],
+  options?: RenderContractPdfOptions,
 ): Promise<{ fileId: string; webViewLink: string }> {
-  const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, outputFileName, lineItems);
+  const pdfBytes = await renderContractPdfFromTemplate(
+    templateDocId,
+    mergeMap,
+    outputFileName,
+    lineItems,
+    options,
+  );
   return uploadPdfBufferToFolder(pdfBytes, outputFileName, destinationFolderId);
 }

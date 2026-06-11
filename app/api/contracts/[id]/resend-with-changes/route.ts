@@ -6,6 +6,8 @@ import { renderContractPdfFromTemplate } from '@/lib/google';
 import { persistContractDraftPdf } from '@/lib/contract-pdf-storage';
 import { fetchContractBoothBrandsOrdered } from '@/lib/contract-booth-brands';
 import { fetchContractLineItemsOrdered } from '@/lib/contract-line-items';
+import { resolveContractTemplateDocId } from '@/lib/contract-template';
+import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { sendEnvelope, voidEnvelope } from '@/lib/docusign';
@@ -101,7 +103,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   };
 
   const safeCompany = contract.exhibitor_company_name.replace(/[^\w\s-]/g, '');
-  const templateDocId = process.env.GOOGLE_TEMPLATE_DOC_ID!;
+  const templateDocId = resolveContractTemplateDocId(mergedContract);
   const mergeMap = buildContractMergeMap(mergedContract, event, 'docusign', boothBrands);
   const fileName = `${safeCompany} — WhiskyFest ${event.year} Contract (DocuSign)`;
 
@@ -113,7 +115,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ error: 'Event countersigner name and email are required.' }, { status: 500 });
     }
 
-    const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileName, lineItems);
+    const pdfBytes = await renderContractPdfFromTemplate(templateDocId, mergeMap, fileName, lineItems, {
+      includeBoothRow: !isSponsorshipOnlyOrder(mergedContract),
+    });
     const { draftStoragePath, drafted_at } = await persistContractDraftPdf(contract.id, pdfBytes);
 
     const sent = await sendEnvelope({
