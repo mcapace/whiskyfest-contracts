@@ -37,6 +37,11 @@ export default async function WineSpectatorRosterPage() {
         initial={{
           syncedAt: roster.syncedAt,
           event: { id: event.id, name: event.name, client_send_enabled: event.client_send_enabled !== false },
+          sheets: roster.sheets.map((sheet) => ({
+            key: sheet.key,
+            label: sheet.label,
+            count: roster.rows.filter((row) => row.listKey === sheet.key).length,
+          })),
           rows: roster.rows,
         }}
       />

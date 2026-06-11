@@ -17,7 +17,16 @@ export async function GET() {
 
   try {
     const roster = await fetchExhibitorRoster(event);
-    return NextResponse.json({ event: { id: event.id, name: event.name, client_send_enabled: event.client_send_enabled }, ...roster });
+    return NextResponse.json({
+      event: { id: event.id, name: event.name, client_send_enabled: event.client_send_enabled },
+      syncedAt: roster.syncedAt,
+      sheets: roster.sheets.map((sheet) => ({
+        key: sheet.key,
+        label: sheet.label,
+        count: roster.rows.filter((row) => row.listKey === sheet.key).length,
+      })),
+      rows: roster.rows,
+    });
   } catch (err) {
     console.error('[wine-spectator/roster] fetch failed', err);
     return NextResponse.json(

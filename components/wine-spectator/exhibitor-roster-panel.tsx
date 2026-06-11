@@ -26,9 +26,16 @@ type RosterRow = {
   sheetLastUpdated: string | null;
 };
 
+type RosterSheet = {
+  key: string;
+  label: string;
+  count: number;
+};
+
 type RosterPayload = {
   syncedAt: string;
   event: { id: string; name: string; client_send_enabled: boolean };
+  sheets: RosterSheet[];
   rows: RosterRow[];
 };
 
@@ -62,15 +69,36 @@ function matchesFilter(row: RosterRow, filter: string): boolean {
 export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
   const router = useRouter();
   const [data, setData] = useState(initial);
+  const [listFilter, setListFilter] = useState<string>('all');
   const [filter, setFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const sheetTabs = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const row of data.rows) {
+      counts.set(row.listKey, (counts.get(row.listKey) ?? 0) + 1);
+    }
+    const fromApi = data.sheets ?? [];
+    const tabs: RosterSheet[] = fromApi.map((sheet) => ({
+      ...sheet,
+      count: counts.get(sheet.key) ?? sheet.count ?? 0,
+    }));
+    if (tabs.length === 0) {
+      for (const [key, count] of counts) {
+        const label = data.rows.find((r) => r.listKey === key)?.listLabel ?? key;
+        tabs.push({ key, label, count });
+      }
+    }
+    return tabs;
+  }, [data.rows, data.sheets]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return data.rows.filter((row) => {
+      if (listFilter !== 'all' && row.listKey !== listFilter) return false;
       if (!matchesFilter(row, filter)) return false;
       if (!q) return true;
       return (
@@ -79,7 +107,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
         row.signerEmail.toLowerCase().includes(q)
       );
     });
-  }, [data.rows, filter, search]);
+  }, [data.rows, filter, listFilter, search]);
 
   const refresh = useCallback(() => {
     startTransition(async () => {
@@ -193,11 +221,37 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
           Send selected ({selectedSendable})
         </Button>
         <span className="text-xs text-muted-foreground">
-          Synced {formatRelative(data.syncedAt)} · {data.rows.length} confirmed exhibitors
+          Synced {formatRelative(data.syncedAt)} · {filtered.length} shown
+          {listFilter === 'all' ? ` · ${data.rows.length} total` : ''}
         </span>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Exhibitor list</p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant={listFilter === 'all' ? 'default' : 'outline'}
+            onClick={() => setListFilter('all')}
+          >
+            All lists ({data.rows.length})
+          </Button>
+          {sheetTabs.map((sheet) => (
+            <Button
+              key={sheet.key}
+              size="sm"
+              variant={listFilter === sheet.key ? 'default' : 'outline'}
+              onClick={() => setListFilter(sheet.key)}
+            >
+              {sheet.label} ({sheet.count})
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">License status</p>
+        <div className="flex flex-wrap items-center gap-2">
         {FILTERS.map((f) => (
           <Button
             key={f.key}
@@ -214,6 +268,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
           placeholder="Search winery, signer, email…"
           className="max-w-xs"
         />
+        </div>
       </div>
 
       {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
@@ -239,6 +294,13 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
             </TableRow>
           </TableHeader>
           <TableBody>
+            {filtered.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                  No exhibitors match this list and filter.
+                </TableCell>
+              </TableRow>
+            ) : null}
             {filtered.map((row) => (
               <TableRow key={row.rowKey}>
                 <TableCell>
