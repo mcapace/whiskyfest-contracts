@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/contracts/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { formatRelative } from '@/lib/utils';
+import { cn, formatRelative } from '@/lib/utils';
+import { rosterListBadgeClass, rosterListRowClass, rosterListStyle } from '@/lib/exhibitor-roster-list-style';
 import type { ContractStatus } from '@/types/db';
 
 type RosterRow = {
@@ -236,17 +237,33 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
           >
             All lists ({data.rows.length})
           </Button>
-          {sheetTabs.map((sheet) => (
-            <Button
-              key={sheet.key}
-              size="sm"
-              variant={listFilter === sheet.key ? 'default' : 'outline'}
-              onClick={() => setListFilter(sheet.key)}
-            >
-              {sheet.label} ({sheet.count})
-            </Button>
-          ))}
+          {sheetTabs.map((sheet) => {
+            const accent = rosterListStyle(sheet.key);
+            const active = listFilter === sheet.key;
+            return (
+              <Button
+                key={sheet.key}
+                size="sm"
+                variant="outline"
+                className={cn(active ? accent.buttonActive : accent.buttonIdle)}
+                onClick={() => setListFilter(sheet.key)}
+              >
+                <span className={cn('mr-2 inline-block h-2 w-2 rounded-full', accent.legendDot)} aria-hidden />
+                {sheet.label} ({sheet.count})
+              </Button>
+            );
+          })}
         </div>
+        {listFilter === 'all' ? (
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            {sheetTabs.map((sheet) => (
+              <span key={sheet.key} className="inline-flex items-center gap-1.5">
+                <span className={cn('inline-block h-2 w-2 rounded-full', rosterListStyle(sheet.key).legendDot)} aria-hidden />
+                {sheet.label}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <div className="space-y-2">
@@ -302,7 +319,10 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
               </TableRow>
             ) : null}
             {filtered.map((row) => (
-              <TableRow key={row.rowKey}>
+              <TableRow
+                key={row.rowKey}
+                className={rosterListRowClass(row.listKey, listFilter === 'all')}
+              >
                 <TableCell>
                   <input
                     type="checkbox"
@@ -319,7 +339,9 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
                     </div>
                   )}
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground">{row.listLabel}</TableCell>
+                <TableCell>
+                  <span className={rosterListBadgeClass(row.listKey)}>{row.listLabel}</span>
+                </TableCell>
                 <TableCell>
                   <div className="text-sm">{row.signerName || '—'}</div>
                   <div className="text-xs text-muted-foreground">{row.signerEmail || '—'}</div>
