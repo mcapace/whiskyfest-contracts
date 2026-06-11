@@ -120,9 +120,9 @@ function renderUiCell(row: RosterRow, columnId: string) {
     case 'list': {
       const ListIcon = rosterListIcon(row.listKey);
       return (
-        <span className={rosterListBadgeClass(row.listKey)}>
-          <ListIcon className="h-3 w-3 shrink-0" aria-hidden />
-          {row.listLabel}
+        <span className={rosterListBadgeClass(row.listKey)} title={row.listLabel}>
+          <ListIcon className="h-2.5 w-2.5 shrink-0 opacity-80" aria-hidden />
+          {rosterListShortLabel(row.listKey, row.listLabel)}
         </span>
       );
     }

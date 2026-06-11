@@ -18,7 +18,7 @@ const STYLES: Record<string, RosterListStyle> = {
   returning: {
     shortLabel: 'Returning',
     icon: Users,
-    badge: 'border-slate-300 bg-slate-50 text-slate-800',
+    badge: 'border-slate-500 bg-slate-100 text-slate-900',
     buttonActive: 'border-slate-700 bg-slate-700 text-white shadow-sm hover:bg-slate-800',
     buttonIdle: 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50',
     rowAccent: 'border-l-4 border-l-slate-500 bg-slate-50/70',
@@ -27,7 +27,7 @@ const STYLES: Record<string, RosterListStyle> = {
   champagne: {
     shortLabel: 'Champagne',
     icon: Sparkles,
-    badge: 'border-amber-300 bg-amber-50 text-amber-950',
+    badge: 'border-amber-600 bg-amber-100 text-amber-950',
     buttonActive: 'border-amber-700 bg-amber-700 text-white shadow-sm hover:bg-amber-800',
     buttonIdle: 'border-amber-300 bg-white text-amber-950 hover:bg-amber-50',
     rowAccent: 'border-l-4 border-l-amber-600 bg-amber-50/50',
@@ -36,7 +36,7 @@ const STYLES: Record<string, RosterListStyle> = {
   new: {
     shortLabel: 'New',
     icon: UserPlus,
-    badge: 'border-rose-300 bg-rose-50 text-rose-950',
+    badge: 'border-rose-600 bg-rose-100 text-rose-950',
     buttonActive: 'border-rose-800 bg-rose-800 text-white shadow-sm hover:bg-rose-900',
     buttonIdle: 'border-rose-300 bg-white text-rose-950 hover:bg-rose-50',
     rowAccent: 'border-l-4 border-l-rose-700 bg-rose-50/50',
@@ -66,7 +66,7 @@ export function rosterListShortLabel(listKey: RosterListKey, fullLabel?: string)
 
 export function rosterListBadgeClass(listKey: RosterListKey): string {
   return cn(
-    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium',
+    'inline-flex h-5 shrink-0 items-center gap-0.5 rounded-full border px-1.5 text-[10px] font-semibold leading-none whitespace-nowrap',
     rosterListStyle(listKey).badge,
   );
 }
