@@ -13,6 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SalesRepSelect } from '@/components/contracts/sales-rep-select';
 import { suggestBrandCategory, type BrandCategory } from '@/lib/brand-category';
 import { BoothBrandInput, type BoothBrandValue } from '@/components/contracts/booth-brand-input';
+import {
+  INTERNAL_CONTRACT_NOTES_HINT,
+  INTERNAL_CONTRACT_NOTES_LABEL,
+  INTERNAL_CONTRACT_NOTES_PLACEHOLDER,
+  SPONSOR_CONTRACT_NOTES_HINT,
+  SPONSOR_CONTRACT_NOTES_LABEL,
+  SPONSOR_CONTRACT_NOTES_PLACEHOLDER,
+} from '@/lib/contract-notes-copy';
 import { dealKindMeta, type ContractDealKind } from '@/lib/contract-deal-kind';
 import { formatLongDate } from '@/lib/utils';
 import type { Event } from '@/types/db';
@@ -75,6 +83,7 @@ export function ImportContractForm({
   const [boothCountInput, setBoothCountInput] = useState('1');
   const [boothRateInput, setBoothRateInput] = useState('');
   const [grandTotalInput, setGrandTotalInput] = useState('');
+  const [exhibitorNotes, setExhibitorNotes] = useState('');
   const [notes, setNotes] = useState('');
   const [billingName, setBillingName] = useState('');
   const [billingEmail, setBillingEmail] = useState('');
@@ -245,6 +254,7 @@ export function ImportContractForm({
         fd.set('line_items_json', JSON.stringify(sponsorshipLinePayload));
       }
       fd.set('originally_signed_at', signedAt);
+      fd.set('exhibitor_notes', exhibitorNotes.trim());
       fd.set('notes', notes.trim());
       fd.set('billing_contact_name', billingName.trim());
       fd.set('billing_contact_email', billingEmail.trim());
@@ -538,8 +548,38 @@ export function ImportContractForm({
                 </div>
               </>
             )}
-            <Field label="Notes (optional)" htmlFor="inotes">
-              <Textarea id="inotes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} />
+          </CardContent>
+        </Card>
+
+        <Card className="border-whisky-200/60">
+          <CardHeader>
+            <CardTitle>Contract notes</CardTitle>
+            <CardDescription>
+              The signed PDF you upload is the legal document. Optionally record program terms here so the team
+              can see them in the app (same field used on new contracts).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-md border border-whisky-300/50 bg-whisky-50/40 p-4">
+              <Field label={SPONSOR_CONTRACT_NOTES_LABEL} hint={SPONSOR_CONTRACT_NOTES_HINT} htmlFor="iexhibitor-notes">
+                <Textarea
+                  id="iexhibitor-notes"
+                  value={exhibitorNotes}
+                  onChange={(e) => setExhibitorNotes(e.target.value)}
+                  placeholder={SPONSOR_CONTRACT_NOTES_PLACEHOLDER}
+                  rows={4}
+                  className="bg-background"
+                />
+              </Field>
+            </div>
+            <Field label={INTERNAL_CONTRACT_NOTES_LABEL} hint={INTERNAL_CONTRACT_NOTES_HINT} htmlFor="inotes">
+              <Textarea
+                id="inotes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder={INTERNAL_CONTRACT_NOTES_PLACEHOLDER}
+                rows={3}
+              />
             </Field>
           </CardContent>
         </Card>

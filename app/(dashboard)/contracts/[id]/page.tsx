@@ -6,6 +6,10 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { getContractWithTotalsForViewer } from '@/lib/auth-contract';
 import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { requiresDiscountApproval, STANDARD_BOOTH_RATE_CENTS } from '@/lib/contracts';
+import {
+  INTERNAL_CONTRACT_NOTES_LABEL,
+  SPONSOR_CONTRACT_NOTES_LABEL,
+} from '@/lib/contract-notes-copy';
 import { dealKindFromContract, dealKindLabel } from '@/lib/contract-deal-kind';
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import { formatStatus } from '@/lib/status-display';
@@ -112,6 +116,18 @@ export default async function ContractDetailPage({ params }: { params: { id: str
   const releaseAudit = audit.find((entry) => entry.action === 'released_to_accounting' || entry.action === 'executed');
   const discountPending = requiresDiscountApproval(contract);
   const dealKind = dealKindFromContract(contract);
+  const canEditContractNotes =
+    contract.status === 'draft' ||
+    ((contract.status === 'imported' || contract.status === 'voided') && (isAdmin || isEventsTeam));
+  const hasInternalNotesOnly =
+    !contract.exhibitor_notes?.trim() &&
+    Boolean(contract.notes?.trim()) &&
+    contract.status !== 'error';
+  const showNotesSection =
+    Boolean(contract.exhibitor_notes?.trim()) ||
+    Boolean(contract.notes?.trim() && contract.status !== 'error') ||
+    canEditContractNotes ||
+    contract.status === 'imported';
 
   const legacyPdfUrl = contract.signed_pdf_url ?? contract.draft_pdf_url;
   const draftPdfHref =
@@ -514,29 +530,62 @@ export default async function ContractDetailPage({ params }: { params: { id: str
       </div>
 
       {/* Notes */}
-      {(contract.exhibitor_notes || (contract.notes && contract.status !== 'error')) && (
+      {showNotesSection ? (
         <Card>
           <div className="border-b border-border/50 px-6 py-4">
-            <h2 className="font-serif text-lg font-semibold">Notes</h2>
+            <h2 className="font-serif text-lg font-semibold">Contract notes</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Program terms print on the PDF under <span className="font-medium">Program terms &amp; benefits</span>.
+              Internal notes never go to the sponsor.
+            </p>
           </div>
           <CardContent className="space-y-4 p-6 text-sm">
-            {contract.exhibitor_notes ? (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  On contract (sponsor-visible)
+            {hasInternalNotesOnly ? (
+              <div className="rounded-md border border-amber-300/60 bg-amber-50 px-4 py-3 text-amber-950">
+                <p className="font-medium">Sponsor-visible terms are empty</p>
+                <p className="mt-1 text-sm">
+                  This contract has internal notes only. Move deal details the client should see into{' '}
+                  <span className="font-medium">{SPONSOR_CONTRACT_NOTES_LABEL}</span>, then regenerate the PDF.
                 </p>
-                <p className="mt-2 whitespace-pre-wrap">{contract.exhibitor_notes}</p>
+                {canEditContractNotes ? (
+                  <Link
+                    href={`/contracts/${contract.id}/edit`}
+                    className="mt-2 inline-block text-sm font-medium text-amber-900 underline underline-offset-2"
+                  >
+                    Edit contract notes
+                  </Link>
+                ) : null}
+              </div>
+            ) : null}
+            {contract.exhibitor_notes?.trim() ? (
+              <div className="rounded-md border border-whisky-200/60 bg-whisky-50/30 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {SPONSOR_CONTRACT_NOTES_LABEL}
+                </p>
+                <p className="mt-2 whitespace-pre-wrap text-foreground">{contract.exhibitor_notes}</p>
+              </div>
+            ) : canEditContractNotes && contract.status !== 'imported' ? (
+              <div className="rounded-md border border-dashed border-border px-4 py-3 text-muted-foreground">
+                <p>No program terms added yet.</p>
+                <Link
+                  href={`/contracts/${contract.id}/edit`}
+                  className="mt-1 inline-block text-sm font-medium text-foreground underline underline-offset-2"
+                >
+                  Add program terms &amp; benefits
+                </Link>
               </div>
             ) : null}
             {contract.notes && contract.status !== 'error' ? (
-              <div className={contract.exhibitor_notes ? 'border-t border-border/50 pt-4' : undefined}>
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Internal only</p>
+              <div className={contract.exhibitor_notes?.trim() ? 'border-t border-border/50 pt-4' : undefined}>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {INTERNAL_CONTRACT_NOTES_LABEL}
+                </p>
                 <p className="mt-2 whitespace-pre-wrap">{contract.notes}</p>
               </div>
             ) : null}
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
       <hr className="my-2 border-parchment-300" />
 

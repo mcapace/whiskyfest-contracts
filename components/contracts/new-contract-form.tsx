@@ -27,6 +27,14 @@ import { SalesRepSelect } from '@/components/contracts/sales-rep-select';
 import { BoothBrandInput, type BoothBrandValue } from '@/components/contracts/booth-brand-input';
 import type { ContractWithTotals, Event } from '@/types/db';
 import { BRAND_CATEGORIES, suggestBrandCategory, type BrandCategory } from '@/lib/brand-category';
+import {
+  INTERNAL_CONTRACT_NOTES_HINT,
+  INTERNAL_CONTRACT_NOTES_LABEL,
+  INTERNAL_CONTRACT_NOTES_PLACEHOLDER,
+  SPONSOR_CONTRACT_NOTES_HINT,
+  SPONSOR_CONTRACT_NOTES_LABEL,
+  SPONSOR_CONTRACT_NOTES_PLACEHOLDER,
+} from '@/lib/contract-notes-copy';
 import { findReturningSponsor, medianBoothCountForCompany } from '@/lib/new-contract-hints';
 
 type BoothBrandDraft = BoothBrandValue;
@@ -908,30 +916,31 @@ export function NewContractForm({
         </Card>
 
         {/* Notes */}
-        <Card>
+        <Card className="border-whisky-200/60">
           <CardHeader>
-            <CardTitle>Contract Notes</CardTitle>
+            <CardTitle>What the sponsor sees on the contract</CardTitle>
             <CardDescription>
-              Notes for the sponsor appear on the generated contract PDF. Internal notes stay in the app only.
+              Put deal details the client must read in the first field below. Pricing belongs in line items /
+              booth fields — not internal notes.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Field
-              label="Notes on contract (visible to sponsor)"
-              hint="Merged into the contract as {{exhibitor_notes}} when you generate the PDF."
-            >
-              <Textarea
-                value={form.exhibitor_notes}
-                onChange={(e) => set('exhibitor_notes', e.target.value)}
-                placeholder="Program benefits, deliverables, scheduling details, etc."
-                rows={4}
-              />
-            </Field>
-            <Field label="Internal notes (team only)">
+            <div className="rounded-md border border-whisky-300/50 bg-whisky-50/40 p-4">
+              <Field label={SPONSOR_CONTRACT_NOTES_LABEL} hint={SPONSOR_CONTRACT_NOTES_HINT}>
+                <Textarea
+                  value={form.exhibitor_notes}
+                  onChange={(e) => set('exhibitor_notes', e.target.value)}
+                  placeholder={SPONSOR_CONTRACT_NOTES_PLACEHOLDER}
+                  rows={5}
+                  className="bg-background"
+                />
+              </Field>
+            </div>
+            <Field label={INTERNAL_CONTRACT_NOTES_LABEL} hint={INTERNAL_CONTRACT_NOTES_HINT}>
               <Textarea
                 value={form.notes}
                 onChange={(e) => set('notes', e.target.value)}
-                placeholder="Context for sales, events, or admin — not printed on the contract."
+                placeholder={INTERNAL_CONTRACT_NOTES_PLACEHOLDER}
                 rows={3}
                 maxLength={20000}
               />
