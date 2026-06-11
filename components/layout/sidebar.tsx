@@ -91,13 +91,16 @@ function AccountPermissionSummary({
   );
 }
 
-const whiskyfestNav: {
+type SidebarNavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
   adminOnly?: boolean;
+  wineSpectatorAdminOk?: boolean;
   legacyImport?: boolean;
-}[] = [
+};
+
+const whiskyfestNav: SidebarNavItem[] = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/#start-deal', label: 'Start a deal', icon: Plus },
   { href: '/contracts', label: 'All Contracts', icon: FileText },
@@ -109,13 +112,7 @@ const whiskyfestNav: {
   { href: '/users', label: 'Users', icon: Users, adminOnly: true },
 ];
 
-const wineSpectatorNav: {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-  adminOnly?: boolean;
-  wineSpectatorAdminOk?: boolean;
-}[] = [
+const wineSpectatorNav: SidebarNavItem[] = [
   { href: '/wine-spectator', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/wine-spectator/roster', label: 'Exhibitor roster', icon: Users },
   { href: '/wine-spectator/contracts/new', label: 'New vendor license', icon: Plus },
@@ -125,11 +122,7 @@ const wineSpectatorNav: {
   { href: '/users', label: 'Users', icon: Users, adminOnly: true },
 ];
 
-const accountingNav: {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-}[] = [
+const accountingNav: SidebarNavItem[] = [
   { href: '/accounting', label: 'AR Dashboard', icon: Landmark },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
