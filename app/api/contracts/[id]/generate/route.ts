@@ -8,6 +8,7 @@ import { fetchContractBoothBrandsOrdered } from '@/lib/contract-booth-brands';
 import { fetchContractLineItemsOrdered } from '@/lib/contract-line-items';
 import { resolveContractTemplateDocId } from '@/lib/contract-template';
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
+import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import { notifyEventsTeamOfPendingReview } from '@/lib/notifications';
 import { requiresDiscountApproval } from '@/lib/contracts';
@@ -25,11 +26,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const supabase = getSupabaseAdmin();
 
-  const { data: contract } = await supabase
-    .from('contracts_with_totals')
-    .select('*')
-    .eq('id', params.id)
-    .single<ContractWithTotals>();
+  const contract = await fetchContractWithTotalsById(supabase, params.id);
 
   if (!contract) return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
 

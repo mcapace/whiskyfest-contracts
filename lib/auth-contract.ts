@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import type { Session } from 'next-auth';
 import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
 import { getAccessibleSalesRepIds } from '@/lib/rep-access';
 import { getEffectiveUserEmail } from '@/lib/effective-user';
 import type { Contract, ContractStatus, ContractWithTotals } from '@/types/db';
@@ -263,15 +264,8 @@ export async function getContractWithTotalsForViewer(
   const actor = await requireContractActorForPage();
   const supabase = getSupabaseAdmin();
 
-  const { data: contract, error } = await supabase
-    .from('contracts_with_totals')
-    .select('*')
-    .eq('id', contractId)
-    .single();
-
-  if (error || !contract) return null;
-
-  const row = contract as ContractWithTotals;
+  const row = await fetchContractWithTotalsById(supabase, contractId);
+  if (!row) return null;
   const sid = row.sales_rep_id;
   const canViewAll = actor.canViewAllSales;
   if (!canViewAll && (!sid || !actor.accessibleSalesRepIds.includes(sid))) return null;
