@@ -50,9 +50,8 @@ export default async function WineSpectatorDashboardPage() {
       <WineSpectatorHero
         event={primaryEvent}
         contractsCount={contractsCount}
-        completionLabel={`${formatCurrency(totalValueCents)} total license value · internal workspace`}
+        completionLabel={`${formatCurrency(totalValueCents)} total license value`}
         greetingHeadline={`${word}, ${first}`}
-        greetingSubtitle="New York Wine Experience vendor licenses"
       />
 
       {sendBlocked ? (

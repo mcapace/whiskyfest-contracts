@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 import { auth } from '@/lib/auth';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
@@ -39,6 +40,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
     pendingAccessRequests = error ? 0 : count ?? 0;
   }
 
+  const pathname = headers().get('x-pathname') ?? '';
+  const showDailyBubble =
+    pathname !== '/wine-spectator' && !pathname.startsWith('/wine-spectator/');
+
   return (
     <AuthSessionProvider>
       <DashboardKeyboardShortcuts>
@@ -55,6 +60,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               isAccounting: Boolean(session.user.is_accounting),
               isEventsTeam: Boolean(session.user.is_events_team),
               wineSpectatorAccess,
+              wineSpectatorAdmin: Boolean(session.user.is_wine_spectator_admin),
             }}
             canImpersonate={Boolean(session.user.can_impersonate)}
             readOnlyImpersonation={readOnly}
@@ -62,7 +68,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           />
           <div className={`flex min-h-screen flex-col lg:pl-64 ${mainPad}`}>
             <Topbar endSlot={<DashboardTopBarActions />} />
-            <DailyBubbleSlot />
+            {showDailyBubble ? <DailyBubbleSlot /> : null}
             <main className="flex-1">
               <div className="mx-auto max-w-6xl animate-fade-in px-6 py-6 pb-24 lg:px-10 lg:py-8 lg:pb-10">
                 {children}

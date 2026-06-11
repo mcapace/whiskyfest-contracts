@@ -1,6 +1,8 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
+import { portalTopbarLabel } from '@/lib/product-portal';
 import { cn } from '@/lib/utils';
 
 /**
@@ -15,6 +17,9 @@ export function Topbar({
   className?: string;
   endSlot?: ReactNode;
 }) {
+  const pathname = usePathname() ?? '';
+  const portalLabel = portalTopbarLabel(pathname);
+
   return (
     <header
       className={cn(
@@ -27,7 +32,7 @@ export function Topbar({
           {title ? (
             <h1 className="truncate font-serif text-lg font-semibold tracking-tight text-foreground">{title}</h1>
           ) : (
-            <p className="wf-label-caps text-[0.65rem] text-muted-foreground">WhiskyFest · Contracts</p>
+            <p className="wf-label-caps text-[0.65rem] text-muted-foreground">{portalLabel}</p>
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">{endSlot}</div>

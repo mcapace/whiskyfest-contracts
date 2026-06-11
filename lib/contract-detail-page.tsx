@@ -50,6 +50,7 @@ import {
   dashboardHref,
   productKeyFromEvent,
 } from '@/lib/product-portal';
+import { wineSpectatorContractIsAdmin } from '@/lib/wine-spectator-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -138,7 +139,10 @@ export async function ContractDetailPage({
     contract !== loadedContract ? await loadAudit(contract.id) : (auditInitial ?? []);
   const activityTimeline = buildContractActivityTimeline(audit, contract);
 
-  const isAdmin = actor.isAdmin;
+  const isAdmin = wineSpectatorContractIsAdmin(productKey, {
+    isAdmin: actor.isAdmin,
+    isWineSpectatorAdmin: actor.isWineSpectatorAdmin,
+  });
   const isEventsTeam = actor.isEventsTeam;
   const releaseAudit = audit.find((entry) => entry.action === 'released_to_accounting' || entry.action === 'executed');
   const discountPending = requiresDiscountApproval(contract);

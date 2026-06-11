@@ -18,29 +18,29 @@ const STYLES: Record<string, RosterListStyle> = {
   returning: {
     shortLabel: 'Returning',
     icon: Users,
-    badge: 'border-[#c97888]/70 bg-[#f8ecee] text-[#5c2430] ring-[#e8c4ca]/70',
-    buttonActive: 'border-[#7a2f3b] bg-[#7a2f3b] text-white shadow-sm hover:bg-[#652630]',
-    buttonIdle: 'border-[#c97888] bg-[#faf0f2] text-[#5c2430] hover:bg-[#f8ecee]',
-    rowAccent: 'border-l-4 border-l-[#7a2f3b] bg-[#faf3f4]/90',
-    legendDot: 'bg-[#7a2f3b]',
+    badge: 'border-slate-300 bg-slate-50 text-slate-800',
+    buttonActive: 'border-slate-700 bg-slate-700 text-white shadow-sm hover:bg-slate-800',
+    buttonIdle: 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50',
+    rowAccent: 'border-l-4 border-l-slate-500 bg-slate-50/70',
+    legendDot: 'bg-slate-500',
   },
   champagne: {
     shortLabel: 'Champagne',
     icon: Sparkles,
-    badge: 'border-amber-400/80 bg-amber-100 text-amber-950 ring-amber-200/60',
-    buttonActive: 'border-amber-600 bg-amber-600 text-white shadow-sm hover:bg-amber-700',
-    buttonIdle: 'border-amber-400 bg-amber-50 text-amber-950 hover:bg-amber-100',
-    rowAccent: 'border-l-4 border-l-amber-500 bg-amber-50/40',
-    legendDot: 'bg-amber-500',
+    badge: 'border-amber-300 bg-amber-50 text-amber-950',
+    buttonActive: 'border-amber-700 bg-amber-700 text-white shadow-sm hover:bg-amber-800',
+    buttonIdle: 'border-amber-300 bg-white text-amber-950 hover:bg-amber-50',
+    rowAccent: 'border-l-4 border-l-amber-600 bg-amber-50/50',
+    legendDot: 'bg-amber-600',
   },
   new: {
     shortLabel: 'New',
     icon: UserPlus,
-    badge: 'border-[#8a9a6d]/80 bg-[#eef1e8] text-[#3d4a34] ring-[#d5ddc8]/80',
-    buttonActive: 'border-[#6d7d5c] bg-[#6d7d5c] text-white shadow-sm hover:bg-[#5a684d]',
-    buttonIdle: 'border-[#8a9a6d] bg-[#f4f6f0] text-[#3d4a34] hover:bg-[#eef1e8]',
-    rowAccent: 'border-l-4 border-l-[#8a9a6d] bg-[#f4f6f0]/80',
-    legendDot: 'bg-[#8a9a6d]',
+    badge: 'border-rose-300 bg-rose-50 text-rose-950',
+    buttonActive: 'border-rose-800 bg-rose-800 text-white shadow-sm hover:bg-rose-900',
+    buttonIdle: 'border-rose-300 bg-white text-rose-950 hover:bg-rose-50',
+    rowAccent: 'border-l-4 border-l-rose-700 bg-rose-50/50',
+    legendDot: 'bg-rose-700',
   },
 };
 
@@ -48,8 +48,8 @@ const FALLBACK: RosterListStyle = {
   shortLabel: 'List',
   icon: Wine,
   badge: 'border-border bg-muted text-foreground',
-  buttonActive: 'border-border bg-foreground text-background',
-  buttonIdle: 'border-border bg-muted/40 text-foreground hover:bg-muted/60',
+  buttonActive: 'border-foreground bg-foreground text-background',
+  buttonIdle: 'border-border bg-white text-foreground hover:bg-muted/40',
   rowAccent: 'border-l-4 border-l-border bg-muted/20',
   legendDot: 'bg-muted-foreground',
 };
@@ -58,9 +58,15 @@ export function rosterListStyle(listKey: RosterListKey): RosterListStyle {
   return STYLES[listKey] ?? FALLBACK;
 }
 
+export function rosterListShortLabel(listKey: RosterListKey, fullLabel?: string): string {
+  const style = rosterListStyle(listKey);
+  if (STYLES[listKey]) return style.shortLabel;
+  return fullLabel?.trim() || style.shortLabel;
+}
+
 export function rosterListBadgeClass(listKey: RosterListKey): string {
   return cn(
-    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset',
+    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium',
     rosterListStyle(listKey).badge,
   );
 }
@@ -77,11 +83,17 @@ export function rosterListIcon(listKey: RosterListKey): LucideIcon {
 export function rosterListFilterClass(listKey: RosterListKey | 'all', active: boolean): string {
   if (listKey === 'all') {
     return active
-      ? 'border-rose-900 bg-rose-900 text-white shadow-sm hover:bg-rose-950'
-      : 'border-border bg-muted/30 text-foreground hover:bg-muted/50';
+      ? 'border-slate-800 bg-slate-800 text-white shadow-sm hover:bg-slate-900'
+      : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50';
   }
   const accent = rosterListStyle(listKey);
   return active ? accent.buttonActive : accent.buttonIdle;
+}
+
+export function rosterListFilterCountClass(active: boolean): string {
+  return active
+    ? 'bg-white/20 text-white'
+    : 'bg-slate-200/90 text-slate-800';
 }
 
 export const ROSTER_ALL_LISTS_ICON = LayoutGrid;

@@ -20,8 +20,10 @@ import {
   ROSTER_ALL_LISTS_ICON,
   rosterListBadgeClass,
   rosterListFilterClass,
+  rosterListFilterCountClass,
   rosterListIcon,
   rosterListRowClass,
+  rosterListShortLabel,
 } from '@/lib/exhibitor-roster-list-style';
 import type { ContractStatus } from '@/types/db';
 
@@ -210,16 +212,16 @@ function RosterListFilterPill({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        'inline-flex min-h-8 items-center justify-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors',
+        'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors',
         className,
       )}
     >
       <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
-      <span className="whitespace-nowrap">{label}</span>
+      <span className="whitespace-nowrap leading-none">{label}</span>
       <span
         className={cn(
-          'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums',
-          active ? 'bg-black/15 text-inherit' : 'bg-black/5 text-inherit',
+          'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums',
+          rosterListFilterCountClass(active),
         )}
       >
         {count}
@@ -440,7 +442,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
                 key={sheet.key}
                 active={active}
                 icon={Icon}
-                label={sheet.label}
+                label={rosterListShortLabel(sheet.key, sheet.label)}
                 count={sheet.count}
                 className={rosterListFilterClass(sheet.key, active)}
                 onClick={() => setListFilter(sheet.key)}

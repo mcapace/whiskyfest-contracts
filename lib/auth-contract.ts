@@ -16,6 +16,7 @@ export interface AppUserRow {
   is_events_team: boolean;
   is_accounting: boolean;
   can_view_all_sales: boolean;
+  is_wine_spectator_admin: boolean;
 }
 
 /** Own sales_reps row id if any; union with accessibleSalesRepIds for scoped access. */
@@ -26,6 +27,7 @@ export interface ContractActorContext {
   isEventsTeam: boolean;
   isAccounting: boolean;
   canViewAllSales: boolean;
+  isWineSpectatorAdmin: boolean;
   salesRepId: string | null;
   /** Own rep id plus any reps this user assists (unique). */
   accessibleSalesRepIds: string[];
@@ -48,7 +50,7 @@ export async function resolveContractActor(session: Session | null): Promise<
   const supabase = getSupabaseAdmin();
   const { data: appUser, error } = await supabase
     .from('app_users')
-    .select('email, role, is_active, name, is_events_team, is_accounting, can_view_all_sales')
+    .select('email, role, is_active, name, is_events_team, is_accounting, can_view_all_sales, is_wine_spectator_admin')
     .eq('email', email)
     .single();
 
@@ -58,6 +60,7 @@ export async function resolveContractActor(session: Session | null): Promise<
   const isAdmin = appUser.role === 'admin';
   const isEventsTeam = Boolean((appUser as { is_events_team?: boolean }).is_events_team);
   const isAccounting = Boolean((appUser as { is_accounting?: boolean }).is_accounting);
+  const isWineSpectatorAdmin = Boolean((appUser as { is_wine_spectator_admin?: boolean }).is_wine_spectator_admin) || isAdmin;
   const canViewAllSales =
     isAdmin || isEventsTeam || isAccounting || Boolean((appUser as { can_view_all_sales?: boolean }).can_view_all_sales);
 
@@ -89,6 +92,7 @@ export async function resolveContractActor(session: Session | null): Promise<
       isEventsTeam,
       isAccounting,
       canViewAllSales,
+      isWineSpectatorAdmin,
       salesRepId,
       accessibleSalesRepIds,
     },
@@ -202,6 +206,7 @@ export interface PageContractActor {
   isEventsTeam: boolean;
   isAccounting: boolean;
   canViewAllSales: boolean;
+  isWineSpectatorAdmin: boolean;
   salesRepId: string | null;
   accessibleSalesRepIds: string[];
   role: string;
@@ -218,7 +223,7 @@ export async function requireContractActorForPage(): Promise<PageContractActor> 
   const supabase = getSupabaseAdmin();
   const { data: appUser } = await supabase
     .from('app_users')
-    .select('role, is_active, is_events_team, is_accounting, can_view_all_sales')
+    .select('role, is_active, is_events_team, is_accounting, can_view_all_sales, is_wine_spectator_admin')
     .eq('email', email)
     .single();
 
@@ -227,6 +232,7 @@ export async function requireContractActorForPage(): Promise<PageContractActor> 
   const isAdmin = appUser.role === 'admin';
   const isEventsTeam = Boolean(appUser.is_events_team);
   const isAccounting = Boolean((appUser as { is_accounting?: boolean }).is_accounting);
+  const isWineSpectatorAdmin = Boolean((appUser as { is_wine_spectator_admin?: boolean }).is_wine_spectator_admin) || isAdmin;
   const canViewAllSales =
     isAdmin || isEventsTeam || isAccounting || Boolean((appUser as { can_view_all_sales?: boolean }).can_view_all_sales);
 
@@ -252,6 +258,7 @@ export async function requireContractActorForPage(): Promise<PageContractActor> 
     isEventsTeam,
     isAccounting,
     canViewAllSales,
+    isWineSpectatorAdmin,
     salesRepId,
     accessibleSalesRepIds,
     role: appUser.role,

@@ -12,6 +12,8 @@ declare module 'next-auth' {
       pipeline_access?: boolean;
       /** True when user may open the Wine Spectator portal (admin, events team, or Susannah Nolan). */
       wine_spectator_access?: boolean;
+      /** Admin within Wine Spectator / NYWE (events settings + contract admin actions). */
+      is_wine_spectator_admin?: boolean;
       /** Real login user — true only for users allowed to use "View as…". */
       can_impersonate?: boolean;
       /** Persisted UI theme; null/undefined = system. */
@@ -41,6 +43,7 @@ declare module 'next-auth/jwt' {
     can_view_all_sales?: boolean;
     pipeline_access?: boolean;
     wine_spectator_access?: boolean;
+    is_wine_spectator_admin?: boolean;
     real_can_impersonate?: boolean;
     impersonation_target_email?: string | null;
     impersonation_target_name?: string | null;

@@ -206,6 +206,7 @@ export interface AppUser {
   role: UserRole;
   is_active: boolean;
   is_events_team?: boolean;
+  is_wine_spectator_admin?: boolean;
   is_accounting?: boolean;
   can_impersonate?: boolean;
   can_view_all_sales?: boolean;

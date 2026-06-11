@@ -88,7 +88,7 @@ export function WineSpectatorHero({
       <div className="grid gap-4 border-t border-parchment-300/15 bg-rose-950/90 p-6 text-parchment-100 sm:grid-cols-[1fr_auto] sm:items-end">
         <div className="min-w-0">
           <p className="text-sm leading-relaxed text-parchment-100/90">
-            {contractsCount} vendor license{contractsCount !== 1 ? 's' : ''} in this workspace
+            {contractsCount} vendor license{contractsCount !== 1 ? 's' : ''}
           </p>
           <p className="mt-2 text-xs text-parchment-200/90">{completionLabel}</p>
         </div>

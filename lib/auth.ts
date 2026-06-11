@@ -6,7 +6,7 @@ import { loadImpersonationTargetDisplay } from '@/lib/effective-user';
 import { logImpersonationEnded, logImpersonationStarted } from '@/lib/impersonation-audit';
 import { ensureAccessRequestForUnknownUser } from '@/lib/access-requests';
 import type { UserRole } from '@/types/db';
-import { canAccessWineSpectator } from '@/lib/wine-spectator-access';
+import { canAccessWineSpectator, isWineSpectatorAdmin } from '@/lib/wine-spectator-access';
 
 const IMPERSONATION_TTL_MS = 30 * 60 * 1000;
 /** Min interval between `last_seen_at` writes per user (JWT refreshes often). */
@@ -22,10 +22,11 @@ async function computeAccessFlagsForEmail(
   can_view_all_sales: boolean;
   pipeline_access: boolean;
   wine_spectator_access: boolean;
+  is_wine_spectator_admin: boolean;
 }> {
   const { data: appUser } = await supabase
     .from('app_users')
-    .select('role, is_active, is_events_team, is_accounting, can_view_all_sales')
+    .select('role, is_active, is_events_team, is_accounting, can_view_all_sales, is_wine_spectator_admin')
     .eq('email', email.toLowerCase())
     .maybeSingle();
 
@@ -37,12 +38,19 @@ async function computeAccessFlagsForEmail(
       can_view_all_sales: false,
       pipeline_access: false,
       wine_spectator_access: false,
+      is_wine_spectator_admin: false,
     };
   }
 
   const accessibleSalesRepIds = await getAccessibleSalesRepIds(email, supabase);
   const isAdmin = appUser.role === 'admin';
   const isEventsTeam = Boolean((appUser as { is_events_team?: boolean }).is_events_team);
+  const isWineSpectatorAdminFlag = isWineSpectatorAdmin({
+    role: appUser.role,
+    is_events_team: isEventsTeam,
+    is_wine_spectator_admin: Boolean((appUser as { is_wine_spectator_admin?: boolean }).is_wine_spectator_admin),
+    email,
+  });
   const isAccounting = Boolean((appUser as { is_accounting?: boolean }).is_accounting);
   const canViewAllSales =
     isAdmin || isEventsTeam || isAccounting || Boolean((appUser as { can_view_all_sales?: boolean }).can_view_all_sales);
@@ -57,8 +65,10 @@ async function computeAccessFlagsForEmail(
     wine_spectator_access: canAccessWineSpectator({
       role: appUser.role,
       is_events_team: isEventsTeam,
+      is_wine_spectator_admin: isWineSpectatorAdminFlag,
       email,
     }),
+    is_wine_spectator_admin: isWineSpectatorAdminFlag,
   };
 }
 
@@ -170,6 +180,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.is_events_team = false;
         token.can_view_all_sales = false;
         token.wine_spectator_access = false;
+        token.is_wine_spectator_admin = false;
         token.real_can_impersonate = false;
         token.impersonation_target_email = null;
         token.impersonation_target_name = null;
@@ -214,6 +225,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       token.can_view_all_sales = flags.can_view_all_sales;
       token.pipeline_access = flags.pipeline_access;
       token.wine_spectator_access = flags.wine_spectator_access;
+      token.is_wine_spectator_admin = flags.is_wine_spectator_admin;
       token.real_can_impersonate = realCanImpersonate;
 
       const tp = (realUser as { theme_preference?: string | null } | null)?.theme_preference;
@@ -261,6 +273,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.can_view_all_sales = Boolean(token.can_view_all_sales);
       session.user.pipeline_access = Boolean(token.pipeline_access);
       session.user.wine_spectator_access = Boolean(token.wine_spectator_access);
+      session.user.is_wine_spectator_admin = Boolean(token.is_wine_spectator_admin);
       session.user.can_impersonate = Boolean(token.real_can_impersonate);
       session.user.theme_preference =
         token.theme_preference === 'light' ||

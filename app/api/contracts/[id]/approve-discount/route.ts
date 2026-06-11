@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireAdminOrWineSpectatorContractAdmin } from '@/lib/api-auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { isDiscountedRate } from '@/lib/contracts';
 import { notifySalesRepDiscountApproved } from '@/lib/notifications';
@@ -12,7 +12,7 @@ const schema = z.object({
 });
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const gate = await requireAdmin();
+  const gate = await requireAdminOrWineSpectatorContractAdmin(params.id);
   if (!gate.ok) return gate.res;
 
   const body = await req.json().catch(() => ({}));

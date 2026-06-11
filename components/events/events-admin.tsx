@@ -14,6 +14,8 @@ import type { Event } from '@/types/db';
 
 interface Props {
   initialEvents: Event[];
+  /** Wine Spectator admins may edit NYWE events only — no create. */
+  wineSpectatorOnly?: boolean;
 }
 
 function emptyForm() {
@@ -37,7 +39,7 @@ function emptyForm() {
   };
 }
 
-export function EventsAdmin({ initialEvents }: Props) {
+export function EventsAdmin({ initialEvents, wineSpectatorOnly = false }: Props) {
   const router = useRouter();
   const readOnly = useImpersonationReadOnly();
   const [pending, startTransition] = useTransition();
@@ -140,12 +142,19 @@ export function EventsAdmin({ initialEvents }: Props) {
     <div className="grid gap-8 lg:grid-cols-5">
       <Card className="lg:col-span-2">
         <CardHeader>
-          <CardTitle>{editingId ? 'Edit event' : 'Add event'}</CardTitle>
+          <CardTitle>{editingId ? 'Edit event' : wineSpectatorOnly ? 'Event settings' : 'Add event'}</CardTitle>
           <CardDescription>
-            {editingId ? 'Update details below, then save.' : 'Create a new WhiskyFest event for the intake form.'}
+            {editingId
+              ? 'Update details below, then save.'
+              : wineSpectatorOnly
+                ? 'Select a New York Wine Experience event from the list to edit.'
+                : 'Create a new WhiskyFest event for the intake form.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {wineSpectatorOnly && !editingId ? (
+            <p className="text-sm text-muted-foreground">Choose an event on the right to update NYWE settings.</p>
+          ) : (
           <form onSubmit={save} className="space-y-4">
             <Field label="Name">
               <Input value={form.name} onChange={e => set('name', e.target.value)} placeholder="WhiskyFest New York" required />
@@ -264,6 +273,7 @@ export function EventsAdmin({ initialEvents }: Props) {
               )}
             </div>
           </form>
+          )}
         </CardContent>
       </Card>
 
@@ -273,9 +283,11 @@ export function EventsAdmin({ initialEvents }: Props) {
             <CardTitle>Events</CardTitle>
             <CardDescription>{initialEvents.length} configured</CardDescription>
           </div>
-          <Button variant="outline" size="sm" onClick={newEvent}>
-            <Plus className="h-4 w-4" /> New
-          </Button>
+          {!wineSpectatorOnly ? (
+            <Button variant="outline" size="sm" onClick={newEvent}>
+              <Plus className="h-4 w-4" /> New
+            </Button>
+          ) : null}
         </CardHeader>
         <CardContent className="space-y-3">
           {initialEvents.length === 0 ? (

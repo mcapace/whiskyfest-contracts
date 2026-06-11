@@ -114,13 +114,14 @@ const wineSpectatorNav: {
   label: string;
   icon: LucideIcon;
   adminOnly?: boolean;
+  wineSpectatorAdminOk?: boolean;
 }[] = [
   { href: '/wine-spectator', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/wine-spectator/roster', label: 'Exhibitor roster', icon: Users },
   { href: '/wine-spectator/contracts/new', label: 'New vendor license', icon: Plus },
   { href: '/wine-spectator/contracts', label: 'All licenses', icon: FileText },
   { href: '/settings', label: 'Settings', icon: Settings },
-  { href: '/events', label: 'Events', icon: CalendarDays, adminOnly: true },
+  { href: '/events', label: 'Events', icon: CalendarDays, adminOnly: true, wineSpectatorAdminOk: true },
   { href: '/users', label: 'Users', icon: Users, adminOnly: true },
 ];
 
@@ -157,6 +158,7 @@ export function Sidebar({
     isAccounting?: boolean;
     isEventsTeam?: boolean;
     wineSpectatorAccess?: boolean;
+    wineSpectatorAdmin?: boolean;
   };
   canImpersonate?: boolean;
   readOnlyImpersonation?: boolean;
@@ -164,6 +166,7 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const isAdmin = user.role === 'admin';
+  const wineSpectatorAdmin = Boolean(user.wineSpectatorAdmin);
   const pipelineAccess = Boolean(user.pipelineAccess);
   const isAccounting = Boolean(user.isAccounting);
   const canAccounting = isAccounting || isAdmin;
@@ -192,7 +195,7 @@ export function Sidebar({
       >
         <div className="mx-auto max-w-[220px] px-3 py-2">
           {wineSpectatorPortal ? (
-            <NyweLogo href={homeHref} priority subtitle="Vendor licenses workspace" imageClassName="max-h-12" />
+            <NyweLogo href={homeHref} priority imageClassName="max-h-12" />
           ) : accountingPortal ? (
             <Link href={homeHref} className="block rounded-lg border border-brass-700/25 bg-stone-950/60 px-4 py-3 text-center">
               <Landmark className="mx-auto h-6 w-6 text-brass-400" />
@@ -285,7 +288,11 @@ export function Sidebar({
             </div>
             {nav
               .filter((item) => {
-                if ('adminOnly' in item && item.adminOnly && !isAdmin) return false;
+                if ('adminOnly' in item && item.adminOnly) {
+                  if (isAdmin) return true;
+                  if (wineSpectatorPortal && wineSpectatorAdmin && item.wineSpectatorAdminOk) return true;
+                  return false;
+                }
                 if ('legacyImport' in item && item.legacyImport && accountingOnly) return false;
                 return true;
               })

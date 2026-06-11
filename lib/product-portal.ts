@@ -28,6 +28,19 @@ export function productDisplayLabel(productKey: ProductKey): string {
   return productKey === PRODUCT_WINE_SPECTATOR ? 'Wine Spectator' : 'WhiskyFest';
 }
 
+/** Sticky header label when no page-specific title is set. */
+export function portalTopbarLabel(pathname: string): string {
+  if (isWineSpectatorPath(pathname)) return 'Wine Spectator · NYWE';
+  if (isAccountingPath(pathname)) return 'Accounting · M. Shanken';
+  return 'WhiskyFest · Contracts';
+}
+
+export function portalDocumentTitle(pathname: string): string {
+  if (isWineSpectatorPath(pathname)) return 'NYWE Contracts | Wine Spectator';
+  if (isAccountingPath(pathname)) return 'Accounting | M. Shanken Contracts';
+  return 'WhiskyFest Contracts';
+}
+
 export function scopeEventsByProduct(events: Event[], productKey: ProductKey): Event[] {
   return events.filter((e) => e.product_key === productKey);
 }

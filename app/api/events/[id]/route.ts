@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireWineSpectatorEventEditor } from '@/lib/api-auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
@@ -28,7 +28,7 @@ const patchSchema = z
   .strict();
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const gate = await requireAdmin();
+  const gate = await requireWineSpectatorEventEditor(params.id);
   if (!gate.ok) return gate.res;
 
   const body = await req.json().catch(() => null);
