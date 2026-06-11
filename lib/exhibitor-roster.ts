@@ -14,6 +14,11 @@ export type ExhibitorRosterSheetConfig = {
   tab: string;
 };
 
+export type ExhibitorRosterSheetField = {
+  label: string;
+  value: string;
+};
+
 export type ExhibitorRosterRow = {
   rowKey: string;
   listKey: string;
@@ -25,7 +30,15 @@ export type ExhibitorRosterRow = {
   signerName: string;
   signerEmail: string;
   billingCompany: string;
+  billingContactName: string;
   billingEmail: string;
+  billingCity: string;
+  billingState: string;
+  primaryContactName: string;
+  primaryContactEmail: string;
+  primaryPhone: string;
+  importerName: string;
+  importerEmail: string;
   wineName: string;
   vintage: string;
   participation: string;
@@ -34,6 +47,8 @@ export type ExhibitorRosterRow = {
   sheetStatus: string | null;
   sheetContractId: string | null;
   sheetLastUpdated: string | null;
+  /** Non-empty cells from the Google Sheet row, keyed by header label. */
+  sheetFields: ExhibitorRosterSheetField[];
 };
 
 type ColumnMap = {
@@ -55,6 +70,10 @@ type ColumnMap = {
   contractRepFirst: number;
   contractRepLast: number;
   contractRepEmail: number;
+  primaryPhone: number;
+  importerName: number;
+  importerPhone: number;
+  importerEmail: number;
 };
 
 const STANDARD_COLUMNS: ColumnMap = {
@@ -76,6 +95,10 @@ const STANDARD_COLUMNS: ColumnMap = {
   contractRepFirst: 30,
   contractRepLast: 31,
   contractRepEmail: 33,
+  primaryPhone: 12,
+  importerName: 18,
+  importerPhone: 19,
+  importerEmail: 20,
 };
 
 const NEW_COLUMNS: ColumnMap = {
@@ -97,6 +120,10 @@ const NEW_COLUMNS: ColumnMap = {
   contractRepFirst: 29,
   contractRepLast: 30,
   contractRepEmail: 32,
+  primaryPhone: 12,
+  importerName: 17,
+  importerPhone: 18,
+  importerEmail: 19,
 };
 
 function tabRange(tab: string, a1: string): string {
@@ -152,6 +179,18 @@ export function rosterSheetsFromEvent(event: Event): ExhibitorRosterSheetConfig[
       };
     })
     .filter(Boolean) as ExhibitorRosterSheetConfig[];
+}
+
+function buildSheetFields(headers: string[], row: string[]): ExhibitorRosterSheetField[] {
+  const fields: ExhibitorRosterSheetField[] = [];
+  const max = Math.max(headers.length, row.length);
+  for (let i = 0; i < max; i++) {
+    const label = String(headers[i] ?? '').trim();
+    const value = cell(row, i);
+    if (!label || !value) continue;
+    fields.push({ label, value });
+  }
+  return fields;
 }
 
 function resolveSigner(row: string[], map: ColumnMap): { name: string; email: string } {
@@ -270,6 +309,10 @@ export async function fetchExhibitorRoster(event: Event): Promise<{
       const rowKey = rosterRowKey(config.spreadsheet_id, config.tab, rowNumber);
       const contract = contractByRowKey.get(rowKey) ?? null;
       const signer = resolveSigner(row, map);
+      const billingFirst = cell(row, map.billingFirst);
+      const billingLast = cell(row, map.billingLast);
+      const primaryFirst = cell(row, map.primaryFirst);
+      const primaryLast = cell(row, map.primaryLast);
       rows.push({
         rowKey,
         listKey: config.key,
@@ -281,7 +324,15 @@ export async function fetchExhibitorRoster(event: Event): Promise<{
         signerName: signer.name,
         signerEmail: signer.email,
         billingCompany: cell(row, map.billingCompany),
+        billingContactName: [billingFirst, billingLast].filter(Boolean).join(' ').trim(),
         billingEmail: cell(row, map.billingEmail),
+        billingCity: cell(row, map.city),
+        billingState: cell(row, map.state),
+        primaryContactName: [primaryFirst, primaryLast].filter(Boolean).join(' ').trim(),
+        primaryContactEmail: cell(row, map.primaryEmail),
+        primaryPhone: cell(row, map.primaryPhone),
+        importerName: cell(row, map.importerName),
+        importerEmail: cell(row, map.importerEmail),
         wineName: cell(row, map.wineName),
         vintage: cell(row, map.vintage),
         participation: cell(row, map.participation),
@@ -290,6 +341,7 @@ export async function fetchExhibitorRoster(event: Event): Promise<{
         sheetStatus: cell(row, statusStart) || null,
         sheetContractId: cell(row, statusStart + 1) || null,
         sheetLastUpdated: cell(row, statusStart + 2) || null,
+        sheetFields: buildSheetFields(headers, row),
       });
     });
   }

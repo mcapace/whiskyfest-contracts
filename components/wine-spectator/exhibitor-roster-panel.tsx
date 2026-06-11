@@ -3,12 +3,18 @@
 import { useCallback, useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Loader2, RefreshCw, Send, FilePlus2 } from 'lucide-react';
+import { Columns3, Loader2, RefreshCw, Send, FilePlus2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/contracts/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn, formatRelative } from '@/lib/utils';
+import {
+  rosterColumnModeLabel,
+  visibleSheetColumns,
+  visibleUiColumns,
+  type RosterColumnMode,
+} from '@/lib/exhibitor-roster-columns';
 import { rosterListBadgeClass, rosterListRowClass, rosterListStyle } from '@/lib/exhibitor-roster-list-style';
 import type { ContractStatus } from '@/types/db';
 
@@ -19,12 +25,23 @@ type RosterRow = {
   wineryName: string;
   signerName: string;
   signerEmail: string;
+  billingCompany: string;
+  billingContactName: string;
+  billingEmail: string;
+  billingCity: string;
+  billingState: string;
+  primaryContactName: string;
+  primaryContactEmail: string;
+  primaryPhone: string;
+  importerName: string;
+  importerEmail: string;
   wineName: string;
   vintage: string;
   contractId: string | null;
   contractStatus: ContractStatus | null;
   sheetStatus: string | null;
   sheetLastUpdated: string | null;
+  sheetFields: { label: string; value: string }[];
 };
 
 type RosterSheet = {
@@ -39,6 +56,8 @@ type RosterPayload = {
   sheets: RosterSheet[];
   rows: RosterRow[];
 };
+
+const COLUMN_MODES: RosterColumnMode[] = ['essential', 'extended', 'all'];
 
 const FILTERS = [
   { key: 'all', label: 'All' },
@@ -67,15 +86,110 @@ function matchesFilter(row: RosterRow, filter: string): boolean {
   }
 }
 
+function sheetFieldValue(row: RosterRow, label: string): string {
+  const normalized = label.trim();
+  const hit = row.sheetFields?.find((f) => f.label.trim() === normalized);
+  return hit?.value ?? '';
+}
+
+function CellText({ value, className }: { value: string; className?: string }) {
+  if (!value) return <span className="text-muted-foreground">—</span>;
+  return (
+    <span className={cn('block max-w-[16rem] truncate', className)} title={value}>
+      {value}
+    </span>
+  );
+}
+
+function renderUiCell(row: RosterRow, columnId: string) {
+  switch (columnId) {
+    case 'winery':
+      return <CellText value={row.wineryName} className="font-medium" />;
+    case 'list':
+      return <span className={rosterListBadgeClass(row.listKey)}>{row.listLabel}</span>;
+    case 'wine':
+      return <CellText value={[row.wineName, row.vintage].filter(Boolean).join(' · ')} />;
+    case 'signer':
+      return (
+        <div className="min-w-0">
+          <CellText value={row.signerName} />
+          {row.signerEmail ? (
+            <span className="block max-w-[16rem] truncate text-xs text-muted-foreground" title={row.signerEmail}>
+              {row.signerEmail}
+            </span>
+          ) : null}
+        </div>
+      );
+    case 'licenseStatus':
+      return row.contractStatus ? (
+        <StatusBadge status={row.contractStatus} />
+      ) : (
+        <span className="text-sm text-muted-foreground">Not started</span>
+      );
+    case 'billingCompany':
+      return <CellText value={row.billingCompany} />;
+    case 'billingContact':
+      return (
+        <div className="min-w-0">
+          <CellText value={row.billingContactName} />
+          {row.billingEmail ? (
+            <span className="block max-w-[16rem] truncate text-xs text-muted-foreground" title={row.billingEmail}>
+              {row.billingEmail}
+            </span>
+          ) : null}
+        </div>
+      );
+    case 'primaryContact':
+      return (
+        <div className="min-w-0">
+          <CellText value={row.primaryContactName} />
+          {row.primaryContactEmail ? (
+            <span className="block max-w-[16rem] truncate text-xs text-muted-foreground" title={row.primaryContactEmail}>
+              {row.primaryContactEmail}
+            </span>
+          ) : null}
+        </div>
+      );
+    case 'billingLocation':
+      return <CellText value={[row.billingCity, row.billingState].filter(Boolean).join(', ')} />;
+    case 'importer':
+      return (
+        <div className="min-w-0">
+          <CellText value={row.importerName} />
+          {row.importerEmail ? (
+            <span className="block max-w-[16rem] truncate text-xs text-muted-foreground" title={row.importerEmail}>
+              {row.importerEmail}
+            </span>
+          ) : null}
+        </div>
+      );
+    case 'sheetStatus':
+      return <CellText value={row.sheetStatus ?? ''} className="text-sm text-muted-foreground" />;
+    case 'sheetUpdated':
+      return <CellText value={row.sheetLastUpdated ?? ''} className="text-sm text-muted-foreground" />;
+    default:
+      return <span className="text-muted-foreground">—</span>;
+  }
+}
+
 export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
   const router = useRouter();
   const [data, setData] = useState(initial);
   const [listFilter, setListFilter] = useState<string>('all');
   const [filter, setFilter] = useState<string>('all');
+  const [columnMode, setColumnMode] = useState<RosterColumnMode>('essential');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const showListColumn = listFilter === 'all';
+  const uiColumns = useMemo(
+    () => visibleUiColumns(columnMode, showListColumn),
+    [columnMode, showListColumn],
+  );
+  const sheetColumns = useMemo(() => visibleSheetColumns(columnMode), [columnMode]);
+  const tableColSpan = 2 + (columnMode === 'all' ? sheetColumns.length : uiColumns.length);
 
   const sheetTabs = useMemo(() => {
     const counts = new Map<string, number>();
@@ -102,11 +216,22 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
       if (listFilter !== 'all' && row.listKey !== listFilter) return false;
       if (!matchesFilter(row, filter)) return false;
       if (!q) return true;
-      return (
-        row.wineryName.toLowerCase().includes(q) ||
-        row.signerName.toLowerCase().includes(q) ||
-        row.signerEmail.toLowerCase().includes(q)
-      );
+      const haystack = [
+        row.wineryName,
+        row.signerName,
+        row.signerEmail,
+        row.wineName,
+        row.vintage,
+        row.billingCompany,
+        row.billingEmail,
+        row.primaryContactName,
+        row.primaryContactEmail,
+        row.importerName,
+        ...(row.sheetFields ?? []).map((f) => `${f.label} ${f.value}`),
+      ]
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(q);
     });
   }, [data.rows, filter, listFilter, search]);
 
@@ -269,32 +394,56 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
       <div className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">License status</p>
         <div className="flex flex-wrap items-center gap-2">
-        {FILTERS.map((f) => (
-          <Button
-            key={f.key}
-            size="sm"
-            variant={filter === f.key ? 'default' : 'outline'}
-            onClick={() => setFilter(f.key)}
-          >
-            {f.label}
-          </Button>
-        ))}
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search winery, signer, email…"
-          className="max-w-xs"
-        />
+          {FILTERS.map((f) => (
+            <Button
+              key={f.key}
+              size="sm"
+              variant={filter === f.key ? 'default' : 'outline'}
+              onClick={() => setFilter(f.key)}
+            >
+              {f.label}
+            </Button>
+          ))}
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search winery, signer, billing, sheet fields…"
+            className="max-w-xs"
+          />
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Columns3 className="h-4 w-4 text-muted-foreground" aria-hidden />
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Columns</p>
+          {COLUMN_MODES.map((mode) => (
+            <Button
+              key={mode}
+              size="sm"
+              variant={columnMode === mode ? 'default' : 'outline'}
+              onClick={() => setColumnMode(mode)}
+            >
+              {rosterColumnModeLabel(mode)}
+            </Button>
+          ))}
+        </div>
+        {columnMode === 'all' ? (
+          <p className="text-xs text-muted-foreground">Scroll horizontally to see every field from the Google Sheet form.</p>
+        ) : columnMode === 'essential' ? (
+          <p className="text-xs text-muted-foreground">Showing winery, wine, contract signer, and license status. Switch to More columns or All sheet fields for full detail.</p>
+        ) : (
+          <p className="text-xs text-muted-foreground">Showing billing, contacts, and sheet sync status in addition to essentials.</p>
+        )}
       </div>
 
       {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
 
       <div className="overflow-x-auto rounded-lg border">
-        <Table>
+        <Table className={columnMode === 'all' ? 'min-w-max text-xs' : undefined}>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-10">
+              <TableHead className="sticky left-0 z-10 w-10 bg-background">
                 <input
                   type="checkbox"
                   aria-label="Select all visible"
@@ -302,18 +451,24 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
                   onChange={toggleAllVisible}
                 />
               </TableHead>
-              <TableHead>Winery</TableHead>
-              <TableHead>List</TableHead>
-              <TableHead>Signer</TableHead>
-              <TableHead>License status</TableHead>
-              <TableHead>Sheet status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              {columnMode === 'all'
+                ? sheetColumns.map((label) => (
+                    <TableHead key={label} className="min-w-[9rem] max-w-[14rem] whitespace-normal text-[10px] leading-snug">
+                      {label.trim()}
+                    </TableHead>
+                  ))
+                : uiColumns.map((col) => (
+                    <TableHead key={col.id} style={{ minWidth: col.minWidth }}>
+                      {col.label}
+                    </TableHead>
+                  ))}
+              <TableHead className="sticky right-0 z-10 bg-background text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={tableColSpan} className="py-10 text-center text-sm text-muted-foreground">
                   No exhibitors match this list and filter.
                 </TableCell>
               </TableRow>
@@ -323,7 +478,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
                 key={row.rowKey}
                 className={rosterListRowClass(row.listKey, listFilter === 'all')}
               >
-                <TableCell>
+                <TableCell className="sticky left-0 z-10 bg-inherit">
                   <input
                     type="checkbox"
                     aria-label={`Select ${row.wineryName}`}
@@ -331,26 +486,18 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
                     onChange={() => toggleRow(row.rowKey)}
                   />
                 </TableCell>
-                <TableCell>
-                  <div className="font-medium">{row.wineryName}</div>
-                  {(row.wineName || row.vintage) && (
-                    <div className="text-xs text-muted-foreground">
-                      {[row.wineName, row.vintage].filter(Boolean).join(' · ')}
-                    </div>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <span className={rosterListBadgeClass(row.listKey)}>{row.listLabel}</span>
-                </TableCell>
-                <TableCell>
-                  <div className="text-sm">{row.signerName || '—'}</div>
-                  <div className="text-xs text-muted-foreground">{row.signerEmail || '—'}</div>
-                </TableCell>
-                <TableCell>
-                  {row.contractStatus ? <StatusBadge status={row.contractStatus} /> : <span className="text-sm text-muted-foreground">Not started</span>}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">{row.sheetStatus || '—'}</TableCell>
-                <TableCell className="text-right">
+                {columnMode === 'all'
+                  ? sheetColumns.map((label) => (
+                      <TableCell key={`${row.rowKey}-${label}`} className="align-top">
+                        <CellText value={sheetFieldValue(row, label)} className="text-xs" />
+                      </TableCell>
+                    ))
+                  : uiColumns.map((col) => (
+                      <TableCell key={col.id} className="align-top">
+                        {renderUiCell(row, col.id)}
+                      </TableCell>
+                    ))}
+                <TableCell className="sticky right-0 z-10 bg-inherit text-right">
                   {row.contractId ? (
                     <Link href={`/wine-spectator/contracts/${row.contractId}`} className="text-sm font-medium text-accent-brand hover:underline">
                       Open
