@@ -5,11 +5,11 @@ import { requireContractActorForPage } from '@/lib/auth-contract';
 import { getVisibleContractsFilter } from '@/lib/permissions';
 import { recentCompanyNames } from '@/lib/new-contract-hints';
 import { parseDealKindParam } from '@/lib/contract-deal-kind';
-import { PRODUCT_WHISKYFEST, scopeEventsByProduct } from '@/lib/product-portal';
+import { PRODUCT_WINE_SPECTATOR, scopeEventsByProduct } from '@/lib/product-portal';
 
 export const dynamic = 'force-dynamic';
 
-export default async function NewContractPage({
+export default async function WineSpectatorNewContractPage({
   searchParams,
 }: {
   searchParams: { deal?: string };
@@ -48,24 +48,32 @@ export default async function NewContractPage({
     hintsQuery,
   ]);
 
+  const scopedEvents = scopeEventsByProduct((events ?? []) as Event[], PRODUCT_WINE_SPECTATOR);
   const hintContracts = (hintRows ?? []) as ContractWithTotals[];
-  const signedOrExecuted = hintContracts.filter((c) => c.status === 'signed' || c.status === 'executed');
+  const wineEventIds = new Set(scopedEvents.map((e) => e.id));
+  const wineHints = hintContracts.filter((c) => wineEventIds.has(c.event_id));
+  const signedOrExecuted = wineHints.filter((c) => c.status === 'signed' || c.status === 'executed');
   const smartHints = {
-    recentCompanies: recentCompanyNames(hintContracts),
+    recentCompanies: recentCompanyNames(wineHints),
     priorContracts: signedOrExecuted,
   };
 
-  const initialDealKind = parseDealKindParam(searchParams.deal) ?? undefined;
-
-  const scopedEvents = scopeEventsByProduct((events ?? []) as Event[], PRODUCT_WHISKYFEST);
+  const initialDealKind = parseDealKindParam(searchParams.deal) ?? 'booth';
 
   return (
-    <NewContractForm
-      events={scopedEvents}
-      currentUserEmail={actor.email}
-      isAdmin={actor.isAdmin}
-      smartHints={smartHints}
-      initialDealKind={initialDealKind}
-    />
+    <div className="space-y-4">
+      <div>
+        <h1 className="font-display text-3xl font-medium text-foreground">New vendor license</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Wine Spectator · New York Wine Experience</p>
+      </div>
+      <NewContractForm
+        events={scopedEvents}
+        currentUserEmail={actor.email}
+        isAdmin={actor.isAdmin}
+        smartHints={smartHints}
+        initialDealKind={initialDealKind}
+        portalBasePath="/wine-spectator"
+      />
+    </div>
   );
 }

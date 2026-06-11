@@ -21,6 +21,12 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
+  isWineSpectatorPath,
+  productDisplayLabel,
+  PRODUCT_WINE_SPECTATOR,
+  PRODUCT_WHISKYFEST,
+} from '@/lib/product-portal';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -100,12 +106,11 @@ function AccountingNavLink({ pathname }: { pathname: string }) {
   );
 }
 
-const nav: {
+const whiskyfestNav: {
   href: string;
   label: string;
   icon: LucideIcon;
   adminOnly?: boolean;
-  /** Hidden for accounting-only users; visible to sales reps, events, and admins. */
   legacyImport?: boolean;
 }[] = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -118,6 +123,31 @@ const nav: {
   { href: '/events', label: 'Events', icon: CalendarDays, adminOnly: true },
   { href: '/users', label: 'Users', icon: Users, adminOnly: true },
 ];
+
+const wineSpectatorNav: {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  adminOnly?: boolean;
+}[] = [
+  { href: '/wine-spectator', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/wine-spectator/roster', label: 'Exhibitor roster', icon: Users },
+  { href: '/wine-spectator/contracts/new', label: 'New vendor license', icon: Plus },
+  { href: '/wine-spectator/contracts', label: 'All licenses', icon: FileText },
+  { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/events', label: 'Events', icon: CalendarDays, adminOnly: true },
+  { href: '/users', label: 'Users', icon: Users, adminOnly: true },
+];
+
+function portalNavLinkActive(pathname: string, href: string): boolean {
+  if (href === '/' || href === '/wine-spectator') {
+    return pathname === href;
+  }
+  if (href === '/#start-deal') {
+    return pathname === '/';
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function Sidebar({
   user,
@@ -143,22 +173,38 @@ export function Sidebar({
   const pipelineAccess = Boolean(user.pipelineAccess);
   const isAccounting = Boolean(user.isAccounting);
   const accountingOnly = isAccounting && !pipelineAccess;
-  const homeHref = accountingOnly ? '/accounting' : '/';
+  const wineSpectatorPortal = isWineSpectatorPath(pathname);
+  const homeHref = accountingOnly ? '/accounting' : wineSpectatorPortal ? '/wine-spectator' : '/';
+  const nav = wineSpectatorPortal ? wineSpectatorNav : whiskyfestNav;
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border/60 bg-bg-surface/95 backdrop-blur-md lg:flex">
-      <div className="shrink-0 border-b border-border/50 bg-gradient-to-b from-fest-600/[0.07] via-bg-surface-raised to-bg-surface px-3 py-4">
+      <div
+        className={cn(
+          'shrink-0 border-b border-border/50 px-3 py-4',
+          wineSpectatorPortal
+            ? 'bg-gradient-to-b from-rose-900/[0.08] via-bg-surface-raised to-bg-surface'
+            : 'bg-gradient-to-b from-fest-600/[0.07] via-bg-surface-raised to-bg-surface',
+        )}
+      >
         <div className="mx-auto max-w-[220px] px-3 py-2">
-          <Link href={homeHref} className="relative mx-auto block h-12 w-full max-w-[200px]">
-            <Image
-              src="/images/WA_BLUE-removebg-preview%20%282%29.png"
-              alt="Whisky Advocate"
-              fill
-              className="object-contain object-center mix-blend-multiply dark:mix-blend-normal dark:brightness-0 dark:invert"
-              sizes="200px"
-              priority
-            />
-          </Link>
+          {wineSpectatorPortal ? (
+            <Link href={homeHref} className="block text-center">
+              <p className="font-display text-lg font-semibold tracking-tight text-foreground">Wine Spectator</p>
+              <p className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Events workspace</p>
+            </Link>
+          ) : (
+            <Link href={homeHref} className="relative mx-auto block h-12 w-full max-w-[200px]">
+              <Image
+                src="/images/WA_BLUE-removebg-preview%20%282%29.png"
+                alt="Whisky Advocate"
+                fill
+                className="object-contain object-center mix-blend-multiply dark:mix-blend-normal dark:brightness-0 dark:invert"
+                sizes="200px"
+                priority
+              />
+            </Link>
+          )}
         </div>
       </div>
 
@@ -181,16 +227,45 @@ export function Sidebar({
           </div>
         ) : (
           <>
+            <div className="mb-5 space-y-1">
+              <p className="mb-2 px-[10px] wf-label-caps text-[10px]">Portal</p>
+              <Link
+                href="/"
+                className={cn(
+                  'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
+                  !wineSpectatorPortal
+                    ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
+                    : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
+                )}
+              >
+                <span className="text-xs font-semibold uppercase tracking-wide">
+                  {productDisplayLabel(PRODUCT_WHISKYFEST)}
+                </span>
+              </Link>
+              <Link
+                href="/wine-spectator"
+                className={cn(
+                  'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
+                  wineSpectatorPortal
+                    ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
+                    : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
+                )}
+              >
+                <span className="text-xs font-semibold uppercase tracking-wide">
+                  {productDisplayLabel(PRODUCT_WINE_SPECTATOR)}
+                </span>
+              </Link>
+            </div>
             {nav
               .filter((item) => {
                 if (item.adminOnly && !isAdmin) return false;
-                if (item.legacyImport && accountingOnly) return false;
+                if ('legacyImport' in item && item.legacyImport && accountingOnly) return false;
                 return true;
               })
               .map((item) => {
-                const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
+                const active = portalNavLinkActive(pathname, item.href);
                 const Icon = item.icon;
-                const isNewContract = item.href === '/#start-deal';
+                const isNewContract = item.href === '/#start-deal' || item.href === '/wine-spectator/contracts/new';
                 const navDisabled = readOnlyImpersonation && isNewContract;
                 if (navDisabled) {
                   return (

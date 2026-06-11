@@ -21,6 +21,7 @@ import { buildContractMergeMap } from '@/lib/merge-map';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { insertContractAudit } from '@/lib/audit-log';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
+import { syncExhibitorRosterWritebackById } from '@/lib/exhibitor-roster-sync-hook';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
@@ -52,6 +53,16 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   if (!contract.events_approved_at) {
     return NextResponse.json(
       { error: 'Events team approval is required before this contract can be sent to DocuSign.' },
+      { status: 403 },
+    );
+  }
+
+  if (event.client_send_enabled === false) {
+    return NextResponse.json(
+      {
+        error:
+          'Client send is disabled for this event. Enable it in Events admin when ready to send to exhibitors.',
+      },
       { status: 403 },
     );
   }
@@ -149,6 +160,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     });
 
     revalidateContractPaths(contract.id);
+    await syncExhibitorRosterWritebackById(contract.id);
 
     return NextResponse.json({
       ok: true,

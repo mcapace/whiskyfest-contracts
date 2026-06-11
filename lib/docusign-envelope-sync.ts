@@ -12,6 +12,7 @@ import { uploadPdfBufferToFolder } from '@/lib/google';
 import { contractSignedPdfPath, uploadContractPdfToStorage } from '@/lib/contract-pdf-storage';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { appendContractRow, updateContractRow } from '@/lib/sheets-tracker';
+import { syncExhibitorRosterWriteback } from '@/lib/exhibitor-roster-sync-hook';
 import { insertContractAudit } from '@/lib/audit-log';
 import { notifyContractFullySigned, notifyPartialSignature } from '@/lib/notifications';
 import type { ContractWithTotals, Event } from '@/types/db';
@@ -118,6 +119,7 @@ export async function applyExhibitorPartialSignature(
     } catch (err) {
       console.error('Failed to append to Sheets tracker', err);
     }
+    await syncExhibitorRosterWriteback(afterPartial);
   }
 
   if (options?.notify !== false) {
@@ -231,6 +233,7 @@ export async function applyEnvelopeFullySigned(
     } catch (err) {
       console.error('Failed to update Sheets tracker', err);
     }
+    await syncExhibitorRosterWriteback(afterSigned);
   }
 
   if (options?.notify !== false) {

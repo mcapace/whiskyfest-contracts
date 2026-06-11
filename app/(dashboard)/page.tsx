@@ -38,6 +38,12 @@ import { StatusBadge } from '@/components/contracts/status-badge';
 import { fetchBoothBrandsByContractIds } from '@/lib/contract-booth-brand-queries';
 import { getBrandMix, getDeadlines, getEventVitalSigns, getPipelineData, getRecentActivity, getSalesLeaderboard } from '@/lib/event-metrics';
 import type { AuditLogEntry, ContractWithTotals, Event } from '@/types/db';
+import {
+  PRODUCT_WHISKYFEST,
+  scopeContractsByProduct,
+  scopeEventsByProduct,
+  type ProductKey,
+} from '@/lib/product-portal';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 60;
@@ -56,7 +62,10 @@ async function getSupportedRepNames(email: string): Promise<string[]> {
   return (reps ?? []).map((r) => (r as { name: string }).name).filter(Boolean);
 }
 
-async function getDashboardData(actor: Awaited<ReturnType<typeof requireContractActorForPage>>) {
+export async function getDashboardData(
+  actor: Awaited<ReturnType<typeof requireContractActorForPage>>,
+  productKey: ProductKey = PRODUCT_WHISKYFEST,
+) {
   const supabase = getSupabaseAdmin();
 
   let contractsQuery = supabase
@@ -103,15 +112,23 @@ async function getDashboardData(actor: Awaited<ReturnType<typeof requireContract
   }
   const { data: auditRows } = await auditQuery;
 
-  const events = (eventsRes.data ?? []) as Event[];
+  const allEvents = (eventsRes.data ?? []) as Event[];
   const excludedAccountEmails = dashboardExcludedAccountEmails();
-  const contracts = filterContractsForDashboard(contractsRaw, excludedAccountEmails);
+  const contractsAll = filterContractsForDashboard(contractsRaw, excludedAccountEmails);
+  const events = scopeEventsByProduct(allEvents, productKey);
+  const contracts = scopeContractsByProduct(contractsAll, allEvents, productKey);
+  const scopedContractIds = new Set(contracts.map((c) => c.id));
+  const boothBrandMixRows = boothBrandRows.filter((row) =>
+    scopedContractIds.has((row as { contract_id: string }).contract_id),
+  );
 
   return {
     contracts,
-    boothBrandMixRows: boothBrandRows,
+    boothBrandMixRows,
     events,
-    audit: filterAuditForDashboard((auditRows ?? []) as AuditLogEntry[], excludedAccountEmails),
+    audit: filterAuditForDashboard((auditRows ?? []) as AuditLogEntry[], excludedAccountEmails).filter(
+      (entry) => !entry.contract_id || scopedContractIds.has(entry.contract_id),
+    ),
     actor,
     supportedRepNames,
     canViewAllSales: canViewAllSales({

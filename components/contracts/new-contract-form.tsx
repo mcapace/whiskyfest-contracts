@@ -100,6 +100,8 @@ interface Props {
   editImportMode?: boolean;
   /** From dashboard ?deal= or edit page inference. */
   initialDealKind?: ContractDealKind;
+  /** e.g. '' for WhiskyFest, '/wine-spectator' for Wine Spectator section */
+  portalBasePath?: string;
 }
 
 function resolveInitialDealKind(
@@ -161,6 +163,7 @@ export function NewContractForm({
   initialBoothBrands,
   editImportMode = false,
   initialDealKind,
+  portalBasePath = '',
 }: Props) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -468,14 +471,14 @@ export function NewContractForm({
 
       if (editContractId) {
         emitContractActionSuccessFeedback(Boolean(session?.user?.sound_enabled));
-        router.push(`/contracts/${editContractId}`);
+        router.push(`${portalBasePath}/contracts/${editContractId}`);
         router.refresh();
         return;
       }
 
       const { id } = await res.json();
       emitContractActionSuccessFeedback(Boolean(session?.user?.sound_enabled));
-      router.push(`/contracts/${id}`);
+      router.push(`${portalBasePath}/contracts/${id}`);
     });
   }
 
@@ -484,7 +487,7 @@ export function NewContractForm({
       {/* Header */}
       <div>
         <Link
-          href={editContractId ? `/contracts/${editContractId}` : '/'}
+          href={editContractId ? `${portalBasePath}/contracts/${editContractId}` : portalBasePath || '/'}
           className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-3.5 w-3.5" /> {editContractId ? 'Back to contract' : 'Back to dashboard'}
@@ -971,7 +974,7 @@ export function NewContractForm({
         {/* Submit */}
         <div className="flex items-center justify-end gap-3">
           <Button type="button" variant="outline" asChild>
-            <Link href="/">Cancel</Link>
+            <Link href={portalBasePath || '/'}>Cancel</Link>
           </Button>
           <Button type="submit" disabled={busy} title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}>
             {pending && <Loader2 className="h-4 w-4 animate-spin" />}

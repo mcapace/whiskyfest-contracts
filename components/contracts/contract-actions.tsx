@@ -98,6 +98,8 @@ interface Props {
   createdBy: string | null;
   discountApprovalPending: boolean;
   isEventsTeam: boolean;
+  /** When false, DocuSign send is blocked for this event (internal prep). */
+  clientSendEnabled?: boolean;
 }
 
 export function ContractActions({
@@ -131,6 +133,7 @@ export function ContractActions({
   createdBy,
   discountApprovalPending,
   isEventsTeam,
+  clientSendEnabled = true,
 }: Props) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -508,16 +511,22 @@ export function ContractActions({
 
           {status === 'approved' && (
             <>
-              <WhenDiscountBlocks active={discountApprovalPending}>
-                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.sendViaDocusign}>
+              <WhenDiscountBlocks active={discountApprovalPending || !clientSendEnabled}>
+                <ActionWithHelp
+                  helpText={
+                    clientSendEnabled
+                      ? CONTRACT_ACTION_HELP.sendViaDocusign
+                      : 'Client send is disabled for this event. Prepare contracts internally until send is enabled in Events admin.'
+                  }
+                >
                   <Button
                     className={btnPrimary}
                     onClick={() => runAction('send', 'send', undefined, 'sent')}
-                    disabled={busy || discountApprovalPending}
+                    disabled={busy || discountApprovalPending || !clientSendEnabled}
                   >
                     <ContractActionButtonLabel
                       icon={Send}
-                      label="Send via DocuSign"
+                      label={clientSendEnabled ? 'Send via DocuSign' : 'Send disabled'}
                       spinning={pending && action === 'send'}
                     />
                   </Button>

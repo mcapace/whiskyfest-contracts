@@ -38,9 +38,20 @@ export interface Event {
   google_template_doc_id: string | null;
   google_sponsorship_template_doc_id: string | null;
   contract_document_label: string;
+  /** When false, approved contracts cannot be sent to clients via DocuSign. */
+  client_send_enabled: boolean;
+  /** Google Sheets configs for live exhibitor roster sync. */
+  exhibitor_roster_sheets: ExhibitorRosterSheetConfig[] | null;
   created_at: string;
   updated_at: string;
 }
+
+export type ExhibitorRosterSheetConfig = {
+  key: string;
+  label: string;
+  spreadsheet_id: string;
+  tab: string;
+};
 
 export interface Contract {
   id: string;
@@ -128,6 +139,9 @@ export interface Contract {
   imported_by: string | null;
   /** Original signature date (paper or prior DocuSign). */
   originally_signed_at: string | null;
+  source_sheet_id: string | null;
+  source_sheet_tab: string | null;
+  source_row_number: number | null;
 }
 
 export interface ContractLineItem {

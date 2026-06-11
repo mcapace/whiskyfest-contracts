@@ -6,5 +6,9 @@ export function revalidateContractPaths(contractId: string) {
   revalidatePath(`/contracts/${contractId}`);
   revalidatePath('/contracts');
   revalidatePath('/');
+  revalidatePath(`/wine-spectator/contracts/${contractId}`);
+  revalidatePath('/wine-spectator/contracts');
+  revalidatePath('/wine-spectator');
+  revalidatePath('/wine-spectator/roster');
   emitContractBroadcast(contractId);
 }

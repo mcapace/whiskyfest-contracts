@@ -58,11 +58,14 @@ export function ContractsList({
   events,
   currentRepId,
   boothRowsByContract = {},
+  portalBasePath = '',
 }: {
   contracts: ContractWithTotals[];
   events: Event[];
   currentRepId: string | null;
   boothRowsByContract?: BoothBrandRowsByContract;
+  /** e.g. '' for WhiskyFest, '/wine-spectator' for Wine Spectator section */
+  portalBasePath?: string;
 }) {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
@@ -78,6 +81,8 @@ export function ContractsList({
   const [searchInput, setSearchInput] = useState('');
   const [customViews, setCustomViews] = useState<{ name: string; filters: ContractViewFilters }[]>([]);
   const eventMap = useMemo(() => new Map(events.map((e) => [e.id, e.name])), [events]);
+  const contractHref = (id: string) => `${portalBasePath}/contracts/${id}`;
+  const newContractHref = `${portalBasePath}/contracts/new`;
 
   useEffect(() => {
     setSearchInput(filters.search);
@@ -275,7 +280,7 @@ export function ContractsList({
               Clear filters
             </Button>
             <Button variant="default" asChild>
-              <Link href="/contracts/new">Create new contract</Link>
+              <Link href={newContractHref}>Create new contract</Link>
             </Button>
           </div>
         </div>
@@ -292,7 +297,7 @@ export function ContractsList({
                 ease: [0.25, 0.1, 0.25, 1],
               }}
             >
-              <ContractCard contract={contract} />
+              <ContractCard contract={contract} portalBasePath={portalBasePath} />
             </motion.div>
           ))}
         </div>
@@ -326,11 +331,11 @@ export function ContractsList({
                       delay: reduceMotion ? 0 : Math.min(rowIdx, 20) * 0.028,
                       ease: [0.25, 0.1, 0.25, 1],
                     }}
-                    onClick={() => router.push(`/contracts/${c.id}`)}
+                    onClick={() => router.push(contractHref(c.id))}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
-                        router.push(`/contracts/${c.id}`);
+                        router.push(contractHref(c.id));
                       }
                     }}
                   >
@@ -367,8 +372,8 @@ export function ContractsList({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                          <DropdownMenuItem onSelect={() => router.push(`/contracts/${c.id}`)}>View contract</DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => window.open(`/contracts/${c.id}`, '_blank')}>
+                          <DropdownMenuItem onSelect={() => router.push(contractHref(c.id))}>View contract</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => window.open(contractHref(c.id), '_blank')}>
                             Open in new tab
                           </DropdownMenuItem>
                         </DropdownMenuContent>

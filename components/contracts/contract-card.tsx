@@ -6,7 +6,13 @@ import { formatCurrency, formatRelative } from '@/lib/utils';
 import { StatusBadge } from '@/components/contracts/status-badge';
 import type { ContractWithTotals } from '@/types/db';
 
-export function ContractCard({ contract }: { contract: ContractWithTotals }) {
+export function ContractCard({
+  contract,
+  portalBasePath = '',
+}: {
+  contract: ContractWithTotals;
+  portalBasePath?: string;
+}) {
   const brands = (contract.brands_poured ?? '')
     .split(/[\n,;]+/)
     .map((b) => b.trim())
@@ -16,7 +22,7 @@ export function ContractCard({ contract }: { contract: ContractWithTotals }) {
 
   return (
     <Link
-      href={`/contracts/${contract.id}`}
+      href={`${portalBasePath}/contracts/${contract.id}`}
       className="block rounded-lg border border-parchment-200 bg-parchment-50 p-5 shadow-wf-editorial-sm transition-all hover:-translate-y-0.5 hover:shadow-wf-editorial motion-reduce:transform-none motion-reduce:hover:translate-y-0"
     >
       <div className="flex items-start justify-between gap-3">

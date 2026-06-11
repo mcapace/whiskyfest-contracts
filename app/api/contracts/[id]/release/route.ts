@@ -14,6 +14,7 @@ import { sendAccountingEmail } from '@/lib/email';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { updateContractRow } from '@/lib/sheets-tracker';
+import { syncExhibitorRosterWriteback } from '@/lib/exhibitor-roster-sync-hook';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
@@ -183,6 +184,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     } catch (err) {
       console.error('Failed to update Sheets tracker', err);
     }
+    await syncExhibitorRosterWriteback(executedContract);
   }
 
   return NextResponse.json({ ok: true });

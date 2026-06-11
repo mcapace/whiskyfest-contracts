@@ -5,6 +5,12 @@ import { ContractsList } from '@/components/contracts/contracts-list';
 import { fetchBoothBrandsByContractIds } from '@/lib/contract-booth-brand-queries';
 import { boothBrandRowsRecordFromMap } from '@/lib/sponsors';
 import type { ContractWithTotals, ContractStatus, Event } from '@/types/db';
+import {
+  PRODUCT_WHISKYFEST,
+  scopeContractsByProduct,
+  scopeEventsByProduct,
+  type ProductKey,
+} from '@/lib/product-portal';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,9 +33,10 @@ function escapeIlikePattern(raw: string): string {
   return raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_').replace(/,/g, ' ');
 }
 
-async function loadContracts(
+export async function loadContracts(
   actor: Awaited<ReturnType<typeof requireContractActorForPage>>,
   searchParams: { status?: string; q?: string },
+  productKey: ProductKey = PRODUCT_WHISKYFEST,
 ) {
   const supabase = getSupabaseAdmin();
   let query = supabase.from('contracts_with_totals').select('*').order('created_at', { ascending: false }).limit(200);
@@ -85,7 +92,9 @@ async function loadContracts(
     supabase.from('events').select('*'),
   ]);
 
-  const contractRows = (contracts ?? []) as ContractWithTotals[];
+  const allEvents = (events ?? []) as Event[];
+  const scopedEvents = scopeEventsByProduct(allEvents, productKey);
+  const contractRows = scopeContractsByProduct((contracts ?? []) as ContractWithTotals[], allEvents, productKey);
   const contractIds = contractRows.map((c) => c.id);
   const boothBrandRows =
     contractIds.length > 0 ? await fetchBoothBrandsByContractIds(supabase, contractIds) : [];
@@ -109,8 +118,9 @@ async function loadContracts(
 
   return {
     contracts: contractRows,
-    events: (events ?? []) as Event[],
+    events: scopedEvents,
     boothRowsByContract: boothBrandRowsRecordFromMap(boothMap),
+    portalBasePath: productKey === PRODUCT_WHISKYFEST ? '' : '/wine-spectator',
   };
 }
 
@@ -123,7 +133,7 @@ export default async function ContractsListPage({
   const status = typeof searchParams.status === 'string' ? searchParams.status : undefined;
   const q = typeof searchParams.q === 'string' ? searchParams.q : undefined;
 
-  const { contracts, events, boothRowsByContract } = await loadContracts(actor, { status, q });
+  const { contracts, events, boothRowsByContract, portalBasePath } = await loadContracts(actor, { status, q });
 
   return (
     <ContractsList
@@ -131,6 +141,7 @@ export default async function ContractsListPage({
       events={events}
       currentRepId={actor.salesRepId}
       boothRowsByContract={boothRowsByContract}
+      portalBasePath={portalBasePath}
     />
   );
 }

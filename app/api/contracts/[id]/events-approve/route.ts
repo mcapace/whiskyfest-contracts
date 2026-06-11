@@ -6,6 +6,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { notifySalesRepEventsApproved } from '@/lib/notifications';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
+import { syncExhibitorRosterWritebackById } from '@/lib/exhibitor-roster-sync-hook';
 import type { Contract } from '@/types/db';
 
 const schema = z.object({
@@ -76,6 +77,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   });
 
   revalidateContractPaths(params.id);
+  await syncExhibitorRosterWritebackById(params.id);
 
   void notifySalesRepEventsApproved(updated as Contract, {
     email,

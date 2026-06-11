@@ -5,6 +5,7 @@ import { assertContractAccess } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { updateContractRow } from '@/lib/sheets-tracker';
+import { syncExhibitorRosterWriteback } from '@/lib/exhibitor-roster-sync-hook';
 import type { ContractWithTotals } from '@/types/db';
 
 const schema = z.object({
@@ -71,6 +72,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     } catch (err) {
       console.error('Failed to update Sheets tracker', err);
     }
+    await syncExhibitorRosterWriteback(cancelledContract);
   }
 
   return NextResponse.json({ ok: true });
