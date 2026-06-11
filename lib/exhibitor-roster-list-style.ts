@@ -83,8 +83,8 @@ export function rosterListIcon(listKey: RosterListKey): LucideIcon {
 export function rosterListFilterClass(listKey: RosterListKey | 'all', active: boolean): string {
   if (listKey === 'all') {
     return active
-      ? 'border-slate-800 bg-slate-800 text-white shadow-sm hover:bg-slate-900'
-      : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50';
+      ? 'border-primary bg-primary text-primary-foreground shadow-sm hover:opacity-95'
+      : 'border-border bg-background text-foreground hover:bg-muted';
   }
   const accent = rosterListStyle(listKey);
   return active ? accent.buttonActive : accent.buttonIdle;
@@ -92,8 +92,8 @@ export function rosterListFilterClass(listKey: RosterListKey | 'all', active: bo
 
 export function rosterListFilterCountClass(active: boolean): string {
   return active
-    ? 'bg-white/20 text-white'
-    : 'bg-slate-200/90 text-slate-800';
+    ? 'bg-black/15 text-inherit'
+    : 'bg-muted text-muted-foreground';
 }
 
 export const ROSTER_ALL_LISTS_ICON = LayoutGrid;
