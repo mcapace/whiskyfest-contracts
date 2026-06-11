@@ -14,33 +14,43 @@ type RosterListStyle = {
   legendDot: string;
 };
 
-const STYLES: Record<string, RosterListStyle> = {
+/** Map sheet keys / labels to canonical roster list keys. */
+export function normalizeRosterListKey(listKey: string): 'returning' | 'champagne' | 'new' | string {
+  const k = listKey.trim().toLowerCase();
+  if (k === 'returning' || k.includes('return')) return 'returning';
+  if (k === 'champagne' || k.includes('sparkling')) return 'champagne';
+  if (k === 'new' || k.includes('new exhib')) return 'new';
+  return k;
+}
+
+/** Theme palette tokens (brass / whisky / ink) — avoid partial Tailwind amber scale. */
+const STYLES: Record<'returning' | 'champagne' | 'new', RosterListStyle> = {
   returning: {
     shortLabel: 'Returning',
     icon: Users,
-    badge: 'border-slate-500 bg-slate-100 text-slate-900',
-    buttonActive: 'border-slate-700 bg-slate-700 text-white shadow-sm hover:bg-slate-800',
-    buttonIdle: 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50',
-    rowAccent: 'border-l-4 border-l-slate-500 bg-slate-50/70',
-    legendDot: 'bg-slate-500',
+    badge: 'border-ink-500 bg-ink-300/30 text-ink-900',
+    buttonActive: 'border-oak-800 bg-oak-800 text-parchment-50 shadow-sm hover:bg-oak-900',
+    buttonIdle: 'border-ink-500 bg-ink-300/25 text-ink-900 hover:bg-ink-300/40',
+    rowAccent: 'border-l-4 border-l-ink-500 bg-ink-300/10',
+    legendDot: 'bg-ink-500',
   },
   champagne: {
     shortLabel: 'Champagne',
     icon: Sparkles,
-    badge: 'border-amber-600 bg-amber-100 text-amber-950',
-    buttonActive: 'border-amber-700 bg-amber-700 text-white shadow-sm hover:bg-amber-800',
-    buttonIdle: 'border-amber-300 bg-white text-amber-950 hover:bg-amber-50',
-    rowAccent: 'border-l-4 border-l-amber-600 bg-amber-50/50',
-    legendDot: 'bg-amber-600',
+    badge: 'border-brass-600 bg-brass-100 text-brass-900',
+    buttonActive: 'border-brass-700 bg-brass-600 text-white shadow-sm hover:bg-brass-700',
+    buttonIdle: 'border-brass-500 bg-brass-100 text-brass-900 hover:bg-brass-200',
+    rowAccent: 'border-l-4 border-l-brass-600 bg-brass-50/90',
+    legendDot: 'bg-brass-600',
   },
   new: {
     shortLabel: 'New',
     icon: UserPlus,
-    badge: 'border-rose-600 bg-rose-100 text-rose-950',
-    buttonActive: 'border-rose-800 bg-rose-800 text-white shadow-sm hover:bg-rose-900',
-    buttonIdle: 'border-rose-300 bg-white text-rose-950 hover:bg-rose-50',
-    rowAccent: 'border-l-4 border-l-rose-700 bg-rose-50/50',
-    legendDot: 'bg-rose-700',
+    badge: 'border-whisky-600 bg-whisky-100 text-whisky-900',
+    buttonActive: 'border-whisky-700 bg-whisky-600 text-white shadow-sm hover:bg-whisky-700',
+    buttonIdle: 'border-whisky-500 bg-whisky-100 text-whisky-900 hover:bg-whisky-200',
+    rowAccent: 'border-l-4 border-l-whisky-600 bg-whisky-50/90',
+    legendDot: 'bg-whisky-600',
   },
 };
 
@@ -49,19 +59,21 @@ const FALLBACK: RosterListStyle = {
   icon: Wine,
   badge: 'border-border bg-muted text-foreground',
   buttonActive: 'border-foreground bg-foreground text-background',
-  buttonIdle: 'border-border bg-white text-foreground hover:bg-muted/40',
+  buttonIdle: 'border-border bg-muted/40 text-foreground hover:bg-muted/60',
   rowAccent: 'border-l-4 border-l-border bg-muted/20',
   legendDot: 'bg-muted-foreground',
 };
 
 export function rosterListStyle(listKey: RosterListKey): RosterListStyle {
-  return STYLES[listKey] ?? FALLBACK;
+  const key = normalizeRosterListKey(listKey);
+  if (key === 'returning' || key === 'champagne' || key === 'new') return STYLES[key];
+  return FALLBACK;
 }
 
 export function rosterListShortLabel(listKey: RosterListKey, fullLabel?: string): string {
-  const style = rosterListStyle(listKey);
-  if (STYLES[listKey]) return style.shortLabel;
-  return fullLabel?.trim() || style.shortLabel;
+  const key = normalizeRosterListKey(listKey);
+  if (key === 'returning' || key === 'champagne' || key === 'new') return STYLES[key].shortLabel;
+  return fullLabel?.trim() || FALLBACK.shortLabel;
 }
 
 export function rosterListBadgeClass(listKey: RosterListKey): string {
@@ -90,10 +102,13 @@ export function rosterListFilterClass(listKey: RosterListKey | 'all', active: bo
   return active ? accent.buttonActive : accent.buttonIdle;
 }
 
-export function rosterListFilterCountClass(active: boolean): string {
-  return active
-    ? 'bg-black/15 text-inherit'
-    : 'bg-muted text-muted-foreground';
+export function rosterListFilterCountClass(listKey: RosterListKey | 'all', active: boolean): string {
+  if (active) return 'bg-black/15 text-inherit';
+  const key = listKey === 'all' ? null : normalizeRosterListKey(listKey);
+  if (key === 'returning') return 'bg-ink-500/20 text-ink-900';
+  if (key === 'champagne') return 'bg-brass-500/25 text-brass-900';
+  if (key === 'new') return 'bg-whisky-500/20 text-whisky-900';
+  return 'bg-muted text-muted-foreground';
 }
 
 export const ROSTER_ALL_LISTS_ICON = LayoutGrid;

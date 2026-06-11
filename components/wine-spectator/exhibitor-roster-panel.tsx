@@ -212,6 +212,7 @@ function RosterListFilterPill({
   icon: Icon,
   label,
   count,
+  listKey,
   className,
   onClick,
 }: {
@@ -219,6 +220,7 @@ function RosterListFilterPill({
   icon: LucideIcon;
   label: string;
   count: number;
+  listKey: string;
   className: string;
   onClick: () => void;
 }) {
@@ -237,7 +239,7 @@ function RosterListFilterPill({
       <span
         className={cn(
           'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums',
-          rosterListFilterCountClass(active),
+          rosterListFilterCountClass(listKey, active),
         )}
       >
         {count}
@@ -450,6 +452,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
             icon={ROSTER_ALL_LISTS_ICON}
             label="All lists"
             count={rowsForListCounts.length}
+            listKey="all"
             className={rosterListFilterClass('all', listFilter === 'all')}
             onClick={() => setListFilter('all')}
           />
@@ -463,6 +466,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
                 icon={Icon}
                 label={rosterListShortLabel(sheet.key, sheet.label)}
                 count={sheet.count}
+                listKey={sheet.key}
                 className={rosterListFilterClass(sheet.key, active)}
                 onClick={() => setListFilter(sheet.key)}
               />
@@ -481,6 +485,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
               icon={f.icon}
               label={f.label}
               count={licenseFilterCounts.get(f.key) ?? 0}
+              listKey="all"
               className={rosterListFilterClass('all', filter === f.key)}
               onClick={() => setFilter(f.key)}
             />
