@@ -77,9 +77,44 @@ export function visibleUiColumns(mode: RosterColumnMode, showListColumn: boolean
   });
 }
 
-export function visibleSheetColumns(mode: RosterColumnMode): string[] {
+export function visibleSheetColumns(mode: RosterColumnMode, rows: { sheetFields?: { label: string }[] }[]): string[] {
   if (mode !== 'all') return [];
-  return ROSTER_SHEET_FIELD_ORDER;
+  return rosterSheetColumnsFromRows(rows);
+}
+
+/** Union of sheet headers from loaded rows, preserving first-seen order. */
+export function rosterSheetColumnsFromRows(rows: { sheetFields?: { label: string }[] }[]): string[] {
+  const seen = new Set<string>();
+  const order: string[] = [];
+  for (const row of rows) {
+    for (const field of row.sheetFields ?? []) {
+      const label = field.label.trim();
+      if (!label || seen.has(label)) continue;
+      seen.add(label);
+      order.push(label);
+    }
+  }
+  for (const trailing of ['LICENSE STATUS', 'CONTRACT ID', 'LAST UPDATED']) {
+    if (!seen.has(trailing)) order.push(trailing);
+  }
+  return order;
+}
+
+export function formatRosterWineDisplay(wineName: string, vintage: string): string {
+  const wine = wineName.trim();
+  const vin = vintage.trim();
+  if (!wine && !vin) return '';
+  if (/^https?:\/\//i.test(wine)) return vin || '';
+  return [wine, vin].filter(Boolean).join(' · ');
+}
+
+export function rosterSheetFieldValue(
+  row: { sheetFields?: { label: string; value: string }[] },
+  label: string,
+): string {
+  const key = label.trim().toUpperCase();
+  const hit = row.sheetFields?.find((f) => f.label.trim().toUpperCase() === key);
+  return hit?.value?.trim() ?? '';
 }
 
 export function rosterColumnModeLabel(mode: RosterColumnMode): string {

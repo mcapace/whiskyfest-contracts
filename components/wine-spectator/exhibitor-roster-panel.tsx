@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { LucideIcon } from 'lucide-react';
-import { Columns3, Loader2, RefreshCw, Send, FilePlus2 } from 'lucide-react';
+import { Columns3, Loader2, RefreshCw, Send, FilePlus2, ListFilter, CircleDashed, Clock, CheckCircle2, Mail, BadgeCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/contracts/status-badge';
@@ -12,6 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn, formatRelative } from '@/lib/utils';
 import {
   rosterColumnModeLabel,
+  formatRosterWineDisplay,
+  rosterSheetFieldValue,
   visibleSheetColumns,
   visibleUiColumns,
   type RosterColumnMode,
@@ -72,12 +74,12 @@ const AUTO_REFRESH_MS = 5 * 60 * 1000;
 const COLUMN_MODES: RosterColumnMode[] = ['essential', 'extended', 'all'];
 
 const FILTERS = [
-  { key: 'all', label: 'All' },
-  { key: 'not_started', label: 'Not in system' },
-  { key: 'in_progress', label: 'In progress' },
-  { key: 'approved', label: 'Approved' },
-  { key: 'sent', label: 'Sent / signing' },
-  { key: 'done', label: 'Signed / executed' },
+  { key: 'all', label: 'All', icon: ListFilter },
+  { key: 'not_started', label: 'Not in system', icon: CircleDashed },
+  { key: 'in_progress', label: 'In progress', icon: Clock },
+  { key: 'approved', label: 'Approved', icon: CheckCircle2 },
+  { key: 'sent', label: 'Sent / signing', icon: Mail },
+  { key: 'done', label: 'Signed / executed', icon: BadgeCheck },
 ] as const;
 
 function matchesFilter(row: RosterRow, filter: string): boolean {
@@ -98,10 +100,24 @@ function matchesFilter(row: RosterRow, filter: string): boolean {
   }
 }
 
-function sheetFieldValue(row: RosterRow, label: string): string {
-  const normalized = label.trim();
-  const hit = row.sheetFields?.find((f) => f.label.trim() === normalized);
-  return hit?.value ?? '';
+function matchesSearch(row: RosterRow, query: string): boolean {
+  if (!query) return true;
+  const haystack = [
+    row.wineryName,
+    row.signerName,
+    row.signerEmail,
+    row.wineName,
+    row.vintage,
+    row.billingCompany,
+    row.billingEmail,
+    row.primaryContactName,
+    row.primaryContactEmail,
+    row.importerName,
+    ...(row.sheetFields ?? []).map((f) => `${f.label} ${f.value}`),
+  ]
+    .join(' ')
+    .toLowerCase();
+  return haystack.includes(query);
 }
 
 function CellText({ value, className }: { value: string; className?: string }) {
@@ -127,7 +143,7 @@ function renderUiCell(row: RosterRow, columnId: string) {
       );
     }
     case 'wine':
-      return <CellText value={[row.wineName, row.vintage].filter(Boolean).join(' · ')} />;
+      return <CellText value={formatRosterWineDisplay(row.wineName, row.vintage)} />;
     case 'signer':
       return (
         <div className="min-w-0">
@@ -236,6 +252,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
   const [listFilter, setListFilter] = useState<string>('all');
   const [filter, setFilter] = useState<string>('all');
   const [columnMode, setColumnMode] = useState<RosterColumnMode>('essential');
+  const [showColumnOptions, setShowColumnOptions] = useState(false);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
@@ -246,18 +263,36 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
     () => visibleUiColumns(columnMode, showListColumn),
     [columnMode, showListColumn],
   );
-  const sheetColumns = useMemo(() => visibleSheetColumns(columnMode), [columnMode]);
+  const sheetColumns = useMemo(() => visibleSheetColumns(columnMode, data.rows), [columnMode, data.rows]);
   const tableColSpan = 2 + (columnMode === 'all' ? sheetColumns.length : uiColumns.length);
+
+  const rowsForListCounts = useMemo(
+    () => data.rows.filter((row) => matchesFilter(row, filter) && matchesSearch(row, search.trim().toLowerCase())),
+    [data.rows, filter, search],
+  );
+
+  const rowsForStatusCounts = useMemo(
+    () => data.rows.filter((row) => (listFilter === 'all' || row.listKey === listFilter) && matchesSearch(row, search.trim().toLowerCase())),
+    [data.rows, listFilter, search],
+  );
+
+  const licenseFilterCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const f of FILTERS) {
+      counts.set(f.key, rowsForStatusCounts.filter((row) => matchesFilter(row, f.key)).length);
+    }
+    return counts;
+  }, [rowsForStatusCounts]);
 
   const sheetTabs = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const row of data.rows) {
+    for (const row of rowsForListCounts) {
       counts.set(row.listKey, (counts.get(row.listKey) ?? 0) + 1);
     }
     const fromApi = data.sheets ?? [];
     const tabs: RosterSheet[] = fromApi.map((sheet) => ({
       ...sheet,
-      count: counts.get(sheet.key) ?? sheet.count ?? 0,
+      count: counts.get(sheet.key) ?? 0,
     }));
     if (tabs.length === 0) {
       for (const [key, count] of counts) {
@@ -266,30 +301,14 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
       }
     }
     return tabs;
-  }, [data.rows, data.sheets]);
+  }, [data.rows, data.sheets, rowsForListCounts]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return data.rows.filter((row) => {
       if (listFilter !== 'all' && row.listKey !== listFilter) return false;
       if (!matchesFilter(row, filter)) return false;
-      if (!q) return true;
-      const haystack = [
-        row.wineryName,
-        row.signerName,
-        row.signerEmail,
-        row.wineName,
-        row.vintage,
-        row.billingCompany,
-        row.billingEmail,
-        row.primaryContactName,
-        row.primaryContactEmail,
-        row.importerName,
-        ...(row.sheetFields ?? []).map((f) => `${f.label} ${f.value}`),
-      ]
-        .join(' ')
-        .toLowerCase();
-      return haystack.includes(q);
+      return matchesSearch(row, q);
     });
   }, [data.rows, filter, listFilter, search]);
 
@@ -430,7 +449,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
             active={listFilter === 'all'}
             icon={ROSTER_ALL_LISTS_ICON}
             label="All lists"
-            count={data.rows.length}
+            count={rowsForListCounts.length}
             className={rosterListFilterClass('all', listFilter === 'all')}
             onClick={() => setListFilter('all')}
           />
@@ -456,52 +475,75 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">License status</p>
         <div className="flex flex-wrap items-center gap-2">
           {FILTERS.map((f) => (
-            <Button
+            <RosterListFilterPill
               key={f.key}
-              size="sm"
-              variant={filter === f.key ? 'default' : 'outline'}
+              active={filter === f.key}
+              icon={f.icon}
+              label={f.label}
+              count={licenseFilterCounts.get(f.key) ?? 0}
+              className={rosterListFilterClass('all', filter === f.key)}
               onClick={() => setFilter(f.key)}
-            >
-              {f.label}
-            </Button>
+            />
           ))}
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search winery, signer, billing, sheet fields…"
-            className="max-w-xs"
+            placeholder="Search winery, signer, billing…"
+            className="h-8 max-w-xs text-sm"
           />
         </div>
       </div>
 
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <Columns3 className="h-4 w-4 text-muted-foreground" aria-hidden />
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Columns</p>
-          {COLUMN_MODES.map((mode) => (
-            <Button
-              key={mode}
-              size="sm"
-              variant={columnMode === mode ? 'default' : 'outline'}
-              onClick={() => setColumnMode(mode)}
-            >
-              {rosterColumnModeLabel(mode)}
-            </Button>
-          ))}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-8 gap-1.5"
+            onClick={() => setShowColumnOptions((open) => !open)}
+          >
+            <Columns3 className="h-3.5 w-3.5" aria-hidden />
+            {showColumnOptions ? 'Hide columns' : 'More columns'}
+          </Button>
+          {columnMode !== 'essential' ? (
+            <span className="text-xs text-muted-foreground">
+              Viewing: {rosterColumnModeLabel(columnMode)}
+            </span>
+          ) : null}
         </div>
-        {columnMode === 'all' ? (
-          <p className="text-xs text-muted-foreground">Scroll horizontally to see every field from the Google Sheet form.</p>
-        ) : columnMode === 'essential' ? (
-          <p className="text-xs text-muted-foreground">Showing winery, wine, contract signer, and license status. Switch to More columns or All sheet fields for full detail.</p>
-        ) : (
-          <p className="text-xs text-muted-foreground">Showing billing, contacts, and sheet sync status in addition to essentials.</p>
-        )}
+        {showColumnOptions ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-muted/20 p-3">
+            {COLUMN_MODES.map((mode) => (
+              <Button
+                key={mode}
+                size="sm"
+                variant={columnMode === mode ? 'default' : 'outline'}
+                onClick={() => {
+                  setColumnMode(mode);
+                  if (mode === 'essential') setShowColumnOptions(false);
+                }}
+              >
+                {rosterColumnModeLabel(mode)}
+              </Button>
+            ))}
+            {columnMode === 'all' ? (
+              <p className="w-full text-xs text-muted-foreground">
+                Scroll horizontally for every Google Sheet field from the synced rows.
+              </p>
+            ) : columnMode === 'extended' ? (
+              <p className="w-full text-xs text-muted-foreground">
+                Billing, contacts, and sheet sync columns in addition to essentials.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
 
       <div className="overflow-x-auto rounded-lg border">
-        <Table className={columnMode === 'all' ? 'min-w-max text-xs' : undefined}>
+        <Table className={cn(columnMode === 'all' ? 'min-w-max text-xs' : 'w-full table-fixed')}>
           <TableHeader>
             <TableRow>
               <TableHead className="sticky left-0 z-10 w-10 bg-background">
@@ -519,7 +561,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
                     </TableHead>
                   ))
                 : uiColumns.map((col) => (
-                    <TableHead key={col.id} style={{ minWidth: col.minWidth }}>
+                    <TableHead key={col.id} className="whitespace-nowrap" style={{ width: col.minWidth }}>
                       {col.label}
                     </TableHead>
                   ))}
@@ -550,7 +592,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
                 {columnMode === 'all'
                   ? sheetColumns.map((label) => (
                       <TableCell key={`${row.rowKey}-${label}`} className="align-top">
-                        <CellText value={sheetFieldValue(row, label)} className="text-xs" />
+                        <CellText value={rosterSheetFieldValue(row, label)} className="text-xs" />
                       </TableCell>
                     ))
                   : uiColumns.map((col) => (

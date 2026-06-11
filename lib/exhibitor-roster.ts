@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getSheetsClient } from '@/lib/sheets-tracker';
+import { formatRosterWineDisplay } from '@/lib/exhibitor-roster-columns';
 import { formatStatus } from '@/lib/status-display';
 import type { ContractStatus, ContractWithTotals, Event } from '@/types/db';
 
@@ -141,6 +142,58 @@ function columnMapForList(listKey: string): ColumnMap {
   return listKey === 'new' ? NEW_COLUMNS : STANDARD_COLUMNS;
 }
 
+function normalizeHeaderLabel(label: string): string {
+  return String(label ?? '').trim().toUpperCase();
+}
+
+function headerIndex(headers: string[], ...candidates: string[]): number {
+  const norm = headers.map(normalizeHeaderLabel);
+  for (const candidate of candidates) {
+    const key = normalizeHeaderLabel(candidate);
+    const exact = norm.indexOf(key);
+    if (exact >= 0) return exact;
+  }
+  for (const candidate of candidates) {
+    const key = normalizeHeaderLabel(candidate);
+    const fuzzy = norm.findIndex((h) => h.includes(key) || key.includes(h));
+    if (fuzzy >= 0) return fuzzy;
+  }
+  return -1;
+}
+
+/** Resolve column indices from the sheet header row (falls back to list-specific defaults). */
+export function buildColumnMapFromHeaders(headers: string[], listKey: string): ColumnMap {
+  const fallback = columnMapForList(listKey);
+  const pick = (key: keyof ColumnMap, ...names: string[]) => {
+    const index = headerIndex(headers, ...names);
+    return index >= 0 ? index : fallback[key];
+  };
+  return {
+    wineryName: pick('wineryName', 'NAME OF PARTICIPATING WINERY'),
+    participation: pick('participation', 'PLEASE CONFIRM YOUR PARTICIPATION:', 'PLEASE CONFIRM YOUR PARTICIPATION'),
+    primaryFirst: pick('primaryFirst', 'PRIMARY CONTACT FIRST NAME'),
+    primaryLast: pick('primaryLast', 'PRIMARY CONTACT LAST NAME'),
+    primaryEmail: pick('primaryEmail', 'PRIMARY CONTACT EMAIL'),
+    primaryPhone: pick('primaryPhone', 'PRIMARY CONTACT PHONE (must be a US cell#)', 'PRIMARY CONTACT PHONE'),
+    wineName: pick('wineName', 'WINE NAME', 'WINE NAME '),
+    vintage: pick('vintage', 'VINTAGE', 'VINTAGE '),
+    billingFirst: pick('billingFirst', 'BILLING CONTACT FIRST NAME'),
+    billingLast: pick('billingLast', 'BILLING CONTACT LAST NAME'),
+    billingEmail: pick('billingEmail', 'BILLING CONTACT EMAIL'),
+    billingCompany: pick('billingCompany', 'BILLING COMPANY NAME'),
+    billingStreet: pick('billingStreet', 'BILLING STREET ADDRESS/ P.O BOX #', 'BILLING STREET ADDRESS'),
+    city: pick('city', 'CITY'),
+    state: pick('state', 'STATE'),
+    zip: pick('zip', 'ZIP CODE/POSTAL CODE', 'ZIP CODE'),
+    contractRepFirst: pick('contractRepFirst', 'CONTRACT REPRESENTATIVE FIRST NAME'),
+    contractRepLast: pick('contractRepLast', 'CONTRACT REPRESENTATIVE LAST NAME'),
+    contractRepEmail: pick('contractRepEmail', 'CONTRACT REPRESENTATIVE EMAIL ADDRESS'),
+    importerName: pick('importerName', 'IMPORTER CONTACT NAME', 'IMPORTER CONTACT NAME '),
+    importerPhone: pick('importerPhone', 'IMPORTER CONTACT PHONE NUMBER', 'IMPORTER CONTACT PHONE NUMBER '),
+    importerEmail: pick('importerEmail', 'IMPORTER EMAIL ADDRESS', 'IMPORTER EMAIL ADDRESS '),
+  };
+}
+
 function participationYes(row: string[], map: ColumnMap): boolean {
   return cell(row, map.participation).toLowerCase().includes('yes');
 }
@@ -222,6 +275,7 @@ export function buildContractPayloadFromRosterRow(
   row: string[],
   listKey: string,
   event: Event,
+  headers?: string[],
 ): {
   exhibitor_legal_name: string;
   exhibitor_company_name: string;
@@ -231,13 +285,13 @@ export function buildContractPayloadFromRosterRow(
   booth_count: number;
   booth_rate_cents: number;
 } {
-  const map = columnMapForList(listKey);
+  const map = headers?.length ? buildColumnMapFromHeaders(headers, listKey) : columnMapForList(listKey);
   const winery = cell(row, map.wineryName);
   const billingCompany = cell(row, map.billingCompany) || winery;
   const signer = resolveSigner(row, map);
   const wineName = cell(row, map.wineName);
   const vintage = cell(row, map.vintage);
-  const brandLine = [wineName, vintage].filter(Boolean).join(' ').trim();
+  const brandLine = formatRosterWineDisplay(wineName, vintage);
 
   return {
     exhibitor_legal_name: billingCompany,
@@ -301,7 +355,7 @@ export async function fetchExhibitorRoster(event: Event): Promise<{
     ]);
     const headers = ((headerRes.data.values?.[0] ?? []) as string[]).map((h) => String(h ?? '').trim());
     const statusStart = statusColumnStart(headers);
-    const map = columnMapForList(config.key);
+    const map = buildColumnMapFromHeaders(headers, config.key);
 
     dataRows.forEach((row, index) => {
       if (!participationYes(row, map)) return;

@@ -14,6 +14,15 @@ function tabRange(tab: string, a1: string): string {
   return `${safe}!${a1}`;
 }
 
+async function readRosterHeaders(spreadsheetId: string, tab: string): Promise<string[]> {
+  const sheets = getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: tabRange(tab, 'A1:AZ1'),
+  });
+  return ((res.data.values?.[0] ?? []) as string[]).map((v) => String(v ?? '').trim());
+}
+
 async function readRosterRow(spreadsheetId: string, tab: string, rowNumber: number): Promise<string[]> {
   const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
@@ -60,8 +69,11 @@ export async function createContractsFromRosterRows(options: {
     }
 
     try {
-      const row = await readRosterRow(parsed.spreadsheetId, parsed.tab, parsed.rowNumber);
-      const payload = buildContractPayloadFromRosterRow(row, item.listKey, options.event);
+      const [headers, row] = await Promise.all([
+        readRosterHeaders(parsed.spreadsheetId, parsed.tab),
+        readRosterRow(parsed.spreadsheetId, parsed.tab, parsed.rowNumber),
+      ]);
+      const payload = buildContractPayloadFromRosterRow(row, item.listKey, options.event, headers);
       if (!payload.exhibitor_company_name.trim()) {
         errors.push({ rowKey, reason: 'Missing winery name' });
         continue;
