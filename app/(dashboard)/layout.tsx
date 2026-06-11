@@ -11,6 +11,7 @@ import { ImpersonationBanner } from '@/components/impersonation/impersonation-ba
 import { TutorialProvider } from '@/components/tutorial/tutorial-provider';
 import { DailyBubbleSlot } from '@/components/daily-bubble/daily-bubble-slot';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { canAccessWineSpectator } from '@/lib/wine-spectator-access';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -23,6 +24,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const isAccounting = Boolean(session.user.is_accounting);
   const accountingOnly = isAccounting && !pipelineAccess;
   const showAccountingNav = isAccounting || session.user.role === 'admin';
+  const wineSpectatorAccess = canAccessWineSpectator({
+    role: session.user.role,
+    is_events_team: session.user.is_events_team,
+    email: session.user.email,
+  });
   let pendingAccessRequests = 0;
   if (session.user.role === 'admin') {
     const supabase = getSupabaseAdmin();
@@ -48,6 +54,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               pipelineAccess: Boolean(session.user.pipeline_access),
               isAccounting: Boolean(session.user.is_accounting),
               isEventsTeam: Boolean(session.user.is_events_team),
+              wineSpectatorAccess,
             }}
             canImpersonate={Boolean(session.user.can_impersonate)}
             readOnlyImpersonation={readOnly}
@@ -62,7 +69,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
               </div>
             </main>
           </div>
-          <MobileBottomNav accountingOnly={accountingOnly} showAdminLinks={showAccountingNav} />
+          <MobileBottomNav
+            accountingOnly={accountingOnly}
+            showAccountingNav={showAccountingNav}
+            wineSpectatorAccess={wineSpectatorAccess}
+          />
         </div>
       </CommandPaletteProvider>
       </DashboardKeyboardShortcuts>

@@ -46,6 +46,10 @@ export interface Event {
   client_send_enabled: boolean;
   /** Google Sheets configs for live exhibitor roster sync. */
   exhibitor_roster_sheets: ExhibitorRosterSheetConfig[] | null;
+  /** Last automated/manual pull from Google Sheets master lists. */
+  roster_last_synced_at: string | null;
+  /** Cached roster rows from the latest sync. */
+  roster_cached_snapshot: unknown | null;
   created_at: string;
   updated_at: string;
 }

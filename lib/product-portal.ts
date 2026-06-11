@@ -16,6 +16,10 @@ export function isWineSpectatorPath(pathname: string): boolean {
   return productFromPathname(pathname) === PRODUCT_WINE_SPECTATOR;
 }
 
+export function isAccountingPath(pathname: string): boolean {
+  return pathname === '/accounting' || pathname.startsWith('/accounting/');
+}
+
 export function productBasePath(productKey: ProductKey): string {
   return productKey === PRODUCT_WINE_SPECTATOR ? '/wine-spectator' : '';
 }

@@ -1,17 +1,13 @@
-import { fetchExhibitorRoster } from '@/lib/exhibitor-roster';
+import { loadExhibitorRoster } from '@/lib/exhibitor-roster-sync-job';
 import { getActiveWineSpectatorEvent } from '@/lib/wine-spectator-event';
 import { requireContractActorForPage } from '@/lib/auth-contract';
-import { redirect } from 'next/navigation';
 import { NyweLogo } from '@/components/brand/nywe-logo';
 import { ExhibitorRosterPanel } from '@/components/wine-spectator/exhibitor-roster-panel';
 
 export const dynamic = 'force-dynamic';
 
 export default async function WineSpectatorRosterPage() {
-  const actor = await requireContractActorForPage();
-  if (!actor.isAdmin && !actor.isEventsTeam) {
-    redirect('/wine-spectator');
-  }
+  await requireContractActorForPage();
 
   const event = await getActiveWineSpectatorEvent();
   if (!event) {
@@ -23,7 +19,7 @@ export default async function WineSpectatorRosterPage() {
     );
   }
 
-  const roster = await fetchExhibitorRoster(event);
+  const { roster } = await loadExhibitorRoster(event);
 
   return (
     <div className="space-y-6">
@@ -32,8 +28,8 @@ export default async function WineSpectatorRosterPage() {
         <div className="min-w-0 sm:order-1">
         <h1 className="font-display text-3xl font-medium text-foreground">Exhibitor roster</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Live sync from Google Sheets for {event.name}. Create vendor licenses on demand, track signing in the app,
-          and write status back to the sheet.
+          Master lists sync from Google Sheets every 30 minutes for {event.name}. Create vendor licenses on demand,
+          track signing in the app, and write status back to the sheet.
         </p>
         </div>
       </div>

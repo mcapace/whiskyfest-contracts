@@ -2,11 +2,15 @@ import { auth } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 import type { Session } from 'next-auth';
 import { IMPERSONATION_READ_ONLY_MESSAGE } from '@/lib/impersonation-read-only';
+import { canAccessWineSpectator } from '@/lib/wine-spectator-access';
 
 type SessionUserFlags = {
   pipeline_access?: boolean;
   is_accounting?: boolean;
+  is_events_team?: boolean;
+  wine_spectator_access?: boolean;
   role?: string;
+  email?: string;
 };
 
 const READ_ONLY_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -60,6 +64,20 @@ export default auth((req) => {
 
     if (pathname.startsWith('/accounting') && !canOpenAccounting) {
       return NextResponse.redirect(new URL('/', req.nextUrl.origin));
+    }
+
+    const wineSpectatorPath =
+      pathname === '/wine-spectator' || pathname.startsWith('/wine-spectator/') || pathname.startsWith('/api/wine-spectator');
+    if (
+      wineSpectatorPath &&
+      !canAccessWineSpectator({
+        role: u.role,
+        is_events_team: u.is_events_team,
+        email: u.email,
+      })
+    ) {
+      const dest = accountingOnly ? '/accounting' : '/';
+      return NextResponse.redirect(new URL(dest, req.nextUrl.origin));
     }
   }
 

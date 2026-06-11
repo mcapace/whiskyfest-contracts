@@ -11,9 +11,13 @@ import { cn } from '@/lib/utils';
 export function HeroParallaxLayer({
   className,
   imageClassName,
+  src = '/images/AdobeStock_271973922.jpeg',
+  objectPosition = 'center 38%',
 }: {
   className?: string;
   imageClassName?: string;
+  src?: string;
+  objectPosition?: string;
 }) {
   const reduce = useReducedMotion();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -43,21 +47,19 @@ export function HeroParallaxLayer({
   return (
     <div ref={rootRef} className={cn('pointer-events-none absolute inset-0', className)} aria-hidden>
       <Image
-        src="/images/AdobeStock_271973922.jpeg"
+        src={src}
         alt=""
         fill
-        className={cn(
-          'object-cover object-[center_38%] opacity-60 sm:object-[center_35%]',
-          imageClassName,
-        )}
-        style={
-          reduce
-            ? undefined
+        className={cn('object-cover opacity-60', imageClassName)}
+        style={{
+          objectPosition,
+          ...(reduce
+            ? {}
             : {
                 transform: `translate3d(0, ${shiftY}px, 0) scale(1.07)`,
                 transition: 'transform 0.12s ease-out',
-              }
-        }
+              }),
+        }}
         priority
       />
     </div>

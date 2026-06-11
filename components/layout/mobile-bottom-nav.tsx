@@ -5,23 +5,38 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Calculator, Home, Landmark, LayoutDashboard, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { isWineSpectatorPath } from '@/lib/product-portal';
+import { isAccountingPath, isWineSpectatorPath } from '@/lib/product-portal';
 import { CommandPaletteTrigger } from '@/components/command-palette/command-palette';
 
 export function MobileBottomNav({
   accountingOnly,
-  showAdminLinks,
+  showAccountingNav,
+  wineSpectatorAccess,
 }: {
   accountingOnly: boolean;
-  showAdminLinks: boolean;
+  showAccountingNav: boolean;
+  wineSpectatorAccess: boolean;
 }) {
   const pathname = usePathname();
-  const wineSpectatorPortal = isWineSpectatorPath(pathname);
+  const wineSpectatorPortal = isWineSpectatorPath(pathname) && wineSpectatorAccess;
+  const accountingPortal = isAccountingPath(pathname);
 
   if (accountingOnly) {
     return (
       <nav className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t border-border/60 bg-bg-surface-raised/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md lg:hidden">
         <NavIcon href="/accounting" active={pathname.startsWith('/accounting')} label="AR" icon={Landmark} />
+        <div className="flex flex-col items-center gap-0.5 py-1">
+          <CommandPaletteTrigger />
+          <span className="text-[10px] text-muted-foreground">Search</span>
+        </div>
+      </nav>
+    );
+  }
+
+  if (accountingPortal && showAccountingNav) {
+    return (
+      <nav className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t border-border/60 bg-bg-surface-raised/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md lg:hidden">
+        <NavIcon href="/accounting" active={pathname === '/accounting'} label="AR" icon={Landmark} />
         <div className="flex flex-col items-center gap-0.5 py-1">
           <CommandPaletteTrigger />
           <span className="text-[10px] text-muted-foreground">Search</span>
@@ -59,7 +74,7 @@ export function MobileBottomNav({
       <NavIcon href="/" active={pathname === '/'} label="Home" icon={LayoutDashboard} />
       <NavIcon href="/#start-deal" active={pathname === '/'} label="Start" icon={Plus} />
       <NavIcon href="/contracts" active={pathname.startsWith('/contracts') && !pathname.includes('/new')} label="Contracts" icon={Home} />
-      {showAdminLinks && (
+      {showAccountingNav && (
         <NavIcon href="/accounting" active={pathname.startsWith('/accounting')} label="AR" icon={Calculator} />
       )}
       <div className="flex min-w-[3rem] flex-col items-center gap-0.5 py-1">

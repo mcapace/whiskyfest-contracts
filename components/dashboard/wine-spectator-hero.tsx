@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CountdownTimer } from '@/components/countdown-timer';
+import { HeroParallaxLayer } from '@/components/dashboard/hero-parallax-layer';
 import { eventCountdownTargetIso, formatEventScheduleLine } from '@/lib/event-schedule';
 import { cn } from '@/lib/utils';
 import type { Event } from '@/types/db';
@@ -38,49 +39,57 @@ export function WineSpectatorHero({
     <section
       data-tour="wine-spectator-hero"
       className={cn(
-        'overflow-hidden rounded-xl border border-rose-900/25 bg-gradient-to-br from-rose-950 via-rose-900 to-stone-900 shadow-wf-editorial',
+        'overflow-hidden rounded-xl border border-rose-900/25 bg-rose-950 shadow-wf-editorial',
         className,
       )}
     >
-      <div className="relative overflow-hidden px-6 py-10 sm:px-10 sm:py-12 lg:px-12">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(251,191,36,0.12),transparent_55%)]" />
-        <div className="relative">
-          <div className="mb-6 inline-block max-w-sm rounded-lg bg-black px-4 py-3 shadow-lg sm:max-w-md">
-            <Image
-              src="/images/nywe-logo.png"
-              alt="Wine Spectator New York Wine Experience"
-              width={514}
-              height={174}
-              priority
-              className="h-auto w-full object-contain"
+      <div className="relative h-[480px] overflow-hidden bg-rose-950">
+        <HeroParallaxLayer
+          src="/images/nywe-hero.png"
+          objectPosition="center 42%"
+          imageClassName="opacity-75 sm:opacity-70"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-rose-950/25 via-rose-950/55 to-rose-950/95" />
+
+        <div className="relative flex h-full flex-col justify-end gap-6 p-6 sm:p-10 lg:p-12">
+          <div>
+            <div className="mb-6 inline-block max-w-sm rounded-lg bg-black/90 px-4 py-3 shadow-lg backdrop-blur-sm sm:max-w-md">
+              <Image
+                src="/images/nywe-logo.png"
+                alt="Wine Spectator New York Wine Experience"
+                width={514}
+                height={174}
+                priority
+                className="h-auto w-full object-contain"
+              />
+            </div>
+            {greetingHeadline && greetingSubtitle ? (
+              <>
+                <h1 className="font-display text-4xl font-medium tracking-tight text-parchment-50 sm:text-5xl lg:text-6xl">
+                  {greetingHeadline}
+                </h1>
+                <p className="mt-3 font-display text-lg font-light italic text-parchment-100 sm:text-xl">
+                  {greetingSubtitle}
+                </p>
+              </>
+            ) : (
+              <h1 className="font-display text-4xl font-medium tracking-tight text-parchment-50 sm:text-5xl lg:text-6xl">
+                {eventName}
+              </h1>
+            )}
+            <p className="mt-3 max-w-2xl font-display text-lg text-parchment-200/95 sm:text-xl">
+              {scheduleLabel}
+            </p>
+            <CountdownTimer
+              targetDate={scheduleEvent.event_date}
+              targetDateTimeIso={countdownIso}
+              className="mt-6"
             />
           </div>
-          {greetingHeadline && greetingSubtitle ? (
-            <>
-              <h1 className="font-display text-4xl font-medium tracking-tight text-parchment-50 sm:text-5xl lg:text-6xl">
-                {greetingHeadline}
-              </h1>
-              <p className="mt-3 font-display text-lg font-light italic text-parchment-100 sm:text-xl">
-                {greetingSubtitle}
-              </p>
-            </>
-          ) : (
-            <h1 className="font-display text-4xl font-medium tracking-tight text-parchment-50 sm:text-5xl lg:text-6xl">
-              {eventName}
-            </h1>
-          )}
-          <p className="mt-3 max-w-2xl font-display text-lg text-parchment-200/95 sm:text-xl">
-            {scheduleLabel}
-          </p>
-          <CountdownTimer
-            targetDate={scheduleEvent.event_date}
-            targetDateTimeIso={countdownIso}
-            className="mt-6"
-          />
         </div>
       </div>
 
-      <div className="grid gap-4 border-t border-parchment-300/15 bg-black/20 p-6 text-parchment-100 sm:grid-cols-[1fr_auto] sm:items-end">
+      <div className="grid gap-4 border-t border-parchment-300/15 bg-rose-950/90 p-6 text-parchment-100 sm:grid-cols-[1fr_auto] sm:items-end">
         <div className="min-w-0">
           <p className="text-sm leading-relaxed text-parchment-100/90">
             {contractsCount} vendor license{contractsCount !== 1 ? 's' : ''} in this workspace

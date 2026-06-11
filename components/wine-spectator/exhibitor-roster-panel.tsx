@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Columns3, Loader2, RefreshCw, Send, FilePlus2 } from 'lucide-react';
@@ -52,10 +52,13 @@ type RosterSheet = {
 
 type RosterPayload = {
   syncedAt: string;
+  fromCache?: boolean;
   event: { id: string; name: string; client_send_enabled: boolean };
   sheets: RosterSheet[];
   rows: RosterRow[];
 };
+
+const AUTO_REFRESH_MS = 5 * 60 * 1000;
 
 const COLUMN_MODES: RosterColumnMode[] = ['essential', 'extended', 'all'];
 
@@ -235,20 +238,33 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
     });
   }, [data.rows, filter, listFilter, search]);
 
-  const refresh = useCallback(() => {
-    startTransition(async () => {
-      setMessage(null);
-      const res = await fetch('/api/wine-spectator/roster', { cache: 'no-store' });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setMessage(json.error ?? 'Refresh failed');
-        return;
-      }
-      setData(json as RosterPayload);
-      setSelected(new Set());
-      router.refresh();
-    });
-  }, [router]);
+  const refresh = useCallback(
+    (options?: { live?: boolean; preserveSelection?: boolean }) => {
+      startTransition(async () => {
+        setMessage(null);
+        const url = options?.live ? '/api/wine-spectator/roster?live=1' : '/api/wine-spectator/roster';
+        const res = await fetch(url, { cache: 'no-store' });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setMessage(json.error ?? 'Refresh failed');
+          return;
+        }
+        setData(json as RosterPayload);
+        if (!options?.preserveSelection) setSelected(new Set());
+        router.refresh();
+      });
+    },
+    [router],
+  );
+
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState !== 'visible') return;
+      refresh({ preserveSelection: true });
+    };
+    const id = window.setInterval(tick, AUTO_REFRESH_MS);
+    return () => window.clearInterval(id);
+  }, [refresh]);
 
   const toggleRow = (rowKey: string) => {
     setSelected((prev) => {
@@ -294,7 +310,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
       const skipped = (json.skipped ?? []).length;
       const errors = (json.errors ?? []).length;
       setMessage(`Created ${created} draft${created === 1 ? '' : 's'} · skipped ${skipped} · errors ${errors}`);
-      await refresh();
+      await refresh({ live: true, preserveSelection: true });
     });
   };
 
@@ -318,7 +334,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
         else failed += 1;
       }
       setMessage(`Sent ${sent} · failed ${failed}`);
-      await refresh();
+      await refresh({ live: true, preserveSelection: true });
     });
   };
 
@@ -334,7 +350,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
       ) : null}
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="outline" size="sm" onClick={refresh} disabled={pending}>
+        <Button variant="outline" size="sm" onClick={() => refresh({ live: true })} disabled={pending}>
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           Refresh from sheets
         </Button>
@@ -347,7 +363,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
           Send selected ({selectedSendable})
         </Button>
         <span className="text-xs text-muted-foreground">
-          Synced {formatRelative(data.syncedAt)} · {filtered.length} shown
+          {data.fromCache ? 'Auto-synced' : 'Live from sheets'} {formatRelative(data.syncedAt)} · {filtered.length} shown
           {listFilter === 'all' ? ` · ${data.rows.length} total` : ''}
         </span>
       </div>

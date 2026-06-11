@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
+  isAccountingPath,
   isWineSpectatorPath,
   productDisplayLabel,
   PRODUCT_WINE_SPECTATOR,
@@ -59,15 +60,18 @@ function AccountPermissionSummary({
     pipelineAccess?: boolean;
     isAccounting?: boolean;
     isEventsTeam?: boolean;
+    wineSpectatorAccess?: boolean;
   };
 }) {
   const pipeline = Boolean(user.pipelineAccess);
   const events = Boolean(user.isEventsTeam);
   const accounting = Boolean(user.isAccounting);
+  const wine = Boolean(user.wineSpectatorAccess);
 
   const rows = [
     { label: 'Role', value: formatRoleLabel(user.role) },
     { label: 'Contract pipeline', value: pipeline ? 'Yes' : 'No' },
+    { label: 'Wine Spectator', value: wine ? 'Yes' : 'No' },
     { label: 'Events team', value: events ? 'Yes' : 'No' },
     { label: 'Accounting', value: accounting ? 'Yes' : 'No' },
   ];
@@ -84,26 +88,6 @@ function AccountPermissionSummary({
         ))}
       </dl>
     </div>
-  );
-}
-
-function AccountingNavLink({ pathname }: { pathname: string }) {
-  const href = '/accounting';
-  const active = pathname === href || pathname.startsWith(`${href}/`);
-  return (
-    <Link
-      href={href}
-      data-tour="sidebar-accounting"
-      className={cn(
-        'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
-        active
-          ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
-          : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
-      )}
-    >
-      <Landmark className={cn('h-4 w-4', active ? 'text-accent-brand' : 'text-muted-foreground/70')} />
-      Accounting Dashboard
-    </Link>
   );
 }
 
@@ -140,8 +124,17 @@ const wineSpectatorNav: {
   { href: '/users', label: 'Users', icon: Users, adminOnly: true },
 ];
 
+const accountingNav: {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+}[] = [
+  { href: '/accounting', label: 'AR Dashboard', icon: Landmark },
+  { href: '/settings', label: 'Settings', icon: Settings },
+];
+
 function portalNavLinkActive(pathname: string, href: string): boolean {
-  if (href === '/' || href === '/wine-spectator') {
+  if (href === '/' || href === '/wine-spectator' || href === '/accounting') {
     return pathname === href;
   }
   if (href === '/#start-deal') {
@@ -163,6 +156,7 @@ export function Sidebar({
     pipelineAccess?: boolean;
     isAccounting?: boolean;
     isEventsTeam?: boolean;
+    wineSpectatorAccess?: boolean;
   };
   canImpersonate?: boolean;
   readOnlyImpersonation?: boolean;
@@ -170,13 +164,19 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const isAdmin = user.role === 'admin';
-  const isEventsTeam = Boolean(user.isEventsTeam);
   const pipelineAccess = Boolean(user.pipelineAccess);
   const isAccounting = Boolean(user.isAccounting);
+  const canAccounting = isAccounting || isAdmin;
+  const canWineSpectator = Boolean(user.wineSpectatorAccess);
   const accountingOnly = isAccounting && !pipelineAccess;
+  const accountingPortal = isAccountingPath(pathname);
   const wineSpectatorPortal = isWineSpectatorPath(pathname);
-  const homeHref = accountingOnly ? '/accounting' : wineSpectatorPortal ? '/wine-spectator' : '/';
-  const nav = wineSpectatorPortal ? wineSpectatorNav : whiskyfestNav;
+  const homeHref = accountingOnly || accountingPortal
+    ? '/accounting'
+    : wineSpectatorPortal
+      ? '/wine-spectator'
+      : '/';
+  const nav = accountingPortal ? accountingNav : wineSpectatorPortal ? wineSpectatorNav : whiskyfestNav;
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border/60 bg-bg-surface/95 backdrop-blur-md lg:flex">
@@ -185,12 +185,20 @@ export function Sidebar({
           'shrink-0 border-b border-border/50 px-3 py-4',
           wineSpectatorPortal
             ? 'bg-gradient-to-b from-rose-900/[0.08] via-bg-surface-raised to-bg-surface'
-            : 'bg-gradient-to-b from-fest-600/[0.07] via-bg-surface-raised to-bg-surface',
+            : accountingPortal
+              ? 'bg-gradient-to-b from-brass-700/[0.08] via-bg-surface-raised to-bg-surface'
+              : 'bg-gradient-to-b from-fest-600/[0.07] via-bg-surface-raised to-bg-surface',
         )}
       >
         <div className="mx-auto max-w-[220px] px-3 py-2">
           {wineSpectatorPortal ? (
             <NyweLogo href={homeHref} priority subtitle="Vendor licenses workspace" imageClassName="max-h-12" />
+          ) : accountingPortal ? (
+            <Link href={homeHref} className="block rounded-lg border border-brass-700/25 bg-stone-950/60 px-4 py-3 text-center">
+              <Landmark className="mx-auto h-6 w-6 text-brass-400" />
+              <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-brass-300">Accounting</p>
+              <p className="mt-0.5 text-[10px] text-muted-foreground">Accounts receivable</p>
+            </Link>
           ) : (
             <Link href={homeHref} className="relative mx-auto block h-12 w-full max-w-[200px]">
               <Image
@@ -209,19 +217,25 @@ export function Sidebar({
       <nav className="flex-1 space-y-0.5 px-3 py-5">
         {accountingOnly ? (
           <div className="space-y-1">
-            <AccountingNavLink pathname={pathname} />
-            <Link
-              href="/settings"
-              className={cn(
-                'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
-                pathname.startsWith('/settings')
-                  ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
-                  : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
-              )}
-            >
-              <Settings className="h-4 w-4 text-muted-foreground/70" />
-              Settings
-            </Link>
+            {accountingNav.map((item) => {
+              const active = portalNavLinkActive(pathname, item.href);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
+                    active
+                      ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
+                      : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
+                  )}
+                >
+                  <Icon className={cn('h-4 w-4', active ? 'text-accent-brand' : 'text-muted-foreground/70')} />
+                  {item.label}
+                </Link>
+              );
+            })}
           </div>
         ) : (
           <>
@@ -231,7 +245,7 @@ export function Sidebar({
                 href="/"
                 className={cn(
                   'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
-                  !wineSpectatorPortal
+                  !wineSpectatorPortal && !accountingPortal
                     ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
                     : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
                 )}
@@ -240,23 +254,38 @@ export function Sidebar({
                   {productDisplayLabel(PRODUCT_WHISKYFEST)}
                 </span>
               </Link>
-              <Link
-                href="/wine-spectator"
-                className={cn(
-                  'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
-                  wineSpectatorPortal
-                    ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
-                    : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
-                )}
-              >
-                <span className="text-xs font-semibold uppercase tracking-wide">
-                  {productDisplayLabel(PRODUCT_WINE_SPECTATOR)}
-                </span>
-              </Link>
+              {canWineSpectator ? (
+                <Link
+                  href="/wine-spectator"
+                  className={cn(
+                    'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
+                    wineSpectatorPortal
+                      ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
+                      : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
+                  )}
+                >
+                  <span className="text-xs font-semibold uppercase tracking-wide">
+                    {productDisplayLabel(PRODUCT_WINE_SPECTATOR)}
+                  </span>
+                </Link>
+              ) : null}
+              {canAccounting ? (
+                <Link
+                  href="/accounting"
+                  className={cn(
+                    'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
+                    accountingPortal
+                      ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
+                      : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
+                  )}
+                >
+                  <span className="text-xs font-semibold uppercase tracking-wide">Accounting</span>
+                </Link>
+              ) : null}
             </div>
             {nav
               .filter((item) => {
-                if (item.adminOnly && !isAdmin) return false;
+                if ('adminOnly' in item && item.adminOnly && !isAdmin) return false;
                 if ('legacyImport' in item && item.legacyImport && accountingOnly) return false;
                 return true;
               })
@@ -300,12 +329,6 @@ export function Sidebar({
                   </Link>
                 );
               })}
-            {isAccounting ? (
-              <div className="pt-6">
-                <p className="mb-2 px-[10px] wf-label-caps text-[10px]">Accounting</p>
-                <AccountingNavLink pathname={pathname} />
-              </div>
-            ) : null}
             {isAdmin ? (
               <div className="pt-6">
                 <p className="mb-2 px-[10px] wf-label-caps text-[10px]">Admin</p>

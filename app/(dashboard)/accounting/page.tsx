@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
 import { formatInvoiceStatus, invoiceStatusBadgeClass } from '@/lib/invoice-status';
 import { ARStatCard } from '@/components/accounting/ar-stat-card';
+import { AccountingHero } from '@/components/dashboard/accounting-hero';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -93,14 +94,12 @@ export default async function AccountingDashboardPage({
 
   return (
     <div className="space-y-10">
-      <header className="border-b border-border/50 pb-8">
-        <p className="wf-label-caps text-brass-700 dark:text-brass-400">Accounting</p>
-        <h1 className="wf-display-serif mt-2 text-3xl text-foreground md:text-4xl">Accounts Receivable</h1>
-        <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-foreground md:text-3xl">
-          {formatCurrency(arTotal)} <span className="text-sm font-sans font-normal text-muted-foreground">outstanding</span>
-        </p>
-        <p className="mt-2 text-sm text-muted-foreground">Executed contracts only · invoice tracking</p>
-      </header>
+      <AccountingHero
+        arTotalCents={arTotal}
+        pendingCount={countFor('pending')}
+        sentCount={countFor('invoice_sent')}
+        paidCount={countFor('paid')}
+      />
 
       <div className="grid grid-cols-1 gap-0 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
         <ARStatCard

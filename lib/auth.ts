@@ -6,6 +6,7 @@ import { loadImpersonationTargetDisplay } from '@/lib/effective-user';
 import { logImpersonationEnded, logImpersonationStarted } from '@/lib/impersonation-audit';
 import { ensureAccessRequestForUnknownUser } from '@/lib/access-requests';
 import type { UserRole } from '@/types/db';
+import { canAccessWineSpectator } from '@/lib/wine-spectator-access';
 
 const IMPERSONATION_TTL_MS = 30 * 60 * 1000;
 /** Min interval between `last_seen_at` writes per user (JWT refreshes often). */
@@ -20,6 +21,7 @@ async function computeAccessFlagsForEmail(
   is_accounting: boolean;
   can_view_all_sales: boolean;
   pipeline_access: boolean;
+  wine_spectator_access: boolean;
 }> {
   const { data: appUser } = await supabase
     .from('app_users')
@@ -34,6 +36,7 @@ async function computeAccessFlagsForEmail(
       is_accounting: false,
       can_view_all_sales: false,
       pipeline_access: false,
+      wine_spectator_access: false,
     };
   }
 
@@ -51,6 +54,11 @@ async function computeAccessFlagsForEmail(
     is_accounting: isAccounting,
     can_view_all_sales: canViewAllSales,
     pipeline_access: canViewAllSales || hasRep,
+    wine_spectator_access: canAccessWineSpectator({
+      role: appUser.role,
+      is_events_team: isEventsTeam,
+      email,
+    }),
   };
 }
 
@@ -161,6 +169,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.is_accounting = false;
         token.is_events_team = false;
         token.can_view_all_sales = false;
+        token.wine_spectator_access = false;
         token.real_can_impersonate = false;
         token.impersonation_target_email = null;
         token.impersonation_target_name = null;
@@ -204,6 +213,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       token.is_accounting = flags.is_accounting;
       token.can_view_all_sales = flags.can_view_all_sales;
       token.pipeline_access = flags.pipeline_access;
+      token.wine_spectator_access = flags.wine_spectator_access;
       token.real_can_impersonate = realCanImpersonate;
 
       const tp = (realUser as { theme_preference?: string | null } | null)?.theme_preference;
@@ -250,6 +260,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.is_accounting = Boolean(token.is_accounting);
       session.user.can_view_all_sales = Boolean(token.can_view_all_sales);
       session.user.pipeline_access = Boolean(token.pipeline_access);
+      session.user.wine_spectator_access = Boolean(token.wine_spectator_access);
       session.user.can_impersonate = Boolean(token.real_can_impersonate);
       session.user.theme_preference =
         token.theme_preference === 'light' ||
