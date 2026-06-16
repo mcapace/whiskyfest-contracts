@@ -14,7 +14,12 @@ import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { appendContractRow, updateContractRow } from '@/lib/sheets-tracker';
 import { syncExhibitorRosterWriteback } from '@/lib/exhibitor-roster-sync-hook';
 import { insertContractAudit } from '@/lib/audit-log';
-import { notifyContractFullySigned, notifyPartialSignature } from '@/lib/notifications';
+import { isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
+import { releaseContractToAccounting } from '@/lib/release-to-accounting';
+import {
+  notifyContractFullySigned,
+  notifyPartialSignature,
+} from '@/lib/notifications';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 function signerCompleted(s: DocuSignSignerRow): boolean {
@@ -234,14 +239,35 @@ export async function applyEnvelopeFullySigned(
       console.error('Failed to update Sheets tracker', err);
     }
     await syncExhibitorRosterWriteback(afterSigned);
+
+    if (event && isNyweEventsManagedEvent(event)) {
+      const actorEmail =
+        countersigner?.email?.trim().toLowerCase() ||
+        event.shanken_signatory_email?.trim().toLowerCase() ||
+        'nywe-auto@mshanken.com';
+      const release = await releaseContractToAccounting({
+        contract: afterSigned,
+        event,
+        actorEmail,
+        auditAction: 'auto_released_to_accounting',
+        supabase,
+      });
+      if (release.ok) {
+        return { updated: true };
+      }
+      console.error('[NYWE auto-release]', afterSigned.id, release.error);
+    }
   }
 
   if (options?.notify !== false) {
     const countersignerDisplayName =
       countersigner?.name?.trim() || event?.shanken_signatory_name?.trim() || 'Countersigner';
-    void notifyContractFullySigned(contract, event, countersignerDisplayName).catch((err) =>
-      console.error('[notifyContractFullySigned]', err),
-    );
+    // NYWE: no countersign email — queue on Wine Spectator dashboard instead.
+    if (!event || !isNyweEventsManagedEvent(event)) {
+      void notifyContractFullySigned(contract, event, countersignerDisplayName).catch((err) =>
+        console.error('[notifyContractFullySigned]', err),
+      );
+    }
   }
 
   return { updated: true };

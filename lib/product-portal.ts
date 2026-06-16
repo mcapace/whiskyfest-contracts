@@ -20,6 +20,14 @@ export function isAccountingPath(pathname: string): boolean {
   return pathname === '/accounting' || pathname.startsWith('/accounting/');
 }
 
+export function isNyweAccountingPathname(pathname: string): boolean {
+  return pathname === '/accounting/nywe' || pathname.startsWith('/accounting/nywe/');
+}
+
+export function accountingDashboardHref(productKey: ProductKey): string {
+  return productKey === PRODUCT_WINE_SPECTATOR ? '/accounting/nywe' : '/accounting';
+}
+
 export function productBasePath(productKey: ProductKey): string {
   return productKey === PRODUCT_WINE_SPECTATOR ? '/wine-spectator' : '';
 }
@@ -31,13 +39,15 @@ export function productDisplayLabel(productKey: ProductKey): string {
 /** Sticky header label when no page-specific title is set. */
 export function portalTopbarLabel(pathname: string): string {
   if (isWineSpectatorPath(pathname)) return 'Wine Spectator · NYWE';
-  if (isAccountingPath(pathname)) return 'Accounting · M. Shanken';
+  if (isNyweAccountingPathname(pathname)) return 'Accounting · NYWE';
+  if (isAccountingPath(pathname)) return 'Accounting · WhiskyFest';
   return 'WhiskyFest · Contracts';
 }
 
 export function portalDocumentTitle(pathname: string): string {
   if (isWineSpectatorPath(pathname)) return 'NYWE Contracts | Wine Spectator';
-  if (isAccountingPath(pathname)) return 'Accounting | M. Shanken Contracts';
+  if (isNyweAccountingPathname(pathname)) return 'NYWE Accounting | M. Shanken';
+  if (isAccountingPath(pathname)) return 'WhiskyFest Accounting | M. Shanken';
   return 'WhiskyFest Contracts';
 }
 

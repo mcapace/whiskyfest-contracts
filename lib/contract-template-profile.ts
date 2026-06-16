@@ -1,3 +1,4 @@
+import { PRODUCT_WINE_SPECTATOR } from '@/lib/product-portal';
 import type { Event } from '@/types/db';
 
 export const CONTRACT_TEMPLATE_PROFILES = ['whiskyfest', 'nywe_vendor'] as const;
@@ -18,6 +19,13 @@ export function eventUsesContractOrderTable(event: Pick<Event, 'contract_templat
 
 export function isEventsManagedWorkflow(event: Pick<Event, 'workflow_profile'>): boolean {
   return event.workflow_profile === 'events_managed';
+}
+
+/** NYWE vendor licenses — events team workflow inside the Wine Spectator portal. */
+export function isNyweEventsManagedEvent(
+  event: Pick<Event, 'product_key' | 'workflow_profile'> | null | undefined,
+): boolean {
+  return event?.product_key === PRODUCT_WINE_SPECTATOR && isEventsManagedWorkflow(event);
 }
 
 export function eventContractDocumentLabel(event: Pick<Event, 'contract_document_label' | 'name'>): string {

@@ -149,6 +149,7 @@ export function describeAuditEntry(entry: AuditLogEntry): AuditDisplay {
     case 'docusign_recalled':
       return { title: 'Recalled from DocuSign — returned to draft for editing', synthetic };
     case 'released_to_accounting':
+    case 'auto_released_to_accounting':
       return { title: 'Released to accounting (executed)', synthetic };
     case 'executed':
       return { title: 'Released to accounting', synthetic };
@@ -219,6 +220,7 @@ export function describeAuditActionShort(action: string): string {
     case 'docusign_synced':
       return 'synced from DocuSign';
     case 'released_to_accounting':
+    case 'auto_released_to_accounting':
       return 'released to accounting';
     case 'invoice_marked_sent':
       return 'marked invoice sent for';

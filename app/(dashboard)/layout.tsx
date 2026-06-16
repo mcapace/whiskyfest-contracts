@@ -45,7 +45,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <DashboardKeyboardShortcuts>
       <CommandPaletteProvider>
         <ImpersonationBanner />
-        <div className="min-h-screen bg-[#f4f5f7] dark:bg-bg-page">
+        <div className="min-h-screen bg-bg-page">
           <TutorialProvider />
           <Sidebar
             user={{
@@ -62,13 +62,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
             readOnlyImpersonation={readOnly}
             pendingAccessRequests={pendingAccessRequests}
           />
-          <div className={`flex min-h-screen flex-col lg:pl-[260px] ${mainPad}`}>
+          <div className={`flex min-h-screen flex-col lg:pl-64 ${mainPad}`}>
             <Topbar endSlot={<DashboardTopBarActions />} />
             <DailyBubblePathGate>
               <DailyBubbleSlot />
             </DailyBubblePathGate>
-            <main className="flex-1 bg-[#f4f5f7] dark:bg-bg-page">
-              <div className="mx-auto max-w-[1400px] animate-fade-in px-4 py-6 pb-24 lg:px-8 lg:py-8 lg:pb-10">
+            <main className="flex-1">
+              <div className="mx-auto max-w-6xl animate-fade-in px-6 py-6 pb-24 lg:px-10 lg:py-8 lg:pb-10">
                 {children}
               </div>
             </main>

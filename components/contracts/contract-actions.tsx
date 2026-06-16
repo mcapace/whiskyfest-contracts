@@ -152,6 +152,7 @@ export function ContractActions({
   const [openApproveDiscount, setOpenApproveDiscount] = useState(false);
   const [openErrorDetails, setOpenErrorDetails] = useState(false);
   const [openSendBack, setOpenSendBack] = useState(false);
+  const [openReleaseAccounting, setOpenReleaseAccounting] = useState(false);
   const [sendBackReason, setSendBackReason] = useState('');
   const [recallReason, setRecallReason] = useState('');
   const [cancelReason, setCancelReason] = useState('');
@@ -555,7 +556,11 @@ export function ContractActions({
               <ActionWithHelp helpText={CONTRACT_ACTION_HELP.releaseToAccounting}>
                 <Button
                   className={btnPrimary}
-                  onClick={() => runAction('release', 'release', undefined, 'executed')}
+                  onClick={() =>
+                    eventsManagedWorkflow
+                      ? setOpenReleaseAccounting(true)
+                      : runAction('release', 'release', undefined, 'executed')
+                  }
                   disabled={busy || discountApprovalPending}
                 >
                   <ContractActionButtonLabel
@@ -1042,6 +1047,32 @@ export function ContractActions({
               disabled={busy || sendBackReason.trim().length < 10}
             >
               Send back
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={openReleaseAccounting} onOpenChange={setOpenReleaseAccounting}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send to accounting?</DialogTitle>
+            <DialogDescription>
+              Release <strong>{exhibitorName}</strong> to accounts receivable. Accounting will receive an email with the
+              signed PDF and billing details.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setOpenReleaseAccounting(false)} disabled={busy}>
+              Not yet
+            </Button>
+            <Button
+              onClick={() => {
+                setOpenReleaseAccounting(false);
+                runAction('release', 'release', undefined, 'executed');
+              }}
+              disabled={busy}
+            >
+              Yes, send to accounting
             </Button>
           </DialogFooter>
         </DialogContent>

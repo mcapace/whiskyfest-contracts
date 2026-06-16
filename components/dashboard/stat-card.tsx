@@ -1,12 +1,12 @@
 import type { LucideIcon } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
-const accentStyles: Record<'neutral' | 'whisky' | 'fest' | 'amber' | 'emerald', string> = {
-  neutral: 'text-slate-600 bg-slate-100',
-  whisky: 'text-whisky-800 bg-whisky-100/80',
-  fest: 'text-fest-700 bg-fest-50',
-  amber: 'text-amber-800 bg-amber-50',
-  emerald: 'text-emerald-700 bg-emerald-50',
+const accentRing: Record<'whisky' | 'fest' | 'amber' | 'emerald', string> = {
+  whisky: 'text-whisky-800 bg-whisky-100/60 ring-whisky-300/30',
+  fest: 'text-fest-800 bg-fest-100/90 ring-fest-300/30',
+  amber: 'text-amber-700 bg-amber-100/60 ring-amber-300/30',
+  emerald: 'text-emerald-700 bg-emerald-100/60 ring-emerald-300/30',
 };
 
 export function DashboardStatCard({
@@ -21,26 +21,31 @@ export function DashboardStatCard({
   label: string;
   value: string;
   sub: string;
-  accent: keyof typeof accentStyles;
+  accent: keyof typeof accentRing;
   className?: string;
 }) {
   return (
-    <div
+    <Card
       className={cn(
-        'rounded-xl border border-border/60 bg-white p-4 shadow-sm transition hover:border-border hover:shadow-md dark:bg-bg-surface',
+        'border-border/60 bg-bg-surface transition-all hover:-translate-y-0.5 hover:shadow-md md:min-h-[7.5rem]',
         className,
       )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-medium text-muted-foreground">{label}</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-foreground">{value}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{sub}</p>
+      <CardContent className="flex items-start gap-4 p-5">
+        <div
+          className={cn(
+            'flex h-10 w-10 shrink-0 items-center justify-center rounded-md ring-1',
+            accentRing[accent],
+          )}
+        >
+          <Icon className="h-5 w-5" />
         </div>
-        <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', accentStyles[accent])}>
-          <Icon className="h-4 w-4" strokeWidth={1.75} />
+        <div className="min-w-0 flex-1">
+          <p className="wf-label-caps text-[0.65rem]">{label}</p>
+          <p className="mt-1.5 font-serif text-2xl font-semibold tabular-nums tracking-tight">{value}</p>
+          <p className="mt-1 break-words text-xs text-muted-foreground">{sub}</p>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

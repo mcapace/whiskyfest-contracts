@@ -3,7 +3,7 @@
 import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Calculator, FileText, Landmark, LayoutDashboard, Plus, Users } from 'lucide-react';
+import { Calculator, Home, Landmark, LayoutDashboard, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isAccountingPath, isWineSpectatorPath } from '@/lib/product-portal';
 import { CommandPaletteTrigger } from '@/components/command-palette/command-palette';
@@ -47,14 +47,19 @@ export function MobileBottomNav({
 
   if (wineSpectatorPortal) {
     return (
-      <nav className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t border-border/60 bg-white/95 px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md dark:bg-bg-surface-raised/95 lg:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t border-border/60 bg-bg-surface-raised/95 px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md lg:hidden">
         <NavIcon href="/wine-spectator" active={pathname === '/wine-spectator'} label="Home" icon={LayoutDashboard} />
-        <NavIcon href="/wine-spectator/roster" active={pathname.startsWith('/wine-spectator/roster')} label="Roster" icon={Users} />
+        <NavIcon
+          href="/wine-spectator/contracts/new"
+          active={pathname.startsWith('/wine-spectator/contracts/new')}
+          label="New"
+          icon={Plus}
+        />
         <NavIcon
           href="/wine-spectator/contracts"
           active={pathname.startsWith('/wine-spectator/contracts') && !pathname.includes('/new')}
           label="Licenses"
-          icon={FileText}
+          icon={Home}
         />
         <div className="flex min-w-[3rem] flex-col items-center gap-0.5 py-1">
           <CommandPaletteTrigger />
@@ -68,7 +73,7 @@ export function MobileBottomNav({
     <nav className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t border-border/60 bg-bg-surface-raised/95 px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md lg:hidden">
       <NavIcon href="/" active={pathname === '/'} label="Home" icon={LayoutDashboard} />
       <NavIcon href="/#start-deal" active={pathname === '/'} label="Start" icon={Plus} />
-      <NavIcon href="/contracts" active={pathname.startsWith('/contracts') && !pathname.includes('/new')} label="Contracts" icon={FileText} />
+      <NavIcon href="/contracts" active={pathname.startsWith('/contracts') && !pathname.includes('/new')} label="Contracts" icon={Home} />
       {showAccountingNav && (
         <NavIcon href="/accounting" active={pathname.startsWith('/accounting')} label="AR" icon={Calculator} />
       )}

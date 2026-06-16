@@ -10,6 +10,8 @@ import { formatCurrency, formatTimestamp } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { AccountingDetailActions } from '@/components/accounting/accounting-detail-actions';
 import { InvoiceLifecycleTimeline } from '@/components/accounting/invoice-lifecycle';
+import { accountingDashboardHref, productKeyFromEvent } from '@/lib/product-portal';
+import { accountingPortalLabel, type AccountingPortalKey } from '@/lib/accounting-portal';
 import type { ContractLineItem, ContractWithTotals, Event, InvoiceStatus } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
@@ -73,12 +75,15 @@ export default async function AccountingContractDetailPage({ params }: { params:
       : formatBillingAddressBlock(contract);
 
   const inv = (contract.invoice_status ?? 'pending') as InvoiceStatus;
+  const productKey = productKeyFromEvent(event) as AccountingPortalKey;
+  const arDashboardHref = accountingDashboardHref(productKey);
+  const arPortalLabel = accountingPortalLabel(productKey);
 
   return (
     <div className="space-y-8 pb-12 lg:pr-8">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-        <Link href="/accounting" className="inline-flex items-center gap-1.5 hover:text-foreground">
-          <ArrowLeft className="h-3.5 w-3.5" /> AR Dashboard
+        <Link href={arDashboardHref} className="inline-flex items-center gap-1.5 hover:text-foreground">
+          <ArrowLeft className="h-3.5 w-3.5" /> {arPortalLabel} AR Dashboard
         </Link>
       </div>
 
