@@ -54,6 +54,12 @@ export function rosterFromEventCache(event: Event): ExhibitorRosterPayload | nul
   return parseCachedSnapshot(event.roster_cached_snapshot);
 }
 
+/** Last good snapshot — used when a live Google Sheets pull fails. */
+export function rosterStaleFromEventCache(event: Event): ExhibitorRosterPayload | null {
+  if (!event.roster_cached_snapshot) return null;
+  return parseCachedSnapshot(event.roster_cached_snapshot);
+}
+
 async function persistRosterSnapshot(eventId: string, roster: ExhibitorRosterPayload): Promise<void> {
   const supabase = getSupabaseAdmin();
   const { error } = await supabase
@@ -118,22 +124,54 @@ export async function syncExhibitorRosterMaster(event?: Event | null): Promise<E
   }
 }
 
+export type LoadExhibitorRosterResult = {
+  roster: ExhibitorRosterPayload;
+  fromCache: boolean;
+  /** Live pull failed; showing last cached snapshot. */
+  stale?: boolean;
+  fetchError?: string;
+  warnings?: string[];
+};
+
 /** Load roster for UI: cached snapshot when fresh, otherwise live pull (and cache). */
 export async function loadExhibitorRoster(
   event: Event,
   options?: { forceLive?: boolean },
-): Promise<{ roster: ExhibitorRosterPayload; fromCache: boolean }> {
+): Promise<LoadExhibitorRosterResult> {
   if (!options?.forceLive) {
     const cached = rosterFromEventCache(event);
     if (cached) return { roster: cached, fromCache: true };
   }
 
-  const roster = await fetchExhibitorRoster(event);
-  const payload: ExhibitorRosterPayload = {
-    syncedAt: roster.syncedAt,
-    sheets: roster.sheets,
-    rows: roster.rows,
-  };
-  await persistRosterSnapshot(event.id, payload);
-  return { roster: payload, fromCache: false };
+  if (rosterSheetsFromEvent(event).length === 0) {
+    throw new Error('No exhibitor roster sheets configured for this event. Check Event settings in Supabase.');
+  }
+
+  try {
+    const roster = await fetchExhibitorRoster(event);
+    const payload: ExhibitorRosterPayload = {
+      syncedAt: roster.syncedAt,
+      sheets: roster.sheets,
+      rows: roster.rows,
+    };
+    await persistRosterSnapshot(event.id, payload);
+    return {
+      roster: payload,
+      fromCache: false,
+      warnings: roster.warnings.length ? roster.warnings : undefined,
+    };
+  } catch (err) {
+    const stale = rosterStaleFromEventCache(event);
+    const message = err instanceof Error ? err.message : 'Exhibitor roster sync failed';
+    if (stale) {
+      console.error('[loadExhibitorRoster] live pull failed — serving stale cache', message);
+      return {
+        roster: stale,
+        fromCache: true,
+        stale: true,
+        fetchError: message,
+      };
+    }
+    throw err instanceof Error ? err : new Error(message);
+  }
 }

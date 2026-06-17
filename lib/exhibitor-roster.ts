@@ -170,7 +170,15 @@ export function buildColumnMapFromHeaders(headers: string[], listKey: string): C
   };
   return {
     wineryName: pick('wineryName', 'NAME OF PARTICIPATING WINERY'),
-    participation: pick('participation', 'PLEASE CONFIRM YOUR PARTICIPATION:', 'PLEASE CONFIRM YOUR PARTICIPATION'),
+    participation: (() => {
+      const index = headerIndex(
+        headers,
+        'PLEASE CONFIRM YOUR PARTICIPATION:',
+        'PLEASE CONFIRM YOUR PARTICIPATION',
+        'PARTICIPATION',
+      );
+      return index >= 0 ? index : -1;
+    })(),
     primaryFirst: pick('primaryFirst', 'PRIMARY CONTACT FIRST NAME'),
     primaryLast: pick('primaryLast', 'PRIMARY CONTACT LAST NAME'),
     primaryEmail: pick('primaryEmail', 'PRIMARY CONTACT EMAIL'),
@@ -194,8 +202,14 @@ export function buildColumnMapFromHeaders(headers: string[], listKey: string): C
   };
 }
 
-function participationYes(row: string[], map: ColumnMap): boolean {
-  return cell(row, map.participation).toLowerCase().includes('yes');
+function rowIncludedInRoster(row: string[], map: ColumnMap): boolean {
+  const winery = cell(row, map.wineryName);
+  if (!winery) return false;
+  if (map.participation < 0) return true;
+  const part = cell(row, map.participation).toLowerCase().trim();
+  if (!part) return true;
+  if (/\bno\b/.test(part) && !part.includes('yes')) return false;
+  return part.includes('yes') || part.includes('confirm');
 }
 
 export function rosterRowKey(spreadsheetId: string, tab: string, rowNumber: number): string {
@@ -324,8 +338,13 @@ export async function fetchExhibitorRoster(event: Event): Promise<{
   syncedAt: string;
   sheets: ExhibitorRosterSheetConfig[];
   rows: ExhibitorRosterRow[];
+  warnings: string[];
 }> {
   const sheetConfigs = rosterSheetsFromEvent(event);
+  if (sheetConfigs.length === 0) {
+    throw new Error('No exhibitor roster sheets configured for this event.');
+  }
+
   const supabase = getSupabaseAdmin();
   const { data: linkedContracts } = await supabase
     .from('contracts_with_totals')
@@ -344,63 +363,86 @@ export async function fetchExhibitorRoster(event: Event): Promise<{
 
   const sheets = getSheetsClient();
   const rows: ExhibitorRosterRow[] = [];
+  const warnings: string[] = [];
 
   for (const config of sheetConfigs) {
-    const [headerRes, dataRows] = await Promise.all([
-      sheets.spreadsheets.values.get({
-        spreadsheetId: config.spreadsheet_id,
-        range: tabRange(config.tab, 'A1:AZ1'),
-      }),
-      readSheetRows(config),
-    ]);
-    const headers = ((headerRes.data.values?.[0] ?? []) as string[]).map((h) => String(h ?? '').trim());
-    const statusStart = statusColumnStart(headers);
-    const map = buildColumnMapFromHeaders(headers, config.key);
+    try {
+      const [headerRes, dataRows] = await Promise.all([
+        sheets.spreadsheets.values.get({
+          spreadsheetId: config.spreadsheet_id,
+          range: tabRange(config.tab, 'A1:AZ1'),
+        }),
+        readSheetRows(config),
+      ]);
+      const headers = ((headerRes.data.values?.[0] ?? []) as string[]).map((h) => String(h ?? '').trim());
+      const statusStart = statusColumnStart(headers);
+      const map = buildColumnMapFromHeaders(headers, config.key);
+      let included = 0;
 
-    dataRows.forEach((row, index) => {
-      if (!participationYes(row, map)) return;
-      const rowNumber = index + 2;
-      const rowKey = rosterRowKey(config.spreadsheet_id, config.tab, rowNumber);
-      const contract = contractByRowKey.get(rowKey) ?? null;
-      const signer = resolveSigner(row, map);
-      const billingFirst = cell(row, map.billingFirst);
-      const billingLast = cell(row, map.billingLast);
-      const primaryFirst = cell(row, map.primaryFirst);
-      const primaryLast = cell(row, map.primaryLast);
-      rows.push({
-        rowKey,
-        listKey: config.key,
-        listLabel: config.label,
-        spreadsheetId: config.spreadsheet_id,
-        tab: config.tab,
-        rowNumber,
-        wineryName: cell(row, map.wineryName),
-        signerName: signer.name,
-        signerEmail: signer.email,
-        billingCompany: cell(row, map.billingCompany),
-        billingContactName: [billingFirst, billingLast].filter(Boolean).join(' ').trim(),
-        billingEmail: cell(row, map.billingEmail),
-        billingCity: cell(row, map.city),
-        billingState: cell(row, map.state),
-        primaryContactName: [primaryFirst, primaryLast].filter(Boolean).join(' ').trim(),
-        primaryContactEmail: cell(row, map.primaryEmail),
-        primaryPhone: cell(row, map.primaryPhone),
-        importerName: cell(row, map.importerName),
-        importerEmail: cell(row, map.importerEmail),
-        wineName: cell(row, map.wineName),
-        vintage: cell(row, map.vintage),
-        participation: cell(row, map.participation),
-        contractId: contract?.id ?? null,
-        contractStatus: contract?.status ?? null,
-        sheetStatus: cell(row, statusStart) || null,
-        sheetContractId: cell(row, statusStart + 1) || null,
-        sheetLastUpdated: cell(row, statusStart + 2) || null,
-        sheetFields: buildSheetFields(headers, row),
+      dataRows.forEach((row, index) => {
+        if (!rowIncludedInRoster(row, map)) return;
+        included += 1;
+        const rowNumber = index + 2;
+        const rowKey = rosterRowKey(config.spreadsheet_id, config.tab, rowNumber);
+        const contract = contractByRowKey.get(rowKey) ?? null;
+        const signer = resolveSigner(row, map);
+        const billingFirst = cell(row, map.billingFirst);
+        const billingLast = cell(row, map.billingLast);
+        const primaryFirst = cell(row, map.primaryFirst);
+        const primaryLast = cell(row, map.primaryLast);
+        rows.push({
+          rowKey,
+          listKey: config.key,
+          listLabel: config.label,
+          spreadsheetId: config.spreadsheet_id,
+          tab: config.tab,
+          rowNumber,
+          wineryName: cell(row, map.wineryName),
+          signerName: signer.name,
+          signerEmail: signer.email,
+          billingCompany: cell(row, map.billingCompany),
+          billingContactName: [billingFirst, billingLast].filter(Boolean).join(' ').trim(),
+          billingEmail: cell(row, map.billingEmail),
+          billingCity: cell(row, map.city),
+          billingState: cell(row, map.state),
+          primaryContactName: [primaryFirst, primaryLast].filter(Boolean).join(' ').trim(),
+          primaryContactEmail: cell(row, map.primaryEmail),
+          primaryPhone: cell(row, map.primaryPhone),
+          importerName: cell(row, map.importerName),
+          importerEmail: cell(row, map.importerEmail),
+          wineName: cell(row, map.wineName),
+          vintage: cell(row, map.vintage),
+          participation: map.participation >= 0 ? cell(row, map.participation) : '',
+          contractId: contract?.id ?? null,
+          contractStatus: contract?.status ?? null,
+          sheetStatus: cell(row, statusStart) || null,
+          sheetContractId: cell(row, statusStart + 1) || null,
+          sheetLastUpdated: cell(row, statusStart + 2) || null,
+          sheetFields: buildSheetFields(headers, row),
+        });
       });
-    });
+
+      if (dataRows.length > 0 && included === 0) {
+        warnings.push(
+          `${config.label}: ${dataRows.length} rows in Google Sheet but none matched (check winery name and participation columns).`,
+        );
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[fetchExhibitorRoster] ${config.label} failed`, msg);
+      warnings.push(`${config.label}: could not load — ${msg}`);
+    }
+  }
+
+  if (rows.length === 0) {
+    throw new Error(
+      warnings.length > 0
+        ? warnings.join(' · ')
+        : 'No exhibitor rows found in configured Google Sheets.',
+    );
   }
 
   rows.sort((a, b) => a.wineryName.localeCompare(b.wineryName, undefined, { sensitivity: 'base' }));
 
-  return { syncedAt: new Date().toISOString(), sheets: sheetConfigs, rows };
+  return { syncedAt: new Date().toISOString(), sheets: sheetConfigs, rows, warnings };
 }

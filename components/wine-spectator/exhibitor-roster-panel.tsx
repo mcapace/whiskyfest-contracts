@@ -64,6 +64,9 @@ type RosterSheet = {
 type RosterPayload = {
   syncedAt: string;
   fromCache?: boolean;
+  stale?: boolean;
+  fetchError?: string;
+  warnings?: string[];
   event: { id: string; name: string; client_send_enabled: boolean };
   sheets: RosterSheet[];
   rows: RosterRow[];
@@ -422,6 +425,21 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
       {!data.event.client_send_enabled ? (
         <div className="rounded-md border border-amber-300/80 bg-amber-50/95 p-4 text-sm text-amber-950">
           Client send is disabled — create and approve licenses internally. Status still writes back to Google Sheets.
+        </div>
+      ) : null}
+
+      {data.stale && data.fetchError ? (
+        <div className="rounded-md border border-amber-300/80 bg-amber-50/95 p-4 text-sm text-amber-950">
+          Could not refresh from Google Sheets ({data.fetchError}). Showing the last synced list from{' '}
+          {formatRelative(data.syncedAt)}. Use &quot;Refresh from sheets&quot; to try again.
+        </div>
+      ) : null}
+
+      {data.warnings?.length ? (
+        <div className="rounded-md border border-amber-300/80 bg-amber-50/95 p-4 text-sm text-amber-950">
+          {data.warnings.map((warning) => (
+            <p key={warning}>{warning}</p>
+          ))}
         </div>
       ) : null}
 
