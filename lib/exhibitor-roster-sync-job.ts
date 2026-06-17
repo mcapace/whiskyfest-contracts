@@ -47,11 +47,28 @@ function parseCachedSnapshot(raw: unknown): ExhibitorRosterPayload | null {
   };
 }
 
+function rosterSheetConfigFingerprint(configs: ExhibitorRosterSheetConfig[]): string {
+  return configs
+    .map((s) => `${s.key}|${s.spreadsheet_id}|${s.tab}`)
+    .sort()
+    .join(';');
+}
+
+function rosterCacheValidForEvent(event: Event, cached: ExhibitorRosterPayload): boolean {
+  const current = rosterSheetsFromEvent(event);
+  if (current.length === 0) return false;
+  if (current.length !== cached.sheets.length) return false;
+  return rosterSheetConfigFingerprint(current) === rosterSheetConfigFingerprint(cached.sheets);
+}
+
 export function rosterFromEventCache(event: Event): ExhibitorRosterPayload | null {
   if (!event.roster_last_synced_at || !event.roster_cached_snapshot) return null;
   const age = Date.now() - new Date(event.roster_last_synced_at).getTime();
   if (age > ROSTER_CACHE_MAX_AGE_MS) return null;
-  return parseCachedSnapshot(event.roster_cached_snapshot);
+  const cached = parseCachedSnapshot(event.roster_cached_snapshot);
+  if (!cached) return null;
+  if (!rosterCacheValidForEvent(event, cached)) return null;
+  return cached;
 }
 
 /** Last good snapshot — used when a live Google Sheets pull fails. */
@@ -106,7 +123,10 @@ export async function syncExhibitorRosterMaster(event?: Event | null): Promise<E
       sheets: roster.sheets,
       rows: roster.rows,
     };
-    await persistRosterSnapshot(activeEvent.id, payload);
+    const sheetLoadFailed = roster.warnings.some((w) => w.includes('could not load'));
+    if (!sheetLoadFailed) {
+      await persistRosterSnapshot(activeEvent.id, payload);
+    }
 
     return {
       status: 'synced',
@@ -154,7 +174,12 @@ export async function loadExhibitorRoster(
       sheets: roster.sheets,
       rows: roster.rows,
     };
-    await persistRosterSnapshot(event.id, payload);
+    const sheetLoadFailed = roster.warnings.some((w) => w.includes('could not load'));
+    if (!sheetLoadFailed) {
+      await persistRosterSnapshot(event.id, payload);
+    } else {
+      console.warn('[loadExhibitorRoster] skipped cache persist — one or more sheets failed to load');
+    }
     return {
       roster: payload,
       fromCache: false,

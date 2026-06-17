@@ -35,7 +35,7 @@ const STYLES: Record<'returning' | 'champagne' | 'new', RosterListStyle> = {
     legendDot: 'bg-ink-500',
   },
   champagne: {
-    shortLabel: 'Champagne',
+    shortLabel: 'Sparkling & Champagne',
     icon: Sparkles,
     badge: 'border-brass-600 bg-brass-100 text-brass-900',
     buttonActive: 'border-brass-700 bg-brass-600 text-white shadow-sm hover:bg-brass-700',
