@@ -19,6 +19,7 @@ import { ContractCard } from '@/components/contracts/contract-card';
 import { ContractsFilterBar } from '@/components/contracts/filter-bar';
 import { SavedViewsDropdown, type ContractViewFilters } from '@/components/contracts/saved-views-dropdown';
 import { categorizeContractBrands } from '@/lib/brand-category';
+import { subscribeToAppContractEvents } from '@/lib/realtime-client';
 import { CONTRACT_DEAL_KINDS, dealKindFromContract, dealKindLabel, listPackageLabel } from '@/lib/contract-deal-kind';
 import type { BoothBrandRowsByContract } from '@/lib/sponsors';
 import type { ContractWithTotals, Event } from '@/types/db';
@@ -70,6 +71,21 @@ export function ContractsList({
   const router = useRouter();
   const reduceMotion = useReducedMotion();
   const [view, setView] = useState<'table' | 'cards'>('table');
+
+  useEffect(() => {
+    const off = subscribeToAppContractEvents(() => {
+      router.refresh();
+    });
+    const onVis = () => {
+      if (document.visibilityState === 'visible') router.refresh();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      off();
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, [router]);
+
   const [filters, setFilters] = useState<ContractViewFilters>({
     status: 'all',
     rep: 'all',

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { isEventsManagedWorkflow } from '@/lib/contract-template-profile';
 import { wineSpectatorContractIsAdmin } from '@/lib/wine-spectator-access';
 import { NyweSusannahDashboard } from '@/components/wine-spectator/nywe-susannah-dashboard';
+import { DashboardLiveRefresh } from '@/components/dashboard/dashboard-live-refresh';
 import type { ContractWithTotals } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
@@ -67,6 +68,7 @@ export default async function WineSpectatorDashboardPage() {
 
   return (
     <div className="space-y-8">
+      <DashboardLiveRefresh />
       <WineSpectatorHero
         event={primaryEvent}
         contractsCount={contractsCount}

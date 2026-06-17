@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/contracts/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn, formatRelative } from '@/lib/utils';
+import { subscribeToAppContractEvents } from '@/lib/realtime-client';
 import {
   rosterColumnModeLabel,
   formatRosterWineDisplay,
@@ -72,7 +73,7 @@ type RosterPayload = {
   rows: RosterRow[];
 };
 
-const AUTO_REFRESH_MS = 5 * 60 * 1000;
+const AUTO_REFRESH_MS = 2 * 60 * 1000;
 
 const COLUMN_MODES: RosterColumnMode[] = ['essential', 'extended', 'all'];
 
@@ -335,6 +336,20 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
     },
     [router],
   );
+
+  useEffect(() => {
+    const off = subscribeToAppContractEvents(() => {
+      refresh({ preserveSelection: true });
+    });
+    const onVis = () => {
+      if (document.visibilityState === 'visible') refresh({ preserveSelection: true });
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      off();
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, [refresh]);
 
   useEffect(() => {
     const tick = () => {

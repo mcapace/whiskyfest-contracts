@@ -1,5 +1,6 @@
 import {
   fetchExhibitorRoster,
+  hydrateRosterRowsWithContracts,
   type ExhibitorRosterRow,
   type ExhibitorRosterSheetConfig,
   rosterSheetsFromEvent,
@@ -153,6 +154,13 @@ export type LoadExhibitorRosterResult = {
   warnings?: string[];
 };
 
+async function withLiveContractStatus(event: Event, roster: ExhibitorRosterPayload): Promise<ExhibitorRosterPayload> {
+  return {
+    ...roster,
+    rows: await hydrateRosterRowsWithContracts(event.id, roster.rows),
+  };
+}
+
 /** Load roster for UI: cached snapshot when fresh, otherwise live pull (and cache). */
 export async function loadExhibitorRoster(
   event: Event,
@@ -160,7 +168,9 @@ export async function loadExhibitorRoster(
 ): Promise<LoadExhibitorRosterResult> {
   if (!options?.forceLive) {
     const cached = rosterFromEventCache(event);
-    if (cached) return { roster: cached, fromCache: true };
+    if (cached) {
+      return { roster: await withLiveContractStatus(event, cached), fromCache: true };
+    }
   }
 
   if (rosterSheetsFromEvent(event).length === 0) {
@@ -181,7 +191,7 @@ export async function loadExhibitorRoster(
       console.warn('[loadExhibitorRoster] skipped cache persist — one or more sheets failed to load');
     }
     return {
-      roster: payload,
+      roster: await withLiveContractStatus(event, payload),
       fromCache: false,
       warnings: roster.warnings.length ? roster.warnings : undefined,
     };
@@ -191,7 +201,7 @@ export async function loadExhibitorRoster(
     if (stale) {
       console.error('[loadExhibitorRoster] live pull failed — serving stale cache', message);
       return {
-        roster: stale,
+        roster: await withLiveContractStatus(event, stale),
         fromCache: true,
         stale: true,
         fetchError: message,

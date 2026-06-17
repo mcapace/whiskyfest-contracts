@@ -231,6 +231,46 @@ export function rosterStatusLabel(status: ContractStatus | null): string {
   return formatStatus(status);
 }
 
+/** Merge live contract status onto cached roster rows (Sheets data can be cached; license status cannot). */
+export async function hydrateRosterRowsWithContracts(
+  eventId: string,
+  rows: ExhibitorRosterRow[],
+): Promise<ExhibitorRosterRow[]> {
+  if (rows.length === 0) return rows;
+
+  const supabase = getSupabaseAdmin();
+  const { data: linkedContracts } = await supabase
+    .from('contracts_with_totals')
+    .select('id, status, updated_at, source_sheet_id, source_sheet_tab, source_row_number')
+    .eq('event_id', eventId)
+    .not('source_sheet_id', 'is', null);
+
+  const contractByRowKey = new Map<string, ContractWithTotals>();
+  for (const contract of (linkedContracts ?? []) as ContractWithTotals[]) {
+    if (!contract.source_sheet_id || !contract.source_sheet_tab || !contract.source_row_number) continue;
+    contractByRowKey.set(
+      rosterRowKey(contract.source_sheet_id, contract.source_sheet_tab, contract.source_row_number),
+      contract,
+    );
+  }
+
+  return rows.map((row) => {
+    const contract = contractByRowKey.get(row.rowKey) ?? null;
+    if (!contract) {
+      return { ...row, contractId: null, contractStatus: null, sheetStatus: null, sheetContractId: null };
+    }
+    const statusLabel = rosterStatusLabel(contract.status);
+    return {
+      ...row,
+      contractId: contract.id,
+      contractStatus: contract.status,
+      sheetStatus: statusLabel,
+      sheetContractId: contract.id,
+      sheetLastUpdated: contract.updated_at ?? row.sheetLastUpdated,
+    };
+  });
+}
+
 export function rosterSheetsFromEvent(event: Event): ExhibitorRosterSheetConfig[] {
   const raw = event.exhibitor_roster_sheets;
   if (!Array.isArray(raw)) return [];
