@@ -1,10 +1,11 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Bell, Sparkles } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
+import { useHydrated } from '@/hooks/use-hydrated';
 import type { ContractWithTotals } from '@/types/db';
 
 type Suggestion = {
@@ -15,9 +16,9 @@ type Suggestion = {
   onClick: () => void;
 };
 
-function daysSinceSent(sentAt: string | null | undefined): number {
+function daysSinceSent(sentAt: string | null | undefined, now: Date): number {
   if (!sentAt) return 0;
-  return differenceInDays(new Date(), new Date(sentAt));
+  return differenceInDays(now, new Date(sentAt));
 }
 
 export function SuggestedActions({
@@ -33,14 +34,20 @@ export function SuggestedActions({
   };
 }) {
   const router = useRouter();
+  const hydrated = useHydrated();
+  const [now, setNow] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setNow(new Date());
+  }, []);
 
   const suggestions = useMemo(() => {
+    if (!hydrated || !now) return [];
     const out: Suggestion[] = [];
-    const now = new Date();
 
     for (const c of contracts) {
       if (c.status === 'sent' && c.sales_rep_id && viewer.sales_rep_id && c.sales_rep_id === viewer.sales_rep_id) {
-        const d = daysSinceSent(c.sent_at);
+        const d = daysSinceSent(c.sent_at, now);
         if (d >= 5) {
           out.push({
             key: `remind-${c.id}`,
@@ -53,10 +60,7 @@ export function SuggestedActions({
           });
         }
       }
-      if (
-        c.status === 'pending_events_review' &&
-        (viewer.is_admin || viewer.is_events_team)
-      ) {
+      if (c.status === 'pending_events_review' && (viewer.is_admin || viewer.is_events_team)) {
         const d = differenceInDays(now, new Date(c.created_at));
         if (d >= 3) {
           out.push({
@@ -71,9 +75,9 @@ export function SuggestedActions({
     }
 
     return out.slice(0, 5);
-  }, [contracts, router, viewer.is_admin, viewer.is_events_team, viewer.sales_rep_id]);
+  }, [contracts, hydrated, now, router, viewer.is_admin, viewer.is_events_team, viewer.sales_rep_id]);
 
-  if (suggestions.length === 0) return null;
+  if (!hydrated || suggestions.length === 0) return null;
 
   return (
     <Card className="border-amber-200/60 bg-gradient-to-br from-parchment-50 to-amber-50/40 shadow-wf-editorial-sm">

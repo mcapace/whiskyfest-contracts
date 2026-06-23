@@ -1,18 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { cn, formatLongDate, formatRelative } from '@/lib/utils';
+import { cn, formatRelative } from '@/lib/utils';
+import { useHydrated } from '@/hooks/use-hydrated';
 
-function stableFallback(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  return formatLongDate(iso);
-}
-
-/** Client-only relative label ("2h ago") to avoid SSR/hydration mismatches from Date.now(). */
+/** Client-only relative label ("2h ago") — identical placeholder on server and first client paint. */
 export function useRelativeTimeLabel(iso: string | null | undefined): string {
-  const [label, setLabel] = useState(() => stableFallback(iso));
+  const hydrated = useHydrated();
+  const [label, setLabel] = useState('');
 
   useEffect(() => {
+    if (!hydrated) return;
     if (!iso) {
       setLabel('—');
       return;
@@ -21,9 +19,10 @@ export function useRelativeTimeLabel(iso: string | null | undefined): string {
     tick();
     const id = window.setInterval(tick, 60_000);
     return () => window.clearInterval(id);
-  }, [iso]);
+  }, [iso, hydrated]);
 
-  return label;
+  if (!hydrated || !iso) return '—';
+  return label || '—';
 }
 
 export function RelativeTime({
@@ -35,8 +34,24 @@ export function RelativeTime({
   className?: string;
   title?: string;
 }) {
+  const hydrated = useHydrated();
   const label = useRelativeTimeLabel(iso);
+
   if (!iso) return <span className={className}>—</span>;
+
+  if (!hydrated) {
+    return (
+      <time
+        dateTime={iso}
+        className={cn(className, 'inline-block min-w-[3ch]')}
+        title={title}
+        suppressHydrationWarning
+        aria-hidden
+      >
+        …
+      </time>
+    );
+  }
 
   return (
     <time dateTime={iso} className={cn(className)} title={title} suppressHydrationWarning>

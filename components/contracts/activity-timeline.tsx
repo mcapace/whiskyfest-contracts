@@ -3,7 +3,7 @@
 import type { AuditLogEntry } from '@/types/db';
 import { auditDotClass, describeAuditEntry } from '@/lib/audit-log-display';
 import { formatStatus } from '@/lib/status-display';
-import { formatTimestamp } from '@/lib/utils';
+import { HydratedTimestamp } from '@/components/ui/hydrated-timestamp';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
@@ -55,7 +55,7 @@ export function ActivityTimeline({ audit }: { audit: AuditLogEntry[] }) {
                     </div>
                     {detail ? <p className="mt-1 font-sans text-xs text-ink-600">{detail}</p> : null}
                     <p className="mt-1 font-sans text-xs text-ink-500">
-                      {formatTimestamp(entry.occurred_at)}
+                      <HydratedTimestamp iso={entry.occurred_at} />
                       {entry.actor_email ? (
                         <>
                           {' '}

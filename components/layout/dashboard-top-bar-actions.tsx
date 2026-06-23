@@ -7,14 +7,28 @@ import { HelpMenu } from '@/components/help-menu';
 import { useOpenShortcutsModal } from '@/components/keyboard-shortcuts/dashboard-keyboard-shortcuts';
 import { Keyboard } from 'lucide-react';
 import { ImpersonationViewAsTopbarButton } from '@/components/impersonation/impersonation-view-as-topbar-button';
+import { useHydrated } from '@/hooks/use-hydrated';
 
 function LocalDateTimePill() {
-  const [now, setNow] = useState<Date>(() => new Date());
+  const hydrated = useHydrated();
+  const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    const sync = () => setNow(new Date());
+    sync();
+    const timer = window.setInterval(sync, 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  if (!hydrated || !now) {
+    return (
+      <div
+        className="hidden h-[30px] min-w-[9rem] rounded-md border border-border/60 bg-muted/40 sm:block"
+        aria-hidden
+        suppressHydrationWarning
+      />
+    );
+  }
 
   const dateLabel = new Intl.DateTimeFormat(undefined, {
     weekday: 'short',

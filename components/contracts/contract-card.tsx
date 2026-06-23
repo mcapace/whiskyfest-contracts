@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { listPackageLabel } from '@/lib/contract-deal-kind';
 import { formatCurrency, formatRelative } from '@/lib/utils';
 import { RelativeTime } from '@/components/ui/relative-time';
+import { useHydrated } from '@/hooks/use-hydrated';
 import { StatusBadge } from '@/components/contracts/status-badge';
 import type { ContractWithTotals } from '@/types/db';
 
@@ -21,8 +22,10 @@ export function ContractCard({
     .filter(Boolean)
     .slice(0, 4);
   const [updatedSummary, setUpdatedSummary] = useState<string | null>(null);
+  const hydrated = useHydrated();
 
   useEffect(() => {
+    if (!hydrated) return;
     const sync = () => {
       const daysSince = Math.max(
         0,
@@ -35,7 +38,7 @@ export function ContractCard({
     sync();
     const id = window.setInterval(sync, 60_000);
     return () => window.clearInterval(id);
-  }, [contract.updated_at]);
+  }, [contract.updated_at, hydrated]);
 
   return (
     <Link

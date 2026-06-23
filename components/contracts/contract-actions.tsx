@@ -48,6 +48,7 @@ import {
 import { Input, Label, Textarea } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/utils';
 import { useRelativeTimeLabel } from '@/components/ui/relative-time';
+import { useHydrated } from '@/hooks/use-hydrated';
 import { useContractLiveOptional } from '@/components/contracts/contract-live-context';
 import type { ContractStatus } from '@/types/db';
 
@@ -1132,6 +1133,7 @@ function StatusLine({
   cancelledBy: string | null;
   errorDetails: string | null;
 }) {
+  const hydrated = useHydrated();
   const sentRelative = useRelativeTimeLabel(sentAt);
   const updatedRelative = useRelativeTimeLabel(updatedAt);
   const releasedRelative = useRelativeTimeLabel(releasedAt ?? executedAt);
@@ -1142,13 +1144,13 @@ function StatusLine({
       return (
         <p className="text-sm italic text-muted-foreground" suppressHydrationWarning>
           Waiting for {signerWaitLabel}
-          {sentAt ? ` · Sent ${sentRelative}` : ''}
+          {sentAt && hydrated ? ` · Sent ${sentRelative}` : ''}
         </p>
       );
     }
     return (
       <p className="text-sm italic text-muted-foreground" suppressHydrationWarning>
-        {sentAt ? `Sent ${sentRelative}` : 'Sent'} · Waiting for {signerEmail ?? 'signer'} to sign
+        {sentAt && hydrated ? `Sent ${sentRelative}` : 'Sent'} · Waiting for {signerEmail ?? 'signer'} to sign
         {(isAdmin || isEventsTeam) && docusignEnvelopeId ? (
           <> · If they already signed in DocuSign, open <span className="font-medium text-foreground">Actions</span> and use Sync from DocuSign.</>
         ) : null}
@@ -1165,7 +1167,7 @@ function StatusLine({
     }
     return (
       <p className="text-sm text-muted-foreground" suppressHydrationWarning>
-        Exhibitor signed {updatedAt ? updatedRelative : 'recently'} · Awaiting Shanken countersignature
+        Exhibitor signed {updatedAt && hydrated ? updatedRelative : 'recently'} · Awaiting Shanken countersignature
       </p>
     );
   }
@@ -1182,7 +1184,7 @@ function StatusLine({
   if (status === 'executed') {
     return (
       <p className="text-sm text-emerald-700" suppressHydrationWarning>
-        ✓ Released {releasedRelative}
+        ✓ Released {hydrated ? releasedRelative : 'recently'}
         {releasedBy ? ` by ${releasedBy}` : ''}
       </p>
     );
@@ -1193,7 +1195,7 @@ function StatusLine({
         <p className="font-medium">Contract cancelled</p>
         {cancelledReason && <p>{cancelledReason}</p>}
         <p className="text-xs text-red-700/80" suppressHydrationWarning>
-          {cancelledAt ? cancelledRelative : 'recently'}
+          {cancelledAt && hydrated ? cancelledRelative : 'recently'}
           {cancelledBy ? ` by ${cancelledBy}` : ''}
         </p>
       </div>

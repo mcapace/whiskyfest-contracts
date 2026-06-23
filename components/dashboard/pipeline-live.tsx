@@ -1,11 +1,19 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useReducedMotion } from 'framer-motion';
 import { subscribeToAppContractEvents } from '@/lib/realtime-client';
-import { PipelineChart } from '@/components/dashboard/pipeline-chart';
 import type { PipelineRow } from '@/lib/event-metrics';
+
+const PipelineChart = dynamic(
+  () => import('@/components/dashboard/pipeline-chart').then((m) => m.PipelineChart),
+  {
+    ssr: false,
+    loading: () => <div className="h-[360px] w-full min-h-[360px] animate-pulse rounded-md bg-muted/25" aria-hidden />,
+  },
+);
 
 export function PipelineLive({ data }: { data: PipelineRow[] }) {
   const router = useRouter();
