@@ -18,16 +18,19 @@ import { cn, formatCurrency, formatLongDate, formatTimestamp } from '@/lib/utils
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StatusBadge } from '@/components/contracts/status-badge';
-import { ContractActions } from '@/components/contracts/contract-actions';
 import { SignerContactEdit } from '@/components/contracts/signer-contact-edit';
-import { ContractDetailHeader } from '@/components/contracts/contract-detail-header';
+import {
+  ActivityTimelineClient,
+  ContractActionsClient,
+  ContractDetailHeaderClient,
+  ContractProgressionTimelineClient,
+  PdfPreviewClient,
+} from '@/lib/contract-detail-client';
 import { ContractLiveProvider } from '@/components/contracts/contract-live-context';
 import { ContractDetailRealtime } from '@/components/contracts/contract-detail-realtime';
 import { ContractTableOfContents } from '@/components/contracts/table-of-contents';
-import { ActivityTimeline } from '@/components/contracts/activity-timeline';
 import { ContractActivityLogger } from '@/components/contracts/contract-activity-logger';
 import { buildContractActivityTimeline } from '@/lib/contract-activity-timeline';
-import { PdfPreview } from '@/components/contracts/pdf-preview';
 import {
   contractPdfPreviewUrl,
   contractPdfPreviewVersion,
@@ -35,7 +38,6 @@ import {
 } from '@/lib/contract-pdf-preview';
 import { syncDraftPdfFromDocuSign } from '@/lib/contract-pdf-sync-docusign';
 import { syncContractFromDocuSign } from '@/lib/docusign-envelope-sync';
-import { ContractProgressionTimeline } from '@/components/contract/progression-timeline';
 import { ContractSummarySection } from '@/components/contract/contract-summary-section';
 import type {
   AuditLogEntry,
@@ -217,7 +219,7 @@ export async function ContractDetailPage({
         </div>
       </div>
 
-      <ContractDetailHeader
+      <ContractDetailHeaderClient
         title={contract.exhibitor_company_name}
         subtitle={`${event?.name ?? 'WhiskyFest'} · ${event ? formatLongDate(event.event_date) : '—'}`}
         status={contract.status}
@@ -244,7 +246,7 @@ export async function ContractDetailPage({
 
       <div id="overview" className="rounded-lg border border-border/50 bg-bg-surface p-4 md:p-6">
         <p className="wf-label-caps mb-4 text-[0.6rem]">Progress</p>
-        <ContractProgressionTimeline status={contract.status} audit={audit} />
+        <ContractProgressionTimelineClient status={contract.status} audit={audit} />
       </div>
 
       <ContractSummarySection contract={contract} event={event ?? null} />
@@ -362,7 +364,7 @@ export async function ContractDetailPage({
       )}
 
       <div className="rounded-lg border border-parchment-200/90 bg-parchment-50/80 p-4 shadow-sm">
-          <ContractActions
+          <ContractActionsClient
             contractId={contract.id}
             exhibitorName={contract.exhibitor_company_name}
             signerEmail={contract.signer_1_email}
@@ -641,7 +643,7 @@ export async function ContractDetailPage({
         <p className="font-sans text-xs text-muted-foreground">
           Creation, reviews, DocuSign signing, views, accounting steps, and other changes — newest at the bottom.
         </p>
-        <ActivityTimeline audit={activityTimeline} />
+        <ActivityTimelineClient audit={activityTimeline} />
       </section>
 
       {canInlinePdf ? (
@@ -649,7 +651,7 @@ export async function ContractDetailPage({
           <hr className="my-2 border-parchment-300" />
           <section id="pdf-preview" className="space-y-4">
             <p className="wf-label-caps text-[0.6rem] text-ink-500">Inline PDF Preview</p>
-            <PdfPreview fileUrl={pdfPreviewUrl} caption={pdfPreviewCaption} />
+            <PdfPreviewClient fileUrl={pdfPreviewUrl} caption={pdfPreviewCaption} />
             {legacyPdfUrl ? (
               <p className="font-sans text-xs text-muted-foreground">
                 <a
