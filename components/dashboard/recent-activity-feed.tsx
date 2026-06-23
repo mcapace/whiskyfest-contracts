@@ -3,13 +3,15 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { CheckCircle2, Clock3, FileCheck2, FilePenLine, FileX2, Send, ShieldCheck } from 'lucide-react';
 import { describeAuditAction, type ActivityRow } from '@/lib/event-metrics';
 import { cn } from '@/lib/utils';
 import { RelativeTime } from '@/components/ui/relative-time';
 import { Card, CardContent } from '@/components/ui/card';
 import { subscribeToActivity } from '@/lib/realtime-client';
+import { useHydrated } from '@/hooks/use-hydrated';
+import { useSafeReducedMotion } from '@/hooks/use-safe-reduced-motion';
 
 function ActivityIcon({ action }: { action: string }) {
   const className = 'mt-0.5 h-4 w-4 shrink-0 text-ink-500';
@@ -42,11 +44,32 @@ function ActivityIcon({ action }: { action: string }) {
   }
 }
 
+function ActivityRowContent({ a }: { a: ActivityRow }) {
+  return (
+    <>
+      <ActivityIcon action={a.action} />
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-sans text-ink-700">
+          <span className="font-medium text-oak-800">{a.actor}</span>{' '}
+          <span>{describeAuditAction(a.action)}</span>{' '}
+          {a.contractId && a.contractName ? (
+            <Link href={`/contracts/${a.contractId}`} className="font-medium text-amber-700 hover:underline">
+              {a.contractName}
+            </Link>
+          ) : null}
+        </p>
+        <RelativeTime iso={a.occurredAt} className="mt-1 block font-sans text-xs text-ink-500" />
+      </div>
+    </>
+  );
+}
+
 const ACTIVITY_CAP = 15;
 
 export function RecentActivityFeed({ activities, title }: { activities: ActivityRow[]; title?: string }) {
   const router = useRouter();
-  const reduce = useReducedMotion();
+  const hydrated = useHydrated();
+  const reduce = useSafeReducedMotion();
   const [expanded, setExpanded] = useState(false);
   const prevHead = useRef<string | undefined>(undefined);
   const [enterPulse, setEnterPulse] = useState(0);
@@ -60,15 +83,16 @@ export function RecentActivityFeed({ activities, title }: { activities: Activity
 
   const headId = activities[0]?.id;
   useEffect(() => {
-    if (prevHead.current !== undefined && headId && headId !== prevHead.current && !reduce) {
+    if (prevHead.current !== undefined && headId && headId !== prevHead.current && hydrated && !reduce) {
       setEnterPulse((n) => n + 1);
     }
     prevHead.current = headId;
-  }, [headId, reduce]);
+  }, [headId, hydrated, reduce]);
 
   const capped = activities.slice(0, ACTIVITY_CAP);
   const visible = expanded ? capped : capped.slice(0, 3);
   const hasMore = capped.length > 3;
+  const animate = hydrated && !reduce;
 
   return (
     <Card className="bg-parchment-50">
@@ -84,32 +108,29 @@ export function RecentActivityFeed({ activities, title }: { activities: Activity
                 expanded ? 'max-h-[2000px]' : 'max-h-[280px]',
               )}
             >
-              <motion.ul className="space-y-4" layout={!reduce}>
-                {visible.map((a, idx) => (
-                  <motion.li
-                    key={idx === 0 ? `${a.id}-${enterPulse}` : a.id}
-                    layout={!reduce}
-                    initial={!reduce && idx === 0 && enterPulse > 0 ? { opacity: 0, y: 8 } : false}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.28, ease: [0.25, 0.1, 0.25, 1] }}
-                    className="flex gap-3 text-sm"
-                  >
-                    <ActivityIcon action={a.action} />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-sans text-ink-700">
-                        <span className="font-medium text-oak-800">{a.actor}</span>{' '}
-                        <span>{describeAuditAction(a.action)}</span>{' '}
-                        {a.contractId && a.contractName ? (
-                          <Link href={`/contracts/${a.contractId}`} className="font-medium text-amber-700 hover:underline">
-                            {a.contractName}
-                          </Link>
-                        ) : null}
-                      </p>
-                      <RelativeTime iso={a.occurredAt} className="mt-1 block font-sans text-xs text-ink-500" />
-                    </div>
-                  </motion.li>
-                ))}
-              </motion.ul>
+              {animate ? (
+                <motion.ul className="space-y-4">
+                  {visible.map((a, idx) => (
+                    <motion.li
+                      key={idx === 0 ? `${a.id}-${enterPulse}` : a.id}
+                      initial={idx === 0 && enterPulse > 0 ? { opacity: 0, y: 8 } : false}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.28, ease: [0.25, 0.1, 0.25, 1] }}
+                      className="flex gap-3 text-sm"
+                    >
+                      <ActivityRowContent a={a} />
+                    </motion.li>
+                  ))}
+                </motion.ul>
+              ) : (
+                <ul className="space-y-4">
+                  {visible.map((a) => (
+                    <li key={a.id} className="flex gap-3 text-sm">
+                      <ActivityRowContent a={a} />
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
             {hasMore ? (
               <button

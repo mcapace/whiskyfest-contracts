@@ -1,14 +1,16 @@
 'use client';
 
-import { useReducedMotion } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import { usePathname } from 'next/navigation';
+import { useHydrated } from '@/hooks/use-hydrated';
+import { useSafeReducedMotion } from '@/hooks/use-safe-reduced-motion';
 
 export default function DashboardTemplate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const reduce = useReducedMotion();
+  const hydrated = useHydrated();
+  const reduce = useSafeReducedMotion();
 
-  if (reduce) {
+  if (!hydrated || reduce) {
     return <>{children}</>;
   }
 

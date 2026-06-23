@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useReducedMotion } from 'framer-motion';
+import { useSafeReducedMotion } from '@/hooks/use-safe-reduced-motion';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -19,7 +19,7 @@ export function HeroParallaxLayer({
   src?: string;
   objectPosition?: string;
 }) {
-  const reduce = useReducedMotion();
+  const reduce = useSafeReducedMotion();
   const rootRef = useRef<HTMLDivElement>(null);
   const [shiftY, setShiftY] = useState(0);
 

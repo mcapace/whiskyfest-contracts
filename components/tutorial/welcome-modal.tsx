@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useSafeReducedMotion } from '@/hooks/use-safe-reduced-motion';
 import { ClipboardCheck, FilePlus2, ShieldCheck, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -24,7 +25,7 @@ export function WelcomeTutorialModal({
   onSkip: () => void;
   onStartTour: () => void;
 }) {
-  const reduce = useReducedMotion();
+  const reduce = useSafeReducedMotion();
   const [step, setStep] = useState(0);
   const dir = 1;
 

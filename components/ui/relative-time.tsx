@@ -7,7 +7,7 @@ import { useHydrated } from '@/hooks/use-hydrated';
 /** Client-only relative label ("2h ago") — identical placeholder on server and first client paint. */
 export function useRelativeTimeLabel(iso: string | null | undefined): string {
   const hydrated = useHydrated();
-  const [label, setLabel] = useState('');
+  const [label, setLabel] = useState('—');
 
   useEffect(() => {
     if (!hydrated) return;
@@ -22,7 +22,7 @@ export function useRelativeTimeLabel(iso: string | null | undefined): string {
   }, [iso, hydrated]);
 
   if (!hydrated || !iso) return '—';
-  return label || '—';
+  return label;
 }
 
 export function RelativeTime({

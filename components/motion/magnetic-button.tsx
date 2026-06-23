@@ -1,6 +1,6 @@
 'use client';
 
-import { useReducedMotion } from 'framer-motion';
+import { useSafeReducedMotion } from '@/hooks/use-safe-reduced-motion';
 import { useCallback, useRef, useState, type CSSProperties, type ReactElement } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -19,7 +19,7 @@ export function MagneticButton({
   /** Multiplier for displacement (default 1). */
   strength?: number;
 }) {
-  const reduce = useReducedMotion();
+  const reduce = useSafeReducedMotion();
   const wrapRef = useRef<HTMLSpanElement>(null);
   const [off, setOff] = useState({ x: 0, y: 0 });
 

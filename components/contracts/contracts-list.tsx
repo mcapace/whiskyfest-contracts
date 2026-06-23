@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion } from 'framer-motion';
+import { useHydrated } from '@/hooks/use-hydrated';
+import { useSafeReducedMotion } from '@/hooks/use-safe-reduced-motion';
 import { LayoutGrid, MoreHorizontal, Table2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { RelativeTime } from '@/components/ui/relative-time';
@@ -70,7 +72,9 @@ export function ContractsList({
   portalBasePath?: string;
 }) {
   const router = useRouter();
-  const reduceMotion = useReducedMotion();
+  const hydrated = useHydrated();
+  const reduceMotion = useSafeReducedMotion();
+  const animate = hydrated && !reduceMotion;
   const [view, setView] = useState<'table' | 'cards'>('table');
 
   useEffect(() => {
@@ -303,20 +307,26 @@ export function ContractsList({
         </div>
       ) : view === 'cards' ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((contract, i) => (
-            <motion.div
-              key={contract.id}
-              initial={reduceMotion ? false : { opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{
-                duration: 0.26,
-                delay: reduceMotion ? 0 : Math.min(i, 18) * 0.032,
-                ease: [0.25, 0.1, 0.25, 1],
-              }}
-            >
-              <ContractCard contract={contract} portalBasePath={portalBasePath} />
-            </motion.div>
-          ))}
+          {filtered.map((contract, i) => {
+            const card = <ContractCard contract={contract} portalBasePath={portalBasePath} />;
+            if (!animate) {
+              return <div key={contract.id}>{card}</div>;
+            }
+            return (
+              <motion.div
+                key={contract.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: 0.26,
+                  delay: Math.min(i, 18) * 0.032,
+                  ease: [0.25, 0.1, 0.25, 1],
+                }}
+              >
+                {card}
+              </motion.div>
+            );
+          })}
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-border bg-card shadow-wf-editorial-sm">
@@ -335,27 +345,20 @@ export function ContractsList({
             <TableBody>
               {filtered.map((c, rowIdx) => {
                 const pill = firstBrandPill(c.brands_poured);
-                return (
-                  <MotionTableRow
-                    key={c.id}
-                    role="link"
-                    tabIndex={0}
-                    className="cursor-pointer"
-                    initial={reduceMotion ? false : { opacity: 0, x: -6 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{
-                      duration: 0.24,
-                      delay: reduceMotion ? 0 : Math.min(rowIdx, 20) * 0.028,
-                      ease: [0.25, 0.1, 0.25, 1],
-                    }}
-                    onClick={() => router.push(contractHref(c.id))}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        router.push(contractHref(c.id));
-                      }
-                    }}
-                  >
+                const rowProps = {
+                  role: 'link' as const,
+                  tabIndex: 0,
+                  className: 'cursor-pointer',
+                  onClick: () => router.push(contractHref(c.id)),
+                  onKeyDown: (e: KeyboardEvent) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      router.push(contractHref(c.id));
+                    }
+                  },
+                };
+                const cells = (
+                  <>
                     <TableCell>
                       <div className="font-medium text-foreground">{c.exhibitor_company_name}</div>
                       <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -398,6 +401,28 @@ export function ContractsList({
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
+                  </>
+                );
+                if (!animate) {
+                  return (
+                    <TableRow key={c.id} {...rowProps}>
+                      {cells}
+                    </TableRow>
+                  );
+                }
+                return (
+                  <MotionTableRow
+                    key={c.id}
+                    {...rowProps}
+                    initial={{ opacity: 0, x: -6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{
+                      duration: 0.24,
+                      delay: Math.min(rowIdx, 20) * 0.028,
+                      ease: [0.25, 0.1, 0.25, 1],
+                    }}
+                  >
+                    {cells}
                   </MotionTableRow>
                 );
               })}

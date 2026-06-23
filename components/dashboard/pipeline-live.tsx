@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useReducedMotion } from 'framer-motion';
+import { useSafeReducedMotion } from '@/hooks/use-safe-reduced-motion';
 import { subscribeToAppContractEvents } from '@/lib/realtime-client';
 import type { PipelineRow } from '@/lib/event-metrics';
 
@@ -17,7 +17,7 @@ const PipelineChart = dynamic(
 
 export function PipelineLive({ data }: { data: PipelineRow[] }) {
   const router = useRouter();
-  const reduce = useReducedMotion();
+  const reduce = useSafeReducedMotion();
   const [pulse, setPulse] = useState(0);
 
   useEffect(() => {
