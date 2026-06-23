@@ -21,7 +21,7 @@ export function PipelineLive({ data }: { data: PipelineRow[] }) {
   }, [router]);
 
   return (
-    <div key={pulse} className={!reduce && pulse > 0 ? 'motion-safe:animate-wf-pipeline-flash' : undefined}>
+    <div className={!reduce && pulse > 0 ? 'motion-safe:animate-wf-pipeline-flash' : undefined}>
       <PipelineChart data={data} />
     </div>
   );
