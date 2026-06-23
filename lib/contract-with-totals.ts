@@ -38,6 +38,41 @@ export async function overlayContractColumnsFromBaseTable(
   return { ...row, ...base };
 }
 
+async function fetchContractWithTotalsFromBaseTable(
+  supabase: SupabaseClient,
+  contractId: string,
+): Promise<ContractWithTotals | null> {
+  const { data: base, error: baseErr } = await supabase
+    .from('contracts')
+    .select('*')
+    .eq('id', contractId)
+    .maybeSingle<Contract>();
+
+  if (baseErr || !base) return null;
+
+  const [{ data: lineItems }, { data: rep }] = await Promise.all([
+    supabase.from('contract_line_items').select('amount_cents').eq('contract_id', contractId),
+    base.sales_rep_id
+      ? supabase.from('sales_reps').select('name, email').eq('id', base.sales_rep_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const lineSub = (lineItems ?? []).reduce((sum, row) => sum + (row.amount_cents ?? 0), 0);
+  const boothSub = base.booth_count * base.booth_rate_cents;
+  const grand = boothSub + lineSub;
+
+  return {
+    ...base,
+    booth_subtotal_cents: boothSub,
+    additional_brand_fee_cents: 0,
+    line_items_subtotal_cents: lineSub,
+    total_amount_cents: grand,
+    grand_total_cents: grand,
+    sales_rep_name: rep?.name ?? null,
+    sales_rep_email: rep?.email ?? null,
+  };
+}
+
 export async function fetchContractWithTotalsById(
   supabase: SupabaseClient,
   contractId: string,
@@ -48,6 +83,13 @@ export async function fetchContractWithTotalsById(
     .eq('id', contractId)
     .maybeSingle<ContractWithTotals>();
 
-  if (error || !data) return null;
-  return overlayContractColumnsFromBaseTable(supabase, contractId, data);
+  if (error) {
+    console.error('[fetchContractWithTotalsById] view query failed', error);
+  }
+
+  if (data) {
+    return overlayContractColumnsFromBaseTable(supabase, contractId, data);
+  }
+
+  return fetchContractWithTotalsFromBaseTable(supabase, contractId);
 }

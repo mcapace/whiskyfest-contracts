@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState, useTransition, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { emitContractActionSuccessFeedback } from '@/lib/contract-action-feedback';
 import { ArrowLeft, Loader2 } from 'lucide-react';
@@ -52,8 +53,9 @@ export function ImportContractForm({
   isEventsTeam?: boolean;
 }) {
   const canPickAnySalesRep = isAdmin || isEventsTeam;
+  const router = useRouter();
   const { data: session } = useSession();
-  const [pending, startTransition] = useTransition();
+  const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const defaultEvent = events[0];
@@ -224,7 +226,8 @@ export function ImportContractForm({
       ? sponsorshipLinePayload.reduce((sum, row) => sum + (parseDollarsToNumber(row.amount_dollars) ?? 0), 0)
       : 0;
 
-    startTransition(async () => {
+    setSubmitting(true);
+    try {
       const fd = new FormData();
       fd.set('order_type', sponsorshipOnly ? 'sponsorship_only' : 'booth');
       fd.set('event_id', resolvedEventId);
@@ -267,11 +270,18 @@ export function ImportContractForm({
         return;
       }
       emitContractActionSuccessFeedback(Boolean(session?.user?.sound_enabled));
-      const id = j.id as string | undefined;
-      // Full navigation avoids client-side route transition hook crashes (React #310) on corporate PCs.
-      if (id) window.location.assign(`/contracts/${id}`);
-      else window.location.assign('/contracts');
-    });
+      const id = (j.id ?? j.contractId) as string | undefined;
+      if (id) {
+        router.push(`/contracts/${id}?imported=1`);
+        router.refresh();
+        return;
+      }
+      setErr('Import saved but no contract id was returned. Open All Contracts to find the new record.');
+    } catch {
+      setErr('Import failed — network error. Check your connection and try again.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -666,8 +676,8 @@ export function ImportContractForm({
         </Card>
 
         <div className="flex flex-wrap gap-3">
-          <Button type="submit" disabled={pending}>
-            {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+          <Button type="submit" disabled={submitting}>
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
             Import contract
           </Button>
           <Button type="button" variant="outline" asChild>
