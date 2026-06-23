@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, useTransition, type ReactNode } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { emitContractActionSuccessFeedback } from '@/lib/contract-action-feedback';
 import { ArrowLeft, Loader2 } from 'lucide-react';
@@ -53,7 +52,6 @@ export function ImportContractForm({
   isEventsTeam?: boolean;
 }) {
   const canPickAnySalesRep = isAdmin || isEventsTeam;
-  const router = useRouter();
   const { data: session } = useSession();
   const [pending, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
@@ -270,9 +268,9 @@ export function ImportContractForm({
       }
       emitContractActionSuccessFeedback(Boolean(session?.user?.sound_enabled));
       const id = j.id as string | undefined;
-      if (id) router.push(`/contracts/${id}`);
-      else router.push('/contracts');
-      router.refresh();
+      // Full navigation avoids client-side route transition hook crashes (React #310) on corporate PCs.
+      if (id) window.location.assign(`/contracts/${id}`);
+      else window.location.assign('/contracts');
     });
   }
 
