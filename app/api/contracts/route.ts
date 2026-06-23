@@ -4,6 +4,10 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { resolveContractActor } from '@/lib/auth-contract';
 import { clearedRepEnteredBilling, newContractBodySchema, sponsorBrandFromBody } from '@/lib/contract-schemas';
+import {
+  normalizeSignerCcEmail,
+  normalizeSignerCcName,
+} from '@/lib/docusign-signer-cc';
 import { replaceContractBoothBrandsForContract } from '@/lib/contract-booth-brands';
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
 import { isEventsManagedWorkflow } from '@/lib/contract-template-profile';
@@ -153,6 +157,8 @@ export async function POST(req: Request) {
       signer_1_name: p.signer_1_name ?? null,
       signer_1_title: p.signer_1_title ?? null,
       signer_1_email: p.signer_1_email ?? null,
+      signer_cc_name: normalizeSignerCcName(p.signer_cc_name),
+      signer_cc_email: normalizeSignerCcEmail(p.signer_cc_email),
       sales_rep_id: effectiveSalesRepId,
       notes: p.notes ?? null,
       exhibitor_notes: p.exhibitor_notes?.trim() || null,

@@ -17,6 +17,8 @@ const CONTRACT_COLUMNS_OVERLAY = [
   'originally_signed_at',
   'exhibitor_notes',
   'order_type',
+  'signer_cc_name',
+  'signer_cc_email',
 ] as const satisfies readonly (keyof Contract)[];
 
 type ContractOverlay = Pick<Contract, (typeof CONTRACT_COLUMNS_OVERLAY)[number]>;

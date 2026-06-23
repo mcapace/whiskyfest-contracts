@@ -88,6 +88,8 @@ export async function EditDraftContractPage({
           signer_1_name: c.signer_1_name ?? '',
           signer_1_title: c.signer_1_title ?? '',
           signer_1_email: c.signer_1_email ?? '',
+          signer_cc_name: c.signer_cc_name ?? '',
+          signer_cc_email: c.signer_cc_email ?? '',
           sales_rep_id: c.sales_rep_id ?? '',
           exhibitor_notes: c.exhibitor_notes ?? '',
           notes: c.notes ?? '',

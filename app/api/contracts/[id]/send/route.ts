@@ -23,6 +23,7 @@ import { insertContractAudit } from '@/lib/audit-log';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { syncExhibitorRosterWritebackById } from '@/lib/exhibitor-roster-sync-hook';
 import { docusignBrandIdForEvent } from '@/lib/product-email';
+import { parseSignerCc, validateSignerCcDistinct } from '@/lib/docusign-signer-cc';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
@@ -96,6 +97,15 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
   const signerEmail = contract.signer_1_email.trim();
   const signerName = contract.signer_1_name.trim();
+  const carbonCopy = parseSignerCc(contract);
+  const ccError = validateSignerCcDistinct({
+    signerEmail,
+    countersignerEmail,
+    cc: carbonCopy,
+  });
+  if (ccError) {
+    return NextResponse.json({ error: ccError }, { status: 400 });
+  }
   const safeCompany = contract.exhibitor_company_name.replace(/[^\w\s-]/g, '');
   const templateDocId = resolveContractTemplateDocId(contract, event);
   const usesOrderTable = eventUsesContractOrderTable(event);
@@ -126,6 +136,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       emailBlurb: contractDocuSignEmailBlurb(contract.exhibitor_company_name, event),
       signer1: { name: signerName, email: signerEmail },
       countersigner: { name: countersignerName, email: countersignerEmail },
+      carbonCopy,
       brandId: docusignBrandIdForEvent(event),
     });
 
@@ -156,6 +167,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
         envelope_id: envelopeId,
         envelope_status: 'sent',
         exhibitor_signer: contract.signer_1_email,
+        signer_cc_email: carbonCopy?.email ?? null,
         countersigner_email: countersignerEmail,
         countersigner_name: countersignerName,
       },

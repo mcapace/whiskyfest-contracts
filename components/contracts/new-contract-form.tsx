@@ -70,6 +70,8 @@ export type ContractFormValues = {
   signer_1_name: string;
   signer_1_title: string;
   signer_1_email: string;
+  signer_cc_name: string;
+  signer_cc_email: string;
   sales_rep_id: string;
   exhibitor_notes: string;
   notes: string;
@@ -190,6 +192,8 @@ export function NewContractForm({
     signer_1_name:          initialValues?.signer_1_name ?? '',
     signer_1_title:         initialValues?.signer_1_title ?? '',
     signer_1_email:         initialValues?.signer_1_email ?? '',
+    signer_cc_name:         initialValues?.signer_cc_name ?? '',
+    signer_cc_email:        initialValues?.signer_cc_email ?? '',
     sales_rep_id:           initialValues?.sales_rep_id ?? '',
     exhibitor_notes:        initialValues?.exhibitor_notes ?? '',
     notes:                  initialValues?.notes ?? '',
@@ -915,6 +919,22 @@ export function NewContractForm({
             <Field label="Email" hint="DocuSign sends the signing request to this address (exhibitor signer).">
               <Input type="email" value={form.signer_1_email} onChange={e => set('signer_1_email', e.target.value)} placeholder="jane@sampledistillery.com" />
             </Field>
+            <div className="rounded-md border border-border/60 bg-muted/20 p-4 space-y-4">
+              <div>
+                <p className="text-sm font-medium text-foreground">DocuSign CC (optional)</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Copy an assistant or colleague on DocuSign signing emails. They receive notifications but do not sign.
+                </p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="CC name">
+                  <Input value={form.signer_cc_name} onChange={e => set('signer_cc_name', e.target.value)} placeholder="Assistant name" />
+                </Field>
+                <Field label="CC email">
+                  <Input type="email" value={form.signer_cc_email} onChange={e => set('signer_cc_email', e.target.value)} placeholder="assistant@company.com" />
+                </Field>
+              </div>
+            </div>
             {!eventsManaged ? (
               <SalesRepSelect
                 currentUserEmail={currentUserEmail}

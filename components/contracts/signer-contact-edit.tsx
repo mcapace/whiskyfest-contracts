@@ -20,14 +20,25 @@ interface Props {
   initialName: string | null;
   initialTitle: string | null;
   initialEmail: string | null;
+  initialCcName?: string | null;
+  initialCcEmail?: string | null;
 }
 
-export function SignerContactEdit({ contractId, initialName, initialTitle, initialEmail }: Props) {
+export function SignerContactEdit({
+  contractId,
+  initialName,
+  initialTitle,
+  initialEmail,
+  initialCcName,
+  initialCcEmail,
+}: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(initialName ?? '');
   const [title, setTitle] = useState(initialTitle ?? '');
   const [email, setEmail] = useState(initialEmail ?? '');
+  const [ccName, setCcName] = useState(initialCcName ?? '');
+  const [ccEmail, setCcEmail] = useState(initialCcEmail ?? '');
   const [err, setErr] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -35,6 +46,8 @@ export function SignerContactEdit({ contractId, initialName, initialTitle, initi
     setName(initialName ?? '');
     setTitle(initialTitle ?? '');
     setEmail(initialEmail ?? '');
+    setCcName(initialCcName ?? '');
+    setCcEmail(initialCcEmail ?? '');
   }
 
   async function save() {
@@ -47,6 +60,8 @@ export function SignerContactEdit({ contractId, initialName, initialTitle, initi
           signer_1_name: name.trim(),
           signer_1_title: title.trim() || null,
           signer_1_email: email.trim(),
+          signer_cc_name: ccName.trim() || null,
+          signer_cc_email: ccEmail.trim() || null,
         }),
       });
       if (!res.ok) {
@@ -81,7 +96,7 @@ export function SignerContactEdit({ contractId, initialName, initialTitle, initi
         <DialogHeader>
           <DialogTitle>Edit exhibitor signer</DialogTitle>
           <DialogDescription>
-            Update the DocuSign recipient name and email before sending. Mailing address, telephone, billing, and event
+            Update the DocuSign recipient and optional CC before sending. Mailing address, telephone, billing, and event
             contact are collected from the exhibitor at signing.
           </DialogDescription>
         </DialogHeader>
@@ -95,7 +110,7 @@ export function SignerContactEdit({ contractId, initialName, initialTitle, initi
             <Input id="s-title" value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="s-email">Email</Label>
+            <Label htmlFor="s-email">Signer email</Label>
             <Input
               id="s-email"
               type="email"
@@ -103,6 +118,28 @@ export function SignerContactEdit({ contractId, initialName, initialTitle, initi
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
             />
+          </div>
+          <div className="space-y-3 rounded-md border border-border/60 bg-muted/20 p-4">
+            <div>
+              <p className="text-sm font-medium text-foreground">DocuSign CC (optional)</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Assistant or colleague copied on DocuSign notifications. They do not sign.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="s-cc-name">CC name</Label>
+              <Input id="s-cc-name" value={ccName} onChange={(e) => setCcName(e.target.value)} placeholder="Assistant name" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="s-cc-email">CC email</Label>
+              <Input
+                id="s-cc-email"
+                type="email"
+                value={ccEmail}
+                onChange={(e) => setCcEmail(e.target.value)}
+                placeholder="assistant@company.com"
+              />
+            </div>
           </div>
         </div>
         {err && (

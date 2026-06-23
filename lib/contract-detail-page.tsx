@@ -415,6 +415,8 @@ export async function ContractDetailPage({
                 initialName={contract.signer_1_name}
                 initialTitle={contract.signer_1_title}
                 initialEmail={contract.signer_1_email}
+                initialCcName={contract.signer_cc_name}
+                initialCcEmail={contract.signer_cc_email}
               />
             )}
           </div>
@@ -439,6 +441,13 @@ export async function ContractDetailPage({
                     )
                   }
                 />
+                {contract.signer_cc_email?.trim() ? (
+                  <Detail
+                    label="DocuSign CC"
+                    value={`${contract.signer_cc_name?.trim() || 'Assistant'} · ${contract.signer_cc_email.trim()}`}
+                    mono
+                  />
+                ) : null}
               </div>
             </div>
             <Detail label="Legal Name" value={contract.exhibitor_legal_name} />

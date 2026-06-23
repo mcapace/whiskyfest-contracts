@@ -33,6 +33,8 @@ export const newContractBodySchema = z
     signer_1_name: z.string().optional().nullable(),
     signer_1_title: z.string().optional().nullable(),
     signer_1_email: z.string().email().optional().or(z.literal('')).nullable(),
+    signer_cc_name: z.string().max(200).optional().nullable(),
+    signer_cc_email: z.string().email().optional().or(z.literal('')).nullable(),
     sales_rep_id: z.string().uuid({ message: 'Sales Rep is required' }).optional().nullable(),
     notes: z.string().max(20000).optional().nullable(),
     exhibitor_notes: z.string().max(50000).optional().nullable(),
@@ -40,6 +42,16 @@ export const newContractBodySchema = z
     booth_brands: z.array(boothBrandInputSchema).optional().default([]),
   })
   .superRefine((data, ctx) => {
+    const ccEmail = data.signer_cc_email?.trim();
+    const signerEmail = data.signer_1_email?.trim();
+    if (ccEmail && signerEmail && ccEmail.toLowerCase() === signerEmail.toLowerCase()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'CC email must differ from the exhibitor signer email.',
+        path: ['signer_cc_email'],
+      });
+    }
+
     const orderType = data.order_type ?? 'booth';
 
     if (orderType === 'sponsorship_only') {
@@ -139,7 +151,19 @@ export const signerContactPatchSchema = z.object({
   signer_1_name: z.string().min(1),
   signer_1_title: z.string().optional().nullable(),
   signer_1_email: z.string().email(),
+  signer_cc_name: z.string().max(200).optional().nullable(),
+  signer_cc_email: z.string().email().optional().or(z.literal('')).nullable(),
   booth_rate_cents: z.number().int().min(0).optional(),
+}).superRefine((data, ctx) => {
+  const ccEmail = data.signer_cc_email?.trim();
+  const signerEmail = data.signer_1_email?.trim();
+  if (ccEmail && signerEmail && ccEmail.toLowerCase() === signerEmail.toLowerCase()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'CC email must differ from the exhibitor signer email.',
+      path: ['signer_cc_email'],
+    });
+  }
 });
 
 export function sponsorBrandFromBody(p: Pick<NewContractBody, 'order_type' | 'sponsor_brand' | 'brands_poured'>): string | null {

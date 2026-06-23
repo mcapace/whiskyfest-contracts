@@ -13,6 +13,10 @@ import {
 } from '@/lib/contract-schemas';
 import { replaceContractBoothBrandsForContract } from '@/lib/contract-booth-brands';
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
+import {
+  normalizeSignerCcEmail,
+  normalizeSignerCcName,
+} from '@/lib/docusign-signer-cc';
 import type { Contract, ContractStatus } from '@/types/db';
 
 const signerEditableStatuses: ContractStatus[] = ['approved', 'ready_for_review', 'pending_events_review'];
@@ -86,6 +90,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         signer_1_name: p.signer_1_name ?? null,
         signer_1_title: p.signer_1_title ?? null,
         signer_1_email: p.signer_1_email ?? null,
+        signer_cc_name: normalizeSignerCcName(p.signer_cc_name),
+        signer_cc_email: normalizeSignerCcEmail(p.signer_cc_email),
         sales_rep_id: effectiveSalesRepId,
         notes: p.notes ?? null,
         exhibitor_notes: p.exhibitor_notes?.trim() || null,
@@ -192,6 +198,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       signer_1_name: p.signer_1_name,
       signer_1_title: p.signer_1_title ?? null,
       signer_1_email: p.signer_1_email,
+      signer_cc_name: normalizeSignerCcName(p.signer_cc_name),
+      signer_cc_email: normalizeSignerCcEmail(p.signer_cc_email),
       booth_rate_cents: incomingBoothRate,
       ...(shouldResetDiscountApproval
         ? {
@@ -215,6 +223,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     metadata: {
       previous_email: contract.signer_1_email,
       new_email: p.signer_1_email,
+      previous_cc_email: contract.signer_cc_email,
+      new_cc_email: normalizeSignerCcEmail(p.signer_cc_email),
     },
   });
 

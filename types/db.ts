@@ -83,6 +83,9 @@ export interface Contract {
   signer_1_name: string | null;
   signer_1_title: string | null;
   signer_1_email: string | null;
+  /** Optional DocuSign carbon copy when sending for signature. */
+  signer_cc_name: string | null;
+  signer_cc_email: string | null;
   sales_rep_id: string | null;
   draft_pdf_drive_id: string | null;
   draft_pdf_url: string | null;

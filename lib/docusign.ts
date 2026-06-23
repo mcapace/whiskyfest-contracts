@@ -155,6 +155,8 @@ export interface SendEnvelopeParams {
   signer1: { email: string; name: string };
   /** Event-level Shanken countersigner recipient (routing order 2). */
   countersigner: { email: string; name: string };
+  /** Optional carbon copy — receives DocuSign notifications but does not sign. */
+  carbonCopy?: { email: string; name: string } | null;
   /** DocuSign brand id — controls exhibitor-facing signing email sender/branding. */
   brandId?: string;
 }
@@ -208,6 +210,19 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
       ],
     },
   };
+
+  const cc = params.carbonCopy?.email?.trim();
+  if (cc) {
+    const recipients = envelopeDefinition.recipients as Record<string, unknown>;
+    recipients.carbonCopies = [
+      {
+        email: cc,
+        name: params.carbonCopy!.name.trim() || cc.split('@')[0] || 'Assistant',
+        recipientId: '3',
+        routingOrder: '1',
+      },
+    ];
+  }
 
   if (params.brandId?.trim()) {
     envelopeDefinition.brandId = params.brandId.trim();

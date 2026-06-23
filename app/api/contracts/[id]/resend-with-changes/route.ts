@@ -21,6 +21,7 @@ import { requiresDiscountApproval } from '@/lib/contracts';
 import { sendEnvelope, voidEnvelope } from '@/lib/docusign';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { docusignBrandIdForEvent } from '@/lib/product-email';
+import { parseSignerCc, validateSignerCcDistinct } from '@/lib/docusign-signer-cc';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
@@ -121,6 +122,16 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ error: 'Event countersigner name and email are required.' }, { status: 500 });
     }
 
+    const carbonCopy = parseSignerCc(mergedContract);
+    const ccError = validateSignerCcDistinct({
+      signerEmail: newSignerEmail,
+      countersignerEmail,
+      cc: carbonCopy,
+    });
+    if (ccError) {
+      return NextResponse.json({ error: ccError }, { status: 400 });
+    }
+
     const pdfBytes = await renderContractPdfFromTemplate(
       templateDocId,
       mergeMap,
@@ -139,6 +150,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       emailBlurb: contractDocuSignEmailBlurb(contract.exhibitor_company_name, event),
       signer1: { name: newSignerName, email: newSignerEmail },
       countersigner: { name: countersignerName, email: countersignerEmail },
+      carbonCopy,
       brandId: docusignBrandIdForEvent(event),
     });
     newEnvelopeId = sent.envelopeId;
