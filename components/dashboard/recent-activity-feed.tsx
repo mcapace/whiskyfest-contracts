@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { motion, useReducedMotion } from 'framer-motion';
 import { CheckCircle2, Clock3, FileCheck2, FilePenLine, FileX2, Send, ShieldCheck } from 'lucide-react';
 import { describeAuditAction, type ActivityRow } from '@/lib/event-metrics';
-import { formatRelative, cn } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { RelativeTime } from '@/components/ui/relative-time';
 import { Card, CardContent } from '@/components/ui/card';
 import { subscribeToActivity } from '@/lib/realtime-client';
 
@@ -104,7 +105,7 @@ export function RecentActivityFeed({ activities, title }: { activities: Activity
                           </Link>
                         ) : null}
                       </p>
-                      <p className="mt-1 font-sans text-xs text-ink-500">{formatRelative(a.occurredAt)}</p>
+                      <RelativeTime iso={a.occurredAt} className="mt-1 block font-sans text-xs text-ink-500" />
                     </div>
                   </motion.li>
                 ))}

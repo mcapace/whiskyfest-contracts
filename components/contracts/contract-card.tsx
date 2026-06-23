@@ -1,8 +1,10 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { listPackageLabel } from '@/lib/contract-deal-kind';
 import { formatCurrency, formatRelative } from '@/lib/utils';
+import { RelativeTime } from '@/components/ui/relative-time';
 import { StatusBadge } from '@/components/contracts/status-badge';
 import type { ContractWithTotals } from '@/types/db';
 
@@ -18,7 +20,22 @@ export function ContractCard({
     .map((b) => b.trim())
     .filter(Boolean)
     .slice(0, 4);
-  const daysSince = Math.max(0, Math.floor((Date.now() - new Date(contract.updated_at).getTime()) / 86400000));
+  const [updatedSummary, setUpdatedSummary] = useState<string | null>(null);
+
+  useEffect(() => {
+    const sync = () => {
+      const daysSince = Math.max(
+        0,
+        Math.floor((Date.now() - new Date(contract.updated_at).getTime()) / 86400000),
+      );
+      setUpdatedSummary(
+        `${daysSince} day${daysSince === 1 ? '' : 's'} since update · ${formatRelative(contract.updated_at)}`,
+      );
+    };
+    sync();
+    const id = window.setInterval(sync, 60_000);
+    return () => window.clearInterval(id);
+  }, [contract.updated_at]);
 
   return (
     <Link
@@ -48,8 +65,12 @@ export function ContractCard({
           <p className="font-sans text-sm font-semibold leading-snug text-oak-800">{listPackageLabel(contract)}</p>
         </div>
       </div>
-      <p className="mt-4 text-xs text-ink-500">
-        {daysSince} day{daysSince === 1 ? '' : 's'} since update · {formatRelative(contract.updated_at)}
+      <p className="mt-4 text-xs text-ink-500" suppressHydrationWarning>
+        {updatedSummary ?? (
+          <>
+            Updated <RelativeTime iso={contract.updated_at} />
+          </>
+        )}
       </p>
     </Link>
   );

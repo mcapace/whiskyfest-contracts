@@ -5,7 +5,8 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { requireContractActorForPage } from '@/lib/auth-contract';
 import { canViewAllSales, getVisibleContractsFilter } from '@/lib/permissions';
 import { requiresDiscountApproval } from '@/lib/contracts';
-import { formatCurrency, formatRelative } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
+import { RelativeTime } from '@/components/ui/relative-time';
 import { formatStatus, statusBadgeClassName } from '@/lib/status-display';
 import {
   contractMatchesDashboardFilter,
@@ -495,7 +496,7 @@ export default async function DashboardPage({
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <StatusBadge status={c.status} dataTour="status-badge" />
-                      <span className="text-xs text-muted-foreground">{formatRelative(c.updated_at)}</span>
+                      <RelativeTime iso={c.updated_at} className="text-xs text-muted-foreground" />
                     </div>
                   </Link>
                 ))}
@@ -533,7 +534,7 @@ export default async function DashboardPage({
                           {formatCurrency(c.grand_total_cents)}
                         </TableCell>
                         <TableCell className="text-right text-xs text-muted-foreground">
-                          {formatRelative(c.updated_at)}
+                          <RelativeTime iso={c.updated_at} />
                         </TableCell>
                         <TableCell>
                           <Link

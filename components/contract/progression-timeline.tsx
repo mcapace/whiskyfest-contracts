@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { formatStatus, progressionStageColor } from '@/lib/status-display';
-import { cn, formatRelative } from '@/lib/utils';
+import { cn, formatLongDate } from '@/lib/utils';
+import { RelativeTime } from '@/components/ui/relative-time';
 import type { AuditLogEntry, ContractStatus } from '@/types/db';
 
 const STAGE_ORDER: Exclude<ContractStatus, 'cancelled' | 'error'>[] = [
@@ -87,7 +88,7 @@ function stageTooltip(stage: (typeof STAGE_ORDER)[number], entry: AuditLogEntry 
   if (!done) return `${label} — not started`;
   if (!entry) return `${label} — completed`;
   const who = actorLabel(entry, stage);
-  const when = formatRelative(entry.occurred_at);
+  const when = formatLongDate(entry.occurred_at);
   if (who) return `${label} ${when} by ${who}`;
   return `${label} ${when}`;
 }
@@ -182,7 +183,10 @@ export function ContractProgressionTimeline({
             <div className="pb-4 pt-0.5">
               <p className="text-xs font-medium leading-tight text-foreground">{formatStatus(stage)}</p>
               {entry && done && (
-                <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">{formatRelative(entry.occurred_at)}</p>
+                <RelativeTime
+                  iso={entry.occurred_at}
+                  className="mt-0.5 block font-mono text-[10px] text-muted-foreground"
+                />
               )}
             </div>
           </div>

@@ -46,7 +46,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input, Label, Textarea } from '@/components/ui/input';
-import { formatCurrency, formatRelative } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
+import { useRelativeTimeLabel } from '@/components/ui/relative-time';
 import { useContractLiveOptional } from '@/components/contracts/contract-live-context';
 import type { ContractStatus } from '@/types/db';
 
@@ -1131,18 +1132,23 @@ function StatusLine({
   cancelledBy: string | null;
   errorDetails: string | null;
 }) {
+  const sentRelative = useRelativeTimeLabel(sentAt);
+  const updatedRelative = useRelativeTimeLabel(updatedAt);
+  const releasedRelative = useRelativeTimeLabel(releasedAt ?? executedAt);
+  const cancelledRelative = useRelativeTimeLabel(cancelledAt);
+
   if (status === 'sent') {
     if (!isAdmin) {
       return (
-        <p className="text-sm italic text-muted-foreground">
+        <p className="text-sm italic text-muted-foreground" suppressHydrationWarning>
           Waiting for {signerWaitLabel}
-          {sentAt ? ` · Sent ${formatRelative(sentAt)}` : ''}
+          {sentAt ? ` · Sent ${sentRelative}` : ''}
         </p>
       );
     }
     return (
-      <p className="text-sm italic text-muted-foreground">
-        {sentAt ? `Sent ${formatRelative(sentAt)}` : 'Sent'} · Waiting for {signerEmail ?? 'signer'} to sign
+      <p className="text-sm italic text-muted-foreground" suppressHydrationWarning>
+        {sentAt ? `Sent ${sentRelative}` : 'Sent'} · Waiting for {signerEmail ?? 'signer'} to sign
         {(isAdmin || isEventsTeam) && docusignEnvelopeId ? (
           <> · If they already signed in DocuSign, open <span className="font-medium text-foreground">Actions</span> and use Sync from DocuSign.</>
         ) : null}
@@ -1158,8 +1164,8 @@ function StatusLine({
       );
     }
     return (
-      <p className="text-sm text-muted-foreground">
-        Exhibitor signed {updatedAt ? formatRelative(updatedAt) : 'recently'} · Awaiting Shanken countersignature
+      <p className="text-sm text-muted-foreground" suppressHydrationWarning>
+        Exhibitor signed {updatedAt ? updatedRelative : 'recently'} · Awaiting Shanken countersignature
       </p>
     );
   }
@@ -1175,8 +1181,8 @@ function StatusLine({
   }
   if (status === 'executed') {
     return (
-      <p className="text-sm text-emerald-700">
-        ✓ Released {formatRelative(releasedAt ?? executedAt)}
+      <p className="text-sm text-emerald-700" suppressHydrationWarning>
+        ✓ Released {releasedRelative}
         {releasedBy ? ` by ${releasedBy}` : ''}
       </p>
     );
@@ -1186,8 +1192,8 @@ function StatusLine({
       <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
         <p className="font-medium">Contract cancelled</p>
         {cancelledReason && <p>{cancelledReason}</p>}
-        <p className="text-xs text-red-700/80">
-          {cancelledAt ? formatRelative(cancelledAt) : 'recently'}
+        <p className="text-xs text-red-700/80" suppressHydrationWarning>
+          {cancelledAt ? cancelledRelative : 'recently'}
           {cancelledBy ? ` by ${cancelledBy}` : ''}
         </p>
       </div>

@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, AlertTriangle, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { formatCurrency, formatRelative } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
+import { RelativeTime } from '@/components/ui/relative-time';
 import { emitContractActionSuccessFeedback } from '@/lib/contract-action-feedback';
 import { useSession } from 'next-auth/react';
 
@@ -146,7 +147,7 @@ export function NyweSusannahDashboard({
                 <div className="min-w-0">
                   <p className="truncate font-medium">{row.exhibitorCompanyName}</p>
                   <p className="text-sm text-muted-foreground">
-                    {row.executedAt ? formatRelative(row.executedAt) : 'Sent recently'}
+                    {row.executedAt ? <RelativeTime iso={row.executedAt} /> : 'Sent recently'}
                   </p>
                 </div>
                 <p className="shrink-0 tabular-nums text-sm font-medium">{formatCurrency(row.grandTotalCents)}</p>

@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, useReducedMotion } from 'framer-motion';
 import { LayoutGrid, MoreHorizontal, Table2 } from 'lucide-react';
-import { formatCurrency, formatRelative } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
+import { RelativeTime } from '@/components/ui/relative-time';
 import { StatusBadge } from '@/components/contracts/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -372,7 +373,9 @@ export function ContractsList({
                     <TableCell className="text-sm text-foreground">{listPackageLabel(c)}</TableCell>
                     <TableCell className="text-right font-semibold tabular-nums">{formatCurrency(c.grand_total_cents)}</TableCell>
                     <TableCell>{c.sales_rep_name ?? c.sales_rep_email ?? '—'}</TableCell>
-                    <TableCell className="text-right text-xs text-muted-foreground tabular-nums">{formatRelative(c.updated_at)}</TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
+                      <RelativeTime iso={c.updated_at} />
+                    </TableCell>
                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

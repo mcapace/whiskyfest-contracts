@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/contracts/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { cn, formatRelative } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { RelativeTime } from '@/components/ui/relative-time';
 import { subscribeToAppContractEvents } from '@/lib/realtime-client';
 import {
   rosterColumnModeLabel,
@@ -446,7 +447,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
       {data.stale && data.fetchError ? (
         <div className="rounded-md border border-amber-300/80 bg-amber-50/95 p-4 text-sm text-amber-950">
           Could not refresh from Google Sheets ({data.fetchError}). Showing the last synced list from{' '}
-          {formatRelative(data.syncedAt)}. Use &quot;Refresh from sheets&quot; to try again.
+          <RelativeTime iso={data.syncedAt} />. Use &quot;Refresh from sheets&quot; to try again.
         </div>
       ) : null}
 
@@ -472,7 +473,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
           Send selected ({selectedSendable})
         </Button>
         <span className="text-xs text-muted-foreground">
-          {data.fromCache ? 'Auto-synced' : 'Live from sheets'} {formatRelative(data.syncedAt)} · {filtered.length} shown
+          {data.fromCache ? 'Auto-synced' : 'Live from sheets'} <RelativeTime iso={data.syncedAt} /> · {filtered.length} shown
           {listFilter === 'all' ? ` · ${data.rows.length} total` : ''}
         </span>
       </div>

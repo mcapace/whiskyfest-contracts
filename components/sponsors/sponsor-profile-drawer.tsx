@@ -1,7 +1,8 @@
 'use client';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { formatCurrency, formatRelative } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
+import { RelativeTime } from '@/components/ui/relative-time';
 import type { SponsorRecord } from '@/lib/sponsors';
 
 export function SponsorProfileDrawer({
@@ -48,7 +49,7 @@ export function SponsorProfileDrawer({
                   <ul className="space-y-1 text-xs text-ink-600">
                     {sponsor.activity.slice(0, 5).map((a) => (
                       <li key={a.id}>
-                        {a.action.replaceAll('_', ' ')} · {formatRelative(a.occurred_at)}
+                        {a.action.replaceAll('_', ' ')} · <RelativeTime iso={a.occurred_at} />
                       </li>
                     ))}
                   </ul>

@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { auth } from '@/lib/auth';
 import { requireContractActorForPage } from '@/lib/auth-contract';
-import { formatCurrency, formatRelative } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
+import { RelativeTime } from '@/components/ui/relative-time';
 import { greetingHour, greetingWord } from '@/lib/dashboard-greeting';
 import { PRODUCT_WINE_SPECTATOR } from '@/lib/product-portal';
 import { getDashboardData } from '@/app/(dashboard)/page';
@@ -143,7 +144,9 @@ export default async function WineSpectatorDashboardPage() {
                         <StatusBadge status={c.status} />
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{formatCurrency(c.grand_total_cents)}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">{formatRelative(c.updated_at)}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        <RelativeTime iso={c.updated_at} />
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
