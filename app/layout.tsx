@@ -1,3 +1,4 @@
+import '@/lib/polyfills/url-parse';
 import type { Metadata } from 'next';
 import { Inter, JetBrains_Mono, Spectral } from 'next/font/google';
 import { SessionProvider } from 'next-auth/react';

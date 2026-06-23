@@ -30,8 +30,8 @@ export function PipelineChart({ data }: { data: PipelineRow[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="h-[360px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="h-[360px] w-full min-h-[360px] min-w-0">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={360}>
           <BarChart data={chartData} layout="vertical" margin={{ top: 8, right: 180, left: 12, bottom: 8 }} barGap={14}>
             <XAxis type="number" domain={[0, max]} hide />
             <YAxis type="category" dataKey="label" width={120} tick={{ fill: '#3E3019', fontSize: 12 }} />

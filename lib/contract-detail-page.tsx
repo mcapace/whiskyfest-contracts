@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import nextDynamic from 'next/dynamic';
 import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
@@ -28,19 +27,12 @@ import { ContractTableOfContents } from '@/components/contracts/table-of-content
 import { ActivityTimeline } from '@/components/contracts/activity-timeline';
 import { ContractActivityLogger } from '@/components/contracts/contract-activity-logger';
 import { buildContractActivityTimeline } from '@/lib/contract-activity-timeline';
+import { PdfPreview } from '@/components/contracts/pdf-preview';
 import {
   contractPdfPreviewUrl,
   contractPdfPreviewVersion,
   contractPrefersSignedPdf,
 } from '@/lib/contract-pdf-preview';
-
-const PdfPreview = nextDynamic(
-  () => import('@/components/contracts/pdf-preview').then((m) => ({ default: m.PdfPreview })),
-  {
-    ssr: false,
-    loading: () => <p className="text-sm text-muted-foreground">Loading PDF preview…</p>,
-  },
-);
 import { syncDraftPdfFromDocuSign } from '@/lib/contract-pdf-sync-docusign';
 import { syncContractFromDocuSign } from '@/lib/docusign-envelope-sync';
 import { ContractProgressionTimeline } from '@/components/contract/progression-timeline';
