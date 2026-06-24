@@ -109,8 +109,11 @@ export function DashboardKeyboardShortcuts({ children }: { children: ReactNode }
     };
 
     window.addEventListener('keydown', onKeyDown);
+    const cancelGo = () => clearGo();
+    window.addEventListener('pointerdown', cancelGo);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('pointerdown', cancelGo);
       clearGo();
     };
   }, [clearGo, router]);

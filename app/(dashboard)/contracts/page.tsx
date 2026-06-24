@@ -132,8 +132,10 @@ export default async function ContractsListPage({
   const actor = await requireContractActorForPage();
   const status = typeof searchParams.status === 'string' ? searchParams.status : undefined;
   const q = typeof searchParams.q === 'string' ? searchParams.q : undefined;
+  const importedId = typeof searchParams.imported === 'string' ? searchParams.imported : undefined;
 
   const { contracts, events, boothRowsByContract, portalBasePath } = await loadContracts(actor, { status, q });
+  const importedContract = importedId ? contracts.find((c) => c.id === importedId) : undefined;
 
   return (
     <ContractsList
@@ -142,6 +144,8 @@ export default async function ContractsListPage({
       currentRepId={actor.salesRepId}
       boothRowsByContract={boothRowsByContract}
       portalBasePath={portalBasePath}
+      importedContractId={importedId}
+      importedExhibitorName={importedContract?.exhibitor_company_name ?? null}
     />
   );
 }

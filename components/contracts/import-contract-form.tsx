@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -55,8 +55,13 @@ export function ImportContractForm({
   const canPickAnySalesRep = isAdmin || isEventsTeam;
   const router = useRouter();
   const { data: session } = useSession();
+  const errorRef = useRef<HTMLDivElement>(null);
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (err) errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [err]);
 
   const defaultEvent = events[0];
   const [eventId, setEventId] = useState(defaultEvent?.id ?? '');
@@ -94,7 +99,7 @@ export function ImportContractForm({
   const [importKind, setImportKind] = useState<ImportDealKind>('booth');
   const [sponsorBrand, setSponsorBrand] = useState('');
   const [sponsorshipLines, setSponsorshipLines] = useState<SponsorshipLineDraft[]>([
-    { key: crypto.randomUUID(), description: '', amountInput: '' },
+    { key: 'line-1', description: '', amountInput: '' },
   ]);
   const [boothBrandRows, setBoothBrandRows] = useState<BoothBrandValue[]>([
     { brand_name: '', brand_category: 'Other', expressions: [] },
@@ -272,8 +277,8 @@ export function ImportContractForm({
       emitContractActionSuccessFeedback(Boolean(session?.user?.sound_enabled));
       const id = (j.id ?? j.contractId) as string | undefined;
       if (id) {
-        router.push(`/contracts/${id}?imported=1`);
-        router.refresh();
+        // All Contracts + success banner — avoids auto-opening contract detail (crash on some PCs).
+        router.replace(`/contracts?imported=${encodeURIComponent(id)}`);
         return;
       }
       setErr('Import saved but no contract id was returned. Open All Contracts to find the new record.');
@@ -316,7 +321,11 @@ export function ImportContractForm({
         }}
       >
         {err ? (
-          <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <div
+            ref={errorRef}
+            role="alert"
+            className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive"
+          >
             {err}
           </div>
         ) : null}
@@ -547,7 +556,7 @@ export function ImportContractForm({
                     onClick={() =>
                       setSponsorshipLines((list) => [
                         ...list,
-                        { key: crypto.randomUUID(), description: '', amountInput: '' },
+                        { key: `line-${sponsorshipLines.length + 1}`, description: '', amountInput: '' },
                       ])
                     }
                   >

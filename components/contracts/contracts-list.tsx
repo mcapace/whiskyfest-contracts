@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ContractCard } from '@/components/contracts/contract-card';
+import { ImportSuccessBanner } from '@/components/contracts/import-success-banner';
 import { ContractsFilterBar } from '@/components/contracts/filter-bar';
 import { SavedViewsDropdown, type ContractViewFilters } from '@/components/contracts/saved-views-dropdown';
 import { categorizeContractBrands } from '@/lib/brand-category';
@@ -63,6 +64,8 @@ export function ContractsList({
   currentRepId,
   boothRowsByContract = {},
   portalBasePath = '',
+  importedContractId,
+  importedExhibitorName,
 }: {
   contracts: ContractWithTotals[];
   events: Event[];
@@ -70,6 +73,8 @@ export function ContractsList({
   boothRowsByContract?: BoothBrandRowsByContract;
   /** e.g. '' for WhiskyFest, '/wine-spectator' for Wine Spectator section */
   portalBasePath?: string;
+  importedContractId?: string;
+  importedExhibitorName?: string | null;
 }) {
   const router = useRouter();
   const hydrated = useHydrated();
@@ -235,6 +240,13 @@ export function ContractsList({
 
   return (
     <div className="space-y-6">
+      {importedContractId ? (
+        <ImportSuccessBanner
+          contractId={importedContractId}
+          exhibitorName={importedExhibitorName ?? null}
+          portalBasePath={portalBasePath}
+        />
+      ) : null}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-5xl font-medium tracking-tight text-foreground">Contracts</h1>
