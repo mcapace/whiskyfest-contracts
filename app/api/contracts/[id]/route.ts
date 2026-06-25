@@ -20,7 +20,7 @@ import {
 import type { Contract, ContractStatus } from '@/types/db';
 import { isLegacyImportedContract } from '@/lib/legacy-import';
 import { billingFieldsFromOptionalBody } from '@/lib/nywe-billing';
-import { applyNyweLicensePricingIfNeeded, isNyweVendorEvent } from '@/lib/nywe-pricing';
+import { applyNyweLicensePricingIfNeeded, isNyweVendorEvent, signerTitleForContract } from '@/lib/nywe-pricing';
 import type { Event } from '@/types/db';
 
 const signerEditableStatuses: ContractStatus[] = ['approved', 'ready_for_review', 'pending_events_review'];
@@ -117,7 +117,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         booth_count: nywePricing.booth_count,
         booth_rate_cents: nywePricing.booth_rate_cents,
         signer_1_name: p.signer_1_name ?? null,
-        signer_1_title: p.signer_1_title ?? null,
+        signer_1_title: signerTitleForContract(patchEvent, p.signer_1_title),
         signer_1_email: p.signer_1_email ?? null,
         signer_cc_name: normalizeSignerCcName(p.signer_cc_name),
         signer_cc_email: normalizeSignerCcEmail(p.signer_cc_email),
@@ -244,7 +244,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     .from('contracts')
     .update({
       signer_1_name: p.signer_1_name,
-      signer_1_title: p.signer_1_title ?? null,
+      signer_1_title: signerTitleForContract(signerPatchEvent, p.signer_1_title),
       signer_1_email: p.signer_1_email,
       signer_cc_name: normalizeSignerCcName(p.signer_cc_name),
       signer_cc_email: normalizeSignerCcEmail(p.signer_cc_email),

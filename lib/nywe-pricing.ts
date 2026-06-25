@@ -28,3 +28,13 @@ export function applyNyweLicensePricingIfNeeded(
   if (!isNyweVendorEvent(event)) return pricing;
   return normalizeNyweLicensePricing(event);
 }
+
+/** NYWE vendor licenses do not include exhibitor job title on the agreement. */
+export function signerTitleForContract(
+  event: Pick<Event, 'contract_template_profile'> | null | undefined,
+  title: string | null | undefined,
+): string | null {
+  if (isNyweVendorEvent(event)) return null;
+  const trimmed = title?.trim();
+  return trimmed || null;
+}

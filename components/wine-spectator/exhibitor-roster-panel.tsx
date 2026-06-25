@@ -50,8 +50,10 @@ type RosterRow = {
   billingCompany: string;
   billingContactName: string;
   billingEmail: string;
+  billingStreet: string;
   billingCity: string;
   billingState: string;
+  wineryAddress: string;
   primaryContactName: string;
   primaryContactEmail: string;
   primaryPhone: string;
@@ -182,6 +184,10 @@ function renderUiCell(row: RosterRow, columnId: string) {
       );
     case 'billingCompany':
       return <CellText value={row.billingCompany} />;
+    case 'billingStreet':
+      return <CellText value={row.billingStreet} />;
+    case 'wineryAddress':
+      return <CellText value={row.wineryAddress} />;
     case 'billingContact':
       return (
         <div className="min-w-0">

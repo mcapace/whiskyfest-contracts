@@ -8,7 +8,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { buildContractPayloadFromRosterRow, parseRosterRowKey } from '../lib/exhibitor-roster.ts';
-import { contractHasBillingInfo } from '../lib/nywe-billing.ts';
+import { contractHasBillingInfo, contractHasExhibitorAddress } from '../lib/nywe-billing.ts';
 import { getSheetsClient } from '../lib/sheets-tracker.ts';
 
 const dryRun = process.argv.includes('--dry-run');
@@ -29,7 +29,9 @@ async function main() {
 
   const { data: contracts, error } = await supabase
     .from('contracts')
-    .select('id, event_id, source_sheet_id, source_sheet_tab, source_row_number, billing_contact_email')
+    .select(
+      'id, event_id, source_sheet_id, source_sheet_tab, source_row_number, billing_contact_email, billing_address_line1, billing_city, billing_state, exhibitor_address_line1, exhibitor_city',
+    )
     .not('source_sheet_id', 'is', null);
 
   if (error) throw error;
@@ -38,7 +40,9 @@ async function main() {
   let skipped = 0;
 
   for (const row of contracts ?? []) {
-    if (contractHasBillingInfo(row)) {
+    const hasBilling = contractHasBillingInfo(row);
+    const hasExhibitorAddress = contractHasExhibitorAddress(row);
+    if (hasBilling && hasExhibitorAddress) {
       skipped += 1;
       continue;
     }
@@ -64,12 +68,16 @@ async function main() {
     });
     const sheetRow = ((rowRes.data.values?.[0] ?? []) as string[]).map((v) => String(v ?? '').trim());
     const payload = buildContractPayloadFromRosterRow(sheetRow, listKey, event, headers);
-    if (!payload.billing) continue;
+    const patch = {
+      ...(hasBilling ? {} : (payload.billing ?? {})),
+      ...(hasExhibitorAddress ? {} : (payload.exhibitorAddress ?? {})),
+    };
+    if (Object.keys(patch).length === 0) continue;
 
     if (dryRun) {
-      console.log(`[dry-run] would update ${row.id}`, payload.billing);
+      console.log(`[dry-run] would update ${row.id}`, patch);
     } else {
-      const { error: updErr } = await supabase.from('contracts').update(payload.billing).eq('id', row.id);
+      const { error: updErr } = await supabase.from('contracts').update(patch).eq('id', row.id);
       if (updErr) {
         console.error(`Failed ${row.id}:`, updErr.message);
         continue;

@@ -11,7 +11,7 @@ import {
 import { replaceContractBoothBrandsForContract } from '@/lib/contract-booth-brands';
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
 import { eventTemplateProfile, isEventsManagedWorkflow } from '@/lib/contract-template-profile';
-import { isNyweVendorEvent, applyNyweLicensePricingIfNeeded } from '@/lib/nywe-pricing';
+import { isNyweVendorEvent, applyNyweLicensePricingIfNeeded, signerTitleForContract } from '@/lib/nywe-pricing';
 import { billingFieldsFromOptionalBody } from '@/lib/nywe-billing';
 import { isDiscountedRate } from '@/lib/contracts';
 import { notifyAdminsOfDiscountRequest } from '@/lib/notifications';
@@ -165,7 +165,7 @@ export async function POST(req: Request) {
       booth_count: nywePricing.booth_count,
       booth_rate_cents: nywePricing.booth_rate_cents,
       signer_1_name: p.signer_1_name ?? null,
-      signer_1_title: p.signer_1_title ?? null,
+      signer_1_title: signerTitleForContract(eventRow, p.signer_1_title),
       signer_1_email: p.signer_1_email ?? null,
       signer_cc_name: normalizeSignerCcName(p.signer_cc_name),
       signer_cc_email: normalizeSignerCcEmail(p.signer_cc_email),

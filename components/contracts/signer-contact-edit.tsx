@@ -18,10 +18,12 @@ import {
 interface Props {
   contractId: string;
   initialName: string | null;
-  initialTitle: string | null;
+  initialTitle?: string | null;
   initialEmail: string | null;
   initialCcName?: string | null;
   initialCcEmail?: string | null;
+  /** NYWE licenses omit job title on the agreement. */
+  includeTitle?: boolean;
 }
 
 export function SignerContactEdit({
@@ -31,6 +33,7 @@ export function SignerContactEdit({
   initialEmail,
   initialCcName,
   initialCcEmail,
+  includeTitle = true,
 }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -58,7 +61,7 @@ export function SignerContactEdit({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           signer_1_name: name.trim(),
-          signer_1_title: title.trim() || null,
+          ...(includeTitle ? { signer_1_title: title.trim() || null } : { signer_1_title: null }),
           signer_1_email: email.trim(),
           signer_cc_name: ccName.trim() || null,
           signer_cc_email: ccEmail.trim() || null,
@@ -105,10 +108,12 @@ export function SignerContactEdit({
             <Label htmlFor="s-name">Name</Label>
             <Input id="s-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="s-title">Title</Label>
-            <Input id="s-title" value={title} onChange={(e) => setTitle(e.target.value)} />
-          </div>
+          {includeTitle ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="s-title">Title</Label>
+              <Input id="s-title" value={title} onChange={(e) => setTitle(e.target.value)} />
+            </div>
+          ) : null}
           <div className="space-y-1.5">
             <Label htmlFor="s-email">Signer email</Label>
             <Input

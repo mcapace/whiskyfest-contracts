@@ -1,4 +1,4 @@
-import { formatBillingAddressBlock } from '@/lib/exhibitor-address';
+import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { exhibitorFieldMergeTokens } from '@/lib/exhibitor-docusign-fields';
 import type { MergePlaceholderMode } from '@/lib/merge-map';
 import type { Contract, ContractWithTotals } from '@/types/db';
@@ -27,6 +27,15 @@ const BILLING_MERGE_KEYS = [
   'billing_country',
 ] as const satisfies readonly (keyof NyweBillingFields)[];
 
+const EXHIBITOR_ADDRESS_MERGE_KEYS = [
+  'exhibitor_address_line1',
+  'exhibitor_address_line2',
+  'exhibitor_city',
+  'exhibitor_state',
+  'exhibitor_zip',
+  'exhibitor_country',
+] as const satisfies readonly (keyof Contract)[];
+
 export function contractHasBillingInfo(
   c: Pick<
     Contract,
@@ -46,6 +55,52 @@ export function contractHasBillingInfo(
   );
 }
 
+export function contractHasExhibitorAddress(
+  c: Pick<
+    Contract,
+    | 'exhibitor_address_line1'
+    | 'exhibitor_address_line2'
+    | 'exhibitor_city'
+    | 'exhibitor_state'
+    | 'exhibitor_zip'
+  >,
+): boolean {
+  return Boolean(
+    c.exhibitor_address_line1?.trim() ||
+      c.exhibitor_address_line2?.trim() ||
+      c.exhibitor_city?.trim() ||
+      c.exhibitor_state?.trim() ||
+      c.exhibitor_zip?.trim(),
+  );
+}
+
+/** Merge tokens for winery / mailing address on NYWE licenses (roster-prefilled or DocuSign anchors). */
+export function nyweExhibitorAddressMergeTokens(
+  contract: ContractWithTotals,
+  mode: MergePlaceholderMode,
+): Record<string, string> {
+  const prefilled = contractHasExhibitorAddress(contract);
+  const formattedAddress = formatExhibitorAddressBlock(contract);
+
+  if (prefilled || mode === 'draft') {
+    const out: Record<string, string> = {
+      '{{exhibitor_address}}': formattedAddress,
+    };
+    for (const key of EXHIBITOR_ADDRESS_MERGE_KEYS) {
+      out[`{{${key}}}`] = (contract[key] ?? '').toString().trim();
+    }
+    return out;
+  }
+
+  const anchors = exhibitorFieldMergeTokens('docusign');
+  return {
+    '{{exhibitor_address}}': '',
+    ...Object.fromEntries(
+      EXHIBITOR_ADDRESS_MERGE_KEYS.map((key) => [`{{${key}}}`, anchors[`{{${key}}}`] ?? '']),
+    ),
+  };
+}
+
 /** Merge tokens for NYWE vendor license billing block (roster-prefilled or DocuSign anchors). */
 export function nyweBillingMergeTokens(
   contract: ContractWithTotals,
@@ -56,7 +111,8 @@ export function nyweBillingMergeTokens(
 
   if (prefilled || mode === 'draft') {
     const out: Record<string, string> = {
-      '{{billing_company_name}}': contract.exhibitor_legal_name?.trim() || contract.exhibitor_company_name,
+      '{{billing_company_name}}':
+        contract.exhibitor_legal_name?.trim() || contract.exhibitor_company_name?.trim() || '',
       '{{billing_address}}': formattedAddress,
     };
     for (const key of BILLING_MERGE_KEYS) {

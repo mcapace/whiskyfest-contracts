@@ -64,7 +64,9 @@ export function ContractSummarySection({
             )
           }
         />
-        <SummaryField label="Title" value={contract.signer_1_title?.trim() || '—'} />
+        {!nyweLicense ? (
+          <SummaryField label="Title" value={contract.signer_1_title?.trim() || '—'} />
+        ) : null}
         <SummaryField label="Last updated" value={formatTimestamp(contract.updated_at)} mono />
       </div>
     </section>

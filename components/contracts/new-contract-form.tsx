@@ -11,7 +11,7 @@ import { MAX_LINE_ITEM_AMOUNT_CENTS } from '@/lib/contract-line-items';
 import { ArrowLeft, Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 
-import { formatCurrency, formatLongDate } from '@/lib/utils';
+import { cn, formatCurrency, formatLongDate } from '@/lib/utils';
 import { isEventsManagedWorkflow } from '@/lib/contract-template-profile';
 import { isDiscountedRate, standardBoothRateCentsForEvent } from '@/lib/contracts';
 import { isNyweVendorEvent, nyweLicenseFeeCents } from '@/lib/nywe-pricing';
@@ -471,6 +471,7 @@ export function NewContractForm({
       const formForSave = {
         ...form,
         event_id: resolvedEventId,
+        signer_1_title: boothOnlyEvent ? null : form.signer_1_title.trim() || null,
         booth_count: boothOnlyEvent ? 1 : boothCountNorm,
         booth_rate_cents: sponsorshipOnly
           ? 0
@@ -1010,9 +1011,11 @@ export function NewContractForm({
             <CardDescription>Who signs on behalf of the exhibitor?</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className={cn('grid gap-4', boothOnlyEvent ? 'sm:grid-cols-1' : 'sm:grid-cols-2')}>
               <Field label="Name"><Input value={form.signer_1_name} onChange={e => set('signer_1_name', e.target.value)} placeholder="Jane Sampleson" /></Field>
-              <Field label="Title"><Input value={form.signer_1_title} onChange={e => set('signer_1_title', e.target.value)} placeholder="VP Marketing" /></Field>
+              {!boothOnlyEvent ? (
+                <Field label="Title"><Input value={form.signer_1_title} onChange={e => set('signer_1_title', e.target.value)} placeholder="VP Marketing" /></Field>
+              ) : null}
             </div>
             <Field label="Email" hint="DocuSign sends the signing request to this address (exhibitor signer).">
               <Input type="email" value={form.signer_1_email} onChange={e => set('signer_1_email', e.target.value)} placeholder="jane@sampledistillery.com" />

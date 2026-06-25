@@ -2,7 +2,7 @@ import { DOCUSIGN_ANCHORS } from '@/lib/merge-map';
 import { formatCurrency } from '@/lib/utils';
 import { getAgreementDatePartsInDisplayZone } from '@/lib/datetime';
 import { formatEventDateForDisplayOrMerge } from '@/lib/event-schedule';
-import { nyweBillingMergeTokens } from '@/lib/nywe-billing';
+import { nyweBillingMergeTokens, nyweExhibitorAddressMergeTokens } from '@/lib/nywe-billing';
 import type { ContractWithTotals, Event } from '@/types/db';
 import type { MergePlaceholderMode } from '@/lib/merge-map';
 
@@ -50,10 +50,11 @@ export function buildNyweVendorMergeMap(
     '{{license_fee_balance}}': moneyNoDollar(licenseFeeCents),
     '{{booth_count}}': String(contract.booth_count),
     '{{signer_1_name}}': contract.signer_1_name ?? '',
-    '{{signer_1_title}}': contract.signer_1_title ?? '',
+    '{{signer_1_title}}': '',
     '{{shanken_signatory_name}}': event.shanken_signatory_name,
     '{{shanken_signatory_title}}': event.shanken_signatory_title,
     '{{shanken_signatory_email}}': event.shanken_signatory_email,
+    ...nyweExhibitorAddressMergeTokens(contract, mode),
     ...nyweBillingMergeTokens(contract, mode),
     ...anchors,
   };

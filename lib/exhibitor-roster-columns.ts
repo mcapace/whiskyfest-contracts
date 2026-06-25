@@ -60,6 +60,8 @@ export const ROSTER_UI_COLUMNS: RosterColumnDef[] = [
   { id: 'signer', label: 'Contract signer', essential: true, extended: true, minWidth: '11rem' },
   { id: 'licenseStatus', label: 'License status', essential: true, extended: true, minWidth: '8rem' },
   { id: 'billingCompany', label: 'Billing company', extended: true, sheetLabel: 'BILLING COMPANY NAME', minWidth: '10rem' },
+  { id: 'billingStreet', label: 'Billing street', extended: true, sheetLabel: 'BILLING STREET ADDRESS/ P.O BOX #', minWidth: '11rem' },
+  { id: 'wineryAddress', label: 'Winery address', extended: true, sheetLabel: 'STREET ADDRESS OF WINERY *', minWidth: '11rem' },
   { id: 'billingContact', label: 'Billing contact', extended: true, minWidth: '10rem' },
   { id: 'primaryContact', label: 'Primary contact', extended: true, minWidth: '10rem' },
   { id: 'billingLocation', label: 'Billing city / state', extended: true, minWidth: '9rem' },

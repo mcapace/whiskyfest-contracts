@@ -304,6 +304,7 @@ export function ContractDetailView({
                         initialEmail={contract.signer_1_email}
                         initialCcName={contract.signer_cc_name}
                         initialCcEmail={contract.signer_cc_email}
+                        includeTitle={!isNyweVendorEvent(event)}
                       />
                     )}
                 </div>
@@ -312,7 +313,9 @@ export function ContractDetailView({
                     <p className="wf-label-caps mb-3 text-[0.65rem] text-muted-foreground">Exhibitor signer</p>
                     <div className="space-y-2.5">
                       <Detail label="Name" value={contract.signer_1_name?.trim() || null} />
-                      <Detail label="Title" value={contract.signer_1_title?.trim() || null} />
+                      {!isNyweVendorEvent(event) ? (
+                        <Detail label="Title" value={contract.signer_1_title?.trim() || null} />
+                      ) : null}
                       <Detail
                         label="Signer email"
                         value={

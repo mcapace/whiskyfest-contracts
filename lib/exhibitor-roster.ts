@@ -1,7 +1,11 @@
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getSheetsClient } from '@/lib/sheets-tracker';
 import { formatRosterWineDisplay } from '@/lib/exhibitor-roster-columns';
-import { billingFieldsFromRosterRow } from '@/lib/exhibitor-roster-billing';
+import {
+  billingFieldsFromRosterRow,
+  exhibitorAddressFromRosterRow,
+  type ExhibitorAddressFromRoster,
+} from '@/lib/exhibitor-roster-billing';
 import type { NyweBillingFields } from '@/lib/nywe-billing';
 import { nyweLicenseFeeCents } from '@/lib/nywe-pricing';
 import {
@@ -36,11 +40,13 @@ export type ExhibitorRosterRow = {
   tab: string;
   rowNumber: number;
   wineryName: string;
+  wineryAddress: string;
   signerName: string;
   signerEmail: string;
   billingCompany: string;
   billingContactName: string;
   billingEmail: string;
+  billingStreet: string;
   billingCity: string;
   billingState: string;
   primaryContactName: string;
@@ -73,10 +79,11 @@ type ColumnMap = {
   billingEmail: number;
   billingCompany: number;
   billingStreet: number;
-  city: number;
-  state: number;
-  country: number;
-  zip: number;
+  billingCity: number;
+  billingState: number;
+  billingCountry: number;
+  billingZip: number;
+  wineryStreet: number;
   contractRepFirst: number;
   contractRepLast: number;
   contractRepEmail: number;
@@ -99,10 +106,11 @@ const STANDARD_COLUMNS: ColumnMap = {
   billingEmail: 23,
   billingCompany: 24,
   billingStreet: 25,
-  city: 26,
-  state: 27,
-  country: 28,
-  zip: 29,
+  billingCity: 26,
+  billingState: 27,
+  billingCountry: 28,
+  billingZip: 29,
+  wineryStreet: 6,
   contractRepFirst: 30,
   contractRepLast: 31,
   contractRepEmail: 33,
@@ -125,10 +133,11 @@ const NEW_COLUMNS: ColumnMap = {
   billingEmail: 22,
   billingCompany: 23,
   billingStreet: 24,
-  city: 25,
-  state: 26,
-  country: 27,
-  zip: 28,
+  billingCity: 25,
+  billingState: 26,
+  billingCountry: 27,
+  billingZip: 28,
+  wineryStreet: 6,
   contractRepFirst: 29,
   contractRepLast: 30,
   contractRepEmail: 32,
@@ -172,6 +181,19 @@ function headerIndex(headers: string[], ...candidates: string[]): number {
   return -1;
 }
 
+/** Prefer columns that appear after a known anchor (e.g. billing city after billing street). */
+function headerIndexAfter(headers: string[], afterIndex: number, ...candidates: string[]): number {
+  if (afterIndex < 0) return -1;
+  const norm = headers.map(normalizeHeaderLabel);
+  for (let i = afterIndex + 1; i < norm.length; i++) {
+    for (const candidate of candidates) {
+      const key = normalizeHeaderLabel(candidate);
+      if (norm[i] === key || norm[i].includes(key) || key.includes(norm[i])) return i;
+    }
+  }
+  return -1;
+}
+
 /** Resolve column indices from the sheet header row (falls back to list-specific defaults). */
 export function buildColumnMapFromHeaders(headers: string[], listKey: string): ColumnMap {
   const fallback = columnMapForList(listKey);
@@ -201,10 +223,32 @@ export function buildColumnMapFromHeaders(headers: string[], listKey: string): C
     billingEmail: pick('billingEmail', 'BILLING CONTACT EMAIL'),
     billingCompany: pick('billingCompany', 'BILLING COMPANY NAME'),
     billingStreet: pick('billingStreet', 'BILLING STREET ADDRESS/ P.O BOX #', 'BILLING STREET ADDRESS'),
-    city: pick('city', 'CITY'),
-    state: pick('state', 'STATE'),
-    country: pick('country', 'COUNTRY (IF APPLICABLE)', 'COUNTRY'),
-    zip: pick('zip', 'ZIP CODE/POSTAL CODE', 'ZIP CODE'),
+    wineryStreet: pick('wineryStreet', 'STREET ADDRESS OF WINERY *', 'STREET ADDRESS OF WINERY'),
+    billingCity: (() => {
+      const street = pick('billingStreet', 'BILLING STREET ADDRESS/ P.O BOX #', 'BILLING STREET ADDRESS');
+      const afterStreet = headerIndexAfter(headers, street, 'CITY');
+      return afterStreet >= 0 ? afterStreet : pick('billingCity', 'CITY');
+    })(),
+    billingState: (() => {
+      const street = pick('billingStreet', 'BILLING STREET ADDRESS/ P.O BOX #', 'BILLING STREET ADDRESS');
+      const afterStreet = headerIndexAfter(headers, street, 'STATE');
+      return afterStreet >= 0 ? afterStreet : pick('billingState', 'STATE');
+    })(),
+    billingCountry: (() => {
+      const street = pick('billingStreet', 'BILLING STREET ADDRESS/ P.O BOX #', 'BILLING STREET ADDRESS');
+      const afterStreet = headerIndexAfter(
+        headers,
+        street,
+        'COUNTRY (IF APPLICABLE)',
+        'COUNTRY',
+      );
+      return afterStreet >= 0 ? afterStreet : pick('billingCountry', 'COUNTRY (IF APPLICABLE)', 'COUNTRY');
+    })(),
+    billingZip: (() => {
+      const street = pick('billingStreet', 'BILLING STREET ADDRESS/ P.O BOX #', 'BILLING STREET ADDRESS');
+      const afterStreet = headerIndexAfter(headers, street, 'ZIP CODE/POSTAL CODE', 'ZIP CODE', 'ZIP');
+      return afterStreet >= 0 ? afterStreet : pick('billingZip', 'ZIP CODE/POSTAL CODE', 'ZIP CODE', 'ZIP');
+    })(),
     contractRepFirst: pick('contractRepFirst', 'CONTRACT REPRESENTATIVE FIRST NAME'),
     contractRepLast: pick('contractRepLast', 'CONTRACT REPRESENTATIVE LAST NAME'),
     contractRepEmail: pick('contractRepEmail', 'CONTRACT REPRESENTATIVE EMAIL ADDRESS'),
@@ -357,6 +401,7 @@ export function buildContractPayloadFromRosterRow(
   booth_count: number;
   booth_rate_cents: number;
   billing: NyweBillingFields | null;
+  exhibitorAddress: ExhibitorAddressFromRoster | null;
 } {
   const map = headers?.length ? buildColumnMapFromHeaders(headers, listKey) : columnMapForList(listKey);
   const winery = cell(row, map.wineryName);
@@ -375,6 +420,7 @@ export function buildContractPayloadFromRosterRow(
     booth_count: 1,
     booth_rate_cents: nyweLicenseFeeCents(event),
     billing: billingFieldsFromRosterRow(row, map),
+    exhibitorAddress: exhibitorAddressFromRosterRow(row, map),
   };
 }
 
@@ -458,13 +504,15 @@ export async function fetchExhibitorRoster(event: Event): Promise<{
           tab: config.tab,
           rowNumber,
           wineryName: cell(row, map.wineryName),
+          wineryAddress: cell(row, map.wineryStreet),
           signerName: signer.name,
           signerEmail: signer.email,
           billingCompany: cell(row, map.billingCompany),
           billingContactName: [billingFirst, billingLast].filter(Boolean).join(' ').trim(),
           billingEmail: cell(row, map.billingEmail),
-          billingCity: cell(row, map.city),
-          billingState: cell(row, map.state),
+          billingStreet: cell(row, map.billingStreet),
+          billingCity: cell(row, map.billingCity),
+          billingState: cell(row, map.billingState),
           primaryContactName: [primaryFirst, primaryLast].filter(Boolean).join(' ').trim(),
           primaryContactEmail: cell(row, map.primaryEmail),
           primaryPhone: cell(row, map.primaryPhone),
