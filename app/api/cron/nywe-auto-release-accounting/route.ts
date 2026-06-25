@@ -16,10 +16,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const exhibitorSync = await syncNyweExhibitorSignaturesFromDocuSign({ limit: 50 }).catch((err) => {
-    console.error('[nywe-auto-release-accounting cron] exhibitor sync failed', err);
-    return { synced: 0, scanned: 0 };
-  });
+  const exhibitorSync = await syncNyweExhibitorSignaturesFromDocuSign({ maxContracts: 500, notify: false }).catch(
+    (err) => {
+      console.error('[nywe-auto-release-accounting cron] exhibitor sync failed', err);
+      return {
+        scanned: 0,
+        partiallySigned: 0,
+        fullySigned: 0,
+        unchanged: 0,
+        errors: 0,
+        errorSamples: [],
+      };
+    },
+  );
 
   const event = await getActiveWineSpectatorEvent();
   if (!event) {

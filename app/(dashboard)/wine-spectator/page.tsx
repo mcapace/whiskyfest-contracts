@@ -14,8 +14,8 @@ import { Button } from '@/components/ui/button';
 import { isEventsManagedWorkflow } from '@/lib/contract-template-profile';
 import { wineSpectatorContractIsAdmin } from '@/lib/wine-spectator-access';
 import { NyweSusannahDashboard } from '@/components/wine-spectator/nywe-susannah-dashboard';
+import { NyweDocuSignStatusSync } from '@/components/wine-spectator/nywe-docusign-status-sync';
 import { releaseStuckNyweSignedLicenses } from '@/lib/nywe-release-stuck-on-load';
-import { syncNyweExhibitorSignaturesFromDocuSign } from '@/lib/nywe-sync-exhibitor-signatures';
 import { DashboardLiveRefresh } from '@/components/dashboard/dashboard-live-refresh';
 import type { ContractWithTotals } from '@/types/db';
 
@@ -32,9 +32,6 @@ export default async function WineSpectatorDashboardPage() {
   const actor = await requireContractActorForPage();
   await releaseStuckNyweSignedLicenses().catch((err) =>
     console.error('[wine-spectator dashboard] auto-release retry failed', err),
-  );
-  await syncNyweExhibitorSignaturesFromDocuSign().catch((err) =>
-    console.error('[wine-spectator dashboard] exhibitor signature sync failed', err),
   );
   const { contracts: allScoped, events } = await getDashboardData(actor, PRODUCT_WINE_SPECTATOR);
 
@@ -83,6 +80,7 @@ export default async function WineSpectatorDashboardPage() {
   return (
     <div className="space-y-8">
       <DashboardLiveRefresh />
+      <NyweDocuSignStatusSync />
       <WineSpectatorHero
         event={primaryEvent}
         contractsCount={contractsCount}
