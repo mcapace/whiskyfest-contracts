@@ -25,12 +25,12 @@ export function NyweQuickNav() {
   ] as const;
 
   return (
-    <section className="grid gap-4 md:grid-cols-3">
+    <section className="grid gap-5 md:grid-cols-3 lg:gap-6">
       {links.map(({ href, title, description, icon: Icon }) => (
         <Link
           key={href}
           href={href}
-          className="group flex items-start gap-4 rounded-2xl border border-border/60 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-rose-200 hover:shadow-md"
+          className="group flex items-start gap-4 rounded-2xl border border-border/60 bg-white p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:border-rose-200 hover:shadow-md"
         >
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-800 ring-1 ring-rose-100">
             <Icon className="h-5 w-5" aria-hidden />

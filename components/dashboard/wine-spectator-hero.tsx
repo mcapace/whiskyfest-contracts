@@ -45,7 +45,7 @@ export function WineSpectatorHero({
         className,
       )}
     >
-      <div className={cn('relative overflow-hidden bg-rose-950', compact ? 'h-[320px]' : 'h-[480px]')}>
+      <div className={cn('relative overflow-hidden bg-rose-950', compact ? 'min-h-[300px] sm:min-h-[340px]' : 'h-[480px]')}>
         <HeroParallaxLayer
           src="/images/nywe-hero.png"
           objectPosition="center 42%"
@@ -53,46 +53,66 @@ export function WineSpectatorHero({
         />
         <div className="absolute inset-0 bg-gradient-to-b from-rose-950/25 via-rose-950/55 to-rose-950/95" />
 
-        <div className="relative flex h-full flex-col justify-end gap-6 p-6 sm:p-10 lg:p-12">
+        <div className="relative flex h-full flex-col justify-end gap-5 p-6 sm:gap-6 sm:p-8 lg:p-10">
           <div>
             <NyweLogo
               onDark
               priority
-              className="mb-6 max-w-sm sm:max-w-md"
-              imageClassName="max-h-16 sm:max-h-[4.5rem]"
+              className={cn('mb-5 max-w-sm sm:max-w-md', compact && 'mb-4 max-w-[11rem] sm:max-w-xs')}
+              imageClassName={cn('max-h-16 sm:max-h-[4.5rem]', compact && 'max-h-12 sm:max-h-14')}
             />
             {greetingHeadline && greetingSubtitle ? (
               <>
-                <h1 className="font-display text-4xl font-medium tracking-tight text-parchment-50 sm:text-5xl lg:text-6xl">
+                <h1
+                  className={cn(
+                    'font-display font-medium tracking-tight text-parchment-50',
+                    compact ? 'text-3xl sm:text-4xl' : 'text-4xl sm:text-5xl lg:text-6xl',
+                  )}
+                >
                   {greetingHeadline}
                 </h1>
-                <p className="mt-3 font-display text-lg font-light italic text-parchment-100 sm:text-xl">
+                <p
+                  className={cn(
+                    'mt-2 font-display font-light italic text-parchment-100',
+                    compact ? 'text-base sm:text-lg' : 'mt-3 text-lg sm:text-xl',
+                  )}
+                >
                   {greetingSubtitle}
                 </p>
               </>
             ) : (
-              <h1 className="font-display text-4xl font-medium tracking-tight text-parchment-50 sm:text-5xl lg:text-6xl">
+              <h1
+                className={cn(
+                  'font-display font-medium tracking-tight text-parchment-50',
+                  compact ? 'text-3xl sm:text-4xl' : 'text-4xl sm:text-5xl lg:text-6xl',
+                )}
+              >
                 {eventName}
               </h1>
             )}
-            <p className="mt-3 max-w-2xl font-display text-lg text-parchment-200/95 sm:text-xl">
+            <p
+              className={cn(
+                'mt-2 max-w-2xl font-display text-parchment-200/95',
+                compact ? 'text-base sm:text-lg' : 'mt-3 text-lg sm:text-xl',
+              )}
+            >
               {scheduleLabel}
             </p>
             <CountdownTimer
               targetDate={scheduleEvent.event_date}
               targetDateTimeIso={countdownIso}
-              className="mt-6"
+              className={cn(compact ? 'mt-4' : 'mt-6')}
             />
           </div>
         </div>
       </div>
 
-      <div className="grid gap-4 border-t border-parchment-300/15 bg-rose-950/90 p-6 text-parchment-100 sm:grid-cols-[1fr_auto] sm:items-end">
-        <div className="min-w-0">
-          <p className="text-sm leading-relaxed text-parchment-100/90">
+      <div className="grid gap-5 border-t border-parchment-300/15 bg-rose-950/90 p-6 text-parchment-100 sm:grid-cols-[1fr_auto] sm:items-center sm:gap-8 sm:p-8">
+        <div className="min-w-0 space-y-1">
+          <p className="text-base font-medium leading-relaxed text-parchment-50">
             {contractsCount} vendor license{contractsCount !== 1 ? 's' : ''}
           </p>
-          <p className="mt-2 text-xs text-parchment-200/90">{completionLabel}</p>
+          <p className="text-sm leading-relaxed text-parchment-200/90">{completionLabel}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild className="border-border bg-transparent text-parchment-50 hover:bg-muted/10">

@@ -9,55 +9,70 @@ type MetricCardProps = {
   detail: string;
   icon: typeof DollarSign;
   tone: 'rose' | 'violet' | 'orange' | 'emerald' | 'slate';
+  featured?: boolean;
 };
 
 const toneStyles: Record<MetricCardProps['tone'], string> = {
-  rose: 'from-rose-950/5 to-rose-900/10 border-rose-200/80 text-rose-950',
-  violet: 'from-violet-950/5 to-violet-900/10 border-violet-200/80 text-violet-950',
-  orange: 'from-orange-950/5 to-orange-900/10 border-orange-200/80 text-orange-950',
-  emerald: 'from-emerald-950/5 to-emerald-900/10 border-emerald-200/80 text-emerald-950',
-  slate: 'from-slate-950/5 to-slate-900/10 border-border/70 text-foreground',
+  rose: 'from-rose-950/[0.04] to-rose-900/[0.08] border-rose-200/70',
+  violet: 'from-violet-950/[0.04] to-violet-900/[0.08] border-violet-200/70',
+  orange: 'from-orange-950/[0.04] to-orange-900/[0.08] border-orange-200/70',
+  emerald: 'from-emerald-950/[0.04] to-emerald-900/[0.08] border-emerald-200/70',
+  slate: 'from-slate-950/[0.03] to-slate-900/[0.06] border-border/60',
 };
 
 const iconStyles: Record<MetricCardProps['tone'], string> = {
-  rose: 'bg-rose-100 text-rose-800',
-  violet: 'bg-violet-100 text-violet-800',
-  orange: 'bg-orange-100 text-orange-800',
-  emerald: 'bg-emerald-100 text-emerald-800',
-  slate: 'bg-muted text-muted-foreground',
+  rose: 'bg-rose-100/90 text-rose-800 ring-rose-200/80',
+  violet: 'bg-violet-100/90 text-violet-800 ring-violet-200/80',
+  orange: 'bg-orange-100/90 text-orange-800 ring-orange-200/80',
+  emerald: 'bg-emerald-100/90 text-emerald-800 ring-emerald-200/80',
+  slate: 'bg-muted/80 text-muted-foreground ring-border/60',
 };
 
-function MetricCard({ label, value, detail, icon: Icon, tone }: MetricCardProps) {
+function MetricCard({ label, value, detail, icon: Icon, tone, featured }: MetricCardProps) {
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-2xl border bg-gradient-to-br p-5 shadow-sm transition-shadow hover:shadow-md',
+        'flex min-h-[9.5rem] flex-col justify-between rounded-2xl border bg-gradient-to-br p-6 shadow-sm transition-shadow hover:shadow-md lg:min-h-[10.25rem] lg:p-7',
         toneStyles[tone],
+        featured && 'lg:min-h-[11rem]',
       )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] opacity-70">{label}</p>
-          <p className="mt-2 font-serif text-3xl font-semibold tabular-nums tracking-tight">{value}</p>
-          <p className="mt-1.5 text-sm opacity-80">{detail}</p>
+      <div className="flex items-start justify-between gap-4">
+        <p className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+        <div
+          className={cn(
+            'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset',
+            iconStyles[tone],
+          )}
+        >
+          <Icon className="h-[1.125rem] w-[1.125rem]" aria-hidden />
         </div>
-        <div className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', iconStyles[tone])}>
-          <Icon className="h-5 w-5" aria-hidden />
-        </div>
+      </div>
+      <div className="mt-4 space-y-2">
+        <p
+          className={cn(
+            'font-serif font-semibold tabular-nums tracking-tight text-foreground',
+            featured ? 'text-3xl sm:text-4xl' : 'text-2xl sm:text-3xl',
+          )}
+        >
+          {value}
+        </p>
+        <p className="max-w-[20rem] text-sm leading-relaxed text-muted-foreground">{detail}</p>
       </div>
     </div>
   );
 }
 
 export function NyweMetricsGrid({ metrics, compact }: { metrics: NyweDashboardMetrics; compact?: boolean }) {
-  return (
-    <div className={cn('grid gap-4', compact ? 'sm:grid-cols-2 xl:grid-cols-3' : 'sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6')}>
+  const primary = (
+    <>
       <MetricCard
         label="Total pipeline"
         value={formatCurrency(metrics.pipelineRevenueCents)}
-        detail={`${metrics.totalLicenses} licenses · ${metrics.rosterWineries} on roster`}
+        detail={`${metrics.totalLicenses} licenses across ${metrics.rosterWineries} roster wineries`}
         icon={TrendingUp}
         tone="slate"
+        featured
       />
       <MetricCard
         label="Executed revenue"
@@ -65,25 +80,32 @@ export function NyweMetricsGrid({ metrics, compact }: { metrics: NyweDashboardMe
         detail={`${metrics.executedCount} fully executed · ${metrics.completionPct}% of roster`}
         icon={DollarSign}
         tone="emerald"
-      />
-      <MetricCard
-        label="Booked (signed)"
-        value={formatCurrency(metrics.bookedRevenueCents)}
-        detail="Countersigned or released to accounting"
-        icon={PenLine}
-        tone="rose"
+        featured
       />
       <MetricCard
         label="In DocuSign"
         value={formatCurrency(metrics.inFlightRevenueCents)}
-        detail={`${metrics.waitingOnWineryCount} with winery · ${metrics.readyToCountersignCount} to countersign`}
+        detail={`${metrics.waitingOnWineryCount} with winery · ${metrics.readyToCountersignCount} ready to countersign`}
         icon={Send}
         tone="violet"
+        featured
+      />
+    </>
+  );
+
+  const secondary = (
+    <>
+      <MetricCard
+        label="Booked (signed)"
+        value={formatCurrency(metrics.bookedRevenueCents)}
+        detail="Countersigned and released to accounting"
+        icon={PenLine}
+        tone="rose"
       />
       <MetricCard
         label="Roster wineries"
         value={String(metrics.rosterWineries)}
-        detail={`${metrics.totalLicenses} licenses in system`}
+        detail={`${metrics.totalLicenses} licenses in the system`}
         icon={Users}
         tone="slate"
       />
@@ -94,6 +116,22 @@ export function NyweMetricsGrid({ metrics, compact }: { metrics: NyweDashboardMe
         icon={CalendarDays}
         tone="orange"
       />
+    </>
+  );
+
+  if (compact) {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {primary}
+        {secondary}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5 lg:space-y-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">{primary}</div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">{secondary}</div>
     </div>
   );
 }

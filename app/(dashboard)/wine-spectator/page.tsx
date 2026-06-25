@@ -85,7 +85,7 @@ export default async function WineSpectatorDashboardPage() {
   const sendBlocked = primaryEvent?.client_send_enabled === false;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 px-4 pb-10 pt-2 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-[1600px] space-y-10 px-4 pb-12 pt-4 sm:px-6 lg:space-y-12 lg:px-8">
       <DashboardLiveRefresh />
 
       <WineSpectatorHero
@@ -104,36 +104,38 @@ export default async function WineSpectatorDashboardPage() {
         </div>
       ) : null}
 
-      <NyweMetricsGrid metrics={metrics} />
+      <section className="space-y-5">
+        <div>
+          <h2 className="font-display text-2xl font-medium tracking-tight text-foreground">Overview</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Revenue and signing progress at a glance</p>
+        </div>
+        <NyweMetricsGrid metrics={metrics} />
+      </section>
 
-      <div className="grid gap-6 xl:grid-cols-5">
-        <div className="xl:col-span-3">
-          <NywePipelinePanel data={pipeline} />
-        </div>
-        <div className="xl:col-span-2">
-          <NyweSusannahDashboard
-            stuck={stuckForAccounting.map((c) => ({
-              id: c.id,
-              exhibitorCompanyName: c.exhibitor_company_name,
-              grandTotalCents: c.grand_total_cents,
-            }))}
-            recentlySent={recentlySent.map((c) => ({
-              id: c.id,
-              exhibitorCompanyName: c.exhibitor_company_name,
-              grandTotalCents: c.grand_total_cents,
-              executedAt: c.executed_at,
-            }))}
-            reviewCount={reviewCount}
-            waitingOnWineryCount={waitingOnWineryCount}
-            readyToCountersign={readyToCountersign.map((c) => ({
-              id: c.id,
-              exhibitorCompanyName: c.exhibitor_company_name,
-              grandTotalCents: c.grand_total_cents,
-              updatedAt: c.updated_at,
-            }))}
-            canFixStuck={canFixStuck}
-          />
-        </div>
+      <div className="grid gap-8 2xl:grid-cols-[1.35fr_1fr] 2xl:gap-10">
+        <NywePipelinePanel data={pipeline} />
+        <NyweSusannahDashboard
+          stuck={stuckForAccounting.map((c) => ({
+            id: c.id,
+            exhibitorCompanyName: c.exhibitor_company_name,
+            grandTotalCents: c.grand_total_cents,
+          }))}
+          recentlySent={recentlySent.map((c) => ({
+            id: c.id,
+            exhibitorCompanyName: c.exhibitor_company_name,
+            grandTotalCents: c.grand_total_cents,
+            executedAt: c.executed_at,
+          }))}
+          reviewCount={reviewCount}
+          waitingOnWineryCount={waitingOnWineryCount}
+          readyToCountersign={readyToCountersign.map((c) => ({
+            id: c.id,
+            exhibitorCompanyName: c.exhibitor_company_name,
+            grandTotalCents: c.grand_total_cents,
+            updatedAt: c.updated_at,
+          }))}
+          canFixStuck={canFixStuck}
+        />
       </div>
 
       <NyweQuickNav />
