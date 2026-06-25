@@ -4,6 +4,7 @@ import { writeExhibitorRosterStatusForContract } from '@/lib/exhibitor-roster-wr
 import {
   buildContractPayloadFromRosterRow,
   parseRosterRowKey,
+  ROSTER_MISSING_ADDRESS_MESSAGE,
 } from '@/lib/exhibitor-roster';
 import { getSheetsClient } from '@/lib/sheets-tracker';
 import type { Contract, ContractWithTotals, Event } from '@/types/db';
@@ -82,6 +83,10 @@ export async function createContractsFromRosterRows(options: {
         errors.push({ rowKey, reason: 'Missing signer email' });
         continue;
       }
+      if (!payload.billing?.billing_address_line1?.trim()) {
+        errors.push({ rowKey, reason: ROSTER_MISSING_ADDRESS_MESSAGE });
+        continue;
+      }
 
       const { data, error } = await supabase
         .from('contracts')
@@ -100,7 +105,6 @@ export async function createContractsFromRosterRows(options: {
           created_by: options.actorEmail,
           status: 'draft',
           ...(payload.billing ?? {}),
-          ...(payload.exhibitorAddress ?? {}),
           source_sheet_id: parsed.spreadsheetId,
           source_sheet_tab: parsed.tab,
           source_row_number: parsed.rowNumber,

@@ -8,6 +8,7 @@ import { fetchContractBoothBrandsOrdered } from '@/lib/contract-booth-brands';
 import { fetchContractLineItemsOrdered } from '@/lib/contract-line-items';
 import { contractPdfBaseName } from '@/lib/contract-document-naming';
 import { eventUsesContractOrderTable } from '@/lib/contract-template-profile';
+import { nyweLicenseAddressError } from '@/lib/nywe-billing';
 import { resolveContractTemplateDocId } from '@/lib/contract-template';
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
@@ -40,6 +41,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       { error: 'Discount approval is required before generating a PDF for submission.' },
       { status: 400 },
     );
+  }
+
+  const addressError = nyweLicenseAddressError(event, contract);
+  if (addressError) {
+    return NextResponse.json({ error: addressError }, { status: 400 });
   }
 
   const lineItems = await fetchContractLineItemsOrdered(supabase, contract.id);

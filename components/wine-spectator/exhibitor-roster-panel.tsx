@@ -38,6 +38,11 @@ import {
   resolveNyweWorkflowStep,
 } from '@/components/wine-spectator/nywe-roster-workflow-guide';
 import { NyweBulkSendWizard, type NyweBulkSendRow } from '@/components/wine-spectator/nywe-bulk-send-wizard';
+import {
+  NyweApprovalChecklist,
+  type NyweApprovalChecklistRow,
+} from '@/components/wine-spectator/nywe-approval-checklist';
+import { rosterAddressMissing, rosterAddressPreview } from '@/lib/exhibitor-roster-display';
 import type { ContractStatus } from '@/types/db';
 
 type RosterRow = {
@@ -64,6 +69,11 @@ type RosterRow = {
   participation: string;
   contractId: string | null;
   contractStatus: ContractStatus | null;
+  contractGrandTotalCents: number | null;
+  contractBillingLine1: string | null;
+  contractBillingCity: string | null;
+  contractBillingState: string | null;
+  contractBillingZip: string | null;
   sheetStatus: string | null;
   sheetLastUpdated: string | null;
   sheetFields: { label: string; value: string }[];
@@ -392,7 +402,12 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
   };
 
   const toggleAllVisible = () => {
-    const keys = filtered.map((r) => r.rowKey);
+    const keys =
+      filter === 'not_started'
+        ? filtered.filter((r) => !r.contractId).map((r) => r.rowKey)
+        : filter === 'approved'
+          ? filtered.filter((r) => r.contractStatus === 'approved' && r.contractId).map((r) => r.rowKey)
+          : filtered.map((r) => r.rowKey);
     const allSelected = keys.length > 0 && keys.every((k) => selected.has(k));
     setSelected((prev) => {
       const next = new Set(prev);
@@ -407,7 +422,14 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
       .filter((r) => selected.has(r.rowKey) && !r.contractId)
       .map((r) => ({ rowKey: r.rowKey, listKey: r.listKey }));
     if (items.length === 0) {
-      setMessage('Select exhibitors without a license to create drafts.');
+      const selectedWithLicense = data.rows.filter((r) => selected.has(r.rowKey) && r.contractId).length;
+      if (selectedWithLicense > 0) {
+        setMessage(
+          `None of your ${selectedWithLicense} selected row${selectedWithLicense === 1 ? '' : 's'} need new drafts — they already have licenses. Filter "Not in system" or use Step 1 in the workflow guide.`,
+        );
+      } else {
+        setMessage('Select exhibitors without a license to create drafts.');
+      }
       return;
     }
     startTransition(async () => {
@@ -459,6 +481,35 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
 
   const activeWorkflowStep = resolveNyweWorkflowStep(workflowCounts);
 
+  const approvalChecklist = useMemo(() => {
+    const active = (row: RosterRow) =>
+      isRosterParticipationPending(row.participation) || isActiveRosterParticipation(row.participation);
+    const rows = data.rows.filter(active);
+    const toChecklist = (row: RosterRow): NyweApprovalChecklistRow | null => {
+      if (!row.contractId || !row.contractStatus) return null;
+      return {
+        rowKey: row.rowKey,
+        wineryName: row.wineryName,
+        signerName: row.signerName,
+        signerEmail: row.signerEmail,
+        contractId: row.contractId,
+        contractStatus: row.contractStatus,
+        addressPreview: rosterAddressPreview(row),
+        addressMissing: rosterAddressMissing(row),
+        grandTotalCents: row.contractGrandTotalCents,
+      };
+    };
+    const pendingReview = rows
+      .filter((r) => r.contractStatus === 'pending_events_review')
+      .map(toChecklist)
+      .filter(Boolean) as NyweApprovalChecklistRow[];
+    const inProgress = rows
+      .filter((r) => r.contractStatus && ['draft', 'ready_for_review'].includes(r.contractStatus))
+      .map(toChecklist)
+      .filter(Boolean) as NyweApprovalChecklistRow[];
+    return { pendingReview, inProgress, approvedCount: workflowCounts.approved };
+  }, [data.rows, workflowCounts.approved]);
+
   const sendableRows: NyweBulkSendRow[] = useMemo(
     () =>
       data.rows
@@ -469,6 +520,9 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
           signerName: r.signerName,
           signerEmail: r.signerEmail,
           contractId: r.contractId!,
+          grandTotalCents: r.contractGrandTotalCents,
+          addressPreview: rosterAddressPreview(r),
+          addressMissing: rosterAddressMissing(r),
         })),
     [data.rows, selected],
   );
@@ -535,6 +589,34 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
         onSelectAllApproved={selectAllApprovedVisible}
         onStartBulkSend={startBulkSendWizard}
       />
+
+      {approvalChecklist.pendingReview.length > 0 || approvalChecklist.inProgress.length > 0 ? (
+        <NyweApprovalChecklist
+          pendingReview={approvalChecklist.pendingReview}
+          inProgress={approvalChecklist.inProgress}
+          approvedCount={approvalChecklist.approvedCount}
+        />
+      ) : null}
+
+      {selected.size > 0 && selectedCreatable === 0 && filter === 'all' ? (
+        <div className="rounded-lg border border-amber-300/90 bg-amber-50 p-4 text-sm text-amber-950">
+          <p className="font-medium">Your selection includes wineries that already have licenses.</p>
+          <p className="mt-1 text-amber-900/90">
+            To create new drafts, filter <strong>Not in system</strong> or use Step 1 in the workflow guide — then{' '}
+            <strong>Select all visible</strong> will only pick rows without a license.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant="outline" onClick={() => setFilter('not_started')}>
+              Show not in system
+            </Button>
+            {selectedSendable > 0 ? (
+              <Button type="button" size="sm" onClick={startBulkSendWizard}>
+                Guided bulk send ({selectedSendable} approved)
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       <NyweBulkSendWizard
         open={bulkSendOpen}

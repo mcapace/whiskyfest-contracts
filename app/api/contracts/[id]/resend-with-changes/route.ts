@@ -13,6 +13,7 @@ import {
   contractPdfBaseName,
 } from '@/lib/contract-document-naming';
 import { eventUsesContractOrderTable } from '@/lib/contract-template-profile';
+import { nyweLicenseAddressError } from '@/lib/nywe-billing';
 import { resolveContractTemplateDocId } from '@/lib/contract-template';
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
@@ -80,6 +81,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   if (!newSignerName || !newSignerEmail) {
     return NextResponse.json({ error: 'Exhibitor signer name and email are required.' }, { status: 400 });
+  }
+
+  const addressError = nyweLicenseAddressError(event, contract);
+  if (addressError) {
+    return NextResponse.json({ error: addressError }, { status: 400 });
   }
 
   try {

@@ -212,6 +212,12 @@ export function NyweRosterWorkflowGuide({
                         </p>
                       ) : (
                         <>
+                          {counts.approved > 0 ? (
+                            <p className="rounded-md border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-xs text-emerald-950">
+                              <strong>{counts.approved}</strong> approved license{counts.approved === 1 ? '' : 's'}{' '}
+                              ready — the guided wizard shows every signer, address, and fee before anything sends.
+                            </p>
+                          ) : null}
                           <div className="flex flex-wrap gap-2">
                             <Button
                               type="button"

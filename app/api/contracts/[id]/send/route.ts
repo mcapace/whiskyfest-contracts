@@ -14,7 +14,7 @@ import {
   contractPdfBaseName,
 } from '@/lib/contract-document-naming';
 import { eventUsesContractOrderTable, eventTemplateProfile } from '@/lib/contract-template-profile';
-import { contractHasBillingInfo } from '@/lib/nywe-billing';
+import { contractHasBillingInfo, contractHasNyweLicenseAddress, nyweLicenseAddressError } from '@/lib/nywe-billing';
 import { resolveContractTemplateDocId } from '@/lib/contract-template';
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
@@ -87,6 +87,11 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     );
   }
 
+  const addressError = nyweLicenseAddressError(event, contract);
+  if (addressError) {
+    return NextResponse.json({ error: addressError }, { status: 400 });
+  }
+
   const countersignerEmail = event.shanken_signatory_email?.trim();
   const countersignerName = event.shanken_signatory_name?.trim();
   if (!countersignerEmail || !countersignerName) {
@@ -140,7 +145,9 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       carbonCopy,
       brandId: docusignBrandIdForEvent(event),
       skipExhibitorDataTabs:
-        eventTemplateProfile(event) === 'nywe_vendor' && contractHasBillingInfo(contract),
+        eventTemplateProfile(event) === 'nywe_vendor' &&
+        contractHasBillingInfo(contract) &&
+        contractHasNyweLicenseAddress(contract),
     });
 
     await supabase

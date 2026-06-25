@@ -1,7 +1,8 @@
 import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
+import { eventTemplateProfile } from '@/lib/contract-template-profile';
 import { exhibitorFieldMergeTokens } from '@/lib/exhibitor-docusign-fields';
 import type { MergePlaceholderMode } from '@/lib/merge-map';
-import type { Contract, ContractWithTotals } from '@/types/db';
+import type { Contract, ContractWithTotals, Event } from '@/types/db';
 
 export type NyweBillingFields = Pick<
   Contract,
@@ -55,6 +56,22 @@ export function contractHasBillingInfo(
   );
 }
 
+export const NYWE_LICENSE_ADDRESS_ERROR =
+  'A billing or winery street address is required before this license can be generated or sent to the client.';
+
+export function contractHasNyweLicenseAddress(c: Pick<Contract, 'billing_address_line1'>): boolean {
+  return Boolean(c.billing_address_line1?.trim());
+}
+
+export function nyweLicenseAddressError(
+  event: Pick<Event, 'contract_template_profile'> | null | undefined,
+  contract: Pick<Contract, 'billing_address_line1'>,
+): string | null {
+  if (!event || eventTemplateProfile(event) !== 'nywe_vendor') return null;
+  if (contractHasNyweLicenseAddress(contract)) return null;
+  return NYWE_LICENSE_ADDRESS_ERROR;
+}
+
 export function contractHasExhibitorAddress(
   c: Pick<
     Contract,
@@ -106,7 +123,7 @@ export function nyweBillingMergeTokens(
   contract: ContractWithTotals,
   mode: MergePlaceholderMode,
 ): Record<string, string> {
-  const prefilled = contractHasBillingInfo(contract);
+  const prefilled = contractHasNyweLicenseAddress(contract);
   const formattedAddress = formatBillingAddressBlock(contract);
 
   if (prefilled || mode === 'draft') {

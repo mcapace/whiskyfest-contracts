@@ -3,8 +3,8 @@ import { getSheetsClient } from '@/lib/sheets-tracker';
 import { formatRosterWineDisplay } from '@/lib/exhibitor-roster-columns';
 import {
   billingFieldsFromRosterRow,
-  exhibitorAddressFromRosterRow,
-  type ExhibitorAddressFromRoster,
+  rosterRowHasContractAddress,
+  ROSTER_MISSING_ADDRESS_MESSAGE,
 } from '@/lib/exhibitor-roster-billing';
 import type { NyweBillingFields } from '@/lib/nywe-billing';
 import { nyweLicenseFeeCents } from '@/lib/nywe-pricing';
@@ -59,6 +59,12 @@ export type ExhibitorRosterRow = {
   participation: string;
   contractId: string | null;
   contractStatus: ContractStatus | null;
+  /** From linked license — used for approve/send review cards. */
+  contractGrandTotalCents: number | null;
+  contractBillingLine1: string | null;
+  contractBillingCity: string | null;
+  contractBillingState: string | null;
+  contractBillingZip: string | null;
   sheetStatus: string | null;
   sheetContractId: string | null;
   sheetLastUpdated: string | null;
@@ -303,7 +309,9 @@ export async function hydrateRosterRowsWithContracts(
   const supabase = getSupabaseAdmin();
   const { data: linkedContracts } = await supabase
     .from('contracts_with_totals')
-    .select('id, status, updated_at, source_sheet_id, source_sheet_tab, source_row_number')
+    .select(
+      'id, status, updated_at, grand_total_cents, billing_address_line1, billing_city, billing_state, billing_zip, source_sheet_id, source_sheet_tab, source_row_number',
+    )
     .eq('event_id', eventId)
     .not('source_sheet_id', 'is', null);
 
@@ -319,13 +327,29 @@ export async function hydrateRosterRowsWithContracts(
   return rows.map((row) => {
     const contract = contractByRowKey.get(row.rowKey) ?? null;
     if (!contract) {
-      return { ...row, contractId: null, contractStatus: null, sheetStatus: null, sheetContractId: null };
+      return {
+        ...row,
+        contractId: null,
+        contractStatus: null,
+        contractGrandTotalCents: null,
+        contractBillingLine1: null,
+        contractBillingCity: null,
+        contractBillingState: null,
+        contractBillingZip: null,
+        sheetStatus: null,
+        sheetContractId: null,
+      };
     }
     const statusLabel = rosterStatusLabel(contract.status);
     return {
       ...row,
       contractId: contract.id,
       contractStatus: contract.status,
+      contractGrandTotalCents: contract.grand_total_cents ?? null,
+      contractBillingLine1: contract.billing_address_line1 ?? null,
+      contractBillingCity: contract.billing_city ?? null,
+      contractBillingState: contract.billing_state ?? null,
+      contractBillingZip: contract.billing_zip ?? null,
       sheetStatus: statusLabel,
       sheetContractId: contract.id,
       sheetLastUpdated: contract.updated_at ?? row.sheetLastUpdated,
@@ -401,7 +425,6 @@ export function buildContractPayloadFromRosterRow(
   booth_count: number;
   booth_rate_cents: number;
   billing: NyweBillingFields | null;
-  exhibitorAddress: ExhibitorAddressFromRoster | null;
 } {
   const map = headers?.length ? buildColumnMapFromHeaders(headers, listKey) : columnMapForList(listKey);
   const winery = cell(row, map.wineryName);
@@ -420,9 +443,10 @@ export function buildContractPayloadFromRosterRow(
     booth_count: 1,
     booth_rate_cents: nyweLicenseFeeCents(event),
     billing: billingFieldsFromRosterRow(row, map),
-    exhibitorAddress: exhibitorAddressFromRosterRow(row, map),
   };
 }
+
+export { rosterRowHasContractAddress, ROSTER_MISSING_ADDRESS_MESSAGE } from '@/lib/exhibitor-roster-billing';
 
 async function readSheetRows(config: ExhibitorRosterSheetConfig): Promise<string[][]> {
   const sheets = getSheetsClient();
@@ -523,6 +547,11 @@ export async function fetchExhibitorRoster(event: Event): Promise<{
           participation: map.participation >= 0 ? cell(row, map.participation) : '',
           contractId: contract?.id ?? null,
           contractStatus: contract?.status ?? null,
+          contractGrandTotalCents: contract?.grand_total_cents ?? null,
+          contractBillingLine1: contract?.billing_address_line1 ?? null,
+          contractBillingCity: contract?.billing_city ?? null,
+          contractBillingState: contract?.billing_state ?? null,
+          contractBillingZip: contract?.billing_zip ?? null,
           sheetStatus: cell(row, statusStart) || null,
           sheetContractId: cell(row, statusStart + 1) || null,
           sheetLastUpdated: cell(row, statusStart + 2) || null,
