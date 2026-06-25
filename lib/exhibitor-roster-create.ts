@@ -16,13 +16,23 @@ function tabRange(tab: string, a1: string): string {
   return `${safe}!${a1}`;
 }
 
-async function readRosterHeaders(spreadsheetId: string, tab: string): Promise<string[]> {
+async function readRosterHeaders(
+  spreadsheetId: string,
+  tab: string,
+  headerCache: Map<string, string[]>,
+): Promise<string[]> {
+  const cacheKey = `${spreadsheetId}::${tab}`;
+  const cached = headerCache.get(cacheKey);
+  if (cached) return cached;
+
   const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range: tabRange(tab, 'A1:AZ1'),
   });
-  return ((res.data.values?.[0] ?? []) as string[]).map((v) => String(v ?? '').trim());
+  const headers = ((res.data.values?.[0] ?? []) as string[]).map((v) => String(v ?? '').trim());
+  headerCache.set(cacheKey, headers);
+  return headers;
 }
 
 async function readRosterRow(spreadsheetId: string, tab: string, rowNumber: number): Promise<string[]> {
@@ -45,6 +55,7 @@ export async function createContractsFromRosterRows(options: {
   errors: { rowKey: string; reason: string }[];
 }> {
   const supabase = getSupabaseAdmin();
+  const headerCache = new Map<string, string[]>();
   const created: { rowKey: string; contractId: string }[] = [];
   const skipped: { rowKey: string; reason: string }[] = [];
   const errors: { rowKey: string; reason: string }[] = [];
@@ -72,7 +83,7 @@ export async function createContractsFromRosterRows(options: {
 
     try {
       const [headers, row] = await Promise.all([
-        readRosterHeaders(parsed.spreadsheetId, parsed.tab),
+        readRosterHeaders(parsed.spreadsheetId, parsed.tab, headerCache),
         readRosterRow(parsed.spreadsheetId, parsed.tab, parsed.rowNumber),
       ]);
       const payload = buildContractPayloadFromRosterRow(row, item.listKey, options.event, headers);

@@ -43,6 +43,7 @@ import {
   type NyweApprovalChecklistRow,
 } from '@/components/wine-spectator/nywe-approval-checklist';
 import { rosterAddressMissing, rosterAddressPreview } from '@/lib/exhibitor-roster-display';
+import { ROSTER_CREATE_BATCH_MAX } from '@/lib/exhibitor-roster-constants';
 import type { ContractStatus } from '@/types/db';
 
 type RosterRow = {
@@ -97,6 +98,14 @@ type RosterPayload = {
 };
 
 const AUTO_REFRESH_MS = 2 * 60 * 1000;
+
+function chunkItems<T>(items: T[], size: number): T[][] {
+  const batches: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    batches.push(items.slice(i, i + size));
+  }
+  return batches;
+}
 
 const COLUMN_MODES: RosterColumnMode[] = ['essential', 'extended', 'all'];
 
@@ -293,8 +302,10 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
+  const [createProgress, setCreateProgress] = useState<{ current: number; total: number } | null>(null);
   const [bulkSendOpen, setBulkSendOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+  const creating = createProgress !== null;
 
   const showListColumn = listFilter === 'all';
   const uiColumns = useMemo(
@@ -417,10 +428,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
     });
   };
 
-  const createSelected = () => {
-    const items = data.rows
-      .filter((r) => selected.has(r.rowKey) && !r.contractId)
-      .map((r) => ({ rowKey: r.rowKey, listKey: r.listKey }));
+  const createItems = (items: { rowKey: string; listKey: string }[]) => {
     if (items.length === 0) {
       const selectedWithLicense = data.rows.filter((r) => selected.has(r.rowKey) && r.contractId).length;
       if (selectedWithLicense > 0) {
@@ -428,28 +436,76 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
           `None of your ${selectedWithLicense} selected row${selectedWithLicense === 1 ? '' : 's'} need new drafts — they already have licenses. Filter "Not in system" or use Step 1 in the workflow guide.`,
         );
       } else {
-        setMessage('Select exhibitors without a license to create drafts.');
+        setMessage('Select exhibitors without a license, then click Create drafts.');
       }
       return;
     }
+
     startTransition(async () => {
       setMessage(null);
-      const res = await fetch('/api/wine-spectator/roster/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setMessage(json.error ?? 'Create failed');
-        return;
+      setCreateProgress({ current: 0, total: items.length });
+
+      let totalCreated = 0;
+      let totalSkipped = 0;
+      let totalErrors = 0;
+      const batches = chunkItems(items, ROSTER_CREATE_BATCH_MAX);
+      let stoppedEarly = false;
+
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        const batch = batches[batchIndex]!;
+        setCreateProgress({
+          current: batchIndex * ROSTER_CREATE_BATCH_MAX,
+          total: items.length,
+        });
+
+        const res = await fetch('/api/wine-spectator/roster/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: batch }),
+        });
+        const json = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          stoppedEarly = true;
+          const detail =
+            typeof json.error === 'string'
+              ? json.error
+              : 'Create failed — try again; licenses created so far are saved.';
+          setMessage(
+            `Stopped on batch ${batchIndex + 1} of ${batches.length}: ${detail} Created ${totalCreated} draft${totalCreated === 1 ? '' : 's'} before stopping.`,
+          );
+          break;
+        }
+
+        totalCreated += (json.created ?? []).length;
+        totalSkipped += (json.skipped ?? []).length;
+        totalErrors += (json.errors ?? []).length;
+
+        setCreateProgress({
+          current: Math.min((batchIndex + 1) * ROSTER_CREATE_BATCH_MAX, items.length),
+          total: items.length,
+        });
       }
-      const created = (json.created ?? []).length;
-      const skipped = (json.skipped ?? []).length;
-      const errors = (json.errors ?? []).length;
-      setMessage(`Created ${created} draft${created === 1 ? '' : 's'} · skipped ${skipped} · errors ${errors}`);
+
+      setCreateProgress(null);
+
+      if (!stoppedEarly) {
+        setMessage(
+          `Created ${totalCreated} draft${totalCreated === 1 ? '' : 's'} · skipped ${totalSkipped} · errors ${totalErrors}${
+            totalErrors > 0 ? ' (often missing signer email or billing address in the sheet)' : ''
+          }`,
+        );
+      }
+
       await refresh({ live: true, preserveSelection: true });
     });
+  };
+
+  const createSelected = () => {
+    const items = data.rows
+      .filter((r) => selected.has(r.rowKey) && !r.contractId)
+      .map((r) => ({ rowKey: r.rowKey, listKey: r.listKey }));
+    createItems(items);
   };
 
   const sendSelected = () => {
@@ -590,6 +646,41 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
         onStartBulkSend={startBulkSendWizard}
       />
 
+      {createProgress ? (
+        <div className="rounded-lg border border-rose-300 bg-rose-50 p-4 text-sm text-rose-950">
+          <p className="flex items-center gap-2 font-medium">
+            <Loader2 className="h-4 w-4 animate-spin shrink-0" aria-hidden />
+            Creating drafts… {createProgress.current} of {createProgress.total}
+          </p>
+          <p className="mt-1 text-rose-900/90">Keep this tab open — large lists run in batches of {ROSTER_CREATE_BATCH_MAX}.</p>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-rose-200">
+            <div
+              className="h-full bg-rose-700 transition-all duration-300"
+              style={{
+                width:
+                  createProgress.total > 0
+                    ? `${Math.round((createProgress.current / createProgress.total) * 100)}%`
+                    : '0%',
+              }}
+            />
+          </div>
+        </div>
+      ) : selectedCreatable > 0 ? (
+        <div className="rounded-lg border border-rose-300 bg-rose-50 p-4 text-sm text-rose-950">
+          <p className="font-medium">
+            {selectedCreatable} winery{selectedCreatable === 1 ? '' : 'ies'} selected — next step: create drafts
+          </p>
+          <p className="mt-1 text-rose-900/90">
+            Checking boxes only selects rows. Click the button below (or <strong>Create drafts</strong> in Step 1) to
+            start. Large lists process {ROSTER_CREATE_BATCH_MAX} at a time and may take several minutes.
+          </p>
+          <Button type="button" className="mt-3" size="sm" onClick={createSelected} disabled={pending || creating}>
+            <FilePlus2 className="h-4 w-4" />
+            Create drafts ({selectedCreatable})
+          </Button>
+        </div>
+      ) : null}
+
       {approvalChecklist.pendingReview.length > 0 || approvalChecklist.inProgress.length > 0 ? (
         <NyweApprovalChecklist
           pendingReview={approvalChecklist.pendingReview}
@@ -645,7 +736,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           Refresh from sheets
         </Button>
-        <Button size="sm" onClick={createSelected} disabled={pending || selectedCreatable === 0}>
+        <Button size="sm" onClick={createSelected} disabled={pending || creating || selectedCreatable === 0}>
           <FilePlus2 className="h-4 w-4" />
           Create drafts ({selectedCreatable})
         </Button>
@@ -765,7 +856,11 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
         ) : null}
       </div>
 
-      {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
+      {message ? (
+        <p className={cn('text-sm', creating ? 'text-muted-foreground' : 'rounded-md border border-border/60 bg-muted/30 p-3 font-medium')}>
+          {message}
+        </p>
+      ) : null}
 
       <div className="overflow-x-auto rounded-lg border">
         <Table className={cn(columnMode === 'all' ? 'min-w-max text-xs' : 'w-full table-fixed')}>
@@ -834,10 +929,9 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
                     <button
                       type="button"
                       className="text-sm font-medium text-accent-brand hover:underline"
-                      disabled={pending}
+                      disabled={pending || creating}
                       onClick={() => {
-                        setSelected(new Set([row.rowKey]));
-                        createSelected();
+                        createItems([{ rowKey: row.rowKey, listKey: row.listKey }]);
                       }}
                     >
                       Create

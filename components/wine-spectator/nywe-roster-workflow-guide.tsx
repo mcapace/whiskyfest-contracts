@@ -181,7 +181,7 @@ export function NyweRosterWorkflowGuide({
                         Select all visible
                       </Button>
                       <Button type="button" size="sm" onClick={onCreateDrafts} disabled={selectedCreatable === 0}>
-                        Create drafts ({selectedCreatable})
+                        Create drafts ({selectedCreatable}) — click after selecting
                       </Button>
                     </div>
                   ) : null}

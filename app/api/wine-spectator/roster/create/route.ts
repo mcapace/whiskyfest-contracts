@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createContractsFromRosterRows } from '@/lib/exhibitor-roster-create';
+import { ROSTER_CREATE_BATCH_MAX } from '@/lib/exhibitor-roster-constants';
 import { getActiveWineSpectatorEvent } from '@/lib/wine-spectator-event';
 import { requireWineSpectatorActor } from '@/lib/wine-spectator-api-auth';
 import { revalidatePath } from 'next/cache';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+export const maxDuration = 120;
 
 const bodySchema = z.object({
   items: z
@@ -17,7 +19,7 @@ const bodySchema = z.object({
       }),
     )
     .min(1)
-    .max(100),
+    .max(ROSTER_CREATE_BATCH_MAX),
 });
 
 export async function POST(req: Request) {
