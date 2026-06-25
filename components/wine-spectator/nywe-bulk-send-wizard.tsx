@@ -66,7 +66,7 @@ export function NyweBulkSendWizard({ open, onOpenChange, sendable, onComplete }:
     for (let i = 0; i < sendable.length; i++) {
       const row = sendable[i]!;
       setProgress({ current: i + 1, total: sendable.length });
-      const res = await fetch(`/api/contracts/${row.contractId}/send`, { method: 'POST' });
+      const res = await fetch(`/api/contracts/${row.contractId}/nywe-client-send`, { method: 'POST' });
       if (res.ok) {
         sent += 1;
       } else {
@@ -90,9 +90,10 @@ export function NyweBulkSendWizard({ open, onOpenChange, sendable, onComplete }:
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle className="font-serif text-xl">Bulk send to DocuSign</DialogTitle>
+          <DialogTitle className="font-serif text-xl">Bulk send to clients</DialogTitle>
           <DialogDescription>
-            Emails each approved winery their signing link. No need to open licenses one by one.
+            Generates each PDF, marks it approved from roster data, and emails DocuSign — no need to open licenses
+            individually.
           </DialogDescription>
         </DialogHeader>
 
@@ -105,8 +106,8 @@ export function NyweBulkSendWizard({ open, onOpenChange, sendable, onComplete }:
                     Send {sendable.length} DocuSign email{sendable.length === 1 ? '' : 's'}?
                   </p>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Only licenses already marked <strong>Approved</strong> are included. Each signer gets one email
-                    immediately when you confirm.
+                    Each draft license is treated as <strong>pre-approved</strong> from the roster. PDFs are generated
+                    fresh, then DocuSign emails go to each winery signer immediately.
                   </p>
                 </div>
                 <div className="rounded-lg border border-rose-200 bg-white/90 px-4 py-2 text-center">
@@ -120,7 +121,7 @@ export function NyweBulkSendWizard({ open, onOpenChange, sendable, onComplete }:
 
               {sendable.length === 0 ? (
                 <p className="mt-4 text-sm text-muted-foreground">
-                  No approved licenses ready to send. Approve licenses in Step 2 first, then try again.
+                  No draft licenses ready to send. Create licenses from the roster first, then try again.
                 </p>
               ) : null}
 

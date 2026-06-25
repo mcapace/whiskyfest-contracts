@@ -1,16 +1,14 @@
 'use client';
 
-import { CheckCircle2, Circle, ArrowRight, Mail, FilePlus2, ShieldCheck, PenLine } from 'lucide-react';
+import { CheckCircle2, Circle, ArrowRight, Mail, FilePlus2, PenLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-export type NyweWorkflowStepId = 'create' | 'approve' | 'send' | 'countersign';
+export type NyweWorkflowStepId = 'create' | 'send' | 'countersign';
 
 type StepCounts = {
   notStarted: number;
-  inProgress: number;
-  needsReview: number;
-  approved: number;
+  readyToSend: number;
   waitingOnWinery: number;
 };
 
@@ -19,12 +17,12 @@ type Props = {
   activeStep: NyweWorkflowStepId;
   filter: string;
   selectedCreatable: number;
-  approvedReadyToSend: number;
+  readyToSend: number;
   clientSendEnabled: boolean;
   onSetFilter: (filter: string) => void;
   onSelectAllCreatable: () => void;
   onCreateDrafts: () => void;
-  onSendAllApproved: () => void;
+  onSendAllToClients: () => void;
 };
 
 type StepDef = {
@@ -44,22 +42,15 @@ const STEPS: StepDef[] = [
     icon: FilePlus2,
   },
   {
-    id: 'approve',
-    number: 2,
-    title: 'Approve PDFs',
-    summary: 'Open each license, check the PDF, then click Approve.',
-    icon: ShieldCheck,
-  },
-  {
     id: 'send',
-    number: 3,
-    title: 'Send to wineries',
-    summary: 'One click emails DocuSign signing links to every approved winery.',
+    number: 2,
+    title: 'Send to clients',
+    summary: 'One click bulk-sends every draft license. Roster data is pre-approved — no need to open each PDF.',
     icon: Mail,
   },
   {
     id: 'countersign',
-    number: 4,
+    number: 3,
     title: 'Countersign in DocuSign',
     summary: 'When they sign, open your DocuSign email and countersign. Accounting is notified automatically.',
     icon: PenLine,
@@ -71,14 +62,13 @@ function stepStatus(
   activeStep: NyweWorkflowStepId,
   counts: StepCounts,
 ): 'done' | 'current' | 'upcoming' {
-  const order: NyweWorkflowStepId[] = ['create', 'approve', 'send', 'countersign'];
+  const order: NyweWorkflowStepId[] = ['create', 'send', 'countersign'];
   const stepIndex = order.indexOf(stepId);
   const activeIndex = order.indexOf(activeStep);
 
   const doneByCounts: Record<NyweWorkflowStepId, boolean> = {
     create: counts.notStarted === 0,
-    approve: counts.inProgress === 0 && counts.needsReview === 0,
-    send: counts.approved === 0 && counts.waitingOnWinery > 0,
+    send: counts.readyToSend === 0 && counts.waitingOnWinery > 0,
     countersign: false,
   };
 
@@ -89,8 +79,8 @@ function stepStatus(
 }
 
 export function resolveNyweWorkflowStep(counts: StepCounts): NyweWorkflowStepId {
-  if (counts.approved > 0) return 'send';
-  if (counts.inProgress > 0 || counts.needsReview > 0) return 'approve';
+  if (counts.waitingOnWinery > 0 && counts.readyToSend === 0) return 'countersign';
+  if (counts.readyToSend > 0) return 'send';
   if (counts.notStarted > 0) return 'create';
   if (counts.waitingOnWinery > 0) return 'countersign';
   return 'create';
@@ -101,12 +91,12 @@ export function NyweRosterWorkflowGuide({
   activeStep,
   filter,
   selectedCreatable,
-  approvedReadyToSend,
+  readyToSend,
   clientSendEnabled,
   onSetFilter,
   onSelectAllCreatable,
   onCreateDrafts,
-  onSendAllApproved,
+  onSendAllToClients,
 }: Props) {
   return (
     <section className="rounded-xl border border-rose-200/80 bg-gradient-to-br from-rose-50/90 to-parchment-50 p-5 shadow-sm">
@@ -114,11 +104,11 @@ export function NyweRosterWorkflowGuide({
         <p className="text-xs font-semibold uppercase tracking-wide text-rose-900/70">Your workflow</p>
         <h2 className="mt-1 font-serif text-lg font-semibold text-foreground">Follow these steps in order</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Boxes highlight where you are now. Step 3 sends every approved license in one click.
+          After drafts are created, bulk send emails every winery — no individual approve step.
         </p>
       </div>
 
-      <ol className="grid gap-3 lg:grid-cols-2">
+      <ol className="grid gap-3 lg:grid-cols-3">
         {STEPS.map((step) => {
           const status = stepStatus(step.id, activeStep, counts);
           const Icon = step.icon;
@@ -184,24 +174,6 @@ export function NyweRosterWorkflowGuide({
                     </div>
                   ) : null}
 
-                  {step.id === 'approve' && isCurrent ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Button type="button" size="sm" variant="outline" onClick={() => onSetFilter('in_progress')}>
-                        Show in progress ({counts.inProgress})
-                      </Button>
-                      {counts.needsReview > 0 ? (
-                        <Button type="button" size="sm" variant="outline" asChild>
-                          <a href="/wine-spectator/contracts?status=pending_events_review">
-                            Review queue ({counts.needsReview})
-                          </a>
-                        </Button>
-                      ) : null}
-                      <p className="w-full text-xs text-muted-foreground">
-                        Open each license → check PDF → click <strong>Approve</strong>.
-                      </p>
-                    </div>
-                  ) : null}
-
                   {step.id === 'send' && isCurrent ? (
                     <div className="mt-3 space-y-2">
                       {!clientSendEnabled ? (
@@ -210,31 +182,26 @@ export function NyweRosterWorkflowGuide({
                         </p>
                       ) : (
                         <>
-                          {counts.approved > 0 ? (
+                          {readyToSend > 0 ? (
                             <p className="rounded-md border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-xs text-emerald-950">
-                              <strong>{counts.approved}</strong> approved license{counts.approved === 1 ? '' : 's'}{' '}
-                              ready — click below to email every signer at once. No need to select rows or open each
-                              license.
+                              <strong>{readyToSend}</strong> draft license{readyToSend === 1 ? '' : 's'} ready — bulk
+                              send generates PDFs and emails every signer. Individual approve is not required.
                             </p>
                           ) : null}
                           <div className="flex flex-wrap gap-2">
                             <Button
                               type="button"
                               size="sm"
-                              variant={filter === 'approved' ? 'default' : 'outline'}
-                              onClick={() => onSetFilter('approved')}
+                              variant={filter === 'in_progress' ? 'default' : 'outline'}
+                              onClick={() => onSetFilter('in_progress')}
                             >
-                              Show approved ({counts.approved})
+                              Show drafts ({counts.readyToSend})
                             </Button>
-                            <Button type="button" size="sm" onClick={onSendAllApproved} disabled={approvedReadyToSend === 0}>
-                              Send all approved ({approvedReadyToSend})
+                            <Button type="button" size="sm" onClick={onSendAllToClients} disabled={readyToSend === 0}>
+                              Send all to clients ({readyToSend})
                               <ArrowRight className="ml-1 h-3.5 w-3.5" aria-hidden />
                             </Button>
                           </div>
-                          <p className="text-xs text-muted-foreground">
-                            DocuSign emails go out immediately after you confirm. Countersign in DocuSign when wineries
-                            sign back.
-                          </p>
                         </>
                       )}
                     </div>

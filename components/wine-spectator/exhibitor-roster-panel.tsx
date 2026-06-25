@@ -38,12 +38,9 @@ import {
   resolveNyweWorkflowStep,
 } from '@/components/wine-spectator/nywe-roster-workflow-guide';
 import { NyweBulkSendWizard, type NyweBulkSendRow } from '@/components/wine-spectator/nywe-bulk-send-wizard';
-import {
-  NyweApprovalChecklist,
-  type NyweApprovalChecklistRow,
-} from '@/components/wine-spectator/nywe-approval-checklist';
 import { rosterAddressMissing, rosterAddressPreview } from '@/lib/exhibitor-roster-display';
 import { ROSTER_CREATE_BATCH_MAX } from '@/lib/exhibitor-roster-constants';
+import { nyweContractReadyForClientSend } from '@/lib/nywe-client-send-eligibility';
 import type { ContractStatus } from '@/types/db';
 
 type RosterRow = {
@@ -516,14 +513,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
     const rows = data.rows.filter(active);
     return {
       notStarted: rows.filter((r) => !r.contractId).length,
-      inProgress: rows.filter(
-        (r) =>
-          r.contractId &&
-          r.contractStatus &&
-          ['draft', 'ready_for_review', 'pending_events_review'].includes(r.contractStatus),
-      ).length,
-      needsReview: rows.filter((r) => r.contractStatus === 'pending_events_review').length,
-      approved: rows.filter((r) => r.contractStatus === 'approved').length,
+      readyToSend: rows.filter((r) => r.contractId && nyweContractReadyForClientSend(r.contractStatus)).length,
       waitingOnWinery: rows.filter(
         (r) => r.contractStatus && ['sent', 'partially_signed'].includes(r.contractStatus),
       ).length,
@@ -532,40 +522,11 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
 
   const activeWorkflowStep = resolveNyweWorkflowStep(workflowCounts);
 
-  const approvalChecklist = useMemo(() => {
-    const active = (row: RosterRow) =>
-      isRosterParticipationPending(row.participation) || isActiveRosterParticipation(row.participation);
-    const rows = data.rows.filter(active);
-    const toChecklist = (row: RosterRow): NyweApprovalChecklistRow | null => {
-      if (!row.contractId || !row.contractStatus) return null;
-      return {
-        rowKey: row.rowKey,
-        wineryName: row.wineryName,
-        signerName: row.signerName,
-        signerEmail: row.signerEmail,
-        contractId: row.contractId,
-        contractStatus: row.contractStatus,
-        addressPreview: rosterAddressPreview(row),
-        addressMissing: rosterAddressMissing(row),
-        grandTotalCents: row.contractGrandTotalCents,
-      };
-    };
-    const pendingReview = rows
-      .filter((r) => r.contractStatus === 'pending_events_review')
-      .map(toChecklist)
-      .filter(Boolean) as NyweApprovalChecklistRow[];
-    const inProgress = rows
-      .filter((r) => r.contractStatus && ['draft', 'ready_for_review'].includes(r.contractStatus))
-      .map(toChecklist)
-      .filter(Boolean) as NyweApprovalChecklistRow[];
-    return { pendingReview, inProgress, approvedCount: workflowCounts.approved };
-  }, [data.rows, workflowCounts.approved]);
-
   const sendableRows: NyweBulkSendRow[] = useMemo(() => {
     const active = (row: RosterRow) =>
       isRosterParticipationPending(row.participation) || isActiveRosterParticipation(row.participation);
     return data.rows
-      .filter((r) => active(r) && r.contractStatus === 'approved' && r.contractId)
+      .filter((r) => active(r) && r.contractId && nyweContractReadyForClientSend(r.contractStatus))
       .map((r) => ({
         rowKey: r.rowKey,
         wineryName: r.wineryName,
@@ -589,7 +550,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
       return;
     }
     if (sendableRows.length === 0) {
-      setMessage('No approved licenses to send. Approve licenses in Step 2 first.');
+      setMessage('No draft licenses to send. Create licenses from the roster first.');
       return;
     }
     setBulkSendOpen(true);
@@ -623,12 +584,12 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
         activeStep={activeWorkflowStep}
         filter={filter}
         selectedCreatable={selectedCreatable}
-        approvedReadyToSend={sendableRows.length}
+        readyToSend={sendableRows.length}
         clientSendEnabled={data.event.client_send_enabled}
         onSetFilter={setFilter}
         onSelectAllCreatable={selectAllCreatableVisible}
         onCreateDrafts={createSelected}
-        onSendAllApproved={startBulkSendWizard}
+        onSendAllToClients={startBulkSendWizard}
       />
 
       {createProgress ? (
@@ -666,12 +627,26 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
         </div>
       ) : null}
 
-      {approvalChecklist.pendingReview.length > 0 || approvalChecklist.inProgress.length > 0 ? (
-        <NyweApprovalChecklist
-          pendingReview={approvalChecklist.pendingReview}
-          inProgress={approvalChecklist.inProgress}
-          approvedCount={approvalChecklist.approvedCount}
-        />
+      {sendableRows.length > 0 && !createProgress && selectedCreatable === 0 ? (
+        <div className="rounded-lg border border-sky-300/90 bg-sky-50 p-4 text-sm text-sky-950">
+          <p className="font-medium">
+            {sendableRows.length} draft license{sendableRows.length === 1 ? '' : 's'} ready for bulk send
+          </p>
+          <p className="mt-1 text-sky-900/90">
+            Roster licenses are treated as pre-approved. Click below to generate PDFs and email DocuSign to every winery
+            — no need to open each license.
+          </p>
+          <Button
+            type="button"
+            className="mt-3"
+            size="sm"
+            onClick={startBulkSendWizard}
+            disabled={pending || !data.event.client_send_enabled}
+          >
+            <Send className="h-4 w-4" />
+            Send all to clients ({sendableRows.length})
+          </Button>
+        </div>
       ) : null}
 
       {selected.size > 0 && selectedCreatable === 0 && filter === 'all' ? (
@@ -687,7 +662,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
             </Button>
             {sendableRows.length > 0 ? (
               <Button type="button" size="sm" onClick={startBulkSendWizard}>
-                Send all approved ({sendableRows.length})
+                Send all to clients ({sendableRows.length})
               </Button>
             ) : null}
           </div>
@@ -728,7 +703,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
           disabled={pending || !data.event.client_send_enabled || sendableRows.length === 0}
         >
           <Send className="h-4 w-4" />
-          Send all approved ({sendableRows.length})
+          Send all to clients ({sendableRows.length})
         </Button>
         <span className="text-xs text-muted-foreground">
           {data.fromCache ? 'Auto-synced' : 'Live from sheets'} <RelativeTime iso={data.syncedAt} /> · {filtered.length} shown
