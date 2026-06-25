@@ -7,7 +7,10 @@
  *   npx tsx scripts/sync-nywe-exhibitor-signatures.mts --dry-run
  *   npx tsx scripts/sync-nywe-exhibitor-signatures.mts --limit=50
  */
-import { syncNyweExhibitorSignaturesFromDocuSign } from '../lib/nywe-sync-exhibitor-signatures.ts';
+import {
+  syncAllNyweExhibitorSignaturesFromDocuSign,
+  syncNyweExhibitorSignaturesFromDocuSign,
+} from '../lib/nywe-sync-exhibitor-signatures.ts';
 
 const dryRun = process.argv.includes('--dry-run');
 const limitArg = process.argv.find((a) => a.startsWith('--limit='));

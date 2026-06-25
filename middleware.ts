@@ -21,7 +21,8 @@ export default auth((req) => {
   const isPublic =
     pathname.startsWith('/auth') ||
     pathname.startsWith('/api/auth') ||
-    pathname.startsWith('/api/webhooks');
+    pathname.startsWith('/api/webhooks') ||
+    pathname.startsWith('/api/cron');
 
   if (!req.auth && !isPublic) {
     const loginUrl = new URL('/auth/login', req.nextUrl.origin);
