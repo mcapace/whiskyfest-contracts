@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { NYWE_DOCUSIGN_SYNC_DONE_EVENT } from '@/lib/nywe-sync-exhibitor-signatures';
+import { NYWE_DOCUSIGN_SYNC_DONE_EVENT } from '@/lib/nywe-docusign-sync-events';
 
 type SyncState = 'idle' | 'running' | 'done' | 'error';
 

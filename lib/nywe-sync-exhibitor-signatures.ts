@@ -187,4 +187,4 @@ export async function syncAllNyweExhibitorSignaturesFromDocuSign(options?: {
   return totals;
 }
 
-export const NYWE_DOCUSIGN_SYNC_DONE_EVENT = 'nywe-docusign-sync-done';
+export { NYWE_DOCUSIGN_SYNC_DONE_EVENT } from '@/lib/nywe-docusign-sync-events';

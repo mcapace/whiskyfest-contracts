@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils';
 import { RelativeTime } from '@/components/ui/relative-time';
 import { subscribeToAppContractEvents } from '@/lib/realtime-client';
-import { NYWE_DOCUSIGN_SYNC_DONE_EVENT } from '@/lib/nywe-sync-exhibitor-signatures';
+import { NYWE_DOCUSIGN_SYNC_DONE_EVENT } from '@/lib/nywe-docusign-sync-events';
 import {
   rosterColumnModeLabel,
   formatRosterWineDisplay,
