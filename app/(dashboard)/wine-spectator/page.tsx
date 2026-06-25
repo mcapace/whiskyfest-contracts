@@ -15,6 +15,7 @@ import { isEventsManagedWorkflow } from '@/lib/contract-template-profile';
 import { wineSpectatorContractIsAdmin } from '@/lib/wine-spectator-access';
 import { NyweSusannahDashboard } from '@/components/wine-spectator/nywe-susannah-dashboard';
 import { releaseStuckNyweSignedLicenses } from '@/lib/nywe-release-stuck-on-load';
+import { syncNyweExhibitorSignaturesFromDocuSign } from '@/lib/nywe-sync-exhibitor-signatures';
 import { DashboardLiveRefresh } from '@/components/dashboard/dashboard-live-refresh';
 import type { ContractWithTotals } from '@/types/db';
 
@@ -32,13 +33,19 @@ export default async function WineSpectatorDashboardPage() {
   await releaseStuckNyweSignedLicenses().catch((err) =>
     console.error('[wine-spectator dashboard] auto-release retry failed', err),
   );
+  await syncNyweExhibitorSignaturesFromDocuSign().catch((err) =>
+    console.error('[wine-spectator dashboard] exhibitor signature sync failed', err),
+  );
   const { contracts: allScoped, events } = await getDashboardData(actor, PRODUCT_WINE_SPECTATOR);
 
   const activeScoped = allScoped.filter((c) => c.status !== 'cancelled' && c.status !== 'voided');
   const primaryEvent = events.find((e) => e.is_active) ?? events[0] ?? null;
   const contractsCount = activeScoped.length;
   const reviewCount = countByStatus(activeScoped, ['pending_events_review']);
-  const waitingOnWineryCount = countByStatus(activeScoped, ['sent', 'partially_signed']);
+  const waitingOnWineryCount = countByStatus(activeScoped, ['sent']);
+  const readyToCountersign = activeScoped
+    .filter((c) => c.status === 'partially_signed')
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
   const totalValueCents = activeScoped.reduce((sum, c) => sum + c.grand_total_cents, 0);
 
   const stuckForAccounting = activeScoped
@@ -104,6 +111,12 @@ export default async function WineSpectatorDashboardPage() {
         }))}
         reviewCount={reviewCount}
         waitingOnWineryCount={waitingOnWineryCount}
+        readyToCountersign={readyToCountersign.map((c) => ({
+          id: c.id,
+          exhibitorCompanyName: c.exhibitor_company_name,
+          grandTotalCents: c.grand_total_cents,
+          updatedAt: c.updated_at,
+        }))}
         canFixStuck={canFixStuck}
       />
 

@@ -3,7 +3,7 @@
 import { useCallback, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, AlertTriangle, Send } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Send, PenLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
 import { RelativeTime } from '@/components/ui/relative-time';
@@ -23,11 +23,19 @@ export type NyweSentLicense = {
   executedAt: string | null;
 };
 
+export type NyweReadyToCountersignLicense = {
+  id: string;
+  exhibitorCompanyName: string;
+  grandTotalCents: number;
+  updatedAt: string;
+};
+
 type Props = {
   stuck: NyweStuckLicense[];
   recentlySent: NyweSentLicense[];
   reviewCount: number;
   waitingOnWineryCount: number;
+  readyToCountersign: NyweReadyToCountersignLicense[];
   canFixStuck: boolean;
 };
 
@@ -36,6 +44,7 @@ export function NyweSusannahDashboard({
   recentlySent,
   reviewCount,
   waitingOnWineryCount,
+  readyToCountersign,
   canFixStuck,
 }: Props) {
   const router = useRouter();
@@ -74,6 +83,43 @@ export function NyweSusannahDashboard({
           <Button asChild size="lg" className="mt-4 h-12 px-8 text-base">
             <Link href="/wine-spectator/contracts?status=pending_events_review">Review now</Link>
           </Button>
+        </section>
+      ) : null}
+
+      {readyToCountersign.length > 0 ? (
+        <section className="rounded-xl border-2 border-orange-500 bg-orange-50 p-6 shadow-sm">
+          <p className="flex items-start gap-2 text-lg font-semibold text-orange-950">
+            <PenLine className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
+            {readyToCountersign.length === 1
+              ? 'One winery signed — countersign in DocuSign'
+              : `${readyToCountersign.length} wineries signed — countersign in DocuSign`}
+          </p>
+          <p className="mt-2 text-base text-orange-900/90">
+            Open the DocuSign email in your inbox for each license below. After you countersign, accounting is notified
+            automatically.
+          </p>
+          <ul className="mt-4 space-y-3">
+            {readyToCountersign.map((row) => (
+              <li
+                key={row.id}
+                className="flex flex-col gap-2 rounded-lg border border-orange-400/40 bg-white/80 p-4 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <p className="text-base font-semibold text-foreground">{row.exhibitorCompanyName}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {formatCurrency(row.grandTotalCents)} · signed{' '}
+                    <RelativeTime iso={row.updatedAt} />
+                  </p>
+                </div>
+                <Link
+                  href={`/wine-spectator/contracts/${row.id}`}
+                  className="text-sm font-medium text-accent-brand hover:underline"
+                >
+                  View license
+                </Link>
+              </li>
+            ))}
+          </ul>
         </section>
       ) : null}
 

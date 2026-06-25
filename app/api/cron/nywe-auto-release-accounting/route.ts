@@ -1,19 +1,25 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { autoReleaseNyweAfterCountersign } from '@/lib/nywe-auto-release-accounting';
+import { syncNyweExhibitorSignaturesFromDocuSign } from '@/lib/nywe-sync-exhibitor-signatures';
 import { getActiveWineSpectatorEvent } from '@/lib/wine-spectator-event';
 import type { ContractWithTotals } from '@/types/db';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
 
-/** Retry NYWE auto-release for countersigned licenses stuck in `signed` (missed webhook / SendGrid blip). */
+/** Retry NYWE DocuSign reconciliation: winery signatures stuck at `sent`, and countersigned licenses stuck in `signed`. */
 export async function POST(req: Request) {
   const authHeader = req.headers.get('authorization');
   const cronSecret = process.env['CRON_SECRET'];
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const exhibitorSync = await syncNyweExhibitorSignaturesFromDocuSign({ limit: 50 }).catch((err) => {
+    console.error('[nywe-auto-release-accounting cron] exhibitor sync failed', err);
+    return { synced: 0, scanned: 0 };
+  });
 
   const event = await getActiveWineSpectatorEvent();
   if (!event) {
@@ -48,5 +54,12 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, scanned: stuck?.length ?? 0, released, failed, errors });
+  return NextResponse.json({
+    ok: true,
+    exhibitorSync,
+    scanned: stuck?.length ?? 0,
+    released,
+    failed,
+    errors,
+  });
 }

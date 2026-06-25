@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { LucideIcon } from 'lucide-react';
-import { Columns3, Loader2, RefreshCw, Send, FilePlus2, ListFilter, CircleDashed, Clock, CheckCircle2, Mail, BadgeCheck } from 'lucide-react';
+import { Columns3, Loader2, RefreshCw, Send, FilePlus2, ListFilter, CircleDashed, Clock, CheckCircle2, Mail, BadgeCheck, PenLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/contracts/status-badge';
@@ -111,7 +111,8 @@ const FILTERS = [
   { key: 'not_started', label: 'Not in system', icon: CircleDashed },
   { key: 'in_progress', label: 'In progress', icon: Clock },
   { key: 'approved', label: 'Approved', icon: CheckCircle2 },
-  { key: 'sent', label: 'Sent / signing', icon: Mail },
+  { key: 'sent', label: 'Waiting on winery', icon: Mail },
+  { key: 'countersign', label: 'Ready to countersign', icon: PenLine },
   { key: 'done', label: 'Signed / executed', icon: BadgeCheck },
 ] as const;
 
@@ -129,7 +130,9 @@ function matchesFilter(row: RosterRow, filter: string): boolean {
     case 'approved':
       return inPipeline && status === 'approved';
     case 'sent':
-      return inPipeline && Boolean(status && ['sent', 'partially_signed'].includes(status));
+      return inPipeline && status === 'sent';
+    case 'countersign':
+      return inPipeline && status === 'partially_signed';
     case 'done':
       return inPipeline && Boolean(status && ['signed', 'executed'].includes(status));
     default:
@@ -514,9 +517,8 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
     return {
       notStarted: rows.filter((r) => !r.contractId).length,
       readyToSend: rows.filter((r) => r.contractId && nyweContractReadyForClientSend(r.contractStatus)).length,
-      waitingOnWinery: rows.filter(
-        (r) => r.contractStatus && ['sent', 'partially_signed'].includes(r.contractStatus),
-      ).length,
+      waitingOnWinery: rows.filter((r) => r.contractStatus === 'sent').length,
+      readyToCountersign: rows.filter((r) => r.contractStatus === 'partially_signed').length,
     };
   }, [data.rows]);
 

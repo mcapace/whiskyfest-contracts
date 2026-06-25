@@ -10,6 +10,7 @@ type StepCounts = {
   notStarted: number;
   readyToSend: number;
   waitingOnWinery: number;
+  readyToCountersign: number;
 };
 
 type Props = {
@@ -68,7 +69,7 @@ function stepStatus(
 
   const doneByCounts: Record<NyweWorkflowStepId, boolean> = {
     create: counts.notStarted === 0,
-    send: counts.readyToSend === 0 && counts.waitingOnWinery > 0,
+    send: counts.readyToSend === 0 && (counts.waitingOnWinery > 0 || counts.readyToCountersign > 0),
     countersign: false,
   };
 
@@ -79,10 +80,11 @@ function stepStatus(
 }
 
 export function resolveNyweWorkflowStep(counts: StepCounts): NyweWorkflowStepId {
+  if (counts.readyToCountersign > 0 && counts.readyToSend === 0) return 'countersign';
   if (counts.waitingOnWinery > 0 && counts.readyToSend === 0) return 'countersign';
   if (counts.readyToSend > 0) return 'send';
   if (counts.notStarted > 0) return 'create';
-  if (counts.waitingOnWinery > 0) return 'countersign';
+  if (counts.readyToCountersign > 0 || counts.waitingOnWinery > 0) return 'countersign';
   return 'create';
 }
 
@@ -207,13 +209,21 @@ export function NyweRosterWorkflowGuide({
                     </div>
                   ) : null}
 
-                  {step.id === 'countersign' && (isCurrent || counts.waitingOnWinery > 0) ? (
-                    <div className="mt-3">
-                      <Button type="button" size="sm" variant="outline" onClick={() => onSetFilter('sent')}>
-                        Show waiting on winery ({counts.waitingOnWinery})
-                      </Button>
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        Check your inbox for DocuSign — countersign after each winery signs. No extra step in this app.
+                  {step.id === 'countersign' && (isCurrent || counts.readyToCountersign > 0 || counts.waitingOnWinery > 0) ? (
+                    <div className="mt-3 space-y-2">
+                      {counts.readyToCountersign > 0 ? (
+                        <Button type="button" size="sm" variant="default" onClick={() => onSetFilter('countersign')}>
+                          Show ready to countersign ({counts.readyToCountersign})
+                        </Button>
+                      ) : null}
+                      {counts.waitingOnWinery > 0 ? (
+                        <Button type="button" size="sm" variant="outline" onClick={() => onSetFilter('sent')}>
+                          Show waiting on winery ({counts.waitingOnWinery})
+                        </Button>
+                      ) : null}
+                      <p className="text-xs text-muted-foreground">
+                        When a winery signs, it appears under ready to countersign. Open your DocuSign inbox to sign — no
+                        extra step in this app.
                       </p>
                     </div>
                   ) : null}

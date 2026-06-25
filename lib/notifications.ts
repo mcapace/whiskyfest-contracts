@@ -10,7 +10,7 @@ import {
   workspaceLabelForEvent,
   type EventEmailContext,
 } from '@/lib/product-email';
-import { isEventsManagedWorkflow } from '@/lib/contract-template-profile';
+import { isEventsManagedWorkflow, isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
 import type { Contract, Event } from '@/types/db';
@@ -267,7 +267,7 @@ export async function notifyPartialSignature(
     line_items_subtotal_cents?: number | null;
     grand_total_cents?: number;
   },
-  event: Pick<Event, 'name' | 'year' | 'shanken_signatory_name' | 'product_key'> | null,
+  event: Pick<Event, 'name' | 'year' | 'shanken_signatory_name' | 'shanken_signatory_email' | 'product_key' | 'workflow_profile'> | null,
 ): Promise<void> {
   const apiKey = process.env['SENDGRID_API_KEY'];
   if (!apiKey) {
@@ -275,6 +275,7 @@ export async function notifyPartialSignature(
     return;
   }
 
+  const nywe = event ? isNyweEventsManagedEvent(event) : false;
   const mail = await contractMailMeta(contract, event);
   const supabase = getSupabaseAdmin();
 
@@ -301,6 +302,11 @@ export async function notifyPartialSignature(
     for (const a of assistants) recipientSet.add(a);
   }
 
+  const countersignerEmail = event?.shanken_signatory_email?.trim().toLowerCase();
+  if (nywe && countersignerEmail) {
+    recipientSet.add(countersignerEmail);
+  }
+
   const recipients = [...recipientSet];
   if (recipients.length === 0) {
     console.warn('[notifyPartialSignature] No recipients — skipping');
@@ -311,14 +317,20 @@ export async function notifyPartialSignature(
 
   const eventTitle = event ? `${event.name} ${event.year}`.trim() : 'WhiskyFest';
   const detailUrl = mail.detailUrl;
-  const exhibitorPerson = (contract.signer_1_name ?? '').trim() || 'Exhibitor';
+  const exhibitorPerson = (contract.signer_1_name ?? '').trim() || (nywe ? 'Winery contact' : 'Exhibitor');
   const company = contract.exhibitor_company_name.trim();
   const signatoryName = (event?.shanken_signatory_name ?? '').trim() || 'the Shanken signatory';
 
-  const subject = `${exhibitorPerson} from ${company} signed — awaiting countersignature`;
+  const subject = nywe
+    ? `${company} signed — countersign in DocuSign`
+    : `${exhibitorPerson} from ${company} signed — awaiting countersignature`;
 
-  const para1 = `${exhibitorPerson} at ${company} has signed the ${eventTitle} contract.`;
-  const para2 = `The contract is now awaiting countersignature from ${signatoryName}. They will receive a separate DocuSign email shortly.`;
+  const para1 = nywe
+    ? `${company} has signed the ${eventTitle} license agreement.`
+    : `${exhibitorPerson} at ${company} has signed the ${eventTitle} contract.`;
+  const para2 = nywe
+    ? `Open the DocuSign email in your inbox to countersign as ${signatoryName}. Accounting is notified automatically after you sign.`
+    : `The contract is now awaiting countersignature from ${signatoryName}. They will receive a separate DocuSign email shortly.`;
   const boothSub = contract.booth_subtotal_cents ?? contract.booth_count * contract.booth_rate_cents;
   const grand =
     typeof contract.grand_total_cents === 'number'
