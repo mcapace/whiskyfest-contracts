@@ -19,13 +19,12 @@ type Props = {
   activeStep: NyweWorkflowStepId;
   filter: string;
   selectedCreatable: number;
-  selectedSendable: number;
+  approvedReadyToSend: number;
   clientSendEnabled: boolean;
   onSetFilter: (filter: string) => void;
   onSelectAllCreatable: () => void;
   onCreateDrafts: () => void;
-  onSelectAllApproved: () => void;
-  onStartBulkSend: () => void;
+  onSendAllApproved: () => void;
 };
 
 type StepDef = {
@@ -55,7 +54,7 @@ const STEPS: StepDef[] = [
     id: 'send',
     number: 3,
     title: 'Send to wineries',
-    summary: 'Bulk email DocuSign signing links to approved wineries.',
+    summary: 'One click emails DocuSign signing links to every approved winery.',
     icon: Mail,
   },
   {
@@ -102,13 +101,12 @@ export function NyweRosterWorkflowGuide({
   activeStep,
   filter,
   selectedCreatable,
-  selectedSendable,
+  approvedReadyToSend,
   clientSendEnabled,
   onSetFilter,
   onSelectAllCreatable,
   onCreateDrafts,
-  onSelectAllApproved,
-  onStartBulkSend,
+  onSendAllApproved,
 }: Props) {
   return (
     <section className="rounded-xl border border-rose-200/80 bg-gradient-to-br from-rose-50/90 to-parchment-50 p-5 shadow-sm">
@@ -116,7 +114,7 @@ export function NyweRosterWorkflowGuide({
         <p className="text-xs font-semibold uppercase tracking-wide text-rose-900/70">Your workflow</p>
         <h2 className="mt-1 font-serif text-lg font-semibold text-foreground">Follow these steps in order</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Boxes highlight where you are now. For bulk send, use the guided wizard on step 3.
+          Boxes highlight where you are now. Step 3 sends every approved license in one click.
         </p>
       </div>
 
@@ -215,7 +213,8 @@ export function NyweRosterWorkflowGuide({
                           {counts.approved > 0 ? (
                             <p className="rounded-md border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-xs text-emerald-950">
                               <strong>{counts.approved}</strong> approved license{counts.approved === 1 ? '' : 's'}{' '}
-                              ready — the guided wizard shows every signer, address, and fee before anything sends.
+                              ready — click below to email every signer at once. No need to select rows or open each
+                              license.
                             </p>
                           ) : null}
                           <div className="flex flex-wrap gap-2">
@@ -227,17 +226,14 @@ export function NyweRosterWorkflowGuide({
                             >
                               Show approved ({counts.approved})
                             </Button>
-                            <Button type="button" size="sm" variant="outline" onClick={onSelectAllApproved}>
-                              Select all approved
-                            </Button>
-                            <Button type="button" size="sm" onClick={onStartBulkSend} disabled={selectedSendable === 0}>
-                              Start guided bulk send ({selectedSendable})
+                            <Button type="button" size="sm" onClick={onSendAllApproved} disabled={approvedReadyToSend === 0}>
+                              Send all approved ({approvedReadyToSend})
                               <ArrowRight className="ml-1 h-3.5 w-3.5" aria-hidden />
                             </Button>
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            The wizard walks you through review and send — one winery at a time in DocuSign, all at once
-                            from here.
+                            DocuSign emails go out immediately after you confirm. Countersign in DocuSign when wineries
+                            sign back.
                           </p>
                         </>
                       )}

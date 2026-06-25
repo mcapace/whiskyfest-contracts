@@ -508,12 +508,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
     createItems(items);
   };
 
-  const sendSelected = () => {
-    startBulkSendWizard();
-  };
-
   const selectedCreatable = data.rows.filter((r) => selected.has(r.rowKey) && !r.contractId).length;
-  const selectedSendable = data.rows.filter((r) => selected.has(r.rowKey) && r.contractStatus === 'approved').length;
 
   const workflowCounts = useMemo(() => {
     const active = (row: RosterRow) =>
@@ -566,44 +561,35 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
     return { pendingReview, inProgress, approvedCount: workflowCounts.approved };
   }, [data.rows, workflowCounts.approved]);
 
-  const sendableRows: NyweBulkSendRow[] = useMemo(
-    () =>
-      data.rows
-        .filter((r) => selected.has(r.rowKey) && r.contractStatus === 'approved' && r.contractId)
-        .map((r) => ({
-          rowKey: r.rowKey,
-          wineryName: r.wineryName,
-          signerName: r.signerName,
-          signerEmail: r.signerEmail,
-          contractId: r.contractId!,
-          grandTotalCents: r.contractGrandTotalCents,
-          addressPreview: rosterAddressPreview(r),
-          addressMissing: rosterAddressMissing(r),
-        })),
-    [data.rows, selected],
-  );
-
-  const skippedNotApproved = useMemo(
-    () =>
-      data.rows
-        .filter((r) => selected.has(r.rowKey) && r.contractStatus !== 'approved')
-        .map((r) => ({ wineryName: r.wineryName, status: r.contractStatus })),
-    [data.rows, selected],
-  );
+  const sendableRows: NyweBulkSendRow[] = useMemo(() => {
+    const active = (row: RosterRow) =>
+      isRosterParticipationPending(row.participation) || isActiveRosterParticipation(row.participation);
+    return data.rows
+      .filter((r) => active(r) && r.contractStatus === 'approved' && r.contractId)
+      .map((r) => ({
+        rowKey: r.rowKey,
+        wineryName: r.wineryName,
+        signerName: r.signerName,
+        signerEmail: r.signerEmail,
+        contractId: r.contractId!,
+        grandTotalCents: r.contractGrandTotalCents,
+        addressPreview: rosterAddressPreview(r),
+        addressMissing: rosterAddressMissing(r),
+      }));
+  }, [data.rows]);
 
   function selectAllCreatableVisible() {
     const keys = filtered.filter((r) => !r.contractId).map((r) => r.rowKey);
     setSelected(new Set(keys));
   }
 
-  function selectAllApprovedVisible() {
-    const keys = filtered.filter((r) => r.contractStatus === 'approved' && r.contractId).map((r) => r.rowKey);
-    setSelected(new Set(keys));
-  }
-
   function startBulkSendWizard() {
     if (!data.event.client_send_enabled) {
       setMessage('Client send is disabled for this event.');
+      return;
+    }
+    if (sendableRows.length === 0) {
+      setMessage('No approved licenses to send. Approve licenses in Step 2 first.');
       return;
     }
     setBulkSendOpen(true);
@@ -637,13 +623,12 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
         activeStep={activeWorkflowStep}
         filter={filter}
         selectedCreatable={selectedCreatable}
-        selectedSendable={selectedSendable}
+        approvedReadyToSend={sendableRows.length}
         clientSendEnabled={data.event.client_send_enabled}
         onSetFilter={setFilter}
         onSelectAllCreatable={selectAllCreatableVisible}
         onCreateDrafts={createSelected}
-        onSelectAllApproved={selectAllApprovedVisible}
-        onStartBulkSend={startBulkSendWizard}
+        onSendAllApproved={startBulkSendWizard}
       />
 
       {createProgress ? (
@@ -700,9 +685,9 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
             <Button type="button" size="sm" variant="outline" onClick={() => setFilter('not_started')}>
               Show not in system
             </Button>
-            {selectedSendable > 0 ? (
+            {sendableRows.length > 0 ? (
               <Button type="button" size="sm" onClick={startBulkSendWizard}>
-                Guided bulk send ({selectedSendable} approved)
+                Send all approved ({sendableRows.length})
               </Button>
             ) : null}
           </div>
@@ -712,11 +697,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
       <NyweBulkSendWizard
         open={bulkSendOpen}
         onOpenChange={setBulkSendOpen}
-        filterIsApproved={filter === 'approved'}
         sendable={sendableRows}
-        skippedNotApproved={skippedNotApproved}
-        onShowApprovedFilter={() => setFilter('approved')}
-        onSelectAllApproved={selectAllApprovedVisible}
         onComplete={(summary) => {
           startTransition(async () => {
             await refresh({ live: true, preserveSelection: true });
@@ -743,11 +724,11 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
         <Button
           size="sm"
           variant="secondary"
-          onClick={sendSelected}
-          disabled={pending || !data.event.client_send_enabled}
+          onClick={startBulkSendWizard}
+          disabled={pending || !data.event.client_send_enabled || sendableRows.length === 0}
         >
           <Send className="h-4 w-4" />
-          Guided bulk send{selectedSendable > 0 ? ` (${selectedSendable})` : ''}
+          Send all approved ({sendableRows.length})
         </Button>
         <span className="text-xs text-muted-foreground">
           {data.fromCache ? 'Auto-synced' : 'Live from sheets'} <RelativeTime iso={data.syncedAt} /> · {filtered.length} shown
