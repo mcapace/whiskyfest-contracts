@@ -41,6 +41,7 @@ import { NyweBulkSendWizard, type NyweBulkSendRow } from '@/components/wine-spec
 import { rosterAddressMissing, rosterAddressPreview } from '@/lib/exhibitor-roster-display';
 import { ROSTER_CREATE_BATCH_MAX } from '@/lib/exhibitor-roster-constants';
 import { nyweContractReadyForClientSend } from '@/lib/nywe-client-send-eligibility';
+import { formatCurrency } from '@/lib/utils';
 import type { ContractStatus } from '@/types/db';
 
 type RosterRow = {
@@ -200,6 +201,12 @@ function renderUiCell(row: RosterRow, columnId: string) {
         <StatusBadge status={row.contractStatus} />
       ) : (
         <span className="text-sm text-muted-foreground">Not started</span>
+      );
+    case 'licenseFee':
+      return row.contractGrandTotalCents != null ? (
+        <span className="tabular-nums text-sm font-medium">{formatCurrency(row.contractGrandTotalCents)}</span>
+      ) : (
+        <span className="text-sm text-muted-foreground">—</span>
       );
     case 'billingCompany':
       return <CellText value={row.billingCompany} />;
@@ -595,13 +602,12 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
       />
 
       {createProgress ? (
-        <div className="rounded-lg border border-rose-300 bg-rose-50 p-4 text-sm text-rose-950">
+        <div className="rounded-xl border border-rose-200 bg-rose-50/80 px-4 py-3 text-sm text-rose-950">
           <p className="flex items-center gap-2 font-medium">
             <Loader2 className="h-4 w-4 animate-spin shrink-0" aria-hidden />
             Creating drafts… {createProgress.current} of {createProgress.total}
           </p>
-          <p className="mt-1 text-rose-900/90">Keep this tab open — large lists run in batches of {ROSTER_CREATE_BATCH_MAX}.</p>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-rose-200">
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-rose-200">
             <div
               className="h-full bg-rose-700 transition-all duration-300"
               style={{
@@ -611,62 +617,6 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
                     : '0%',
               }}
             />
-          </div>
-        </div>
-      ) : selectedCreatable > 0 ? (
-        <div className="rounded-lg border border-rose-300 bg-rose-50 p-4 text-sm text-rose-950">
-          <p className="font-medium">
-            {selectedCreatable} winery{selectedCreatable === 1 ? '' : 'ies'} selected — next step: create drafts
-          </p>
-          <p className="mt-1 text-rose-900/90">
-            Checking boxes only selects rows. Click the button below (or <strong>Create drafts</strong> in Step 1) to
-            start. Large lists process {ROSTER_CREATE_BATCH_MAX} at a time and may take several minutes.
-          </p>
-          <Button type="button" className="mt-3" size="sm" onClick={createSelected} disabled={pending || creating}>
-            <FilePlus2 className="h-4 w-4" />
-            Create drafts ({selectedCreatable})
-          </Button>
-        </div>
-      ) : null}
-
-      {sendableRows.length > 0 && !createProgress && selectedCreatable === 0 ? (
-        <div className="rounded-lg border border-sky-300/90 bg-sky-50 p-4 text-sm text-sky-950">
-          <p className="font-medium">
-            {sendableRows.length} draft license{sendableRows.length === 1 ? '' : 's'} ready for bulk send
-          </p>
-          <p className="mt-1 text-sky-900/90">
-            Roster licenses are treated as pre-approved. Click below to generate PDFs and email DocuSign to every winery
-            — no need to open each license.
-          </p>
-          <Button
-            type="button"
-            className="mt-3"
-            size="sm"
-            onClick={startBulkSendWizard}
-            disabled={pending || !data.event.client_send_enabled}
-          >
-            <Send className="h-4 w-4" />
-            Send all to clients ({sendableRows.length})
-          </Button>
-        </div>
-      ) : null}
-
-      {selected.size > 0 && selectedCreatable === 0 && filter === 'all' ? (
-        <div className="rounded-lg border border-amber-300/90 bg-amber-50 p-4 text-sm text-amber-950">
-          <p className="font-medium">Your selection includes wineries that already have licenses.</p>
-          <p className="mt-1 text-amber-900/90">
-            To create new drafts, filter <strong>Not in system</strong> or use Step 1 in the workflow guide — then{' '}
-            <strong>Select all visible</strong> will only pick rows without a license.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="outline" onClick={() => setFilter('not_started')}>
-              Show not in system
-            </Button>
-            {sendableRows.length > 0 ? (
-              <Button type="button" size="sm" onClick={startBulkSendWizard}>
-                Send all to clients ({sendableRows.length})
-              </Button>
-            ) : null}
           </div>
         </div>
       ) : null}
@@ -820,7 +770,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
         </p>
       ) : null}
 
-      <div className="overflow-x-auto rounded-lg border">
+      <div className="overflow-x-auto rounded-2xl border border-border/60 bg-white shadow-sm">
         <Table className={cn(columnMode === 'all' ? 'min-w-max text-xs' : 'w-full table-fixed')}>
           <TableHeader>
             <TableRow>

@@ -1,10 +1,12 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useCallback, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, AlertTriangle, Send, PenLine } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, PenLine, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
 import { RelativeTime } from '@/components/ui/relative-time';
 import { emitContractActionSuccessFeedback } from '@/lib/contract-action-feedback';
@@ -39,6 +41,35 @@ type Props = {
   canFixStuck: boolean;
 };
 
+function QueueRow({
+  title,
+  subtitle,
+  href,
+  amount,
+}: {
+  title: string;
+  subtitle: ReactNode;
+  href: string;
+  amount?: number;
+}) {
+  return (
+    <li className="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/20 px-3 py-2.5">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium">{title}</p>
+        <p className="text-xs text-muted-foreground">{subtitle}</p>
+      </div>
+      <div className="flex shrink-0 items-center gap-3">
+        {typeof amount === 'number' ? (
+          <span className="text-sm tabular-nums text-muted-foreground">{formatCurrency(amount)}</span>
+        ) : null}
+        <Link href={href} className="text-xs font-medium text-accent-brand hover:underline">
+          Open
+        </Link>
+      </div>
+    </li>
+  );
+}
+
 export function NyweSusannahDashboard({
   stuck,
   recentlySent,
@@ -70,138 +101,119 @@ export function NyweSusannahDashboard({
     [router, session?.user?.sound_enabled],
   );
 
+  const hasQueue =
+    reviewCount > 0 || readyToCountersign.length > 0 || stuck.length > 0 || waitingOnWineryCount > 0;
+
   return (
-    <div className="space-y-4">
-      {reviewCount > 0 ? (
-        <section className="rounded-xl border-2 border-sky-400/60 bg-sky-50 p-6 shadow-sm">
-          <p className="text-lg font-semibold text-sky-950">
-            {reviewCount} license{reviewCount === 1 ? '' : 's'} need{reviewCount === 1 ? 's' : ''} your approval
-          </p>
-          <p className="mt-2 text-base text-sky-900/90">
-            Open the license, check the PDF, and click <strong>Approve</strong>.
-          </p>
-          <Button asChild size="lg" className="mt-4 h-12 px-8 text-base">
-            <Link href="/wine-spectator/contracts?status=pending_events_review">Review now</Link>
-          </Button>
-        </section>
-      ) : null}
+    <Card className="border-border/60 shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="font-display text-xl font-medium">Your action queue</CardTitle>
+        <p className="text-sm text-muted-foreground">What needs attention right now</p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!hasQueue ? (
+          <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/80 p-4">
+            <p className="flex items-center gap-2 text-sm font-medium text-emerald-950">
+              <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
+              All caught up
+            </p>
+            <p className="mt-1 text-sm text-emerald-900/80">
+              Countersign in DocuSign when wineries sign — accounting runs automatically after that.
+            </p>
+          </div>
+        ) : null}
 
-      {readyToCountersign.length > 0 ? (
-        <section className="rounded-xl border-2 border-orange-500 bg-orange-50 p-6 shadow-sm">
-          <p className="flex items-start gap-2 text-lg font-semibold text-orange-950">
-            <PenLine className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
-            {readyToCountersign.length === 1
-              ? 'One winery signed — countersign in DocuSign'
-              : `${readyToCountersign.length} wineries signed — countersign in DocuSign`}
-          </p>
-          <p className="mt-2 text-base text-orange-900/90">
-            Open the DocuSign email in your inbox for each license below. After you countersign, accounting is notified
-            automatically.
-          </p>
-          <ul className="mt-4 space-y-3">
-            {readyToCountersign.map((row) => (
-              <li
-                key={row.id}
-                className="flex flex-col gap-2 rounded-lg border border-orange-400/40 bg-white/80 p-4 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div>
-                  <p className="text-base font-semibold text-foreground">{row.exhibitorCompanyName}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {formatCurrency(row.grandTotalCents)} · signed{' '}
-                    <RelativeTime iso={row.updatedAt} />
-                  </p>
-                </div>
-                <Link
+        {readyToCountersign.length > 0 ? (
+          <section>
+            <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-orange-800">
+              <PenLine className="h-3.5 w-3.5" aria-hidden />
+              Countersign in DocuSign ({readyToCountersign.length})
+            </p>
+            <ul className="space-y-2">
+              {readyToCountersign.slice(0, 5).map((row) => (
+                <QueueRow
+                  key={row.id}
+                  title={row.exhibitorCompanyName}
+                  subtitle={`Winery signed ${new Date(row.updatedAt).toLocaleDateString()}`}
                   href={`/wine-spectator/contracts/${row.id}`}
-                  className="text-sm font-medium text-accent-brand hover:underline"
+                  amount={row.grandTotalCents}
+                />
+              ))}
+            </ul>
+            {readyToCountersign.length > 5 ? (
+              <Link href="/wine-spectator/roster?filter=countersign" className="mt-2 inline-block text-xs font-medium text-accent-brand hover:underline">
+                View all {readyToCountersign.length} on roster
+              </Link>
+            ) : null}
+          </section>
+        ) : null}
+
+        {reviewCount > 0 ? (
+          <section className="rounded-xl border border-sky-200 bg-sky-50/80 p-4">
+            <p className="text-sm font-medium text-sky-950">
+              {reviewCount} license{reviewCount === 1 ? '' : 's'} awaiting approval
+            </p>
+            <Button asChild size="sm" className="mt-3">
+              <Link href="/wine-spectator/contracts?status=pending_events_review">Review now</Link>
+            </Button>
+          </section>
+        ) : null}
+
+        {stuck.length > 0 ? (
+          <section>
+            <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-800">
+              <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+              Release to accounting ({stuck.length})
+            </p>
+            <ul className="space-y-2">
+              {stuck.map((row) => (
+                <li
+                  key={row.id}
+                  className="flex flex-col gap-2 rounded-lg border border-amber-200/80 bg-amber-50/50 p-3 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  View license
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+                  <div>
+                    <p className="text-sm font-medium">{row.exhibitorCompanyName}</p>
+                    <p className="text-xs text-muted-foreground">{formatCurrency(row.grandTotalCents)}</p>
+                  </div>
+                  {canFixStuck ? (
+                    <Button size="sm" disabled={pending} onClick={() => fixStuck(row.id)}>
+                      {pending && pendingId === row.id ? 'Sending…' : 'Send to accounting'}
+                    </Button>
+                  ) : (
+                    <Link href={`/wine-spectator/contracts/${row.id}`} className="text-xs font-medium text-accent-brand hover:underline">
+                      Open
+                    </Link>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
 
-      {waitingOnWineryCount > 0 ? (
-        <section className="rounded-xl border border-emerald-300/70 bg-emerald-50/80 p-5">
-          <p className="flex items-center gap-2 text-base font-medium text-emerald-950">
-            <Send className="h-5 w-5 shrink-0" aria-hidden />
-            {waitingOnWineryCount} waiting on the winery to sign — nothing for you to do yet
+        {waitingOnWineryCount > 0 && readyToCountersign.length === 0 ? (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Send className="h-4 w-4 shrink-0" aria-hidden />
+            {waitingOnWineryCount} waiting on winery signature in DocuSign
           </p>
-        </section>
-      ) : null}
+        ) : null}
 
-      {stuck.length > 0 ? (
-        <section className="rounded-xl border-2 border-amber-500 bg-amber-50 p-6 shadow-sm">
-          <p className="flex items-start gap-2 text-lg font-semibold text-amber-950">
-            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
-            {stuck.length === 1
-              ? 'One license needs a quick tap to reach accounting'
-              : `${stuck.length} licenses need a quick tap to reach accounting`}
-          </p>
-          <p className="mt-2 text-base text-amber-900/90">
-            You already signed these in DocuSign. Tap the button below and we&apos;ll send them to Danielle&apos;s team.
-          </p>
-          <ul className="mt-4 space-y-3">
-            {stuck.map((row) => (
-              <li
-                key={row.id}
-                className="flex flex-col gap-3 rounded-lg border border-amber-400/40 bg-white/80 p-4 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div>
-                  <p className="text-base font-semibold text-foreground">{row.exhibitorCompanyName}</p>
-                  <p className="text-sm text-muted-foreground">{formatCurrency(row.grandTotalCents)}</p>
-                </div>
-                {canFixStuck ? (
-                  <Button
-                    size="lg"
-                    className="h-12 shrink-0 px-6 text-base"
-                    disabled={pending}
-                    onClick={() => fixStuck(row.id)}
-                  >
-                    {pending && pendingId === row.id ? 'Sending…' : 'Send to accounting'}
-                  </Button>
-                ) : (
-                  <Link href={`/wine-spectator/contracts/${row.id}`} className="text-sm font-medium text-accent-brand hover:underline">
-                    Open license
-                  </Link>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : (
-        <section className="rounded-xl border border-emerald-400/50 bg-emerald-50/90 p-6">
-          <p className="flex items-start gap-2 text-lg font-semibold text-emerald-950">
-            <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0" aria-hidden />
-            You&apos;re all caught up on accounting
-          </p>
-          <p className="mt-2 text-base leading-relaxed text-emerald-900/90">
-            When you countersign a license in DocuSign, it goes to Danielle&apos;s team automatically. You don&apos;t need
-            to do anything else in this app for invoicing.
-          </p>
-        </section>
-      )}
-
-      {recentlySent.length > 0 ? (
-        <section className="rounded-lg border border-border/60 bg-white p-5">
-          <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Recently sent to accounting</p>
-          <ul className="mt-3 divide-y divide-border/50">
-            {recentlySent.map((row) => (
-              <li key={row.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{row.exhibitorCompanyName}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {row.executedAt ? <RelativeTime iso={row.executedAt} /> : 'Sent recently'}
-                  </p>
-                </div>
-                <p className="shrink-0 tabular-nums text-sm font-medium">{formatCurrency(row.grandTotalCents)}</p>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-    </div>
+        {recentlySent.length > 0 ? (
+          <section className="border-t border-border/50 pt-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recently executed</p>
+            <ul className="mt-2 space-y-2">
+              {recentlySent.slice(0, 4).map((row) => (
+                <QueueRow
+                  key={row.id}
+                  title={row.exhibitorCompanyName}
+                  subtitle={row.executedAt ? <RelativeTime iso={row.executedAt} /> : 'Recently'}
+                  href={`/wine-spectator/contracts/${row.id}`}
+                  amount={row.grandTotalCents}
+                />
+              ))}
+            </ul>
+          </section>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }

@@ -17,6 +17,7 @@ export function WineSpectatorHero({
   greetingHeadline,
   greetingSubtitle,
   className,
+  compact,
 }: {
   event: Event | null;
   contractsCount: number;
@@ -24,6 +25,7 @@ export function WineSpectatorHero({
   greetingHeadline?: string;
   greetingSubtitle?: string;
   className?: string;
+  compact?: boolean;
 }) {
   const eventName = event?.name ?? 'New York Wine Experience';
   const scheduleEvent = event ?? {
@@ -43,7 +45,7 @@ export function WineSpectatorHero({
         className,
       )}
     >
-      <div className="relative h-[480px] overflow-hidden bg-rose-950">
+      <div className={cn('relative overflow-hidden bg-rose-950', compact ? 'h-[320px]' : 'h-[480px]')}>
         <HeroParallaxLayer
           src="/images/nywe-hero.png"
           objectPosition="center 42%"
