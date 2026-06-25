@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth';
 import { canImportLegacyContracts, resolveContractActor } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { clearedRepEnteredBilling } from '@/lib/contract-schemas';
+import { PRODUCT_WINE_SPECTATOR } from '@/lib/product-portal';
 import { suggestBrandCategory } from '@/lib/brand-category';
 import { replaceContractBoothBrandsForContract } from '@/lib/contract-booth-brands';
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
@@ -150,6 +151,19 @@ export async function POST(req: Request) {
   }
 
   const p = parsed.data;
+
+  const supabase = getSupabaseAdmin();
+  const { data: importEvent } = await supabase
+    .from('events')
+    .select('product_key')
+    .eq('id', p.event_id)
+    .maybeSingle();
+  if (importEvent?.product_key === PRODUCT_WINE_SPECTATOR) {
+    return NextResponse.json(
+      { error: 'Legacy PDF import is not available for New York Wine Experience — create licenses from the exhibitor roster instead.' },
+      { status: 400 },
+    );
+  }
 
   if (!gate.actor.isAdmin && !gate.actor.isEventsTeam) {
     if (!gate.actor.accessibleSalesRepIds.includes(p.sales_rep_id)) {

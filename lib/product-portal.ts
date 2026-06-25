@@ -67,7 +67,23 @@ export function scopeContractsByProduct(
   const eventIds = new Set(
     allEvents.filter((e) => e.product_key === productKey).map((e) => e.id),
   );
-  return contracts.filter((c) => eventIds.has(c.event_id));
+  const scoped = contracts.filter((c) => eventIds.has(c.event_id));
+  if (productKey === PRODUCT_WINE_SPECTATOR) {
+    return filterNywePortalContracts(scoped);
+  }
+  return scoped;
+}
+
+/**
+ * NYWE portal shows roster-linked licenses and drafts created in-app — not legacy
+ * WhiskyFest PDF imports that were accidentally attached to the wine_spectator event.
+ */
+export function filterNywePortalContracts(contracts: ContractWithTotals[]): ContractWithTotals[] {
+  return contracts.filter((c) => {
+    if (c.source_sheet_id) return true;
+    if (c.status === 'imported' || c.imported_at) return false;
+    return true;
+  });
 }
 
 export function contractListHref(productKey: ProductKey): string {
