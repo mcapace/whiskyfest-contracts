@@ -42,6 +42,8 @@ export interface Event {
   google_template_doc_id: string | null;
   google_sponsorship_template_doc_id: string | null;
   contract_document_label: string;
+  /** DocuSign signing email subject template (see DOCUSIGN_EMAIL_SUBJECT_TOKENS). */
+  docusign_email_subject_template: string | null;
   /** When false, approved contracts cannot be sent to clients via DocuSign. */
   client_send_enabled: boolean;
   /** Google Sheets configs for live exhibitor roster sync. */

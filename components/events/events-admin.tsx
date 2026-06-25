@@ -11,6 +11,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input, Label } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import type { Event } from '@/types/db';
+import {
+  DOCUSIGN_EMAIL_SUBJECT_TOKENS,
+  defaultDocuSignEmailSubjectTemplate,
+} from '@/lib/contract-document-naming';
 
 interface Props {
   initialEvents: Event[];
@@ -36,6 +40,7 @@ function emptyForm(wineSpectatorOnly = false) {
     workflow_profile: 'sales_rep' as 'sales_rep' | 'events_managed',
     google_template_doc_id: '',
     contract_document_label: 'Contract',
+    docusign_email_subject_template: '',
   };
 }
 
@@ -68,6 +73,7 @@ export function EventsAdmin({ initialEvents, wineSpectatorOnly = false }: Props)
       workflow_profile: (ev.workflow_profile === 'events_managed' ? 'events_managed' : 'sales_rep'),
       google_template_doc_id: ev.google_template_doc_id ?? '',
       contract_document_label: ev.contract_document_label ?? 'Contract',
+      docusign_email_subject_template: ev.docusign_email_subject_template ?? '',
     });
   }
 
@@ -118,6 +124,7 @@ export function EventsAdmin({ initialEvents, wineSpectatorOnly = false }: Props)
       workflow_profile: form.workflow_profile,
       google_template_doc_id: form.google_template_doc_id.trim() || null,
       contract_document_label: form.contract_document_label.trim() || 'Contract',
+      docusign_email_subject_template: form.docusign_email_subject_template.trim() || null,
     };
 
     startTransition(async () => {
@@ -231,6 +238,20 @@ export function EventsAdmin({ initialEvents, wineSpectatorOnly = false }: Props)
               />
               <p className="text-xs text-muted-foreground">
                 Per-event booth/vendor Google Doc. Falls back to env when empty.
+              </p>
+            </Field>
+            <Field label="DocuSign email subject">
+              <Input
+                value={form.docusign_email_subject_template}
+                onChange={e => set('docusign_email_subject_template', e.target.value)}
+                placeholder={defaultDocuSignEmailSubjectTemplate({
+                  product_key: form.product_key,
+                  contract_document_label: form.contract_document_label,
+                })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Signing email subject — one per winery when sent. Tokens:{' '}
+                {DOCUSIGN_EMAIL_SUBJECT_TOKENS.join(', ')}. Leave blank for the default (winery name first).
               </p>
             </Field>
             <div className="border-t border-border/50 pt-4">

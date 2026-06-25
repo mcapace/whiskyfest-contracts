@@ -24,6 +24,7 @@ const patchSchema = z
     google_template_doc_id: z.string().optional().nullable(),
     google_sponsorship_template_doc_id: z.string().optional().nullable(),
     contract_document_label: z.string().min(1).optional(),
+    docusign_email_subject_template: z.string().max(200).optional().nullable(),
   })
   .strict();
 
