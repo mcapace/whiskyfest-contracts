@@ -8,6 +8,7 @@ import { boothBrandRowsRecordFromMap } from '@/lib/sponsors';
 import type { ContractWithTotals, ContractStatus, Event } from '@/types/db';
 import {
   PRODUCT_WHISKYFEST,
+  eventIdsForProduct,
   scopeContractsByProduct,
   scopeEventsByProduct,
   type ProductKey,
@@ -50,7 +51,18 @@ export async function loadContracts(
   productKey: ProductKey = PRODUCT_WHISKYFEST,
 ) {
   const supabase = getSupabaseAdmin();
+
+  const { data: events } = await supabase.from('events').select('*');
+  const allEvents = (events ?? []) as Event[];
+  const productEventIds = eventIdsForProduct(allEvents, productKey);
+
   let query = supabase.from('contracts_with_totals').select('*').order('created_at', { ascending: false }).limit(200);
+
+  if (productEventIds.length === 0) {
+    query = query.limit(0);
+  } else {
+    query = query.in('event_id', productEventIds);
+  }
 
   const { data: appUser } = await supabase
     .from('app_users')
@@ -98,12 +110,8 @@ export async function loadContracts(
     query = query.or(parts.join(','));
   }
 
-  const [{ data: contracts }, { data: events }] = await Promise.all([
-    query,
-    supabase.from('events').select('*'),
-  ]);
+  const [{ data: contracts }] = await Promise.all([query]);
 
-  const allEvents = (events ?? []) as Event[];
   const scopedEvents = scopeEventsByProduct(allEvents, productKey);
   let contractRows = scopeContractsByProduct((contracts ?? []) as ContractWithTotals[], allEvents, productKey);
 

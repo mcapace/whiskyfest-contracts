@@ -4,6 +4,7 @@ import { formatCurrency, formatTimestamp } from '@/lib/utils';
 import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { calculateDiscountCents, isDiscountedRate, requiresDiscountApproval } from '@/lib/contracts';
 import { isLegacyImportedContract } from '@/lib/legacy-import';
+import { contractHasBillingInfo } from '@/lib/nywe-billing';
 import { downloadCompletedPdf } from '@/lib/docusign';
 import {
   downloadContractPdfFromStorage,
@@ -37,7 +38,7 @@ export async function releaseContractToAccounting(options: {
   const { contract, event, actorEmail, auditAction = 'released_to_accounting' } = options;
   const supabase = options.supabase ?? getSupabaseAdmin();
 
-  if (requiresDiscountApproval(contract)) {
+  if (requiresDiscountApproval(contract, event)) {
     return { ok: false, error: 'Discount approval required before contract can be released.', status: 403 };
   }
 
@@ -116,9 +117,17 @@ export async function releaseContractToAccounting(options: {
       ]
         .filter((x) => (x ?? '').toString().trim())
         .join(' · ')
-    : billingSame
-      ? (formatExhibitorAddressBlock(contract) || '—').replace(/\n/g, ', ')
-      : (formatBillingAddressBlock(contract) || '—').replace(/\n/g, ', ');
+    : contractHasBillingInfo(contract)
+      ? [
+          contract.billing_contact_name,
+          contract.billing_contact_email,
+          (formatBillingAddressBlock(contract) || '—').replace(/\n/g, ', '),
+        ]
+          .filter((x) => (x ?? '').toString().trim())
+          .join(' · ')
+      : billingSame
+        ? (formatExhibitorAddressBlock(contract) || '—').replace(/\n/g, ', ')
+        : (formatBillingAddressBlock(contract) || '—').replace(/\n/g, ', ');
 
   const discountCents = calculateDiscountCents(contract.booth_count, contract.booth_rate_cents);
   const discountLine =
@@ -133,9 +142,12 @@ export async function releaseContractToAccounting(options: {
     signerEmail: contract.signer_1_email,
     exhibitorTelephone: contract.exhibitor_telephone,
     billingAddressLine,
-    exhibitorBillingContactName: exhibitorCaptured ? contract.billing_contact_name : null,
-    exhibitorBillingContactEmail: exhibitorCaptured ? contract.billing_contact_email : null,
-    exhibitorBillingAddressDetail: exhibitorCaptured ? formatBillingAddressBlock(contract) : null,
+    exhibitorBillingContactName:
+      exhibitorCaptured || contractHasBillingInfo(contract) ? contract.billing_contact_name : null,
+    exhibitorBillingContactEmail:
+      exhibitorCaptured || contractHasBillingInfo(contract) ? contract.billing_contact_email : null,
+    exhibitorBillingAddressDetail:
+      exhibitorCaptured || contractHasBillingInfo(contract) ? formatBillingAddressBlock(contract) : null,
     exhibitorEventContactName: exhibitorCaptured ? contract.event_contact_name : null,
     exhibitorEventContactEmail: exhibitorCaptured ? contract.event_contact_email : null,
     eventName: event.name,

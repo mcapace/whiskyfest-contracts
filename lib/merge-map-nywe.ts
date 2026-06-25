@@ -2,6 +2,7 @@ import { DOCUSIGN_ANCHORS } from '@/lib/merge-map';
 import { formatCurrency } from '@/lib/utils';
 import { getAgreementDatePartsInDisplayZone } from '@/lib/datetime';
 import { formatEventDateForDisplayOrMerge } from '@/lib/event-schedule';
+import { nyweBillingMergeTokens } from '@/lib/nywe-billing';
 import type { ContractWithTotals, Event } from '@/types/db';
 import type { MergePlaceholderMode } from '@/lib/merge-map';
 
@@ -53,6 +54,7 @@ export function buildNyweVendorMergeMap(
     '{{shanken_signatory_name}}': event.shanken_signatory_name,
     '{{shanken_signatory_title}}': event.shanken_signatory_title,
     '{{shanken_signatory_email}}': event.shanken_signatory_email,
+    ...nyweBillingMergeTokens(contract, mode),
     ...anchors,
   };
 }

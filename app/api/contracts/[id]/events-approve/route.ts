@@ -40,7 +40,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: 'Contract is not pending events review.' }, { status: 400 });
   }
 
-  if (requiresDiscountApproval(c)) {
+  const { data: event } = await supabase
+    .from('events')
+    .select('contract_template_profile, booth_rate_cents')
+    .eq('id', c.event_id)
+    .maybeSingle();
+
+  if (requiresDiscountApproval(c, event ?? undefined)) {
     return NextResponse.json({ error: 'Discount approval required before events review.' }, { status: 400 });
   }
 

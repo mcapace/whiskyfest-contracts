@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { isNyweVendorEvent, nyweLicenseFeeCents } from '@/lib/nywe-pricing';
 import { cn, formatCurrency, formatLongDate, formatTimestamp } from '@/lib/utils';
 import { formatStatus } from '@/lib/status-display';
 import type { ContractWithTotals, Event } from '@/types/db';
@@ -10,8 +11,12 @@ export function ContractSummarySection({
   contract: ContractWithTotals;
   event: Event | null;
 }) {
-  const boothSummary =
-    contract.booth_count === 1 ? '1 booth' : `${contract.booth_count} booths`;
+  const nyweLicense = isNyweVendorEvent(event);
+  const boothSummary = nyweLicense
+    ? `Vendor license · ${formatCurrency(nyweLicenseFeeCents(event ?? undefined))}`
+    : contract.booth_count === 1
+      ? '1 booth'
+      : `${contract.booth_count} booths`;
 
   return (
     <section className="divide-y divide-border/50 border-b border-border/50 pb-8">
@@ -34,8 +39,14 @@ export function ContractSummarySection({
 
       <div className="grid gap-y-5 pt-6 sm:grid-cols-2 lg:grid-cols-3">
         <SummaryField label="Grand total" value={formatCurrency(contract.grand_total_cents)} mono emphasis />
-        <SummaryField label="Booth rate" value={formatCurrency(contract.booth_rate_cents)} mono />
-        <SummaryField label="Booth count" value={String(contract.booth_count)} />
+        {nyweLicense ? (
+          <SummaryField label="License fee" value={formatCurrency(nyweLicenseFeeCents(event ?? undefined))} mono />
+        ) : (
+          <>
+            <SummaryField label="Booth rate" value={formatCurrency(contract.booth_rate_cents)} mono />
+            <SummaryField label="Booth count" value={String(contract.booth_count)} />
+          </>
+        )}
         <SummaryField label="Sales rep" value={contract.sales_rep_name ?? contract.sales_rep_email ?? '—'} />
         <SummaryField label="Signer" value={contract.signer_1_name?.trim() || '—'} />
         <SummaryField

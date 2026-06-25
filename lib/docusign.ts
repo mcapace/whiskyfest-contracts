@@ -159,6 +159,8 @@ export interface SendEnvelopeParams {
   carbonCopy?: { email: string; name: string } | null;
   /** DocuSign brand id — controls exhibitor-facing signing email sender/branding. */
   brandId?: string;
+  /** NYWE licenses with roster billing merged into PDF — skip empty exhibitor fill tabs. */
+  skipExhibitorDataTabs?: boolean;
 }
 
 export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelopeId: string }> {
@@ -169,7 +171,7 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
   const date1 = anchorOnly(DOCUSIGN_ANCHORS.date1);
   const signHere2 = anchorOnly(DOCUSIGN_ANCHORS.sig2);
   const date2 = anchorOnly(DOCUSIGN_ANCHORS.date2);
-  const exhibitorTabs = buildExhibitorDataTextTabs();
+  const exhibitorTabs = params.skipExhibitorDataTabs ? {} : buildExhibitorDataTextTabs();
 
   const envelopeDefinition: Record<string, unknown> = {
     emailSubject: params.emailSubject,

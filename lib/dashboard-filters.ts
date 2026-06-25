@@ -1,5 +1,5 @@
 import { requiresDiscountApproval } from '@/lib/contracts';
-import type { ContractWithTotals } from '@/types/db';
+import type { ContractWithTotals, Event } from '@/types/db';
 
 export type DashboardFilterKey =
   | 'all'
@@ -53,6 +53,7 @@ export function contractMatchesDashboardFilter(
   c: ContractWithTotals,
   filter: DashboardFilterKey,
   accessibleSalesRepIds: string[],
+  eventById?: Map<string, Pick<Event, 'contract_template_profile' | 'booth_rate_cents'>>,
 ): boolean {
   const repOwns =
     c.sales_rep_id != null && accessibleSalesRepIds.includes(c.sales_rep_id);
@@ -77,7 +78,11 @@ export function contractMatchesDashboardFilter(
     case 'cancelled':
       return c.status === 'cancelled';
     case 'staff_needs_approval':
-      return requiresDiscountApproval(c) || c.status === 'pending_events_review' || c.status === 'imported';
+      return (
+        requiresDiscountApproval(c, eventById?.get(c.event_id)) ||
+        c.status === 'pending_events_review' ||
+        c.status === 'imported'
+      );
     case 'staff_countersign':
       return c.status === 'partially_signed';
     case 'staff_ready_release':

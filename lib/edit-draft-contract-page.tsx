@@ -96,6 +96,14 @@ export async function EditDraftContractPage({
           sales_rep_id: c.sales_rep_id ?? '',
           exhibitor_notes: c.exhibitor_notes ?? '',
           notes: c.notes ?? '',
+          billing_contact_name: c.billing_contact_name ?? '',
+          billing_contact_email: c.billing_contact_email ?? '',
+          billing_address_line1: c.billing_address_line1 ?? '',
+          billing_address_line2: c.billing_address_line2 ?? '',
+          billing_city: c.billing_city ?? '',
+          billing_state: c.billing_state ?? '',
+          billing_zip: c.billing_zip ?? '',
+          billing_country: c.billing_country ?? '',
         }}
         initialDealKind={dealKindFromContract(c)}
         initialBoothBrands={

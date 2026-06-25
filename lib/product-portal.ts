@@ -55,6 +55,10 @@ export function scopeEventsByProduct(events: Event[], productKey: ProductKey): E
   return events.filter((e) => e.product_key === productKey);
 }
 
+export function eventIdsForProduct(events: Event[], productKey: ProductKey): string[] {
+  return scopeEventsByProduct(events, productKey).map((e) => e.id);
+}
+
 export function scopeContractsByProduct(
   contracts: ContractWithTotals[],
   allEvents: Event[],

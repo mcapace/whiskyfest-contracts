@@ -41,6 +41,7 @@ import { getBrandMix, getDeadlines, getEventVitalSigns, getPipelineData, getRece
 import type { AuditLogEntry, ContractWithTotals, Event } from '@/types/db';
 import {
   PRODUCT_WHISKYFEST,
+  eventIdsForProduct,
   scopeContractsByProduct,
   scopeEventsByProduct,
   type ProductKey,
@@ -69,12 +70,6 @@ export async function getDashboardData(
 ) {
   const supabase = getSupabaseAdmin();
 
-  let contractsQuery = supabase
-    .from('contracts_with_totals')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(DASH_SCOPE_LIMIT);
-
   const { data: appUser } = await supabase
     .from('app_users')
     .select('is_accounting, can_view_all_sales')
@@ -88,47 +83,62 @@ export async function getDashboardData(
     can_view_all_sales: Boolean((appUser as { can_view_all_sales?: boolean } | null)?.can_view_all_sales),
     accessibleSalesRepIds: actor.accessibleSalesRepIds,
   });
+
+  const { data: eventsData } = await supabase.from('events').select('*').eq('is_active', true);
+  const allEvents = (eventsData ?? []) as Event[];
+  const productEventIds = eventIdsForProduct(allEvents, productKey);
+
+  let contractsQuery = supabase
+    .from('contracts_with_totals')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(DASH_SCOPE_LIMIT);
+
+  if (productEventIds.length === 0) {
+    contractsQuery = contractsQuery.limit(0);
+  } else {
+    contractsQuery = contractsQuery.in('event_id', productEventIds);
+  }
+
   if (visibility.filter === 'own' && visibility.salesRepIds.length > 0) {
     contractsQuery = contractsQuery.in('sales_rep_id', visibility.salesRepIds);
   } else if (visibility.filter === 'own') {
     contractsQuery = contractsQuery.limit(0);
   }
 
-  const [contractsRes, eventsRes, supportedRepNames] = await Promise.all([
+  const [contractsRes, supportedRepNames] = await Promise.all([
     contractsQuery,
-    supabase.from('events').select('*').eq('is_active', true),
     getSupportedRepNames(actor.email),
   ]);
   const contractsRaw = (contractsRes.data ?? []) as ContractWithTotals[];
-  const contractIds = contractsRaw.map((c) => c.id);
-  const boothBrandRows =
-    contractIds.length > 0 ? await fetchBoothBrandsByContractIds(supabase, contractIds) : [];
-  let auditQuery = supabase.from('audit_log').select('*').order('occurred_at', { ascending: false }).limit(200);
-  if (visibility.filter === 'own') {
-    if (contractIds.length === 0) {
-      auditQuery = supabase.from('audit_log').select('*').eq('id', -1);
-    } else {
-      auditQuery = auditQuery.in('contract_id', contractIds);
-    }
-  }
-  const { data: auditRows } = await auditQuery;
-
-  const allEvents = (eventsRes.data ?? []) as Event[];
   const excludedAccountEmails = dashboardExcludedAccountEmails();
   const contractsAll = filterContractsForDashboard(contractsRaw, excludedAccountEmails);
   const events = scopeEventsByProduct(allEvents, productKey);
   const contracts = scopeContractsByProduct(contractsAll, allEvents, productKey);
-  const scopedContractIds = new Set(contracts.map((c) => c.id));
+  const scopedContractIds = contracts.map((c) => c.id);
+
+  const boothBrandRows =
+    scopedContractIds.length > 0
+      ? await fetchBoothBrandsByContractIds(supabase, scopedContractIds)
+      : [];
   const boothBrandMixRows = boothBrandRows.filter((row) =>
-    scopedContractIds.has((row as { contract_id: string }).contract_id),
+    scopedContractIds.includes((row as { contract_id: string }).contract_id),
   );
+
+  let auditQuery = supabase.from('audit_log').select('*').order('occurred_at', { ascending: false }).limit(200);
+  if (scopedContractIds.length === 0) {
+    auditQuery = supabase.from('audit_log').select('*').eq('id', -1);
+  } else {
+    auditQuery = auditQuery.in('contract_id', scopedContractIds);
+  }
+  const { data: auditRows } = await auditQuery;
 
   return {
     contracts,
     boothBrandMixRows,
     events,
     audit: filterAuditForDashboard((auditRows ?? []) as AuditLogEntry[], excludedAccountEmails).filter(
-      (entry) => !entry.contract_id || scopedContractIds.has(entry.contract_id),
+      (entry) => entry.contract_id && scopedContractIds.includes(entry.contract_id),
     ),
     actor,
     supportedRepNames,
@@ -207,8 +217,9 @@ export default async function DashboardPage({
   if (!staffPersonaEarly && rawFilter?.startsWith('staff_')) filter = 'all';
 
   const scopeIds = actor.accessibleSalesRepIds;
+  const eventMap = new Map(events.map((e) => [e.id, e]));
   const visibleContracts = allScoped
-    .filter((c) => contractMatchesDashboardFilter(c, filter, scopeIds))
+    .filter((c) => contractMatchesDashboardFilter(c, filter, scopeIds, eventMap))
     .slice(0, 50);
 
   const activeScoped = allScoped.filter(
@@ -237,12 +248,11 @@ export default async function DashboardPage({
   const draftCount = activeScoped.filter((c) => c.status === 'draft' || c.status === 'ready_for_review').length;
   const executedCount = activeScoped.filter((c) => c.status === 'executed').length;
 
-  const eventMap = new Map(events.map((e) => [e.id, e]));
   const vitalSigns = getEventVitalSigns(activeScoped, events);
   const pipelineData = getPipelineData(activeScoped);
   const leaderboard = getSalesLeaderboard(activeScoped);
   const recentActivity = getRecentActivity(audit, activeScoped);
-  const deadlines = getDeadlines(activeScoped);
+  const deadlines = getDeadlines(activeScoped, eventMap);
   const brandMix = getBrandMix(activeScoped, boothBrandMixRows);
 
   const pillDefs: { key: DashboardFilterKey; label: string }[] = [
@@ -258,22 +268,25 @@ export default async function DashboardPage({
   ];
 
   const pillCounts = (k: DashboardFilterKey) =>
-    allScoped.filter((c) => contractMatchesDashboardFilter(c, k, scopeIds)).length;
+    allScoped.filter((c) => contractMatchesDashboardFilter(c, k, scopeIds, eventMap)).length;
 
   const staffNeedsApprovalCount = allScoped.filter(
-    (c) => requiresDiscountApproval(c) || c.status === 'pending_events_review' || c.status === 'imported',
+    (c) =>
+      requiresDiscountApproval(c, eventMap.get(c.event_id)) ||
+      c.status === 'pending_events_review' ||
+      c.status === 'imported',
   ).length;
   const staffCountersignCount = allScoped.filter((c) => c.status === 'partially_signed').length;
   const staffReadyReleaseCount = allScoped.filter((c) => c.status === 'signed').length;
 
   const repAttentionCount = allScoped.filter((c) =>
-    contractMatchesDashboardFilter(c, 'rep_attention', scopeIds),
+    contractMatchesDashboardFilter(c, 'rep_attention', scopeIds, eventMap),
   ).length;
   const repEventsCount = allScoped.filter((c) =>
-    contractMatchesDashboardFilter(c, 'rep_events', scopeIds),
+    contractMatchesDashboardFilter(c, 'rep_events', scopeIds, eventMap),
   ).length;
   const repReadySendCount = allScoped.filter((c) =>
-    contractMatchesDashboardFilter(c, 'rep_ready_send', scopeIds),
+    contractMatchesDashboardFilter(c, 'rep_ready_send', scopeIds, eventMap),
   ).length;
 
   const completionLabel = `${executedCount} of ${contractsCount} contracts executed · ${formatCurrency(totalExecutedCents)} of ${formatCurrency(totalPipelineCents)} executed value`;
@@ -286,7 +299,11 @@ export default async function DashboardPage({
     session?.user?.email?.split('@')[0] ??
     'there';
   const greetingHeadline = `${word}, ${first}`;
-  const smartMetrics = buildSmartMetrics(allScoped, actor.salesRepId, requiresDiscountApproval);
+  const smartMetrics = buildSmartMetrics(
+    allScoped,
+    actor.salesRepId,
+    (c) => requiresDiscountApproval(c, eventMap.get(c.event_id)),
+  );
   const primaryEvent = events.find((e) => e.is_active) ?? events[0];
   const wfDate = primaryEvent?.event_date ? new Date(`${primaryEvent.event_date}T12:00:00`) : new Date('2026-11-20T12:00:00');
   const daysToEvent = Math.max(0, Math.ceil((wfDate.getTime() - Date.now()) / 86400000));

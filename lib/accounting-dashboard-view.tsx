@@ -18,6 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import type { ContractWithTotals, Event, InvoiceStatus } from '@/types/db';
+import { contractHasBillingInfo } from '@/lib/nywe-billing';
 
 export async function AccountingDashboardView({
   productKey,
@@ -56,7 +57,18 @@ export async function AccountingDashboardView({
   }
   if (q) {
     const lower = q.toLowerCase();
-    contracts = contracts.filter((c) => c.exhibitor_company_name.toLowerCase().includes(lower));
+    contracts = contracts.filter((c) => {
+      const blob = [
+        c.exhibitor_company_name,
+        c.billing_contact_name,
+        c.billing_contact_email,
+        c.signer_1_email,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return blob.includes(lower);
+    });
   }
   if (repQ) {
     const lower = repQ.toLowerCase();
@@ -94,6 +106,7 @@ export async function AccountingDashboardView({
 
   const portalLabel = accountingPortalLabel(productKey);
   const showSalesRep = productKey !== 'wine_spectator';
+  const showBillingColumns = productKey === 'wine_spectator';
 
   return (
     <div className="space-y-10">
@@ -144,7 +157,12 @@ export async function AccountingDashboardView({
             {invoice !== 'all' ? <input type="hidden" name="invoice" value={invoice} /> : null}
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Company</label>
-              <Input name="q" placeholder="Search company…" defaultValue={q} className="w-full md:w-56" />
+              <Input
+                name="q"
+                placeholder={showBillingColumns ? 'Search company or billing…' : 'Search company…'}
+                defaultValue={q}
+                className="w-full md:w-56"
+              />
             </div>
             {showSalesRep ? (
               <div className="space-y-1.5">
@@ -206,6 +224,9 @@ export async function AccountingDashboardView({
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         {showSalesRep ? <span>{c.sales_rep_name ?? c.sales_rep_email ?? '—'}</span> : null}
+                        {showBillingColumns && c.billing_contact_email ? (
+                          <span>{c.billing_contact_email}</span>
+                        ) : null}
                         <span className={`inline-flex rounded-full px-2 py-0.5 font-medium ${invoiceStatusBadgeClass(inv)}`}>
                           {formatInvoiceStatus(inv)}
                         </span>
@@ -219,6 +240,12 @@ export async function AccountingDashboardView({
                   <TableHeader>
                     <TableRow>
                       <TableHead>Company</TableHead>
+                      {showBillingColumns ? (
+                        <>
+                          <TableHead>Billing contact</TableHead>
+                          <TableHead>Billing email</TableHead>
+                        </>
+                      ) : null}
                       <TableHead>Event</TableHead>
                       <TableHead className="text-right">Total</TableHead>
                       {showSalesRep ? <TableHead>Sales Rep</TableHead> : null}
@@ -234,6 +261,12 @@ export async function AccountingDashboardView({
                       return (
                         <TableRow key={c.id}>
                           <TableCell className="font-medium">{c.exhibitor_company_name}</TableCell>
+                          {showBillingColumns ? (
+                            <>
+                              <TableCell className="text-sm">{c.billing_contact_name?.trim() || '—'}</TableCell>
+                              <TableCell className="text-sm font-mono">{c.billing_contact_email ?? '—'}</TableCell>
+                            </>
+                          ) : null}
                           <TableCell className="text-sm text-muted-foreground">{ev?.name ?? '—'}</TableCell>
                           <TableCell className="text-right font-mono tabular-nums">{formatCurrency(c.grand_total_cents)}</TableCell>
                           {showSalesRep ? (

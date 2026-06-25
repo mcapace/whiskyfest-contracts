@@ -1,6 +1,9 @@
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getSheetsClient } from '@/lib/sheets-tracker';
 import { formatRosterWineDisplay } from '@/lib/exhibitor-roster-columns';
+import { billingFieldsFromRosterRow } from '@/lib/exhibitor-roster-billing';
+import type { NyweBillingFields } from '@/lib/nywe-billing';
+import { nyweLicenseFeeCents } from '@/lib/nywe-pricing';
 import { formatStatus } from '@/lib/status-display';
 import type { ContractStatus, ContractWithTotals, Event } from '@/types/db';
 
@@ -67,6 +70,7 @@ type ColumnMap = {
   billingStreet: number;
   city: number;
   state: number;
+  country: number;
   zip: number;
   contractRepFirst: number;
   contractRepLast: number;
@@ -92,6 +96,7 @@ const STANDARD_COLUMNS: ColumnMap = {
   billingStreet: 25,
   city: 26,
   state: 27,
+  country: 28,
   zip: 29,
   contractRepFirst: 30,
   contractRepLast: 31,
@@ -117,6 +122,7 @@ const NEW_COLUMNS: ColumnMap = {
   billingStreet: 24,
   city: 25,
   state: 26,
+  country: 27,
   zip: 28,
   contractRepFirst: 29,
   contractRepLast: 30,
@@ -192,6 +198,7 @@ export function buildColumnMapFromHeaders(headers: string[], listKey: string): C
     billingStreet: pick('billingStreet', 'BILLING STREET ADDRESS/ P.O BOX #', 'BILLING STREET ADDRESS'),
     city: pick('city', 'CITY'),
     state: pick('state', 'STATE'),
+    country: pick('country', 'COUNTRY (IF APPLICABLE)', 'COUNTRY'),
     zip: pick('zip', 'ZIP CODE/POSTAL CODE', 'ZIP CODE'),
     contractRepFirst: pick('contractRepFirst', 'CONTRACT REPRESENTATIVE FIRST NAME'),
     contractRepLast: pick('contractRepLast', 'CONTRACT REPRESENTATIVE LAST NAME'),
@@ -206,10 +213,32 @@ function rowIncludedInRoster(row: string[], map: ColumnMap): boolean {
   const winery = cell(row, map.wineryName);
   if (!winery) return false;
   if (map.participation < 0) return true;
-  const part = cell(row, map.participation).toLowerCase().trim();
-  if (!part) return true;
+  const part = cell(row, map.participation);
+  if (isRosterParticipationPending(part)) return true;
+  if (hasWithdrawnRosterParticipation(part)) return false;
+  return isActiveRosterParticipation(part);
+}
+
+/** Participation column is blank — winery is on the roster but has not confirmed yet. */
+export function isRosterParticipationPending(participation: string): boolean {
+  return !participation.trim();
+}
+
+/** Explicit yes / confirmed — winery is actively participating in NYWE. */
+export function isActiveRosterParticipation(participation: string): boolean {
+  const part = participation.toLowerCase().trim();
+  if (!part) return false;
+  if (part === 'false' || part === '0') return false;
   if (/\bno\b/.test(part) && !part.includes('yes')) return false;
-  return part.includes('yes') || part.includes('confirm');
+  return part.includes('yes') || part.includes('confirm') || part === 'true';
+}
+
+/** User declined or unchecked participation in Google Sheets. */
+export function hasWithdrawnRosterParticipation(participation: string): boolean {
+  const part = participation.toLowerCase().trim();
+  if (!part) return false;
+  if (part === 'false' || part === '0') return true;
+  return /\bno\b/.test(part) && !part.includes('yes');
 }
 
 export function rosterRowKey(spreadsheetId: string, tab: string, rowNumber: number): string {
@@ -338,6 +367,7 @@ export function buildContractPayloadFromRosterRow(
   brands_poured: string | null;
   booth_count: number;
   booth_rate_cents: number;
+  billing: NyweBillingFields | null;
 } {
   const map = headers?.length ? buildColumnMapFromHeaders(headers, listKey) : columnMapForList(listKey);
   const winery = cell(row, map.wineryName);
@@ -354,7 +384,8 @@ export function buildContractPayloadFromRosterRow(
     signer_1_email: signer.email,
     brands_poured: brandLine || null,
     booth_count: 1,
-    booth_rate_cents: event.booth_rate_cents,
+    booth_rate_cents: nyweLicenseFeeCents(event),
+    billing: billingFieldsFromRosterRow(row, map),
   };
 }
 

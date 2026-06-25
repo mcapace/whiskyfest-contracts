@@ -181,7 +181,10 @@ export function getRecentActivity(audit: AuditLogEntry[], contracts: ContractWit
   }));
 }
 
-export function getDeadlines(contracts: ContractWithTotals[]): DeadlineRow[] {
+export function getDeadlines(
+  contracts: ContractWithTotals[],
+  eventById?: Map<string, Pick<Event, 'contract_template_profile' | 'booth_rate_cents'>>,
+): DeadlineRow[] {
   const nowMs = Date.now();
   const items: DeadlineRow[] = [];
 
@@ -249,7 +252,7 @@ export function getDeadlines(contracts: ContractWithTotals[]): DeadlineRow[] {
       }
     }
 
-    if (requiresDiscountApproval(c)) {
+    if (requiresDiscountApproval(c, eventById?.get(c.event_id))) {
       const days = daysSince(c.updated_at, nowMs);
       if (days > 2) {
         items.push({

@@ -1,4 +1,5 @@
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
+import { isNyweVendorEvent } from '@/lib/nywe-pricing';
 import type { Contract, Event } from '@/types/db';
 
 /** WhiskyFest list booth rate when no event context is available. */
@@ -19,9 +20,10 @@ export function requiresDiscountApproval(
     order_type?: Contract['order_type'] | null;
     booth_count?: number;
   },
-  event?: Pick<Event, 'booth_rate_cents'> | null,
+  event?: Pick<Event, 'booth_rate_cents' | 'contract_template_profile'> | null,
 ): boolean {
   if (isSponsorshipOnlyOrder(contract)) return false;
+  if (isNyweVendorEvent(event)) return false;
   return isDiscountedRate(contract.booth_rate_cents, event) && !contract.discount_approved_at;
 }
 

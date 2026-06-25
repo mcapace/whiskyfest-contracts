@@ -6,6 +6,8 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { createContractPdfSignedUrl } from '@/lib/contract-pdf-storage';
 import { calculateDiscountCents, calculateListSubtotalCents, isDiscountedRate } from '@/lib/contracts';
 import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
+import { contractHasBillingInfo } from '@/lib/nywe-billing';
+import { isNyweVendorEvent, nyweLicenseFeeCents } from '@/lib/nywe-pricing';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { AccountingDetailActions } from '@/components/accounting/accounting-detail-actions';
@@ -39,12 +41,14 @@ export default async function AccountingContractDetailPage({ params }: { params:
     .order('created_at', { ascending: true });
   const accLineItems = (accLineRows ?? []) as ContractLineItem[];
 
-  const listCents = calculateListSubtotalCents(contract.booth_count);
-  const discountCents = calculateDiscountCents(contract.booth_count, contract.booth_rate_cents);
+  const listCents = calculateListSubtotalCents(contract.booth_count, event ?? undefined);
+  const discountCents = calculateDiscountCents(contract.booth_count, contract.booth_rate_cents, event ?? undefined);
   const pctOff =
     listCents > 0 && discountCents > 0 ? Math.round((discountCents / listCents) * 1000) / 10 : null;
   const discountLabel =
-    isDiscountedRate(contract.booth_rate_cents) && discountCents > 0
+    !isNyweVendorEvent(event) &&
+    isDiscountedRate(contract.booth_rate_cents, event ?? undefined) &&
+    discountCents > 0
       ? pctOff != null
         ? `${pctOff}% / ${formatCurrency(discountCents)}`
         : formatCurrency(discountCents)
@@ -70,9 +74,19 @@ export default async function AccountingContractDetailPage({ params }: { params:
       ]
         .filter((x) => (x ?? '').toString().trim())
         .join('\n\n')
-    : contract.billing_same_as_corporate ?? true
-      ? formatExhibitorAddressBlock(contract)
-      : formatBillingAddressBlock(contract);
+    : contractHasBillingInfo(contract)
+      ? [
+          contract.billing_contact_name,
+          contract.billing_contact_email,
+          formatBillingAddressBlock(contract),
+        ]
+          .filter((x) => (x ?? '').toString().trim())
+          .join('\n')
+      : contract.billing_same_as_corporate ?? true
+        ? formatExhibitorAddressBlock(contract)
+        : formatBillingAddressBlock(contract);
+  const showBillingContactRows =
+    Boolean(contract.exhibitor_fields_captured_at) || contractHasBillingInfo(contract);
 
   const inv = (contract.invoice_status ?? 'pending') as InvoiceStatus;
   const productKey = productKeyFromEvent(event) as AccountingPortalKey;
@@ -106,7 +120,7 @@ export default async function AccountingContractDetailPage({ params }: { params:
               <Detail label="Exhibitor" value={`${contract.exhibitor_company_name} — ${contract.signer_1_name ?? '—'}`} />
               <Detail label="Email" value={contract.signer_1_email} mono />
               <Detail label="Address" value={billingBlock || '—'} multiline />
-              {contract.exhibitor_fields_captured_at ? (
+              {showBillingContactRows ? (
                 <>
                   <Detail label="Billing contact" value={contract.billing_contact_name ?? '—'} />
                   <Detail label="Billing email" value={contract.billing_contact_email ?? '—'} mono />
@@ -120,9 +134,20 @@ export default async function AccountingContractDetailPage({ params }: { params:
               ) : null}
               <Detail label="Sales Rep" value={contract.sales_rep_name ?? contract.sales_rep_email ?? '—'} />
               <Detail label="Event" value={event ? `${event.name} ${event.year}` : '—'} />
-              <Detail label="Booth Rate" value={formatCurrency(contract.booth_rate_cents)} />
-              <Detail label="Discount" value={discountLabel} />
-              <Detail label="Booth subtotal" value={formatCurrency(contract.booth_subtotal_cents)} />
+              <Detail
+                label={isNyweVendorEvent(event) ? 'License fee' : 'Booth Rate'}
+                value={formatCurrency(
+                  isNyweVendorEvent(event)
+                    ? nyweLicenseFeeCents(event ?? undefined)
+                    : contract.booth_rate_cents,
+                )}
+              />
+              {!isNyweVendorEvent(event) ? (
+                <>
+                  <Detail label="Discount" value={discountLabel} />
+                  <Detail label="Booth subtotal" value={formatCurrency(contract.booth_subtotal_cents)} />
+                </>
+              ) : null}
               {accLineItems.length > 0 && (
                 <>
                   <div className="sm:col-span-2">

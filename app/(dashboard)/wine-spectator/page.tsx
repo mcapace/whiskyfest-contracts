@@ -47,7 +47,9 @@ export default async function WineSpectatorDashboardPage() {
     .sort((a, b) => (b.executed_at ?? '').localeCompare(a.executed_at ?? ''))
     .slice(0, 8);
 
-  const recent = allScoped.slice(0, 8);
+  const recent = [...activeScoped]
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+    .slice(0, 8);
 
   const eventsManaged = primaryEvent ? isEventsManagedWorkflow(primaryEvent) : false;
   const canFixStuck =

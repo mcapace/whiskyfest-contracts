@@ -18,7 +18,7 @@ interface Props {
   wineSpectatorOnly?: boolean;
 }
 
-function emptyForm() {
+function emptyForm(wineSpectatorOnly = false) {
   return {
     name: '',
     tagline: '',
@@ -26,7 +26,7 @@ function emptyForm() {
     event_date: '',
     venue: '',
     year: new Date().getFullYear(),
-    booth_rate_dollars: 15000,
+    booth_rate_dollars: wineSpectatorOnly ? 14000 : 15000,
     shanken_signatory_name: 'Nicole Mazza',
     shanken_signatory_title: 'Vice President, Events',
     shanken_signatory_email: 'nmazza@mshanken.com',
@@ -46,7 +46,7 @@ export function EventsAdmin({ initialEvents, wineSpectatorOnly = false }: Props)
   const busy = pending || readOnly;
   const [err, setErr] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(emptyForm());
+  const [form, setForm] = useState(emptyForm(wineSpectatorOnly));
 
   function loadEvent(ev: Event) {
     setEditingId(ev.id);
@@ -74,7 +74,7 @@ export function EventsAdmin({ initialEvents, wineSpectatorOnly = false }: Props)
   function newEvent() {
     setEditingId(null);
     setErr(null);
-    setForm(emptyForm());
+    setForm(emptyForm(wineSpectatorOnly));
   }
 
   function set<K extends keyof ReturnType<typeof emptyForm>>(k: K, v: ReturnType<typeof emptyForm>[K]) {
@@ -180,7 +180,7 @@ export function EventsAdmin({ initialEvents, wineSpectatorOnly = false }: Props)
             <Field label="Venue">
               <Input value={form.venue} onChange={e => set('venue', e.target.value)} />
             </Field>
-            <Field label="Booth rate (USD per booth)">
+            <Field label={form.contract_template_profile === 'nywe_vendor' ? 'License fee (USD)' : 'Booth rate (USD per booth)'}>
               <Input
                 type="number"
                 min={0}
@@ -304,7 +304,10 @@ export function EventsAdmin({ initialEvents, wineSpectatorOnly = false }: Props)
                       )}
                     </div>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {formatLongDate(ev.event_date)} · {ev.location ?? '—'} · {formatCurrency(ev.booth_rate_cents)} / booth
+                      {formatLongDate(ev.event_date)} · {ev.location ?? '—'} ·{' '}
+                      {ev.contract_template_profile === 'nywe_vendor'
+                        ? `${formatCurrency(ev.booth_rate_cents)} license`
+                        : `${formatCurrency(ev.booth_rate_cents)} / booth`}
                       {ev.product_key ? ` · ${ev.product_key}` : ''}
                     </p>
                   </div>

@@ -122,7 +122,7 @@ export async function ContractDetailPage({
   });
   const isEventsTeam = actor.isEventsTeam;
   const releaseAudit = audit.find((entry) => entry.action === 'released_to_accounting' || entry.action === 'executed');
-  const discountPending = requiresDiscountApproval(contract);
+  const discountPending = requiresDiscountApproval(contract, event ?? undefined);
   const dealKind = dealKindFromContract(contract);
   const legacyImport = isLegacyImportedContract(contract);
   const canEditContractNotes =

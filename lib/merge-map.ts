@@ -75,7 +75,7 @@ export function buildPricingComposition(
   const discountCents = calculateDiscountCents(boothCount, contract.booth_rate_cents, event);
 
   return {
-    pricing_description: `Booths @ ${formatMoney(STANDARD_BOOTH_RATE_CENTS)}/booth (list)${lb}Negotiated discount`,
+    pricing_description: `Booths @ ${formatMoney(listRateCents)}/booth (list)${lb}Negotiated discount`,
     pricing_qty: `${boothCount}${lb}`,
     pricing_amount: `${formatMoney(listSubtotalCents)}${lb}-${formatMoney(discountCents)}`,
   };

@@ -10,7 +10,9 @@ import {
 } from '@/lib/docusign-signer-cc';
 import { replaceContractBoothBrandsForContract } from '@/lib/contract-booth-brands';
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
-import { isEventsManagedWorkflow } from '@/lib/contract-template-profile';
+import { eventTemplateProfile, isEventsManagedWorkflow } from '@/lib/contract-template-profile';
+import { isNyweVendorEvent, applyNyweLicensePricingIfNeeded } from '@/lib/nywe-pricing';
+import { billingFieldsFromOptionalBody } from '@/lib/nywe-billing';
 import { isDiscountedRate } from '@/lib/contracts';
 import { notifyAdminsOfDiscountRequest } from '@/lib/notifications';
 import type { Contract, ContractWithTotals, Event } from '@/types/db';
@@ -135,6 +137,14 @@ export async function POST(req: Request) {
   }
 
   const bill = clearedRepEnteredBilling();
+  const rosterBilling =
+    eventTemplateProfile(eventRow) === 'nywe_vendor' ? billingFieldsFromOptionalBody(p) : null;
+
+  const nywePricing = applyNyweLicensePricingIfNeeded(eventRow, {
+    booth_count: p.booth_count,
+    booth_rate_cents: p.booth_rate_cents,
+  });
+  const nyweLineItems = isNyweVendorEvent(eventRow) ? [] : (p.line_items ?? []);
 
   const { data: assignedRepLookup } = effectiveSalesRepId
     ? await supabase.from('sales_reps').select('name, email').eq('id', effectiveSalesRepId).single()
@@ -152,8 +162,8 @@ export async function POST(req: Request) {
       exhibitor_company_name: p.exhibitor_company_name,
       order_type: p.order_type ?? 'booth',
       brands_poured: p.order_type === 'sponsorship_only' ? sponsorBrandFromBody(p) : null,
-      booth_count: p.booth_count,
-      booth_rate_cents: p.booth_rate_cents,
+      booth_count: nywePricing.booth_count,
+      booth_rate_cents: nywePricing.booth_rate_cents,
       signer_1_name: p.signer_1_name ?? null,
       signer_1_title: p.signer_1_title ?? null,
       signer_1_email: p.signer_1_email ?? null,
@@ -165,6 +175,7 @@ export async function POST(req: Request) {
       created_by: actor.email,
       status: 'draft',
       ...bill,
+      ...(rosterBilling ?? {}),
     })
     .select()
     .single();
@@ -177,8 +188,8 @@ export async function POST(req: Request) {
   const row = data as Contract;
 
   try {
-    await replaceContractLineItemsForContract(supabase, row.id, p.line_items ?? []);
-    await replaceContractBoothBrandsForContract(supabase, row.id, p.booth_count, p.booth_brands ?? []);
+    await replaceContractLineItemsForContract(supabase, row.id, nyweLineItems);
+    await replaceContractBoothBrandsForContract(supabase, row.id, nywePricing.booth_count, p.booth_brands ?? []);
   } catch (e) {
     console.error('Failed to save contract line items:', e);
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Failed to save line items' }, { status: 500 });

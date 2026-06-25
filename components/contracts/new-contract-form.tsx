@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { formatCurrency, formatLongDate } from '@/lib/utils';
 import { isEventsManagedWorkflow } from '@/lib/contract-template-profile';
 import { isDiscountedRate, standardBoothRateCentsForEvent } from '@/lib/contracts';
+import { isNyweVendorEvent, nyweLicenseFeeCents } from '@/lib/nywe-pricing';
 import {
   CONTRACT_DEAL_KINDS,
   dealKindMeta,
@@ -75,6 +76,14 @@ export type ContractFormValues = {
   sales_rep_id: string;
   exhibitor_notes: string;
   notes: string;
+  billing_contact_name: string;
+  billing_contact_email: string;
+  billing_address_line1: string;
+  billing_address_line2: string;
+  billing_city: string;
+  billing_state: string;
+  billing_zip: string;
+  billing_country: string;
 };
 
 export type InitialContractLineItem = { description: string; amount_cents: number };
@@ -177,7 +186,13 @@ export function NewContractForm({
   const defaultEvent = events[0];
   const resolvedDealKind = resolveInitialDealKind(initialDealKind, initialValues, initialLineItems);
   const isSponsorshipOnly = resolvedDealKind === 'sponsorship_only';
-  const defaultBoothRateCents = initialValues?.booth_rate_cents ?? defaultEvent?.booth_rate_cents ?? 1500000;
+  const defaultBoothRateCents =
+    initialValues?.booth_rate_cents ??
+    (defaultEvent
+      ? isNyweVendorEvent(defaultEvent)
+        ? nyweLicenseFeeCents(defaultEvent)
+        : defaultEvent.booth_rate_cents
+      : 1500000);
 
   const [dealKind, setDealKind] = useState<ContractDealKind>(resolvedDealKind);
   const orderType = orderTypeFromDealKind(dealKind);
@@ -197,6 +212,14 @@ export function NewContractForm({
     sales_rep_id:           initialValues?.sales_rep_id ?? '',
     exhibitor_notes:        initialValues?.exhibitor_notes ?? '',
     notes:                  initialValues?.notes ?? '',
+    billing_contact_name:   initialValues?.billing_contact_name ?? '',
+    billing_contact_email:  initialValues?.billing_contact_email ?? '',
+    billing_address_line1:  initialValues?.billing_address_line1 ?? '',
+    billing_address_line2:  initialValues?.billing_address_line2 ?? '',
+    billing_city:           initialValues?.billing_city ?? '',
+    billing_state:          initialValues?.billing_state ?? '',
+    billing_zip:            initialValues?.billing_zip ?? '',
+    billing_country:        initialValues?.billing_country ?? '',
   }));
 
   /** Separate from `booth_rate_cents` so typing isn't overwritten every render by .toFixed(2). */
@@ -332,10 +355,15 @@ export function NewContractForm({
 
   useEffect(() => {
     if (!selectedEvent || dealKind === 'sponsorship_only') return;
-    const cents = selectedEvent.booth_rate_cents ?? 1500000;
-    setForm((f) => ({ ...f, booth_rate_cents: cents }));
+    const cents = boothOnlyEvent ? nyweLicenseFeeCents(selectedEvent) : (selectedEvent.booth_rate_cents ?? 1500000);
+    setForm((f) => ({
+      ...f,
+      booth_count: boothOnlyEvent ? 1 : f.booth_count,
+      booth_rate_cents: cents,
+    }));
     setBoothRateInput((cents / 100).toFixed(2));
-  }, [selectedEvent?.id, dealKind]);
+    if (boothOnlyEvent) setBoothCountInput('1');
+  }, [selectedEvent?.id, dealKind, boothOnlyEvent]);
 
   function switchDealKind(next: ContractDealKind) {
     if (next === dealKind) return;
@@ -443,21 +471,27 @@ export function NewContractForm({
       const formForSave = {
         ...form,
         event_id: resolvedEventId,
-        booth_count: boothCountNorm,
-        booth_rate_cents: sponsorshipOnly ? 0 : form.booth_rate_cents,
+        booth_count: boothOnlyEvent ? 1 : boothCountNorm,
+        booth_rate_cents: sponsorshipOnly
+          ? 0
+          : boothOnlyEvent && selectedEvent
+            ? nyweLicenseFeeCents(selectedEvent)
+            : form.booth_rate_cents,
       };
-      const booth_brands = rowsForSave.map((row, i) => ({
-        booth_index: i + 1,
-        brand_name: row.brand_name.trim(),
-        brand_category: row.brand_category,
-        expressions: row.expressions.filter(Boolean),
-      }));
+      const booth_brands = boothOnlyEvent
+        ? []
+        : rowsForSave.map((row, i) => ({
+            booth_index: i + 1,
+            brand_name: row.brand_name.trim(),
+            brand_category: row.brand_category,
+            expressions: row.expressions.filter(Boolean),
+          }));
       const payload = {
         ...formForSave,
         sales_rep_id: eventsManaged ? null : form.sales_rep_id,
         order_type: orderType,
         sponsor_brand: sponsorshipOnly ? sponsorBrand.trim() || null : null,
-        line_items: parsedLines.rows,
+        line_items: boothOnlyEvent ? [] : parsedLines.rows,
         booth_brands,
       };
 
@@ -526,7 +560,11 @@ export function NewContractForm({
         <Card>
           <CardHeader>
             <CardTitle>Event</CardTitle>
-            <CardDescription>Which WhiskyFest is this for?</CardDescription>
+            <CardDescription>
+              {boothOnlyEvent
+                ? 'Which New York Wine Experience event is this license for?'
+                : 'Which WhiskyFest is this for?'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {events.length === 0 ? (
@@ -574,7 +612,7 @@ export function NewContractForm({
                 </datalist>
               ) : null}
             </Field>
-            {matchedSponsor ? (
+            {matchedSponsor && !boothOnlyEvent ? (
               <div className="rounded-lg border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm text-amber-950">
                 <div className="flex gap-2">
                   <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden />
@@ -606,7 +644,7 @@ export function NewContractForm({
                 </div>
               </div>
             ) : null}
-            {medianBooths != null && !matchedSponsor ? (
+            {medianBooths != null && !matchedSponsor && !boothOnlyEvent ? (
               <p className="text-xs text-muted-foreground">
                 Typical booth count for this name in your history:{' '}
                 <button
@@ -625,10 +663,50 @@ export function NewContractForm({
             <Field label="Legal Name" hint="Full legal entity name as it will appear in the agreement line">
               <Input value={form.exhibitor_legal_name} onChange={e => set('exhibitor_legal_name', e.target.value)} placeholder="Sample Distillery Inc." required />
             </Field>
-            <div className="rounded-md border border-dashed border-border/70 bg-muted/15 px-3 py-2.5 text-sm text-muted-foreground">
-              Mailing address, telephone, billing address, billing contact, and event contact will be collected from
-              the exhibitor at signing.
-            </div>
+            {boothOnlyEvent ? (
+              <div className="space-y-3 rounded-md border border-border/70 bg-muted/10 px-3 py-3">
+                <p className="text-sm font-medium text-foreground">Billing information</p>
+                <p className="text-xs text-muted-foreground">
+                  Pre-filled from the exhibitor roster when created from the list. Appears on the license PDF and NYWE
+                  accounting dashboard.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Billing contact">
+                    <Input value={form.billing_contact_name} onChange={(e) => set('billing_contact_name', e.target.value)} />
+                  </Field>
+                  <Field label="Billing email">
+                    <Input type="email" value={form.billing_contact_email} onChange={(e) => set('billing_contact_email', e.target.value)} />
+                  </Field>
+                  <div className="sm:col-span-2">
+                    <Field label="Street / P.O. Box">
+                      <Input value={form.billing_address_line1} onChange={(e) => set('billing_address_line1', e.target.value)} />
+                    </Field>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Field label="Address line 2">
+                      <Input value={form.billing_address_line2} onChange={(e) => set('billing_address_line2', e.target.value)} />
+                    </Field>
+                  </div>
+                  <Field label="City">
+                    <Input value={form.billing_city} onChange={(e) => set('billing_city', e.target.value)} />
+                  </Field>
+                  <Field label="State">
+                    <Input value={form.billing_state} onChange={(e) => set('billing_state', e.target.value)} />
+                  </Field>
+                  <Field label="ZIP / Postal">
+                    <Input value={form.billing_zip} onChange={(e) => set('billing_zip', e.target.value)} />
+                  </Field>
+                  <Field label="Country (if not US)">
+                    <Input value={form.billing_country} onChange={(e) => set('billing_country', e.target.value)} />
+                  </Field>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-md border border-dashed border-border/70 bg-muted/15 px-3 py-2.5 text-sm text-muted-foreground">
+                Mailing address, telephone, billing address, billing contact, and event contact will be collected from
+                the exhibitor at signing.
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -637,11 +715,13 @@ export function NewContractForm({
           <CardHeader>
             <CardTitle>Pricing</CardTitle>
             <CardDescription>
-              {dealKind === 'sponsorship_only'
-                ? 'Sponsorship-only — line items only, no booth on the contract.'
-                : dealKind === 'booth_and_sponsorship'
-                  ? 'Booth package plus sponsorship or activation line items on one contract (combo deal).'
-                  : 'Booth package only — add line items if you later need a combo deal.'}
+              {boothOnlyEvent
+                ? 'NYWE vendor licenses are a flat fee — not per-booth WhiskyFest pricing.'
+                : dealKind === 'sponsorship_only'
+                  ? 'Sponsorship-only — line items only, no booth on the contract.'
+                  : dealKind === 'booth_and_sponsorship'
+                    ? 'Booth package plus sponsorship or activation line items on one contract (combo deal).'
+                    : 'Booth package only — add line items if you later need a combo deal.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -663,6 +743,17 @@ export function NewContractForm({
             </div>
 
             {dealKind !== 'sponsorship_only' ? (
+            boothOnlyEvent ? (
+              <div className="rounded-lg border border-border/60 bg-muted/10 p-4">
+                <p className="text-sm font-medium text-foreground">Vendor license fee</p>
+                <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-fest-900">
+                  {formatCurrency(nyweLicenseFeeCents(selectedEvent))}
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Flat NYWE participation fee. Wine details come from the exhibitor roster.
+                </p>
+              </div>
+            ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Booth Count">
                 <Input
@@ -717,6 +808,7 @@ export function NewContractForm({
                 )}
               </Field>
             </div>
+            )
             ) : (
               <Field
                 label="Sponsor / brand (optional)"
@@ -731,7 +823,7 @@ export function NewContractForm({
               </Field>
             )}
 
-            {dealKind !== 'sponsorship_only' ? (
+            {dealKind !== 'sponsorship_only' && !boothOnlyEvent ? (
             <div className="space-y-4 rounded-lg border border-border/60 bg-muted/10 p-4">
               <div>
                 <p className="text-sm font-medium text-foreground">Brands by booth</p>
@@ -770,6 +862,7 @@ export function NewContractForm({
             </div>
             ) : null}
 
+            {!boothOnlyEvent ? (
             <div className="border-t border-border/60 pt-6">
               <h3 className="font-serif text-base font-semibold">
                 {dealKind === 'sponsorship_only'
@@ -880,12 +973,15 @@ export function NewContractForm({
                 + Add Line Item
               </Button>
             </div>
+            ) : null}
 
             {/* Live total */}
             <div className="mt-6 rounded-lg border border-fest-600/20 bg-gradient-to-br from-fest-600/[0.07] to-whisky-50/50 p-5">
               {dealKind !== 'sponsorship_only' ? (
               <div className="flex items-baseline justify-between text-sm">
-                <span className="text-muted-foreground">Booth subtotal</span>
+                <span className="text-muted-foreground">
+                  {boothOnlyEvent ? 'License fee' : 'Booth subtotal'}
+                </span>
                 <span className="font-mono tabular-nums">{formatCurrency(boothSubtotal)}</span>
               </div>
               ) : null}
@@ -896,7 +992,9 @@ export function NewContractForm({
                 </div>
               )}
               <div className="mt-4 flex items-baseline justify-between border-t border-fest-600/15 pt-3">
-                <span className="font-serif text-xl font-semibold">Contract total</span>
+                <span className="font-serif text-xl font-semibold">
+                  {boothOnlyEvent ? 'License total' : 'Contract total'}
+                </span>
                 <span className="font-serif text-2xl font-semibold tabular-nums text-fest-900">
                   {formatCurrency(grandTotal)}
                 </span>

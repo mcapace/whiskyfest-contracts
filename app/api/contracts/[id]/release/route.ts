@@ -23,15 +23,16 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     .eq('id', params.id)
     .single<ContractWithTotals>();
   if (!contract) return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
-  if (requiresDiscountApproval(contract)) {
+
+  const { data: event } = await supabase.from('events').select('*').eq('id', contract.event_id).single<Event>();
+  if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+
+  if (requiresDiscountApproval(contract, event)) {
     return NextResponse.json(
       { error: 'Discount approval required before contract can be released.' },
       { status: 403 },
     );
   }
-
-  const { data: event } = await supabase.from('events').select('*').eq('id', contract.event_id).single<Event>();
-  if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
 
   const { actor } = gate;
   const eventsManagedRelease = actor.isEventsTeam && isEventsManagedWorkflow(event);

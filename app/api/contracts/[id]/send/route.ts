@@ -13,7 +13,8 @@ import {
   contractDocuSignFileName,
   contractPdfBaseName,
 } from '@/lib/contract-document-naming';
-import { eventUsesContractOrderTable } from '@/lib/contract-template-profile';
+import { eventUsesContractOrderTable, eventTemplateProfile } from '@/lib/contract-template-profile';
+import { contractHasBillingInfo } from '@/lib/nywe-billing';
 import { resolveContractTemplateDocId } from '@/lib/contract-template';
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
@@ -138,6 +139,8 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       countersigner: { name: countersignerName, email: countersignerEmail },
       carbonCopy,
       brandId: docusignBrandIdForEvent(event),
+      skipExhibitorDataTabs:
+        eventTemplateProfile(event) === 'nywe_vendor' && contractHasBillingInfo(contract),
     });
 
     await supabase

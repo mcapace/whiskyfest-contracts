@@ -4,13 +4,15 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
-import { STANDARD_BOOTH_RATE_CENTS } from '@/lib/contracts';
+import { standardBoothRateCentsForEvent } from '@/lib/contracts';
+import { isNyweVendorEvent, nyweLicenseFeeCents } from '@/lib/nywe-pricing';
 import {
   INTERNAL_CONTRACT_NOTES_LABEL,
   SPONSOR_CONTRACT_NOTES_LABEL,
 } from '@/lib/contract-notes-copy';
 import { dealKindLabel, type ContractDealKind } from '@/lib/contract-deal-kind';
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
+import { contractHasBillingInfo } from '@/lib/nywe-billing';
 import { cn, formatCurrency, formatLongDate, formatTimestamp } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -182,7 +184,7 @@ export function ContractDetailView({
                 <p className="text-sm font-semibold">⚠ Discounted rate pending admin approval</p>
                 <p className="mt-1 text-sm">
                   Booth rate: {formatCurrency(contract.booth_rate_cents)} is below the{' '}
-                  {formatCurrency(STANDARD_BOOTH_RATE_CENTS)} standard. This contract is paused until an admin approves
+                  {formatCurrency(standardBoothRateCentsForEvent(event))} standard. This contract is paused until an admin approves
                   the discount.
                 </p>
                 {!isAdmin && (
@@ -406,6 +408,18 @@ export function ContractDetailView({
                         <Detail label="Sponsor / brand" value={contract.brands_poured} />
                       ) : null}
                     </>
+                  ) : isNyweVendorEvent(event) ? (
+                    <>
+                      <p className="wf-label-caps text-[0.6rem] text-muted-foreground">Vendor license</p>
+                      <Detail
+                        label="License fee"
+                        value={formatCurrency(nyweLicenseFeeCents(event ?? undefined))}
+                        mono
+                      />
+                      {contract.brands_poured ? (
+                        <Detail label="Wine / brand" value={contract.brands_poured} />
+                      ) : null}
+                    </>
                   ) : (
                     <>
                       <p className="wf-label-caps text-[0.6rem] text-muted-foreground">Booth Package</p>
@@ -578,8 +592,9 @@ function ExhibitorProvidedInformationSection({ contract }: { contract: ContractW
     );
   const legacyRepBilling =
     !captured &&
-    contract.billing_same_as_corporate === false &&
-    Boolean(contract.billing_address_line1?.trim() || contract.billing_city?.trim());
+    (contractHasBillingInfo(contract) ||
+      (contract.billing_same_as_corporate === false &&
+        Boolean(contract.billing_address_line1?.trim() || contract.billing_city?.trim())));
   const legacyPhone = !captured && Boolean(contract.exhibitor_telephone?.trim());
   const hasLegacy = legacyRepMailing || legacyRepBilling || legacyPhone;
 
@@ -646,8 +661,8 @@ function ExhibitorProvidedInformationSection({ contract }: { contract: ContractW
     return (
       <div className="space-y-6">
         <p className="text-xs font-medium text-amber-900 dark:text-amber-200">
-          Some values were saved by a sales rep before exhibitor-only DocuSign fields; newer contracts collect these only
-          at signing.
+          Billing details were saved from the exhibitor roster or entered on the license; DocuSign signing does not
+          re-collect them for NYWE vendor licenses.
         </p>
         <div>
           <p className="wf-label-caps mb-2 text-[0.6rem] text-muted-foreground">Mailing address</p>
@@ -682,7 +697,7 @@ function ExhibitorProvidedInformationSection({ contract }: { contract: ContractW
             />
             <Detail
               label="Billing address"
-              value={legacyRepBilling ? formatBillingAddressBlock(contract) : '—'}
+              value={legacyRepBilling ? formatBillingAddressBlock(contract) || '—' : '—'}
               multiline
             />
           </div>

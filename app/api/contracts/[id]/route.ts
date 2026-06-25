@@ -19,6 +19,9 @@ import {
 } from '@/lib/docusign-signer-cc';
 import type { Contract, ContractStatus } from '@/types/db';
 import { isLegacyImportedContract } from '@/lib/legacy-import';
+import { billingFieldsFromOptionalBody } from '@/lib/nywe-billing';
+import { applyNyweLicensePricingIfNeeded, isNyweVendorEvent } from '@/lib/nywe-pricing';
+import type { Event } from '@/types/db';
 
 const signerEditableStatuses: ContractStatus[] = ['approved', 'ready_for_review', 'pending_events_review'];
 
@@ -79,12 +82,28 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
 
     const incomingBoothRate = p.booth_rate_cents;
-    const boothRateChanged = incomingBoothRate !== contract.booth_rate_cents;
-    const shouldResetDiscountApproval =
-      boothRateChanged &&
-      (incomingBoothRate >= STANDARD_BOOTH_RATE_CENTS || incomingBoothRate < contract.booth_rate_cents);
-
     const bill = clearedRepEnteredBilling();
+    const { data: patchEvent } = await supabase
+      .from('events')
+      .select('contract_template_profile, booth_rate_cents')
+      .eq('id', p.event_id)
+      .maybeSingle<Pick<Event, 'contract_template_profile' | 'booth_rate_cents'>>();
+    const nywePricing = patchEvent
+      ? applyNyweLicensePricingIfNeeded(patchEvent, {
+          booth_count: p.booth_count,
+          booth_rate_cents: incomingBoothRate,
+        })
+      : { booth_count: p.booth_count, booth_rate_cents: incomingBoothRate };
+    const nyweLineItems = patchEvent && isNyweVendorEvent(patchEvent) ? [] : (p.line_items ?? []);
+    const boothRateChanged = nywePricing.booth_rate_cents !== contract.booth_rate_cents;
+    const shouldResetDiscountApproval =
+      !isNyweVendorEvent(patchEvent) &&
+      boothRateChanged &&
+      (nywePricing.booth_rate_cents >= STANDARD_BOOTH_RATE_CENTS ||
+        nywePricing.booth_rate_cents < contract.booth_rate_cents);
+
+    const nyweBilling =
+      patchEvent && isNyweVendorEvent(patchEvent) ? billingFieldsFromOptionalBody(p) : null;
 
     const { error } = await supabase
       .from('contracts')
@@ -95,8 +114,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         order_type: p.order_type ?? 'booth',
         brands_poured:
           p.order_type === 'sponsorship_only' ? sponsorBrandFromBody(p) : null,
-        booth_count: p.booth_count,
-        booth_rate_cents: incomingBoothRate,
+        booth_count: nywePricing.booth_count,
+        booth_rate_cents: nywePricing.booth_rate_cents,
         signer_1_name: p.signer_1_name ?? null,
         signer_1_title: p.signer_1_title ?? null,
         signer_1_email: p.signer_1_email ?? null,
@@ -116,6 +135,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             }
           : {}),
         ...bill,
+        ...(nyweBilling ?? {}),
         ...(shouldResetDiscountApproval
           ? {
               discount_approved_at: null,
@@ -132,8 +152,13 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
 
     try {
-      await replaceContractLineItemsForContract(supabase, params.id, p.line_items ?? []);
-      await replaceContractBoothBrandsForContract(supabase, params.id, p.booth_count, p.booth_brands ?? []);
+      await replaceContractLineItemsForContract(supabase, params.id, nyweLineItems);
+      await replaceContractBoothBrandsForContract(
+        supabase,
+        params.id,
+        nywePricing.booth_count,
+        p.booth_brands ?? [],
+      );
     } catch (e) {
       console.error('Failed to save contract line items:', e);
       return NextResponse.json({ error: e instanceof Error ? e.message : 'Failed to save line items' }, { status: 500 });
@@ -147,7 +172,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         metadata: {
           previous_approver: contract.discount_approved_by,
           old_rate: contract.booth_rate_cents,
-          new_rate: incomingBoothRate,
+          new_rate: nywePricing.booth_rate_cents,
         },
       });
     }
@@ -155,7 +180,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     await notifyAdminsIfNewlyRequiresDiscountApproval({
       contractId: params.id,
       before: contract as Contract,
-      incomingBoothRate,
+      incomingBoothRate: nywePricing.booth_rate_cents,
       shouldResetDiscountApproval,
       editor: { email: actor.email, name: actor.appUser?.name },
     });
@@ -196,11 +221,24 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
 
   const p = parsed.data;
-  const incomingBoothRate = typeof p.booth_rate_cents === 'number' ? p.booth_rate_cents : contract.booth_rate_cents;
-  const boothRateChanged = incomingBoothRate !== contract.booth_rate_cents;
+  const { data: signerPatchEvent } = await supabase
+    .from('events')
+    .select('contract_template_profile, booth_rate_cents')
+    .eq('id', contract.event_id)
+    .maybeSingle<Pick<Event, 'contract_template_profile' | 'booth_rate_cents'>>();
+  const incomingBoothRate =
+    typeof p.booth_rate_cents === 'number' ? p.booth_rate_cents : contract.booth_rate_cents;
+  const normalizedRate = signerPatchEvent
+    ? applyNyweLicensePricingIfNeeded(signerPatchEvent, {
+        booth_count: contract.booth_count,
+        booth_rate_cents: incomingBoothRate,
+      }).booth_rate_cents
+    : incomingBoothRate;
+  const boothRateChanged = normalizedRate !== contract.booth_rate_cents;
   const shouldResetDiscountApproval =
+    !isNyweVendorEvent(signerPatchEvent) &&
     boothRateChanged &&
-    (incomingBoothRate >= STANDARD_BOOTH_RATE_CENTS || incomingBoothRate < contract.booth_rate_cents);
+    (normalizedRate >= STANDARD_BOOTH_RATE_CENTS || normalizedRate < contract.booth_rate_cents);
 
   const { error } = await supabase
     .from('contracts')
@@ -210,7 +248,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       signer_1_email: p.signer_1_email,
       signer_cc_name: normalizeSignerCcName(p.signer_cc_name),
       signer_cc_email: normalizeSignerCcEmail(p.signer_cc_email),
-      booth_rate_cents: incomingBoothRate,
+      booth_rate_cents: normalizedRate,
       ...(shouldResetDiscountApproval
         ? {
             discount_approved_at: null,
@@ -246,7 +284,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       metadata: {
         previous_approver: contract.discount_approved_by,
         old_rate: contract.booth_rate_cents,
-        new_rate: incomingBoothRate,
+        new_rate: normalizedRate,
       },
     });
   }
@@ -254,7 +292,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   await notifyAdminsIfNewlyRequiresDiscountApproval({
     contractId: params.id,
     before: contract as Contract,
-    incomingBoothRate,
+    incomingBoothRate: normalizedRate,
     shouldResetDiscountApproval,
     editor: { email: actor.email, name: actor.appUser?.name },
   });

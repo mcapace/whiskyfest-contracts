@@ -29,6 +29,15 @@ import {
   rosterListRowClass,
   rosterListShortLabel,
 } from '@/lib/exhibitor-roster-list-style';
+import {
+  isActiveRosterParticipation,
+  isRosterParticipationPending,
+} from '@/lib/exhibitor-roster';
+import {
+  NyweRosterWorkflowGuide,
+  resolveNyweWorkflowStep,
+} from '@/components/wine-spectator/nywe-roster-workflow-guide';
+import { NyweBulkSendWizard, type NyweBulkSendRow } from '@/components/wine-spectator/nywe-bulk-send-wizard';
 import type { ContractStatus } from '@/types/db';
 
 type RosterRow = {
@@ -50,6 +59,7 @@ type RosterRow = {
   importerEmail: string;
   wineName: string;
   vintage: string;
+  participation: string;
   contractId: string | null;
   contractStatus: ContractStatus | null;
   sheetStatus: string | null;
@@ -89,17 +99,21 @@ const FILTERS = [
 
 function matchesFilter(row: RosterRow, filter: string): boolean {
   const status = row.contractStatus;
+  const inPipeline = isActiveRosterParticipation(row.participation);
   switch (filter) {
     case 'not_started':
-      return !row.contractId;
+      return !row.contractId && (isRosterParticipationPending(row.participation) || inPipeline);
     case 'in_progress':
-      return Boolean(status && ['draft', 'ready_for_review', 'pending_events_review'].includes(status));
+      return (
+        inPipeline &&
+        Boolean(status && ['draft', 'ready_for_review', 'pending_events_review'].includes(status))
+      );
     case 'approved':
-      return status === 'approved';
+      return inPipeline && status === 'approved';
     case 'sent':
-      return Boolean(status && ['sent', 'partially_signed'].includes(status));
+      return inPipeline && Boolean(status && ['sent', 'partially_signed'].includes(status));
     case 'done':
-      return Boolean(status && ['signed', 'executed'].includes(status));
+      return inPipeline && Boolean(status && ['signed', 'executed'].includes(status));
     default:
       return true;
   }
@@ -263,6 +277,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
+  const [bulkSendOpen, setBulkSendOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const showListColumn = listFilter === 'all';
@@ -340,10 +355,10 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
 
   useEffect(() => {
     const off = subscribeToAppContractEvents(() => {
-      refresh({ preserveSelection: true });
+      refresh({ preserveSelection: true, live: true });
     });
     const onVis = () => {
-      if (document.visibilityState === 'visible') refresh({ preserveSelection: true });
+      if (document.visibilityState === 'visible') refresh({ preserveSelection: true, live: true });
     };
     document.addEventListener('visibilitychange', onVis);
     return () => {
@@ -355,7 +370,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
   useEffect(() => {
     const tick = () => {
       if (document.visibilityState !== 'visible') return;
-      refresh({ preserveSelection: true });
+      refresh({ preserveSelection: true, live: true });
     };
     const id = window.setInterval(tick, AUTO_REFRESH_MS);
     return () => window.clearInterval(id);
@@ -410,31 +425,73 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
   };
 
   const sendSelected = () => {
-    if (!data.event.client_send_enabled) {
-      setMessage('Client send is disabled for this event.');
-      return;
-    }
-    const ids = data.rows.filter((r) => selected.has(r.rowKey) && r.contractStatus === 'approved' && r.contractId).map((r) => r.contractId!);
-    if (ids.length === 0) {
-      setMessage('Select approved licenses to send.');
-      return;
-    }
-    startTransition(async () => {
-      setMessage(null);
-      let sent = 0;
-      let failed = 0;
-      for (const id of ids) {
-        const res = await fetch(`/api/contracts/${id}/send`, { method: 'POST' });
-        if (res.ok) sent += 1;
-        else failed += 1;
-      }
-      setMessage(`Sent ${sent} · failed ${failed}`);
-      await refresh({ live: true, preserveSelection: true });
-    });
+    startBulkSendWizard();
   };
 
   const selectedCreatable = data.rows.filter((r) => selected.has(r.rowKey) && !r.contractId).length;
   const selectedSendable = data.rows.filter((r) => selected.has(r.rowKey) && r.contractStatus === 'approved').length;
+
+  const workflowCounts = useMemo(() => {
+    const active = (row: RosterRow) =>
+      isRosterParticipationPending(row.participation) || isActiveRosterParticipation(row.participation);
+    const rows = data.rows.filter(active);
+    return {
+      notStarted: rows.filter((r) => !r.contractId).length,
+      inProgress: rows.filter(
+        (r) =>
+          r.contractId &&
+          r.contractStatus &&
+          ['draft', 'ready_for_review', 'pending_events_review'].includes(r.contractStatus),
+      ).length,
+      needsReview: rows.filter((r) => r.contractStatus === 'pending_events_review').length,
+      approved: rows.filter((r) => r.contractStatus === 'approved').length,
+      waitingOnWinery: rows.filter(
+        (r) => r.contractStatus && ['sent', 'partially_signed'].includes(r.contractStatus),
+      ).length,
+    };
+  }, [data.rows]);
+
+  const activeWorkflowStep = resolveNyweWorkflowStep(workflowCounts);
+
+  const sendableRows: NyweBulkSendRow[] = useMemo(
+    () =>
+      data.rows
+        .filter((r) => selected.has(r.rowKey) && r.contractStatus === 'approved' && r.contractId)
+        .map((r) => ({
+          rowKey: r.rowKey,
+          wineryName: r.wineryName,
+          signerName: r.signerName,
+          signerEmail: r.signerEmail,
+          contractId: r.contractId!,
+        })),
+    [data.rows, selected],
+  );
+
+  const skippedNotApproved = useMemo(
+    () =>
+      data.rows
+        .filter((r) => selected.has(r.rowKey) && r.contractStatus !== 'approved')
+        .map((r) => ({ wineryName: r.wineryName, status: r.contractStatus })),
+    [data.rows, selected],
+  );
+
+  function selectAllCreatableVisible() {
+    const keys = filtered.filter((r) => !r.contractId).map((r) => r.rowKey);
+    setSelected(new Set(keys));
+  }
+
+  function selectAllApprovedVisible() {
+    const keys = filtered.filter((r) => r.contractStatus === 'approved' && r.contractId).map((r) => r.rowKey);
+    setSelected(new Set(keys));
+  }
+
+  function startBulkSendWizard() {
+    if (!data.event.client_send_enabled) {
+      setMessage('Client send is disabled for this event.');
+      return;
+    }
+    setBulkSendOpen(true);
+  }
 
   return (
     <div className="space-y-4">
@@ -459,6 +516,42 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
         </div>
       ) : null}
 
+      <NyweRosterWorkflowGuide
+        counts={workflowCounts}
+        activeStep={activeWorkflowStep}
+        filter={filter}
+        selectedCreatable={selectedCreatable}
+        selectedSendable={selectedSendable}
+        clientSendEnabled={data.event.client_send_enabled}
+        onSetFilter={setFilter}
+        onSelectAllCreatable={selectAllCreatableVisible}
+        onCreateDrafts={createSelected}
+        onSelectAllApproved={selectAllApprovedVisible}
+        onStartBulkSend={startBulkSendWizard}
+      />
+
+      <NyweBulkSendWizard
+        open={bulkSendOpen}
+        onOpenChange={setBulkSendOpen}
+        filterIsApproved={filter === 'approved'}
+        sendable={sendableRows}
+        skippedNotApproved={skippedNotApproved}
+        onShowApprovedFilter={() => setFilter('approved')}
+        onSelectAllApproved={selectAllApprovedVisible}
+        onComplete={(summary) => {
+          startTransition(async () => {
+            await refresh({ live: true, preserveSelection: true });
+            if (summary.sent > 0) {
+              setMessage(
+                `Sent ${summary.sent} DocuSign email${summary.sent === 1 ? '' : 's'}${summary.failed > 0 ? ` · ${summary.failed} failed` : ''}. Countersign in DocuSign when wineries sign.`,
+              );
+            } else if (summary.failed > 0) {
+              setMessage(`Bulk send failed for ${summary.failed} license${summary.failed === 1 ? '' : 's'}.`);
+            }
+          });
+        }}
+      />
+
       <div className="flex flex-wrap items-center gap-3">
         <Button variant="outline" size="sm" onClick={() => refresh({ live: true })} disabled={pending}>
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
@@ -468,9 +561,14 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
           <FilePlus2 className="h-4 w-4" />
           Create drafts ({selectedCreatable})
         </Button>
-        <Button size="sm" variant="secondary" onClick={sendSelected} disabled={pending || selectedSendable === 0 || !data.event.client_send_enabled}>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={sendSelected}
+          disabled={pending || !data.event.client_send_enabled}
+        >
           <Send className="h-4 w-4" />
-          Send selected ({selectedSendable})
+          Guided bulk send{selectedSendable > 0 ? ` (${selectedSendable})` : ''}
         </Button>
         <span className="text-xs text-muted-foreground">
           {data.fromCache ? 'Auto-synced' : 'Live from sheets'} <RelativeTime iso={data.syncedAt} /> · {filtered.length} shown
