@@ -5,6 +5,7 @@ import {
   type BrandCategory,
 } from '@/lib/brand-category';
 import { requiresDiscountApproval } from '@/lib/contracts';
+import { awaitsEventsReviewForLegacyImport } from '@/lib/legacy-import';
 import type { AuditLogEntry, ContractWithTotals, Event } from '@/types/db';
 
 const EVENT_DATE_FALLBACK = '2026-11-20T18:30:00-05:00';
@@ -128,6 +129,9 @@ export function getPipelineData(contracts: ContractWithTotals[]): PipelineRow[] 
   return PIPELINE_ORDER.map((key) => {
     const matching = contracts.filter((c) => {
       if (key === 'draft') return c.status === 'draft' || c.status === 'ready_for_review';
+      if (key === 'pending_events_review') {
+        return c.status === 'pending_events_review' || c.status === 'imported';
+      }
       return c.status === key;
     });
     return {
@@ -185,13 +189,17 @@ export function getDeadlines(contracts: ContractWithTotals[]): DeadlineRow[] {
     const company = c.exhibitor_company_name;
     const link = `/contracts/${c.id}`;
 
-    if (c.status === 'pending_events_review') {
-      const days = daysSince(c.events_submitted_at ?? c.created_at, nowMs);
+    if (c.status === 'pending_events_review' || c.status === 'imported') {
+      const days = daysSince(c.events_submitted_at ?? c.imported_at ?? c.created_at, nowMs);
       if (days > 3) {
+        const detail =
+          c.status === 'imported' || awaitsEventsReviewForLegacyImport(c)
+            ? `Awaiting events review (legacy import) for ${days} day${days === 1 ? '' : 's'}`
+            : `Awaiting events review for ${days} day${days === 1 ? '' : 's'}`;
         items.push({
           id: `${c.id}-review`,
           label: company,
-          detail: `Awaiting events review for ${days} day${days === 1 ? '' : 's'}`,
+          detail,
           link,
           severity: days > 7 ? 'high' : 'medium',
           days,

@@ -22,16 +22,16 @@ export function ImportSuccessBanner({
     >
       <p className="font-semibold">Contract imported successfully</p>
       <p className="mt-1 text-sm leading-relaxed text-emerald-950/90">
-        The agreement is saved with status <span className="font-medium">Imported</span>.{' '}
+        The legacy agreement is saved and queued for events review (same as a new deal).{' '}
         <a href={detailHref} className="font-semibold text-emerald-900 underline underline-offset-2">
           Open {label} →
         </a>{' '}
-        or find it below (filter by Imported).
+        or find it below under Pending Review.
       </p>
       <p className="mt-2 text-xs text-emerald-900/75">
-        Prefer the list?{' '}
-        <Link href={`${portalBasePath}/contracts?status=imported`} className="underline underline-offset-2">
-          Show imported contracts only
+        Events will approve, then release to accounting — no DocuSign send to the client.{' '}
+        <Link href={`${portalBasePath}/contracts?status=pending_events_review`} className="underline underline-offset-2">
+          Show pending review
         </Link>
       </p>
     </div>

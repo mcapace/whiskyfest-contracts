@@ -278,7 +278,8 @@ export function ImportContractForm({
       const id = (j.id ?? j.contractId) as string | undefined;
       if (id) {
         // All Contracts + success banner — avoids auto-opening contract detail (crash on some PCs).
-        router.replace(`/contracts?imported=${encodeURIComponent(id)}`);
+        router.replace(`/contracts?imported=${encodeURIComponent(id)}&status=pending_events_review`);
+        router.refresh();
         return;
       }
       setErr('Import saved but no contract id was returned. Open All Contracts to find the new record.');

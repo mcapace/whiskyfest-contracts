@@ -18,6 +18,7 @@ import {
   normalizeSignerCcName,
 } from '@/lib/docusign-signer-cc';
 import type { Contract, ContractStatus } from '@/types/db';
+import { isLegacyImportedContract } from '@/lib/legacy-import';
 
 const signerEditableStatuses: ContractStatus[] = ['approved', 'ready_for_review', 'pending_events_review'];
 
@@ -32,13 +33,22 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const body = await req.json().catch(() => null);
   const supabase = getSupabaseAdmin();
 
-  if (contract.status === 'draft' || contract.status === 'imported' || contract.status === 'voided') {
+  if (
+    contract.status === 'draft' ||
+    contract.status === 'imported' ||
+    contract.status === 'voided' ||
+    (contract.status === 'pending_events_review' && isLegacyImportedContract(contract))
+  ) {
     const parsed = newContractBodySchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 400 });
     }
 
     if (contract.status === 'imported' || contract.status === 'voided') {
+      if (!actor.isAdmin && !actor.isEventsTeam) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    } else if (contract.status === 'pending_events_review' && isLegacyImportedContract(contract)) {
       if (!actor.isAdmin && !actor.isEventsTeam) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }

@@ -104,6 +104,8 @@ interface Props {
   eventsManagedWorkflow?: boolean;
   /** When false, DocuSign send is blocked for this event (internal prep). */
   clientSendEnabled?: boolean;
+  /** When set, contract was imported from a legacy signed PDF (skips DocuSign send). */
+  importedAt?: string | null;
 }
 
 export function ContractActions({
@@ -139,7 +141,9 @@ export function ContractActions({
   isEventsTeam,
   eventsManagedWorkflow = false,
   clientSendEnabled = true,
+  importedAt = null,
 }: Props) {
+  const legacyImport = Boolean(importedAt?.trim());
   const router = useRouter();
   const { data: session } = useSession();
   const contractLive = useContractLiveOptional();
@@ -261,10 +265,11 @@ export function ContractActions({
     (status === 'sent' || status === 'partially_signed') && (isAdmin || isEventsTeam);
   const canCancelSigned = status === 'signed' && (isAdmin || isEventsTeam);
   const canRelease = status === 'signed' && (isAdmin || (isEventsTeam && eventsManagedWorkflow));
-  const canReleaseImported = status === 'imported' && (isAdmin || isEventsTeam) && !discountApprovalPending;
-  const canEditImported = status === 'imported' && (isAdmin || isEventsTeam);
+  const canEditImported =
+    legacyImport && (status === 'imported' || status === 'pending_events_review') && (isAdmin || isEventsTeam);
   const canEditVoided = status === 'voided' && (isAdmin || isEventsTeam);
-  const canVoidImported = status === 'imported' && (isAdmin || isEventsTeam);
+  const canVoidImported =
+    legacyImport && (status === 'imported' || status === 'pending_events_review') && (isAdmin || isEventsTeam);
   const signerWaitLabel = signerName?.trim() || signerEmail?.trim() || 'signer';
 
   const fabVisible = useMemo(() => {
@@ -280,9 +285,9 @@ export function ContractActions({
     if (status === 'approved') return true;
     if (hasDocuSignSecondary) return true;
     if (canCancelInflightDocuSign) return true;
-    if (canRelease || canReleaseImported || canCancelSigned) return true;
+    if (canRelease || canCancelSigned) return true;
     if (canEditVoided) return true;
-    if (status === 'imported' && (signedPdfHref || canEditImported || canVoidImported)) return true;
+    if (legacyImport && (signedPdfHref || canEditImported || canVoidImported)) return true;
     if (status === 'executed' && signedPdfHref) return true;
     if (status === 'error' && isAdmin) return true;
     return false;
@@ -295,7 +300,6 @@ export function ContractActions({
     hasDocuSignSecondary,
     canCancelInflightDocuSign,
     canRelease,
-    canReleaseImported,
     canEditImported,
     canEditVoided,
     canVoidImported,
@@ -468,44 +472,63 @@ export function ContractActions({
             </>
           )}
 
-          {status === 'pending_events_review' && !discountApprovalPending && isEventsTeam && (
+          {(status === 'pending_events_review' || status === 'imported') && !discountApprovalPending && isEventsTeam && (
             <>
               <ActionWithHelp helpText={CONTRACT_ACTION_HELP.approveContract}>
                 <Button
                   className={btnPrimary}
-                  onClick={() => runAction('events-approve', 'events-approve', {}, 'approved')}
+                  onClick={() =>
+                    runAction(
+                      'events-approve',
+                      'events-approve',
+                      {},
+                      legacyImport ? 'signed' : 'approved',
+                    )
+                  }
                   disabled={busy}
                 >
                   <ContractActionButtonLabel
                     icon={CheckCircle2}
-                    label="Approve Contract"
+                    label={legacyImport ? 'Approve legacy import' : 'Approve Contract'}
                     spinning={pending && action === 'events-approve'}
                   />
                 </Button>
               </ActionWithHelp>
-              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.sendBack}>
-                <Button
-                  className={btnSecondary}
-                  onClick={() => setOpenSendBack(true)}
-                  disabled={readOnly}
-                  title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
-                >
-                  <ContractActionButtonLabel icon={Undo2} label="Send Back for Changes" />
-                </Button>
-              </ActionWithHelp>
-              {draftPdfHref && (
-                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.viewDraftPdf}>
+              {!legacyImport && (
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.sendBack}>
+                  <Button
+                    className={btnSecondary}
+                    onClick={() => setOpenSendBack(true)}
+                    disabled={readOnly}
+                    title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                  >
+                    <ContractActionButtonLabel icon={Undo2} label="Send Back for Changes" />
+                  </Button>
+                </ActionWithHelp>
+              )}
+              {legacyImport && signedPdfHref ? (
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.viewSignedPdf}>
                   <Button className={btnSecondary} asChild>
-                    <a href={draftPdfHref} target="_blank" rel="noreferrer">
-                      <ContractActionButtonLabel icon={ExternalLink} label="View Draft PDF" />
+                    <a href={signedPdfHref} target="_blank" rel="noreferrer">
+                      <ContractActionButtonLabel icon={ExternalLink} label="View signed PDF" />
                     </a>
                   </Button>
                 </ActionWithHelp>
+              ) : (
+                draftPdfHref && (
+                  <ActionWithHelp helpText={CONTRACT_ACTION_HELP.viewDraftPdf}>
+                    <Button className={btnSecondary} asChild>
+                      <a href={draftPdfHref} target="_blank" rel="noreferrer">
+                        <ContractActionButtonLabel icon={ExternalLink} label="View Draft PDF" />
+                      </a>
+                    </Button>
+                  </ActionWithHelp>
+                )
               )}
             </>
           )}
 
-          {status === 'pending_events_review' && !discountApprovalPending && !isEventsTeam && isAdmin && draftPdfHref && (
+          {status === 'pending_events_review' && !discountApprovalPending && !isEventsTeam && isAdmin && draftPdfHref && !legacyImport && (
             <ActionWithHelp helpText={CONTRACT_ACTION_HELP.viewDraftPdf}>
               <Button className={btnSecondary} asChild>
                 <a href={draftPdfHref} target="_blank" rel="noreferrer">
@@ -575,7 +598,7 @@ export function ContractActions({
             </WhenDiscountBlocks>
           )}
 
-          {status === 'imported' && signedPdfHref && (
+          {legacyImport && signedPdfHref && status !== 'pending_events_review' && status !== 'imported' && (
             <ActionWithHelp helpText={CONTRACT_ACTION_HELP.viewSignedPdf}>
               <Button className={btnSecondary} asChild>
                 <a href={signedPdfHref} target="_blank" rel="noreferrer">
@@ -583,24 +606,6 @@ export function ContractActions({
                 </a>
               </Button>
             </ActionWithHelp>
-          )}
-
-          {canReleaseImported && (
-            <WhenDiscountBlocks active={discountApprovalPending}>
-              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.releaseImported}>
-                <Button
-                  className={btnPrimary}
-                  onClick={() => runAction('release', 'release', undefined, 'executed')}
-                  disabled={busy || discountApprovalPending}
-                >
-                  <ContractActionButtonLabel
-                    icon={CheckCircle2}
-                    label="Release to Accounting"
-                    spinning={pending && action === 'release'}
-                  />
-                </Button>
-              </ActionWithHelp>
-            </WhenDiscountBlocks>
           )}
 
           {canEditImported && (
@@ -774,6 +779,7 @@ export function ContractActions({
         {/* Status messages when there are no primary row buttons */}
         <StatusLine
           status={status}
+          legacyImport={legacyImport}
           signerEmail={signerEmail}
           signerWaitLabel={signerWaitLabel}
           sentAt={sentAt}
@@ -1100,6 +1106,7 @@ export function ContractActions({
 
 function StatusLine({
   status,
+  legacyImport,
   signerEmail,
   signerWaitLabel,
   sentAt,
@@ -1117,6 +1124,7 @@ function StatusLine({
   errorDetails,
 }: {
   status: ContractStatus;
+  legacyImport: boolean;
   signerEmail: string | null;
   signerWaitLabel: string;
   sentAt: string | null;
@@ -1174,10 +1182,10 @@ function StatusLine({
   if (status === 'signed' && !isAdmin && !(isEventsTeam && eventsManagedWorkflow)) {
     return <p className="text-sm text-muted-foreground">Awaiting admin release to accounting.</p>;
   }
-  if (status === 'imported') {
+  if (status === 'imported' || (legacyImport && status === 'pending_events_review')) {
     return (
       <p className="text-sm text-muted-foreground">
-        Legacy agreement on file — release to accounting when AR should pick this up for invoicing.
+        Legacy signed agreement on file — awaiting events approval, then release to accounting for invoicing.
       </p>
     );
   }

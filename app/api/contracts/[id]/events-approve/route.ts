@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth';
 import { resolveContractActor } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { requiresDiscountApproval } from '@/lib/contracts';
+import { isLegacyImportedContract } from '@/lib/legacy-import';
 import { notifySalesRepEventsApproved } from '@/lib/notifications';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { syncExhibitorRosterWritebackById } from '@/lib/exhibitor-roster-sync-hook';
@@ -35,7 +36,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const c = contract as Contract;
 
-  if (c.status !== 'pending_events_review') {
+  if (c.status !== 'pending_events_review' && c.status !== 'imported') {
     return NextResponse.json({ error: 'Contract is not pending events review.' }, { status: 400 });
   }
 
@@ -46,12 +47,14 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const reason = parsed.data.reason?.trim() || null;
   const now = new Date().toISOString();
   const email = gate.actor.email;
+  const legacyImport = isLegacyImportedContract(c);
+  const nextStatus = legacyImport ? 'signed' : 'approved';
 
   const { data: updated, error } = await supabase
     .from('contracts')
     .update({
-      status: 'approved',
-      approved_at: now,
+      status: nextStatus,
+      approved_at: legacyImport ? null : now,
       events_approved_at: now,
       events_approved_by: email,
       events_approval_reason: reason,
@@ -68,8 +71,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     contract_id: params.id,
     actor_email: email,
     action: 'events_approved',
-    from_status: 'pending_events_review',
-    to_status: 'approved',
+    from_status: c.status,
+    to_status: nextStatus,
     metadata: {
       approver: email,
       reason,

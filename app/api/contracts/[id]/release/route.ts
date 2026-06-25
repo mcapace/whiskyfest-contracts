@@ -4,6 +4,7 @@ import { resolveContractActor } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { isEventsManagedWorkflow } from '@/lib/contract-template-profile';
 import { requiresDiscountApproval } from '@/lib/contracts';
+import { isLegacyImportedContract } from '@/lib/legacy-import';
 import { releaseContractToAccounting } from '@/lib/release-to-accounting';
 import type { ContractWithTotals, Event } from '@/types/db';
 
@@ -35,17 +36,24 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   const { actor } = gate;
   const eventsManagedRelease = actor.isEventsTeam && isEventsManagedWorkflow(event);
 
-  if (contract.status === 'imported') {
-    if (!actor.isAdmin && !actor.isEventsTeam) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-  } else if (contract.status === 'signed') {
+  if (contract.status === 'signed') {
     if (!actor.isAdmin && !eventsManagedRelease) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+    if (isLegacyImportedContract(contract) && !contract.events_approved_at) {
+      return NextResponse.json(
+        { error: 'Events approval required before this legacy import can be released to accounting.' },
+        { status: 403 },
+      );
+    }
+  } else if (contract.status === 'imported') {
+    return NextResponse.json(
+      { error: 'Approve this legacy import before releasing to accounting.' },
+      { status: 409 },
+    );
   } else {
     return NextResponse.json(
-      { error: 'Release to Accounting is only available for fully signed or imported contracts.' },
+      { error: 'Release to Accounting is only available for fully signed contracts.' },
       { status: 409 },
     );
   }

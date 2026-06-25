@@ -22,7 +22,9 @@ export function buildSmartMetrics(
   salesRepId: string | null,
   discountPendingFn: (c: ContractWithTotals) => boolean,
 ): SmartGreetingMetrics {
-  const pendingReview = contracts.filter((c) => c.status === 'pending_events_review').length;
+  const pendingReview = contracts.filter(
+    (c) => c.status === 'pending_events_review' || c.status === 'imported',
+  ).length;
   const discountPending = contracts.filter(discountPendingFn).length;
   const stuckContracts = contracts.filter((c) => {
     if (!STUCK_STATUSES.has(c.status)) return false;

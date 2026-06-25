@@ -3,6 +3,7 @@ import { requireContractActorForPage } from '@/lib/auth-contract';
 import { getVisibleContractsFilter } from '@/lib/permissions';
 import { ContractsList } from '@/components/contracts/contracts-list';
 import { fetchBoothBrandsByContractIds } from '@/lib/contract-booth-brand-queries';
+import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
 import { boothBrandRowsRecordFromMap } from '@/lib/sponsors';
 import type { ContractWithTotals, ContractStatus, Event } from '@/types/db';
 import {
@@ -33,9 +34,19 @@ function escapeIlikePattern(raw: string): string {
   return raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_').replace(/,/g, ' ');
 }
 
+function isContractVisibleToActor(
+  row: Pick<ContractWithTotals, 'sales_rep_id'>,
+  visibility: ReturnType<typeof getVisibleContractsFilter>,
+): boolean {
+  if (visibility.filter !== 'own') return true;
+  if (visibility.salesRepIds.length === 0) return false;
+  if (!row.sales_rep_id) return false;
+  return visibility.salesRepIds.includes(row.sales_rep_id);
+}
+
 export async function loadContracts(
   actor: Awaited<ReturnType<typeof requireContractActorForPage>>,
-  searchParams: { status?: string; q?: string },
+  searchParams: { status?: string; q?: string; importedId?: string },
   productKey: ProductKey = PRODUCT_WHISKYFEST,
 ) {
   const supabase = getSupabaseAdmin();
@@ -94,7 +105,19 @@ export async function loadContracts(
 
   const allEvents = (events ?? []) as Event[];
   const scopedEvents = scopeEventsByProduct(allEvents, productKey);
-  const contractRows = scopeContractsByProduct((contracts ?? []) as ContractWithTotals[], allEvents, productKey);
+  let contractRows = scopeContractsByProduct((contracts ?? []) as ContractWithTotals[], allEvents, productKey);
+
+  const importedId = searchParams.importedId?.trim();
+  if (importedId && !contractRows.some((c) => c.id === importedId)) {
+    const importedRow = await fetchContractWithTotalsById(supabase, importedId);
+    if (importedRow && isContractVisibleToActor(importedRow, visibility)) {
+      const [scopedImported] = scopeContractsByProduct([importedRow], allEvents, productKey);
+      if (scopedImported) {
+        contractRows = [scopedImported, ...contractRows];
+      }
+    }
+  }
+
   const contractIds = contractRows.map((c) => c.id);
   const boothBrandRows =
     contractIds.length > 0 ? await fetchBoothBrandsByContractIds(supabase, contractIds) : [];
@@ -130,11 +153,20 @@ export default async function ContractsListPage({
   searchParams: Record<string, string | string[] | undefined>;
 }) {
   const actor = await requireContractActorForPage();
-  const status = typeof searchParams.status === 'string' ? searchParams.status : undefined;
+  const importedId = typeof searchParams.imported === 'string' ? searchParams.imported.trim() : undefined;
+  const status =
+    typeof searchParams.status === 'string'
+      ? searchParams.status
+      : importedId
+        ? 'pending_events_review'
+        : undefined;
   const q = typeof searchParams.q === 'string' ? searchParams.q : undefined;
-  const importedId = typeof searchParams.imported === 'string' ? searchParams.imported : undefined;
 
-  const { contracts, events, boothRowsByContract, portalBasePath } = await loadContracts(actor, { status, q });
+  const { contracts, events, boothRowsByContract, portalBasePath } = await loadContracts(actor, {
+    status,
+    q,
+    importedId,
+  });
   const importedContract = importedId ? contracts.find((c) => c.id === importedId) : undefined;
 
   return (
@@ -146,6 +178,7 @@ export default async function ContractsListPage({
       portalBasePath={portalBasePath}
       importedContractId={importedId}
       importedExhibitorName={importedContract?.exhibitor_company_name ?? null}
+      initialFilterStatus={status === 'pending_events_review' && importedId ? 'pending_events_review' : 'all'}
     />
   );
 }

@@ -4,6 +4,7 @@ import { getContractWithTotalsForViewer } from '@/lib/auth-contract';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { isEventsManagedWorkflow } from '@/lib/contract-template-profile';
 import { dealKindFromContract } from '@/lib/contract-deal-kind';
+import { isLegacyImportedContract } from '@/lib/legacy-import';
 import { ContractDetailViewClient } from '@/lib/contract-detail-client';
 import { buildContractActivityTimeline } from '@/lib/contract-activity-timeline';
 import {
@@ -123,9 +124,13 @@ export async function ContractDetailPage({
   const releaseAudit = audit.find((entry) => entry.action === 'released_to_accounting' || entry.action === 'executed');
   const discountPending = requiresDiscountApproval(contract);
   const dealKind = dealKindFromContract(contract);
+  const legacyImport = isLegacyImportedContract(contract);
   const canEditContractNotes =
     contract.status === 'draft' ||
-    ((contract.status === 'imported' || contract.status === 'voided') && (isAdmin || isEventsTeam));
+    (contract.status === 'voided' && (isAdmin || isEventsTeam)) ||
+    (legacyImport &&
+      (contract.status === 'imported' || contract.status === 'pending_events_review') &&
+      (isAdmin || isEventsTeam));
   const hasInternalNotesOnly =
     !contract.exhibitor_notes?.trim() &&
     Boolean(contract.notes?.trim()) &&
@@ -134,7 +139,7 @@ export async function ContractDetailPage({
     Boolean(contract.exhibitor_notes?.trim()) ||
     Boolean(contract.notes?.trim() && contract.status !== 'error') ||
     canEditContractNotes ||
-    contract.status === 'imported';
+    legacyImport;
 
   const legacyPdfUrl = contract.signed_pdf_url ?? contract.draft_pdf_url;
   const draftPdfHref =

@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
 import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { calculateDiscountCents, isDiscountedRate, requiresDiscountApproval } from '@/lib/contracts';
+import { isLegacyImportedContract } from '@/lib/legacy-import';
 import { downloadCompletedPdf } from '@/lib/docusign';
 import {
   downloadContractPdfFromStorage,
@@ -40,11 +41,26 @@ export async function releaseContractToAccounting(options: {
     return { ok: false, error: 'Discount approval required before contract can be released.', status: 403 };
   }
 
-  if (contract.status !== 'signed' && contract.status !== 'imported') {
+  if (contract.status !== 'signed') {
+    if (contract.status === 'imported') {
+      return {
+        ok: false,
+        error: 'Approve this legacy import before releasing to accounting.',
+        status: 409,
+      };
+    }
     return {
       ok: false,
-      error: 'Release to Accounting is only available for fully signed or imported contracts.',
+      error: 'Release to Accounting is only available for fully signed contracts.',
       status: 409,
+    };
+  }
+
+  if (isLegacyImportedContract(contract) && !contract.events_approved_at) {
+    return {
+      ok: false,
+      error: 'Events approval required before legacy import can be released to accounting.',
+      status: 403,
     };
   }
 
@@ -54,7 +70,7 @@ export async function releaseContractToAccounting(options: {
 
   let signedPdfBytes: Buffer;
 
-  if (contract.status === 'imported') {
+  if (isLegacyImportedContract(contract)) {
     try {
       signedPdfBytes = await downloadImportedContractPdf(contract);
     } catch (e: unknown) {
@@ -132,7 +148,7 @@ export async function releaseContractToAccounting(options: {
     grandTotalCents: contract.grand_total_cents,
     salesRepName: contract.sales_rep_name ?? null,
     executedAtFormatted: formatTimestamp(now),
-    countersignedByName: contract.status === 'imported' ? null : contract.countersigned_by_name,
+    countersignedByName: isLegacyImportedContract(contract) ? null : contract.countersigned_by_name,
     signedPdfBytes,
     accountingContractUrl: `${appBaseUrl()}/accounting/${contract.id}`,
     salesRepEmail: contract.sales_rep_email ?? contract.created_by,

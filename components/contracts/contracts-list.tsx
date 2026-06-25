@@ -66,6 +66,7 @@ export function ContractsList({
   portalBasePath = '',
   importedContractId,
   importedExhibitorName,
+  initialFilterStatus = 'all',
 }: {
   contracts: ContractWithTotals[];
   events: Event[];
@@ -75,6 +76,8 @@ export function ContractsList({
   portalBasePath?: string;
   importedContractId?: string;
   importedExhibitorName?: string | null;
+  /** Sync status chip with URL after import redirect (?status=imported). */
+  initialFilterStatus?: ContractViewFilters['status'];
 }) {
   const router = useRouter();
   const hydrated = useHydrated();
@@ -97,13 +100,17 @@ export function ContractsList({
   }, [router]);
 
   const [filters, setFilters] = useState<ContractViewFilters>({
-    status: 'all',
+    status: initialFilterStatus,
     rep: 'all',
     brand: 'all',
     dealType: 'all',
     search: '',
     listPreset: 'none',
   });
+
+  useEffect(() => {
+    setFilters((f) => (f.status === initialFilterStatus ? f : { ...f, status: initialFilterStatus }));
+  }, [initialFilterStatus]);
   const [searchInput, setSearchInput] = useState('');
   const [customViews, setCustomViews] = useState<{ name: string; filters: ContractViewFilters }[]>([]);
   const eventMap = useMemo(() => new Map(events.map((e) => [e.id, e.name])), [events]);
@@ -178,6 +185,8 @@ export function ContractsList({
       if (filters.status !== 'all') {
         if (filters.status === 'draft') {
           if (c.status !== 'draft' && c.status !== 'ready_for_review') return false;
+        } else if (filters.status === 'imported') {
+          if (!c.imported_at && c.status !== 'imported') return false;
         } else if (c.status !== filters.status) return false;
       }
       if (filters.rep !== 'all') {

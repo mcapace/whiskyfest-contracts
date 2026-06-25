@@ -222,9 +222,15 @@ export default async function DashboardPage({
     .reduce((a, c) => a + c.grand_total_cents, 0);
   const totalInFlightCents = activeScoped
     .filter((c) =>
-      ['ready_for_review', 'approved', 'sent', 'partially_signed', 'signed', 'pending_events_review'].includes(
-        c.status,
-      ),
+      [
+        'ready_for_review',
+        'approved',
+        'sent',
+        'partially_signed',
+        'signed',
+        'pending_events_review',
+        'imported',
+      ].includes(c.status),
     )
     .reduce((a, c) => a + c.grand_total_cents, 0);
   const totalPipelineCents = totalExecutedCents + totalInFlightCents;
@@ -255,7 +261,7 @@ export default async function DashboardPage({
     allScoped.filter((c) => contractMatchesDashboardFilter(c, k, scopeIds)).length;
 
   const staffNeedsApprovalCount = allScoped.filter(
-    (c) => requiresDiscountApproval(c) || c.status === 'pending_events_review',
+    (c) => requiresDiscountApproval(c) || c.status === 'pending_events_review' || c.status === 'imported',
   ).length;
   const staffCountersignCount = allScoped.filter((c) => c.status === 'partially_signed').length;
   const staffReadyReleaseCount = allScoped.filter((c) => c.status === 'signed').length;

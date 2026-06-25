@@ -219,10 +219,11 @@ export async function POST(req: Request) {
 
     const insertPayload: Record<string, unknown> = {
       event_id: p.event_id,
-      status: 'imported',
+      status: 'pending_events_review',
       order_type: 'sponsorship_only',
       imported_at: nowIso,
       imported_by: actorEmail,
+      events_submitted_at: nowIso,
       originally_signed_at: signedDay,
       signed_at: signedDay,
       exhibitor_legal_name: p.exhibitor_legal_name,
@@ -289,7 +290,7 @@ export async function POST(req: Request) {
       contract_id: contractId,
       actor_email: actorEmail,
       action: 'contract_imported',
-      to_status: 'imported',
+      to_status: 'pending_events_review',
       metadata: { originally_signed_at: signedDay, order_type: 'sponsorship_only' },
     });
 
@@ -353,10 +354,11 @@ export async function POST(req: Request) {
 
   const insertPayload: Record<string, unknown> = {
     event_id: p.event_id,
-    status: 'imported',
+    status: 'pending_events_review',
     order_type: 'booth',
     imported_at: nowIso,
     imported_by: actorEmail,
+    events_submitted_at: nowIso,
     originally_signed_at: signedDay,
     signed_at: signedDay,
     exhibitor_legal_name: p.exhibitor_legal_name,
@@ -458,7 +460,7 @@ export async function POST(req: Request) {
     contract_id: contractId,
     actor_email: actorEmail,
     action: 'contract_imported',
-    to_status: 'imported',
+    to_status: 'pending_events_review',
     metadata: { originally_signed_at: signedDay },
   });
 

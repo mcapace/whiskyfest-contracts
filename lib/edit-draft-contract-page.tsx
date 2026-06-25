@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { getContractWithTotalsForViewer } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { isLegacyImportedContract } from '@/lib/legacy-import';
 import { NewContractForm } from '@/components/contracts/new-contract-form';
 import { dealKindFromContract } from '@/lib/contract-deal-kind';
 import type { ContractLineItem, Event } from '@/types/db';
@@ -25,7 +26,9 @@ export async function EditDraftContractPage({
   const canEditVoided =
     viewed.contract.status === 'voided' && (viewed.actor.isAdmin || viewed.actor.isEventsTeam);
   const canEditImported =
-    viewed.contract.status === 'imported' && (viewed.actor.isAdmin || viewed.actor.isEventsTeam);
+    isLegacyImportedContract(viewed.contract) &&
+    (viewed.contract.status === 'imported' || viewed.contract.status === 'pending_events_review') &&
+    (viewed.actor.isAdmin || viewed.actor.isEventsTeam);
   if (viewed.contract.status !== 'draft' && !canEditImported && !canEditVoided) notFound();
 
   const supabase = getSupabaseAdmin();
@@ -76,7 +79,7 @@ export async function EditDraftContractPage({
         currentUserEmail={viewed.actor.email}
         isAdmin={viewed.actor.isAdmin}
         editContractId={c.id}
-        editImportMode={c.status === 'imported'}
+        editImportMode={isLegacyImportedContract(c)}
         initialLineItems={initialLineItems}
         initialValues={{
           event_id: c.event_id,

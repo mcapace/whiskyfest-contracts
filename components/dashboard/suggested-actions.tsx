@@ -60,8 +60,11 @@ export function SuggestedActions({
           });
         }
       }
-      if (c.status === 'pending_events_review' && (viewer.is_admin || viewer.is_events_team)) {
-        const d = differenceInDays(now, new Date(c.created_at));
+      if (
+        (c.status === 'pending_events_review' || c.status === 'imported') &&
+        (viewer.is_admin || viewer.is_events_team)
+      ) {
+        const d = differenceInDays(now, new Date(c.events_submitted_at ?? c.imported_at ?? c.created_at));
         if (d >= 3) {
           out.push({
             key: `review-${c.id}`,

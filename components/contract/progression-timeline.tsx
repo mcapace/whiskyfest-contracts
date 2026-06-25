@@ -96,9 +96,11 @@ function stageTooltip(stage: (typeof STAGE_ORDER)[number], entry: AuditLogEntry 
 export function ContractProgressionTimeline({
   status,
   audit,
+  importedAt,
 }: {
   status: ContractStatus;
   audit: AuditLogEntry[];
+  importedAt?: string | null;
 }) {
   const [reducedMotion, setReducedMotion] = useState(false);
 
@@ -112,12 +114,17 @@ export function ContractProgressionTimeline({
 
   const auditChronological = useMemo(() => [...audit].sort((a, b) => a.occurred_at.localeCompare(b.occurred_at)), [audit]);
 
+  const legacyImport = Boolean(importedAt?.trim()) || status === 'imported';
+
   const { currentIdx, special } = useMemo(() => {
     if (status === 'cancelled') return { currentIdx: -1, special: 'cancelled' as const };
     if (status === 'error') return { currentIdx: -1, special: 'error' as const };
+    if (legacyImport && (status === 'pending_events_review' || status === 'imported')) {
+      return { currentIdx: STAGE_ORDER.indexOf('pending_events_review'), special: null as null };
+    }
     const idx = STAGE_ORDER.indexOf(status as (typeof STAGE_ORDER)[number]);
     return { currentIdx: Math.max(0, idx), special: null as null };
-  }, [status]);
+  }, [status, legacyImport]);
 
   const stageMeta = useMemo(
     () =>
@@ -125,21 +132,15 @@ export function ContractProgressionTimeline({
         stage,
         idx,
         entry: auditForStage(stage, auditChronological),
-        done: special ? false : idx < currentIdx,
+        done: special
+          ? false
+          : legacyImport && (status === 'pending_events_review' || status === 'imported')
+            ? idx < STAGE_ORDER.indexOf('pending_events_review')
+            : idx < currentIdx,
         current: special ? false : idx === currentIdx,
       })),
-    [auditChronological, currentIdx, special],
+    [auditChronological, currentIdx, special, legacyImport, status],
   );
-
-  if (status === 'imported') {
-    return (
-      <p className="text-sm leading-relaxed text-muted-foreground">
-        Standard DocuSign stages do not apply to imported legacy contracts. Use{' '}
-        <span className="font-medium text-foreground">Release to Accounting</span> when accounts receivable should pick
-        this up.
-      </p>
-    );
-  }
 
   if (special === 'cancelled') {
     return <p className="text-sm font-medium text-destructive">Contract cancelled — timeline unavailable</p>;

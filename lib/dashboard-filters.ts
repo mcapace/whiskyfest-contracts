@@ -63,7 +63,7 @@ export function contractMatchesDashboardFilter(
     case 'draft':
       return c.status === 'draft' || c.status === 'ready_for_review';
     case 'events_review':
-      return c.status === 'pending_events_review';
+      return c.status === 'pending_events_review' || c.status === 'imported';
     case 'approved':
       return c.status === 'approved';
     case 'sent':
@@ -77,7 +77,7 @@ export function contractMatchesDashboardFilter(
     case 'cancelled':
       return c.status === 'cancelled';
     case 'staff_needs_approval':
-      return requiresDiscountApproval(c) || c.status === 'pending_events_review';
+      return requiresDiscountApproval(c) || c.status === 'pending_events_review' || c.status === 'imported';
     case 'staff_countersign':
       return c.status === 'partially_signed';
     case 'staff_ready_release':

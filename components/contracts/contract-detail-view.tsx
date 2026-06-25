@@ -131,7 +131,11 @@ export function ContractDetailView({
           <div className="space-y-6">
             <div id="overview" className="rounded-lg border border-border/50 bg-bg-surface p-4 md:p-6">
               <p className="wf-label-caps mb-4 text-[0.6rem]">Progress</p>
-              <ContractProgressionTimeline status={contract.status} audit={audit} />
+              <ContractProgressionTimeline
+                status={contract.status}
+                audit={audit}
+                importedAt={contract.imported_at}
+              />
             </div>
 
             <ContractSummarySection contract={contract} event={event} />
@@ -277,6 +281,7 @@ export function ContractDetailView({
                 isEventsTeam={isEventsTeam}
                 eventsManagedWorkflow={eventsManagedWorkflow}
                 clientSendEnabled={clientSendEnabled}
+                importedAt={contract.imported_at}
               />
             </div>
 
@@ -493,7 +498,7 @@ export function ContractDetailView({
                       </p>
                       <p className="mt-2 whitespace-pre-wrap text-foreground">{contract.exhibitor_notes}</p>
                     </div>
-                  ) : canEditContractNotes && contract.status !== 'imported' ? (
+                  ) : canEditContractNotes && !contract.imported_at ? (
                     <div className="rounded-md border border-dashed border-border px-4 py-3 text-muted-foreground">
                       <p>No program terms added yet.</p>
                       <Link
