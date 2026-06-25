@@ -4,6 +4,11 @@ import { formatRosterWineDisplay } from '@/lib/exhibitor-roster-columns';
 import { billingFieldsFromRosterRow } from '@/lib/exhibitor-roster-billing';
 import type { NyweBillingFields } from '@/lib/nywe-billing';
 import { nyweLicenseFeeCents } from '@/lib/nywe-pricing';
+import {
+  hasWithdrawnRosterParticipation,
+  isActiveRosterParticipation,
+  isRosterParticipationPending,
+} from '@/lib/exhibitor-roster-participation';
 import { formatStatus } from '@/lib/status-display';
 import type { ContractStatus, ContractWithTotals, Event } from '@/types/db';
 
@@ -219,27 +224,11 @@ function rowIncludedInRoster(row: string[], map: ColumnMap): boolean {
   return isActiveRosterParticipation(part);
 }
 
-/** Participation column is blank — winery is on the roster but has not confirmed yet. */
-export function isRosterParticipationPending(participation: string): boolean {
-  return !participation.trim();
-}
-
-/** Explicit yes / confirmed — winery is actively participating in NYWE. */
-export function isActiveRosterParticipation(participation: string): boolean {
-  const part = participation.toLowerCase().trim();
-  if (!part) return false;
-  if (part === 'false' || part === '0') return false;
-  if (/\bno\b/.test(part) && !part.includes('yes')) return false;
-  return part.includes('yes') || part.includes('confirm') || part === 'true';
-}
-
-/** User declined or unchecked participation in Google Sheets. */
-export function hasWithdrawnRosterParticipation(participation: string): boolean {
-  const part = participation.toLowerCase().trim();
-  if (!part) return false;
-  if (part === 'false' || part === '0') return true;
-  return /\bno\b/.test(part) && !part.includes('yes');
-}
+export {
+  hasWithdrawnRosterParticipation,
+  isActiveRosterParticipation,
+  isRosterParticipationPending,
+} from '@/lib/exhibitor-roster-participation';
 
 export function rosterRowKey(spreadsheetId: string, tab: string, rowNumber: number): string {
   return `${spreadsheetId}|${tab}|${rowNumber}`;

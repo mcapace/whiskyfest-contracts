@@ -32,7 +32,7 @@ import {
 import {
   isActiveRosterParticipation,
   isRosterParticipationPending,
-} from '@/lib/exhibitor-roster';
+} from '@/lib/exhibitor-roster-participation';
 import {
   NyweRosterWorkflowGuide,
   resolveNyweWorkflowStep,
