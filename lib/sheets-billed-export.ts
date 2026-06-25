@@ -47,16 +47,31 @@ function configuredSpreadsheetId(productKey: AccountingPortalKey): string | null
   return process.env[envKey]?.trim() || null;
 }
 
-function exportFolderId(): string {
-  const folder =
+async function resolveExportFolderId(): Promise<string> {
+  const explicit =
     process.env['GOOGLE_BILLED_EXPORT_FOLDER_ID']?.trim() ||
     process.env['GOOGLE_DRIVE_ROOT_FOLDER_ID']?.trim();
-  if (!folder) {
-    throw new Error(
-      'Set GOOGLE_BILLED_EXPORT_FOLDER_ID (or GOOGLE_DRIVE_ROOT_FOLDER_ID) to the Shared Drive folder for billed exports.',
-    );
+  if (explicit) return explicit;
+
+  const drive = getDriveClient();
+  const fallbackFileId =
+    process.env['GOOGLE_DRAFTS_FOLDER_ID']?.trim() ||
+    process.env['GOOGLE_SIGNED_FOLDER_ID']?.trim() ||
+    process.env['GOOGLE_TEMPLATE_DOC_ID']?.trim();
+
+  if (fallbackFileId) {
+    const meta = await drive.files.get({
+      fileId: fallbackFileId,
+      fields: 'parents',
+      supportsAllDrives: true,
+    });
+    const parent = meta.data.parents?.[0];
+    if (parent) return parent;
   }
-  return folder;
+
+  throw new Error(
+    'Could not resolve a Google Drive folder for billed exports. Set GOOGLE_BILLED_EXPORT_FOLDER_ID or ensure GOOGLE_DRAFTS_FOLDER_ID is configured.',
+  );
 }
 
 function exportTabName(): string {
@@ -94,7 +109,7 @@ async function getOrCreateSpreadsheet(productKey: AccountingPortalKey): Promise<
     };
   }
 
-  const folderId = exportFolderId();
+  const folderId = await resolveExportFolderId();
   const title = spreadsheetTitle(productKey);
   const drive = getDriveClient();
 
