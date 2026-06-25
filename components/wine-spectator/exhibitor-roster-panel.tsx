@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { LucideIcon } from 'lucide-react';
-import { Columns3, Loader2, RefreshCw, Send, FilePlus2, ListFilter, CircleDashed, Clock, CheckCircle2, Mail, BadgeCheck, PenLine } from 'lucide-react';
+import { Columns3, Loader2, RefreshCw, Send, FilePlus2, ListFilter, CircleDashed, Clock, CheckCircle2, Mail, BadgeCheck, PenLine, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/contracts/status-badge';
@@ -266,6 +266,7 @@ function RosterListFilterPill({
   listKey,
   className,
   onClick,
+  compact,
 }: {
   active: boolean;
   icon: LucideIcon;
@@ -274,6 +275,7 @@ function RosterListFilterPill({
   listKey: string;
   className: string;
   onClick: () => void;
+  compact?: boolean;
 }) {
   return (
     <button
@@ -281,15 +283,17 @@ function RosterListFilterPill({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors',
+        'inline-flex shrink-0 items-center gap-1.5 rounded-full border font-medium transition-colors',
+        compact ? 'h-7 px-2.5 text-[11px]' : 'h-8 px-3 text-xs',
         className,
       )}
     >
-      <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      <Icon className={cn('shrink-0', compact ? 'h-3 w-3' : 'h-3.5 w-3.5')} aria-hidden />
       <span className="whitespace-nowrap leading-none">{label}</span>
       <span
         className={cn(
-          'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums',
+          'inline-flex min-w-[1.15rem] items-center justify-center rounded-full font-semibold leading-none tabular-nums',
+          compact ? 'px-1 py-0.5 text-[9px]' : 'px-1.5 py-0.5 text-[10px]',
           rosterListFilterCountClass(listKey, active),
         )}
       >
@@ -297,6 +301,22 @@ function RosterListFilterPill({
       </span>
     </button>
   );
+}
+
+function licenseStatusFilterClass(filterKey: string, active: boolean, count: number): string {
+  if (active) {
+    if (filterKey === 'countersign') return 'border-rose-600 bg-rose-600 text-white shadow-sm hover:bg-rose-700';
+    if (filterKey === 'sent') return 'border-amber-700 bg-amber-700 text-white shadow-sm hover:bg-amber-800';
+    if (filterKey === 'done') return 'border-emerald-700 bg-emerald-700 text-white shadow-sm hover:bg-emerald-800';
+    return 'border-foreground bg-foreground text-background shadow-sm hover:opacity-95';
+  }
+  if (filterKey === 'countersign' && count > 0) {
+    return 'border-rose-300 bg-rose-50 text-rose-900 hover:bg-rose-100';
+  }
+  if (filterKey === 'sent' && count > 0) {
+    return 'border-amber-300/80 bg-amber-50 text-amber-950 hover:bg-amber-100';
+  }
+  return 'border-border/70 bg-background text-foreground hover:bg-muted/50';
 }
 
 export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
@@ -639,129 +659,181 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
         }}
       />
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Button variant="outline" size="sm" onClick={() => refresh({ live: true })} disabled={pending}>
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          Refresh from sheets
-        </Button>
-        <Button size="sm" onClick={createSelected} disabled={pending || creating || selectedCreatable === 0}>
-          <FilePlus2 className="h-4 w-4" />
-          Create drafts ({selectedCreatable})
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={startBulkSendWizard}
-          disabled={pending || !data.event.client_send_enabled || sendableRows.length === 0}
-        >
-          <Send className="h-4 w-4" />
-          Send all to clients ({sendableRows.length})
-        </Button>
-        <span className="text-xs text-muted-foreground">
-          {data.fromCache ? 'Auto-synced' : 'Live from sheets'} <RelativeTime iso={data.syncedAt} /> · {filtered.length} shown
-          {listFilter === 'all' ? ` · ${data.rows.length} total` : ''}
-        </span>
-      </div>
+      <div className="overflow-hidden rounded-2xl border border-border/60 bg-white shadow-sm">
+        <div className="flex flex-col gap-4 p-4 sm:p-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" size="sm" className="h-8" onClick={() => refresh({ live: true })} disabled={pending}>
+                  {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                  Refresh from sheets
+                </Button>
+                <Button size="sm" className="h-8" onClick={createSelected} disabled={pending || creating || selectedCreatable === 0}>
+                  <FilePlus2 className="h-3.5 w-3.5" />
+                  Create drafts ({selectedCreatable})
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="h-8"
+                  onClick={startBulkSendWizard}
+                  disabled={pending || !data.event.client_send_enabled || sendableRows.length === 0}
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  Send all to clients ({sendableRows.length})
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {data.fromCache ? 'Auto-synced' : 'Live from sheets'}{' '}
+                <RelativeTime iso={data.syncedAt} />
+                {' · '}
+                <span className="font-medium text-foreground">{filtered.length}</span> shown
+                {listFilter === 'all' ? (
+                  <>
+                    {' · '}
+                    <span className="font-medium text-foreground">{data.rows.length}</span> total
+                  </>
+                ) : null}
+                {(listFilter !== 'all' || filter !== 'all' || search.trim()) ? (
+                  <>
+                    {' · '}
+                    <button
+                      type="button"
+                      className="font-medium text-accent-brand hover:underline"
+                      onClick={() => {
+                        setListFilter('all');
+                        setFilter('all');
+                        setSearch('');
+                      }}
+                    >
+                      Clear filters
+                    </button>
+                  </>
+                ) : null}
+              </p>
+            </div>
 
-      <div className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Exhibitor list</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <RosterListFilterPill
-            active={listFilter === 'all'}
-            icon={ROSTER_ALL_LISTS_ICON}
-            label="All lists"
-            count={rowsForListCounts.length}
-            listKey="all"
-            className={rosterListFilterClass('all', listFilter === 'all')}
-            onClick={() => setListFilter('all')}
-          />
-          {sheetTabs.map((sheet) => {
-            const Icon = rosterListIcon(sheet.key);
-            const active = listFilter === sheet.key;
-            return (
-              <RosterListFilterPill
-                key={sheet.key}
-                active={active}
-                icon={Icon}
-                label={rosterListShortLabel(sheet.key, sheet.label)}
-                count={sheet.count}
-                listKey={sheet.key}
-                className={rosterListFilterClass(sheet.key, active)}
-                onClick={() => setListFilter(sheet.key)}
+            <div className="relative w-full lg:w-72 lg:shrink-0">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search winery, signer, billing…"
+                className="h-9 border-border/70 bg-muted/20 pl-9 pr-9 text-sm shadow-none focus-visible:bg-background"
+                aria-label="Search exhibitors"
               />
-            );
-          })}
-        </div>
-      </div>
+              {search.trim() ? (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
+                  aria-label="Clear search"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              ) : null}
+            </div>
+          </div>
 
-      <div className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">License status</p>
-        <div className="flex flex-wrap items-center gap-2">
-          {FILTERS.map((f) => (
-            <RosterListFilterPill
-              key={f.key}
-              active={filter === f.key}
-              icon={f.icon}
-              label={f.label}
-              count={licenseFilterCounts.get(f.key) ?? 0}
-              listKey="all"
-              className={rosterListFilterClass('all', filter === f.key)}
-              onClick={() => setFilter(f.key)}
-            />
-          ))}
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search winery, signer, billing…"
-            className="h-8 max-w-xs text-sm"
-          />
-        </div>
-      </div>
+          <div className="space-y-2 border-t border-border/50 pt-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Exhibitor list</p>
+            <div className="flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <RosterListFilterPill
+                active={listFilter === 'all'}
+                icon={ROSTER_ALL_LISTS_ICON}
+                label="All lists"
+                count={rowsForListCounts.length}
+                listKey="all"
+                className={rosterListFilterClass('all', listFilter === 'all')}
+                onClick={() => setListFilter('all')}
+                compact
+              />
+              {sheetTabs.map((sheet) => {
+                const Icon = rosterListIcon(sheet.key);
+                const active = listFilter === sheet.key;
+                return (
+                  <RosterListFilterPill
+                    key={sheet.key}
+                    active={active}
+                    icon={Icon}
+                    label={rosterListShortLabel(sheet.key, sheet.label)}
+                    count={sheet.count}
+                    listKey={sheet.key}
+                    className={rosterListFilterClass(sheet.key, active)}
+                    onClick={() => setListFilter(sheet.key)}
+                    compact
+                  />
+                );
+              })}
+            </div>
+          </div>
 
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-8 gap-1.5"
-            onClick={() => setShowColumnOptions((open) => !open)}
-          >
-            <Columns3 className="h-3.5 w-3.5" aria-hidden />
-            {showColumnOptions ? 'Hide columns' : 'More columns'}
-          </Button>
-          {columnMode !== 'essential' ? (
-            <span className="text-xs text-muted-foreground">
-              Viewing: {rosterColumnModeLabel(columnMode)}
-            </span>
-          ) : null}
-        </div>
-        {showColumnOptions ? (
-          <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-muted/20 p-3">
-            {COLUMN_MODES.map((mode) => (
+          <div className="space-y-2 border-t border-border/50 pt-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">License status</p>
               <Button
-                key={mode}
+                type="button"
                 size="sm"
-                variant={columnMode === mode ? 'default' : 'outline'}
-                onClick={() => {
-                  setColumnMode(mode);
-                  if (mode === 'essential') setShowColumnOptions(false);
-                }}
+                variant="ghost"
+                className="h-7 shrink-0 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setShowColumnOptions((open) => !open)}
               >
-                {rosterColumnModeLabel(mode)}
+                <Columns3 className="h-3.5 w-3.5" aria-hidden />
+                {showColumnOptions ? 'Hide columns' : 'More columns'}
+                {columnMode !== 'essential' ? (
+                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-foreground">
+                    {rosterColumnModeLabel(columnMode)}
+                  </span>
+                ) : null}
               </Button>
-            ))}
-            {columnMode === 'all' ? (
-              <p className="w-full text-xs text-muted-foreground">
-                Scroll horizontally for every Google Sheet field from the synced rows.
-              </p>
-            ) : columnMode === 'extended' ? (
-              <p className="w-full text-xs text-muted-foreground">
-                Billing, contacts, and sheet sync columns in addition to essentials.
-              </p>
+            </div>
+            <div className="flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {FILTERS.map((f) => {
+                const count = licenseFilterCounts.get(f.key) ?? 0;
+                return (
+                  <RosterListFilterPill
+                    key={f.key}
+                    active={filter === f.key}
+                    icon={f.icon}
+                    label={f.label}
+                    count={count}
+                    listKey="all"
+                    className={licenseStatusFilterClass(f.key, filter === f.key, count)}
+                    onClick={() => setFilter(f.key)}
+                    compact
+                  />
+                );
+              })}
+            </div>
+            {showColumnOptions ? (
+              <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/50 bg-muted/20 p-3">
+                {COLUMN_MODES.map((mode) => (
+                  <Button
+                    key={mode}
+                    size="sm"
+                    variant={columnMode === mode ? 'default' : 'outline'}
+                    className="h-7 text-xs"
+                    onClick={() => {
+                      setColumnMode(mode);
+                      if (mode === 'essential') setShowColumnOptions(false);
+                    }}
+                  >
+                    {rosterColumnModeLabel(mode)}
+                  </Button>
+                ))}
+                {columnMode === 'all' ? (
+                  <p className="w-full text-xs text-muted-foreground">
+                    Scroll horizontally for every Google Sheet field from the synced rows.
+                  </p>
+                ) : columnMode === 'extended' ? (
+                  <p className="w-full text-xs text-muted-foreground">
+                    Billing, contacts, and sheet sync columns in addition to essentials.
+                  </p>
+                ) : null}
+              </div>
             ) : null}
           </div>
-        ) : null}
+        </div>
       </div>
 
       {message ? (

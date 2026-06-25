@@ -18,7 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import type { ContractWithTotals, Event, InvoiceStatus } from '@/types/db';
-import { contractHasBillingInfo } from '@/lib/nywe-billing';
+import { ExportBilledButton } from '@/components/accounting/export-billed-button';
 
 export async function AccountingDashboardView({
   productKey,
@@ -178,7 +178,8 @@ export async function AccountingDashboardView({
             )}
           </form>
 
-          <div className="flex flex-wrap gap-2 border-b border-border/60 pb-4">
+          <div className="flex flex-col gap-4 border-b border-border/60 pb-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap gap-2">
             {(
               [
                 { key: 'all' as const, label: 'All' },
@@ -197,6 +198,8 @@ export async function AccountingDashboardView({
                 {tab.label}
               </Link>
             ))}
+            </div>
+            <ExportBilledButton productKey={productKey} />
           </div>
 
           {contracts.length === 0 ? (

@@ -32,6 +32,16 @@
   - Signed/executed/cancelled/void updates existing row
 - **Config**: `SHEETS_TRACKER_ID`, `SHEETS_TRACKER_TAB`
 
+### Billed exhibitor export (accounting)
+
+- **Why**: AR needs a shareable Google Sheet of all invoiced exhibitors (invoice sent + paid).
+- **Products**: separate spreadsheets for WhiskyFest and NYWE (`WhiskyFest Billed Exhibitors`, `NYWE Billed Exhibitors`).
+- **Trigger**: **Export billed to Google Sheets** on each accounting dashboard; auto-refreshes when AR marks invoice sent or paid.
+- **Config**:
+  - `GOOGLE_BILLED_EXPORT_FOLDER_ID` — Shared Drive folder (falls back to `GOOGLE_DRIVE_ROOT_FOLDER_ID`)
+  - Optional fixed sheet IDs: `SHEETS_BILLED_WHISKYFEST_ID`, `SHEETS_BILLED_NYWE_ID`
+  - Tab name: `SHEETS_BILLED_TAB` (default `Billed Exhibitors`)
+
 ## Supabase Storage
 
 - **Why**: centralized private PDF storage with app-compatible signed URL access.

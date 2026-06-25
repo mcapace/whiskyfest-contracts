@@ -6,6 +6,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { insertContractAudit } from '@/lib/audit-log';
 import { notifySalesRepInvoicePaid, notifySalesRepInvoiceSent } from '@/lib/notifications';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
+import { syncBilledContractToGoogleSheet } from '@/lib/sheets-billed-export';
 import { formatTimestamp } from '@/lib/utils';
 import { revalidatePath } from 'next/cache';
 import type { ContractWithTotals, InvoiceStatus } from '@/types/db';
@@ -115,6 +116,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       createdBy: contract.created_by,
     }).catch((e) => console.error('[notifySalesRepInvoiceSent]', e));
 
+    void syncBilledContractToGoogleSheet(contract.id);
+
     revalidatePath('/accounting');
     revalidatePath(`/accounting/${contract.id}`);
     return NextResponse.json({ ok: true });
@@ -151,6 +154,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       eventId: contract.event_id,
       createdBy: contract.created_by,
     }).catch((e) => console.error('[notifySalesRepInvoicePaid]', e));
+
+    void syncBilledContractToGoogleSheet(contract.id);
 
     revalidatePath('/accounting');
     revalidatePath(`/accounting/${contract.id}`);
