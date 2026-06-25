@@ -15,7 +15,7 @@ import { appendContractRow, updateContractRow } from '@/lib/sheets-tracker';
 import { syncExhibitorRosterWriteback } from '@/lib/exhibitor-roster-sync-hook';
 import { insertContractAudit } from '@/lib/audit-log';
 import { isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
-import { releaseContractToAccounting } from '@/lib/release-to-accounting';
+import { autoReleaseNyweAfterCountersign } from '@/lib/nywe-auto-release-accounting';
 import {
   notifyContractFullySigned,
   notifyPartialSignature,
@@ -144,7 +144,21 @@ export async function applyEnvelopeFullySigned(
   envelopeId: string,
   options?: { notify?: boolean; actorEmail?: string | null },
 ): Promise<{ updated: boolean }> {
-  if (contract.status === 'signed' || contract.status === 'executed') {
+  if (contract.status === 'executed') {
+    return { updated: false };
+  }
+
+  if (contract.status === 'signed') {
+    if (event && isNyweEventsManagedEvent(event)) {
+      const retry = await autoReleaseNyweAfterCountersign({
+        supabase,
+        contractId: contract.id,
+        event,
+        countersignerEmail: contract.countersigned_by_email,
+        actorEmail: options?.actorEmail ?? null,
+      });
+      return { updated: retry.released };
+    }
     return { updated: false };
   }
 
@@ -209,7 +223,7 @@ export async function applyEnvelopeFullySigned(
     metadata: {
       envelope_id: envelopeId,
       signed_pdf_url: webViewLink,
-      release_required: true,
+      release_required: !(event && isNyweEventsManagedEvent(event)),
       countersigned_by_email: countersigner?.email ?? null,
       countersigned_by_name: countersigner?.name ?? null,
       source: options?.actorEmail ? 'manual_sync' : 'webhook',
@@ -241,21 +255,13 @@ export async function applyEnvelopeFullySigned(
     await syncExhibitorRosterWriteback(afterSigned);
 
     if (event && isNyweEventsManagedEvent(event)) {
-      const actorEmail =
-        countersigner?.email?.trim().toLowerCase() ||
-        event.shanken_signatory_email?.trim().toLowerCase() ||
-        'nywe-auto@mshanken.com';
-      const release = await releaseContractToAccounting({
-        contract: afterSigned,
-        event,
-        actorEmail,
-        auditAction: 'auto_released_to_accounting',
+      await autoReleaseNyweAfterCountersign({
         supabase,
+        contractId: afterSigned.id,
+        event,
+        countersignerEmail: countersigner?.email ?? afterSigned.countersigned_by_email,
+        actorEmail: options?.actorEmail ?? null,
       });
-      if (release.ok) {
-        return { updated: true };
-      }
-      console.error('[NYWE auto-release]', afterSigned.id, release.error);
     }
   }
 
@@ -287,6 +293,36 @@ export async function syncContractFromDocuSign(
   const envelopeId = contract.docusign_envelope_id?.trim();
   if (!envelopeId) {
     return { ok: false, error: 'No DocuSign envelope is linked to this contract.' };
+  }
+
+  if (contract.status === 'signed') {
+    if (event && isNyweEventsManagedEvent(event)) {
+      const retry = await autoReleaseNyweAfterCountersign({
+        supabase,
+        contractId: contract.id,
+        event,
+        countersignerEmail: contract.countersigned_by_email,
+        actorEmail: actorEmail ?? null,
+      });
+      if (retry.released) {
+        return {
+          ok: true,
+          changed: true,
+          fromStatus: 'signed',
+          toStatus: 'executed',
+          message: 'Released countersigned license to accounting.',
+        };
+      }
+      if (retry.error) {
+        return { ok: false, error: retry.error };
+      }
+    }
+    return {
+      ok: true,
+      changed: false,
+      message: 'Contract is already fully signed in the app.',
+      status: contract.status,
+    };
   }
 
   if (!['sent', 'partially_signed', 'error'].includes(contract.status)) {
@@ -328,7 +364,7 @@ export async function syncContractFromDocuSign(
         actorEmail,
         notify,
       });
-      if (!updated && (contract.status === 'signed' || contract.status === 'executed')) {
+      if (!updated) {
         return {
           ok: true,
           changed: false,

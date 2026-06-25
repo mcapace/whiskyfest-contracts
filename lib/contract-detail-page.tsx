@@ -87,10 +87,15 @@ export async function ContractDetailPage({
   const dashboardLinkHref = dashboardHref(productKey);
   const clientSendEnabled = eventRow?.client_send_enabled !== false;
   const eventsManagedWorkflow = eventRow ? isEventsManagedWorkflow(eventRow) : false;
+  const nyweSignedNeedsAccounting =
+    eventsManagedWorkflow &&
+    contract.status === 'signed' &&
+    !contract.executed_at &&
+    Boolean(contract.docusign_envelope_id);
 
   if (
     contract.docusign_envelope_id &&
-    ['sent', 'partially_signed', 'error'].includes(contract.status)
+    (['sent', 'partially_signed', 'error'].includes(contract.status) || nyweSignedNeedsAccounting)
   ) {
     try {
       const sync = await syncContractFromDocuSign(
