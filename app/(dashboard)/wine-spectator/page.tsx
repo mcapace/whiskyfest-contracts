@@ -15,6 +15,7 @@ import { isEventsManagedWorkflow } from '@/lib/contract-template-profile';
 import { wineSpectatorContractIsAdmin } from '@/lib/wine-spectator-access';
 import { NyweSusannahDashboard } from '@/components/wine-spectator/nywe-susannah-dashboard';
 import { releaseStuckNyweSignedLicenses } from '@/lib/nywe-release-stuck-on-load';
+import { runNyweBackgroundDocuSignSync } from '@/lib/nywe-background-docusign-sync';
 import { DashboardLiveRefresh } from '@/components/dashboard/dashboard-live-refresh';
 import type { ContractWithTotals } from '@/types/db';
 
@@ -32,6 +33,7 @@ export default async function WineSpectatorDashboardPage() {
   await releaseStuckNyweSignedLicenses().catch((err) =>
     console.error('[wine-spectator dashboard] auto-release retry failed', err),
   );
+  await runNyweBackgroundDocuSignSync();
   const { contracts: allScoped, events } = await getDashboardData(actor, PRODUCT_WINE_SPECTATOR);
 
   const activeScoped = allScoped.filter((c) => c.status !== 'cancelled' && c.status !== 'voided');

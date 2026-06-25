@@ -1,5 +1,6 @@
 import { loadExhibitorRoster } from '@/lib/exhibitor-roster-sync-job';
 import { getActiveWineSpectatorEvent } from '@/lib/wine-spectator-event';
+import { runNyweBackgroundDocuSignSync } from '@/lib/nywe-background-docusign-sync';
 import { requireContractActorForPage } from '@/lib/auth-contract';
 import { NyweLogo } from '@/components/brand/nywe-logo';
 import { ExhibitorRosterPanel } from '@/components/wine-spectator/exhibitor-roster-panel';
@@ -20,7 +21,10 @@ export default async function WineSpectatorRosterPage() {
   }
 
   try {
-    const { roster, fromCache, stale, fetchError, warnings } = await loadExhibitorRoster(event);
+    const [{ roster, fromCache, stale, fetchError, warnings }] = await Promise.all([
+      loadExhibitorRoster(event),
+      runNyweBackgroundDocuSignSync(),
+    ]);
 
     return (
       <div className="space-y-6">

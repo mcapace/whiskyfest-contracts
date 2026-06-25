@@ -72,6 +72,7 @@ export async function syncNyweExhibitorSignaturesFromDocuSign(options?: {
     .eq('event_id', event.id)
     .eq('status', 'sent')
     .not('docusign_envelope_id', 'is', null)
+    .order('sent_at', { ascending: false, nullsFirst: false })
     .order('id', { ascending: true })
     .limit(batchSize);
 
@@ -186,5 +187,3 @@ export async function syncAllNyweExhibitorSignaturesFromDocuSign(options?: {
 
   return totals;
 }
-
-export { NYWE_DOCUSIGN_SYNC_DONE_EVENT } from '@/lib/nywe-docusign-sync-events';
