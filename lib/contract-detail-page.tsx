@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { getContractWithTotalsForViewer } from '@/lib/auth-contract';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { isEventsManagedWorkflow } from '@/lib/contract-template-profile';
+import { isNyweVendorEvent } from '@/lib/nywe-pricing';
 import { dealKindFromContract } from '@/lib/contract-deal-kind';
 import { isLegacyImportedContract } from '@/lib/legacy-import';
 import { ContractDetailViewClient } from '@/lib/contract-detail-client';
@@ -180,7 +181,9 @@ export async function ContractDetailPage({
     ? 'Signed agreement (latest stored copy)'
     : contract.status === 'sent' || contract.status === 'partially_signed'
       ? 'Draft sent to DocuSign (matches latest envelope)'
-      : 'Latest generated draft';
+      : isNyweVendorEvent(eventRow)
+        ? 'Live preview — billing address and signatory title from current data'
+        : 'Latest generated draft';
 
   return (
     <ContractDetailViewClient

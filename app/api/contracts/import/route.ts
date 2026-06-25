@@ -218,8 +218,6 @@ export async function POST(req: Request) {
     }
     if (!notesCombined) notesCombined = 'Imported pre-existing signed sponsorship contract.';
 
-    const supabase = getSupabaseAdmin();
-
     let signedDay = p.originally_signed_at.trim();
     if (/^\d{4}-\d{2}-\d{2}$/.test(signedDay)) {
       signedDay = `${signedDay}T12:00:00.000Z`;
@@ -361,8 +359,6 @@ export async function POST(req: Request) {
     notesCombined = `${notesCombined}${notesCombined ? '\n\n' : ''}Billing address (import):\n${p.billing_address_notes.trim()}`;
   }
   if (!notesCombined) notesCombined = 'Imported pre-existing signed contract.';
-
-  const supabase = getSupabaseAdmin();
 
   const discounted = isDiscountedRate(booth_rate_cents);
 

@@ -6,7 +6,8 @@ import {
 } from '@/lib/contract-pdf-storage';
 import { contractPrefersSignedPdf } from '@/lib/contract-pdf-preview';
 import { syncDraftPdfFromDocuSign } from '@/lib/contract-pdf-sync-docusign';
-import type { Contract, ContractStatus } from '@/types/db';
+import { nyweUsesLiveDraftPreview, renderNyweLiveDraftPdf } from '@/lib/nywe-live-draft-pdf';
+import type { Contract, ContractStatus, Event } from '@/types/db';
 
 export type ResolvedContractPdf =
   | { kind: 'bytes'; bytes: Buffer }
@@ -45,6 +46,24 @@ export async function resolveContractPdf(
   }
 
   if (variant === 'draft' || (variant === 'auto' && !preferSigned)) {
+    const { data: eventRow } = await supabase
+      .from('events')
+      .select('contract_template_profile, product_key')
+      .eq('id', contract.event_id)
+      .maybeSingle<Event>();
+
+    if (nyweUsesLiveDraftPreview(contract, eventRow, variant)) {
+      try {
+        const live = await renderNyweLiveDraftPdf(supabase, id);
+        if (live) return { kind: 'bytes', bytes: live };
+      } catch (err) {
+        console.error('[resolveContractPdf] NYWE live draft render failed', {
+          contractId: id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     const bytes =
       (await tryDownloadStorage(contractDraftPdfPath(id))) ??
       (contract.pdf_storage_path?.endsWith('draft.pdf')
