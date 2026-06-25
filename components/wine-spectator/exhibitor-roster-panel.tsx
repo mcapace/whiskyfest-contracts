@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils';
 import { RelativeTime } from '@/components/ui/relative-time';
 import { subscribeToAppContractEvents } from '@/lib/realtime-client';
+import { NYWE_DOCUSIGN_SYNC_DONE_EVENT } from '@/lib/nywe-sync-exhibitor-signatures';
 import {
   rosterColumnModeLabel,
   formatRosterWineDisplay,
@@ -94,7 +95,7 @@ type RosterPayload = {
   rows: RosterRow[];
 };
 
-const AUTO_REFRESH_MS = 2 * 60 * 1000;
+const AUTO_REFRESH_MS = 60 * 1000;
 
 function chunkItems<T>(items: T[], size: number): T[][] {
   const batches: T[][] = [];
@@ -387,10 +388,13 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
     const onVis = () => {
       if (document.visibilityState === 'visible') refresh({ preserveSelection: true, live: true });
     };
+    const onDocuSignSync = () => refresh({ preserveSelection: true, live: true });
     document.addEventListener('visibilitychange', onVis);
+    window.addEventListener(NYWE_DOCUSIGN_SYNC_DONE_EVENT, onDocuSignSync);
     return () => {
       off();
       document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener(NYWE_DOCUSIGN_SYNC_DONE_EVENT, onDocuSignSync);
     };
   }, [refresh]);
 

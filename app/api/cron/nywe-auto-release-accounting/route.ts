@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { autoReleaseNyweAfterCountersign } from '@/lib/nywe-auto-release-accounting';
-import { syncNyweExhibitorSignaturesFromDocuSign } from '@/lib/nywe-sync-exhibitor-signatures';
+import {
+  syncAllNyweExhibitorSignaturesFromDocuSign,
+  syncNyweExhibitorSignaturesFromDocuSign,
+} from '@/lib/nywe-sync-exhibitor-signatures';
 import { getActiveWineSpectatorEvent } from '@/lib/wine-spectator-event';
 import type { ContractWithTotals } from '@/types/db';
 
@@ -16,19 +19,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const exhibitorSync = await syncNyweExhibitorSignaturesFromDocuSign({ maxContracts: 500, notify: false }).catch(
-    (err) => {
-      console.error('[nywe-auto-release-accounting cron] exhibitor sync failed', err);
-      return {
-        scanned: 0,
-        partiallySigned: 0,
-        fullySigned: 0,
-        unchanged: 0,
-        errors: 0,
-        errorSamples: [],
-      };
-    },
-  );
+  const exhibitorSync = await syncAllNyweExhibitorSignaturesFromDocuSign({
+    batchSize: 25,
+    maxBatches: 40,
+    notify: false,
+  }).catch((err) => {
+    console.error('[nywe-auto-release-accounting cron] exhibitor sync failed', err);
+    return {
+      scanned: 0,
+      partiallySigned: 0,
+      fullySigned: 0,
+      unchanged: 0,
+      errors: 0,
+      errorSamples: [],
+      nextAfterId: null,
+      hasMore: false,
+      remainingSent: 0,
+    };
+  });
 
   const event = await getActiveWineSpectatorEvent();
   if (!event) {

@@ -52,7 +52,7 @@ async function main() {
     return;
   }
 
-  const result = await syncNyweExhibitorSignaturesFromDocuSign({ maxContracts: limit, notify: true });
+  const result = await syncAllNyweExhibitorSignaturesFromDocuSign({ batchSize: limit, maxBatches: 40, notify: true });
   console.log(result);
 }
 
