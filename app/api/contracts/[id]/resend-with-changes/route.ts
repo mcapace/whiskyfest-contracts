@@ -14,6 +14,7 @@ import {
 } from '@/lib/contract-document-naming';
 import { eventUsesContractOrderTable } from '@/lib/contract-template-profile';
 import { nyweLicenseAddressError } from '@/lib/nywe-billing';
+import { refreshNyweBillingFromRosterForContract } from '@/lib/nywe-roster-billing-sync';
 import { resolveContractTemplateDocId } from '@/lib/contract-template';
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
@@ -46,12 +47,14 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }
 
   const supabase = getSupabaseAdmin();
-  const contract = await fetchContractWithTotalsById(supabase, params.id);
+  let contract = await fetchContractWithTotalsById(supabase, params.id);
 
   if (!contract) return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
 
   const { data: event } = await supabase.from('events').select('*').eq('id', contract.event_id).single<Event>();
   if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+
+  contract = await refreshNyweBillingFromRosterForContract(supabase, contract, event);
 
   if (requiresDiscountApproval(contract, event)) {
     return NextResponse.json(

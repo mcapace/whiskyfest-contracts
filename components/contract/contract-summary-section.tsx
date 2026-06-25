@@ -47,7 +47,9 @@ export function ContractSummarySection({
             <SummaryField label="Booth count" value={String(contract.booth_count)} />
           </>
         )}
-        <SummaryField label="Sales rep" value={contract.sales_rep_name ?? contract.sales_rep_email ?? '—'} />
+        {!nyweLicense ? (
+          <SummaryField label="Sales rep" value={contract.sales_rep_name ?? contract.sales_rep_email ?? '—'} />
+        ) : null}
         <SummaryField label="Signer" value={contract.signer_1_name?.trim() || '—'} />
         <SummaryField
           label="Email"

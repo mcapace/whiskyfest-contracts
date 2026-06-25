@@ -37,8 +37,10 @@ async function main() {
   let updated = 0;
   let skipped = 0;
 
+  const force = process.argv.includes('--force');
+
   for (const row of contracts ?? []) {
-    if (contractHasNyweLicenseAddress(row)) {
+    if (!force && contractHasNyweLicenseAddress(row)) {
       skipped += 1;
       continue;
     }

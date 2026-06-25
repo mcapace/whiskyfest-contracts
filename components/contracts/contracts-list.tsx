@@ -64,6 +64,7 @@ export function ContractsList({
   currentRepId,
   boothRowsByContract = {},
   portalBasePath = '',
+  winePortal = portalBasePath === '/wine-spectator',
   importedContractId,
   importedExhibitorName,
   initialFilterStatus = 'all',
@@ -74,6 +75,8 @@ export function ContractsList({
   boothRowsByContract?: BoothBrandRowsByContract;
   /** e.g. '' for WhiskyFest, '/wine-spectator' for Wine Spectator section */
   portalBasePath?: string;
+  /** Wine Spectator portal — hide WhiskyFest sales rep + spirit brand filters/columns. */
+  winePortal?: boolean;
   importedContractId?: string;
   importedExhibitorName?: string | null;
   /** Sync status chip with URL after import redirect (?status=imported). */
@@ -311,6 +314,9 @@ export function ContractsList({
         ]}
         repOptions={repOptions}
         brandOptions={brandOptions}
+        hideRepFilter={winePortal}
+        hideBrandFilter={winePortal}
+        hideDealTypeFilter={winePortal}
       />
 
       {filtered.length === 0 ? (
@@ -358,7 +364,7 @@ export function ContractsList({
                 <TableHead>Status</TableHead>
                 <TableHead>Package</TableHead>
                 <TableHead className="text-right">Total</TableHead>
-                <TableHead>Sales Rep</TableHead>
+                {!winePortal ? <TableHead>Sales Rep</TableHead> : null}
                 <TableHead className="text-right">Last Activity</TableHead>
                 <TableHead className="w-12 text-right">Actions</TableHead>
               </TableRow>
@@ -394,9 +400,13 @@ export function ContractsList({
                     <TableCell>
                       <StatusBadge status={c.status} />
                     </TableCell>
-                    <TableCell className="text-sm text-foreground">{listPackageLabel(c)}</TableCell>
+                    <TableCell className="text-sm text-foreground">
+                      {winePortal ? 'Vendor license' : listPackageLabel(c)}
+                    </TableCell>
                     <TableCell className="text-right font-semibold tabular-nums">{formatCurrency(c.grand_total_cents)}</TableCell>
-                    <TableCell>{c.sales_rep_name ?? c.sales_rep_email ?? '—'}</TableCell>
+                    {!winePortal ? (
+                      <TableCell>{c.sales_rep_name ?? c.sales_rep_email ?? '—'}</TableCell>
+                    ) : null}
                     <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
                       <RelativeTime iso={c.updated_at} />
                     </TableCell>

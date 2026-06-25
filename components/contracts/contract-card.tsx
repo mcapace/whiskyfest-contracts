@@ -12,9 +12,11 @@ import type { ContractWithTotals } from '@/types/db';
 export function ContractCard({
   contract,
   portalBasePath = '',
+  vendorLicense = portalBasePath === '/wine-spectator',
 }: {
   contract: ContractWithTotals;
   portalBasePath?: string;
+  vendorLicense?: boolean;
 }) {
   const brands = (contract.brands_poured ?? '')
     .split(/[\n,;]+/)
@@ -65,7 +67,9 @@ export function ContractCard({
         </div>
         <div>
           <p className="text-[11px] uppercase tracking-wide text-ink-500">Package</p>
-          <p className="font-sans text-sm font-semibold leading-snug text-oak-800">{listPackageLabel(contract)}</p>
+          <p className="font-sans text-sm font-semibold leading-snug text-oak-800">
+            {vendorLicense ? 'Vendor license' : listPackageLabel(contract)}
+          </p>
         </div>
       </div>
       <p className="mt-4 text-xs text-ink-500" suppressHydrationWarning>

@@ -67,6 +67,15 @@ export async function replaceContractBoothBrandsForContract(
   await supabase.from('contracts').update({ brands_poured: brandsPoured }).eq('id', contractId);
 }
 
+/** NYWE vendor licenses do not use per-booth whisky/spirit brand rows. */
+export async function clearContractBoothBrandsForContract(
+  supabase: SupabaseClient,
+  contractId: string,
+): Promise<void> {
+  const { error } = await supabase.from('contract_booth_brands').delete().eq('contract_id', contractId);
+  if (error) throw new Error(error.message);
+}
+
 /**
  * Google Docs merge token `{{booth_brands_block}}` — one line per booth.
  * With expressions: Booth 1: Don Julio (Blanco, Reposado)

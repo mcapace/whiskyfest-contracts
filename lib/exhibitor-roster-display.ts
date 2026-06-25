@@ -1,5 +1,10 @@
 /** Client-safe display helpers for NYWE exhibitor roster rows. */
 
+import {
+  billingStreetDefersToWinery,
+  resolveContractStreetFromSheetCells,
+} from '@/lib/exhibitor-roster-billing';
+
 export type RosterAddressPreviewInput = {
   billingStreet?: string;
   billingCity?: string;
@@ -12,18 +17,28 @@ export type RosterAddressPreviewInput = {
   contractBillingZip?: string | null;
 };
 
+function resolvedStreetLine(row: RosterAddressPreviewInput): string {
+  const stored = row.contractBillingLine1?.trim() ?? '';
+  if (stored && !billingStreetDefersToWinery(stored)) return stored;
+  const fromSheet = resolveContractStreetFromSheetCells(
+    row.billingStreet ?? '',
+    row.wineryAddress ?? '',
+  );
+  if (fromSheet) return fromSheet.line1;
+  if (stored) return stored;
+  return '';
+}
+
 /** Best-effort single-line contract/billing address for review lists. */
 export function rosterAddressPreview(row: RosterAddressPreviewInput): string {
-  const line1 =
-    row.contractBillingLine1?.trim() || row.billingStreet?.trim() || row.wineryAddress?.trim() || '';
+  const line1 = resolvedStreetLine(row);
   const city = row.contractBillingCity?.trim() || row.billingCity?.trim() || '';
   const state = row.contractBillingState?.trim() || row.billingState?.trim() || '';
-  const zip = row.contractBillingZip?.trim() || '';
+  const zip = row.contractBillingZip?.trim() || row.billingZip?.trim() || '';
   const cityLine = [city, [state, zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
   return [line1, cityLine].filter(Boolean).join(' · ') || '—';
 }
 
 export function rosterAddressMissing(row: RosterAddressPreviewInput): boolean {
-  const preview = rosterAddressPreview(row);
-  return preview === '—' || !preview.trim();
+  return !resolvedStreetLine(row);
 }

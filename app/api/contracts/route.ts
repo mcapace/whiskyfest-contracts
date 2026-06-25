@@ -8,7 +8,7 @@ import {
   normalizeSignerCcEmail,
   normalizeSignerCcName,
 } from '@/lib/docusign-signer-cc';
-import { replaceContractBoothBrandsForContract } from '@/lib/contract-booth-brands';
+import { replaceContractBoothBrandsForContract, clearContractBoothBrandsForContract } from '@/lib/contract-booth-brands';
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
 import { eventTemplateProfile, isEventsManagedWorkflow } from '@/lib/contract-template-profile';
 import { isNyweVendorEvent, applyNyweLicensePricingIfNeeded, signerTitleForContract } from '@/lib/nywe-pricing';
@@ -169,7 +169,7 @@ export async function POST(req: Request) {
       signer_1_email: p.signer_1_email ?? null,
       signer_cc_name: normalizeSignerCcName(p.signer_cc_name),
       signer_cc_email: normalizeSignerCcEmail(p.signer_cc_email),
-      sales_rep_id: effectiveSalesRepId,
+      sales_rep_id: isNyweVendorEvent(eventRow) ? null : effectiveSalesRepId,
       notes: p.notes ?? null,
       exhibitor_notes: p.exhibitor_notes?.trim() || null,
       created_by: actor.email,
@@ -189,7 +189,11 @@ export async function POST(req: Request) {
 
   try {
     await replaceContractLineItemsForContract(supabase, row.id, nyweLineItems);
-    await replaceContractBoothBrandsForContract(supabase, row.id, nywePricing.booth_count, p.booth_brands ?? []);
+    if (isNyweVendorEvent(eventRow)) {
+      await clearContractBoothBrandsForContract(supabase, row.id);
+    } else {
+      await replaceContractBoothBrandsForContract(supabase, row.id, nywePricing.booth_count, p.booth_brands ?? []);
+    }
   } catch (e) {
     console.error('Failed to save contract line items:', e);
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Failed to save line items' }, { status: 500 });

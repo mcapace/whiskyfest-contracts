@@ -726,10 +726,11 @@ export function NewContractForm({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {!boothOnlyEvent ? (
             <div className="space-y-2">
               <Label>Deal type</Label>
               <div className="flex flex-wrap gap-2">
-                {(boothOnlyEvent ? (['booth'] as const) : CONTRACT_DEAL_KINDS).map((kind) => (
+                {CONTRACT_DEAL_KINDS.map((kind) => (
                   <Button
                     key={kind}
                     type="button"
@@ -742,6 +743,7 @@ export function NewContractForm({
                 ))}
               </div>
             </div>
+            ) : null}
 
             {dealKind !== 'sponsorship_only' ? (
             boothOnlyEvent ? (

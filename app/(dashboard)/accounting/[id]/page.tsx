@@ -132,7 +132,9 @@ export default async function AccountingContractDetailPage({ params }: { params:
                   )}
                 </>
               ) : null}
-              <Detail label="Sales Rep" value={contract.sales_rep_name ?? contract.sales_rep_email ?? '—'} />
+              {!isNyweVendorEvent(event) ? (
+                <Detail label="Sales Rep" value={contract.sales_rep_name ?? contract.sales_rep_email ?? '—'} />
+              ) : null}
               <Detail label="Event" value={event ? `${event.name} ${event.year}` : '—'} />
               <Detail
                 label={isNyweVendorEvent(event) ? 'License fee' : 'Booth Rate'}

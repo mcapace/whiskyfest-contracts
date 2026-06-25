@@ -34,6 +34,7 @@ export default async function WineSpectatorContractsPage({
         currentRepId={actor.salesRepId}
         boothRowsByContract={boothRowsByContract}
         portalBasePath="/wine-spectator"
+        winePortal
       />
     </div>
   );

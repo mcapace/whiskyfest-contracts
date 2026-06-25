@@ -11,7 +11,7 @@ import {
   signerContactPatchSchema,
   sponsorBrandFromBody,
 } from '@/lib/contract-schemas';
-import { replaceContractBoothBrandsForContract } from '@/lib/contract-booth-brands';
+import { replaceContractBoothBrandsForContract, clearContractBoothBrandsForContract } from '@/lib/contract-booth-brands';
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
 import {
   normalizeSignerCcEmail,
@@ -105,6 +105,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const nyweBilling =
       patchEvent && isNyweVendorEvent(patchEvent) ? billingFieldsFromOptionalBody(p) : null;
 
+    const nyweEvent = patchEvent && isNyweVendorEvent(patchEvent);
+    if (nyweEvent) {
+      effectiveSalesRepId = null;
+    }
+
     const { error } = await supabase
       .from('contracts')
       .update({
@@ -153,12 +158,16 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     try {
       await replaceContractLineItemsForContract(supabase, params.id, nyweLineItems);
-      await replaceContractBoothBrandsForContract(
-        supabase,
-        params.id,
-        nywePricing.booth_count,
-        p.booth_brands ?? [],
-      );
+      if (nyweEvent) {
+        await clearContractBoothBrandsForContract(supabase, params.id);
+      } else {
+        await replaceContractBoothBrandsForContract(
+          supabase,
+          params.id,
+          nywePricing.booth_count,
+          p.booth_brands ?? [],
+        );
+      }
     } catch (e) {
       console.error('Failed to save contract line items:', e);
       return NextResponse.json({ error: e instanceof Error ? e.message : 'Failed to save line items' }, { status: 500 });

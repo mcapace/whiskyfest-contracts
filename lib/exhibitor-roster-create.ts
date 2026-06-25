@@ -6,6 +6,7 @@ import {
   parseRosterRowKey,
   ROSTER_MISSING_ADDRESS_MESSAGE,
 } from '@/lib/exhibitor-roster';
+import { contractHasNyweLicenseAddress } from '@/lib/nywe-billing';
 import { getSheetsClient } from '@/lib/sheets-tracker';
 import type { Contract, ContractWithTotals, Event } from '@/types/db';
 
@@ -83,7 +84,7 @@ export async function createContractsFromRosterRows(options: {
         errors.push({ rowKey, reason: 'Missing signer email' });
         continue;
       }
-      if (!payload.billing?.billing_address_line1?.trim()) {
+      if (!payload.billing || !contractHasNyweLicenseAddress(payload.billing)) {
         errors.push({ rowKey, reason: ROSTER_MISSING_ADDRESS_MESSAGE });
         continue;
       }

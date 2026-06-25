@@ -855,9 +855,11 @@ export function ContractActions({
             <p>
               <span className="text-muted-foreground">Contract total:</span> {formatCurrency(grandTotalCents)}
             </p>
-            <p>
-              <span className="text-muted-foreground">Sales rep:</span> {salesRep ?? '—'}
-            </p>
+            {!eventsManagedWorkflow ? (
+              <p>
+                <span className="text-muted-foreground">Sales rep:</span> {salesRep ?? '—'}
+              </p>
+            ) : null}
             <p>
               <span className="text-muted-foreground">Created by:</span> {createdBy ?? '—'}
             </p>
@@ -999,7 +1001,9 @@ export function ContractActions({
                 <ul className="space-y-1 text-sm text-foreground/90">
                   <li>- {signerName?.trim() || 'Exhibitor signer'} {signerEmail ? `(${signerEmail})` : ''}</li>
                   <li>- {countersignerName?.trim() || 'Countersigner'} {countersignerEmail ? `(${countersignerEmail})` : ''}</li>
-                  <li>- Sales rep: {salesRep ?? salesRepEmail ?? '—'}</li>
+                  {!eventsManagedWorkflow ? (
+                    <li>- Sales rep: {salesRep ?? salesRepEmail ?? '—'}</li>
+                  ) : null}
                   <li>- Events team</li>
                 </ul>
               </div>

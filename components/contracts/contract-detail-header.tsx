@@ -15,6 +15,8 @@ export function ContractDetailHeader({
   lineItemsSubtotalCents,
   totalCents,
   salesRep,
+  showSalesRep = true,
+  vendorLicense = false,
 }: {
   title: string;
   subtitle: string;
@@ -24,6 +26,8 @@ export function ContractDetailHeader({
   lineItemsSubtotalCents?: number | null;
   totalCents: number;
   salesRep: string | null;
+  showSalesRep?: boolean;
+  vendorLicense?: boolean;
 }) {
   const dealKind = dealKindFromContract({
     order_type: orderType,
@@ -43,24 +47,33 @@ export function ContractDetailHeader({
       </div>
       <p className="font-display text-lg italic text-ink-700">{subtitle}</p>
       <div className="flex flex-wrap gap-6 border-t border-parchment-200 pt-3 text-sm text-ink-700">
-        <p>
-          <span className="text-ink-500">Deal</span> ·{' '}
-          <span className="font-semibold text-oak-800">{packageLabel}</span>
-          {dealKind !== 'sponsorship_only' ? (
-            <span className="text-ink-500">
-              {' '}
-              · <span className="tabular-nums">{boothCount}</span> booth{boothCount === 1 ? '' : 's'}
-            </span>
-          ) : null}
-        </p>
+        {vendorLicense ? (
+          <p>
+            <span className="text-ink-500">Package</span> ·{' '}
+            <span className="font-semibold text-oak-800">Vendor license</span>
+          </p>
+        ) : (
+          <p>
+            <span className="text-ink-500">Deal</span> ·{' '}
+            <span className="font-semibold text-oak-800">{packageLabel}</span>
+            {dealKind !== 'sponsorship_only' ? (
+              <span className="text-ink-500">
+                {' '}
+                · <span className="tabular-nums">{boothCount}</span> booth{boothCount === 1 ? '' : 's'}
+              </span>
+            ) : null}
+          </p>
+        )}
         <p>
           <span className="text-ink-500">Total</span> ·{' '}
           <span className="tabular-nums font-semibold text-oak-800">{formatCurrency(totalCents)}</span>
         </p>
-        <p>
-          <span className="text-ink-500">Sales Rep</span> ·{' '}
-          <span className="font-semibold text-oak-800">{salesRep ?? '—'}</span>
-        </p>
+        {showSalesRep ? (
+          <p>
+            <span className="text-ink-500">Sales Rep</span> ·{' '}
+            <span className="font-semibold text-oak-800">{salesRep ?? '—'}</span>
+          </p>
+        ) : null}
       </div>
     </header>
   );

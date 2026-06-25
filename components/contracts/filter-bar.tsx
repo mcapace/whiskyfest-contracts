@@ -50,6 +50,9 @@ export function ContractsFilterBar({
   repOptions,
   brandOptions,
   dealTypeOptions,
+  hideRepFilter,
+  hideBrandFilter,
+  hideDealTypeFilter,
 }: {
   filters: ContractViewFilters;
   searchDraft: string;
@@ -59,6 +62,9 @@ export function ContractsFilterBar({
   repOptions: Option[];
   brandOptions: Option[];
   dealTypeOptions: Option[];
+  hideRepFilter?: boolean;
+  hideBrandFilter?: boolean;
+  hideDealTypeFilter?: boolean;
 }) {
   return (
     <div className="space-y-4 rounded-lg border border-parchment-200 bg-parchment-50 p-4">
@@ -75,7 +81,7 @@ export function ContractsFilterBar({
             <Input
               value={searchDraft}
               onChange={(e) => onSearchDraftChange(e.target.value)}
-              placeholder="Search company, signer, email, brands"
+              placeholder={hideBrandFilter ? 'Search company, signer, email, wine' : 'Search company, signer, email, brands'}
               className="pl-8 pr-8 font-sans"
               aria-label="Search contracts"
             />
@@ -102,24 +108,30 @@ export function ContractsFilterBar({
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <ChipGroup
-          label="Deal type"
-          options={dealTypeOptions}
-          selected={filters.dealType}
-          onSelect={(dealType) => onChange({ ...filters, dealType, listPreset: 'none' })}
-        />
-        <ChipGroup
-          label="Sales rep"
-          options={repOptions}
-          selected={filters.rep}
-          onSelect={(rep) => onChange({ ...filters, rep, listPreset: 'none' })}
-        />
-        <ChipGroup
-          label="Brand category"
-          options={brandOptions}
-          selected={filters.brand}
-          onSelect={(brand) => onChange({ ...filters, brand, listPreset: 'none' })}
-        />
+        {!hideDealTypeFilter ? (
+          <ChipGroup
+            label="Deal type"
+            options={dealTypeOptions}
+            selected={filters.dealType}
+            onSelect={(dealType) => onChange({ ...filters, dealType, listPreset: 'none' })}
+          />
+        ) : null}
+        {!hideRepFilter ? (
+          <ChipGroup
+            label="Sales rep"
+            options={repOptions}
+            selected={filters.rep}
+            onSelect={(rep) => onChange({ ...filters, rep, listPreset: 'none' })}
+          />
+        ) : null}
+        {!hideBrandFilter ? (
+          <ChipGroup
+            label="Brand category"
+            options={brandOptions}
+            selected={filters.brand}
+            onSelect={(brand) => onChange({ ...filters, brand, listPreset: 'none' })}
+          />
+        ) : null}
       </div>
     </div>
   );

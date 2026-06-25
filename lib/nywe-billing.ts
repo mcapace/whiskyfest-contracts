@@ -1,4 +1,5 @@
 import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
+import { billingStreetDefersToWinery } from '@/lib/exhibitor-roster-billing';
 import { eventTemplateProfile } from '@/lib/contract-template-profile';
 import { exhibitorFieldMergeTokens } from '@/lib/exhibitor-docusign-fields';
 import type { MergePlaceholderMode } from '@/lib/merge-map';
@@ -57,10 +58,13 @@ export function contractHasBillingInfo(
 }
 
 export const NYWE_LICENSE_ADDRESS_ERROR =
-  'A billing or winery street address is required before this license can be generated or sent to the client.';
+  'Billing street address is required on the license. Use the billing street from the roster, or winery street when billing says "same as winery address" or is blank. Add an address in Google Sheets, then regenerate.';
 
+/** True when line1 is a real street address (not a sheet placeholder like "same as winery"). */
 export function contractHasNyweLicenseAddress(c: Pick<Contract, 'billing_address_line1'>): boolean {
-  return Boolean(c.billing_address_line1?.trim());
+  const line1 = c.billing_address_line1?.trim();
+  if (!line1) return false;
+  return !billingStreetDefersToWinery(line1);
 }
 
 export function nyweLicenseAddressError(

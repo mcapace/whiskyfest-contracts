@@ -23,7 +23,7 @@ export type ResolvedRosterContractAddress = {
 };
 
 export const ROSTER_MISSING_ADDRESS_MESSAGE =
-  'Missing billing or winery street address — add one in Google Sheets before creating or sending this license.';
+  'Billing street or winery street address is required — add one in Google Sheets before creating this license.';
 
 function cell(row: string[], index: number): string {
   const v = row[index];
@@ -42,16 +42,17 @@ export function billingStreetDefersToWinery(billingStreet: string): boolean {
 }
 
 /**
- * Contract street line for NYWE licenses:
+ * Resolve the contract billing street from sheet cells:
  * 1. Billing street when it is a real address
  * 2. Winery street when billing says "same as winery" or billing is blank
+ * 3. null when both are blank — cannot generate a license
  */
-export function resolveRosterContractStreetAddress(
-  row: string[],
-  map: RosterAddressColumnMap,
+export function resolveContractStreetFromSheetCells(
+  billingStreet: string,
+  wineryStreet: string,
 ): ResolvedRosterContractAddress | null {
-  const billingRaw = cell(row, map.billingStreet);
-  const winery = cell(row, map.wineryStreet);
+  const billingRaw = billingStreet.trim();
+  const winery = wineryStreet.trim();
 
   if (billingRaw && !billingStreetDefersToWinery(billingRaw)) {
     return { line1: billingRaw, sameAsWinery: false, usedWineryStreet: false };
@@ -66,6 +67,14 @@ export function resolveRosterContractStreetAddress(
   }
 
   return null;
+}
+
+/** @see resolveContractStreetFromSheetCells */
+export function resolveRosterContractStreetAddress(
+  row: string[],
+  map: RosterAddressColumnMap,
+): ResolvedRosterContractAddress | null {
+  return resolveContractStreetFromSheetCells(cell(row, map.billingStreet), cell(row, map.wineryStreet));
 }
 
 export function rosterRowHasContractAddress(row: string[], map: RosterAddressColumnMap): boolean {

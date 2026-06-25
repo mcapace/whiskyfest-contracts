@@ -91,6 +91,8 @@ export function ContractDetailView({
   pdfPreviewCaption,
   legacyPdfUrl,
 }: ContractDetailViewProps) {
+  const nyweLicense = isNyweVendorEvent(event);
+
   return (
     <ContractLiveProvider>
       <div className="space-y-6">
@@ -116,6 +118,8 @@ export function ContractDetailView({
           lineItemsSubtotalCents={contract.line_items_subtotal_cents}
           totalCents={contract.grand_total_cents}
           salesRep={contract.sales_rep_name ?? contract.sales_rep_email ?? null}
+          showSalesRep={!nyweLicense}
+          vendorLicense={nyweLicense}
         />
 
         <div className="grid gap-6 xl:grid-cols-[240px_minmax(0,1fr)]">
@@ -342,7 +346,7 @@ export function ContractDetailView({
                   </div>
                   <Detail label="Legal Name" value={contract.exhibitor_legal_name} />
                   <Detail label="Display Name" value={contract.exhibitor_company_name} />
-                  {boothBrands.length > 0 ? (
+                  {!nyweLicense && boothBrands.length > 0 ? (
                     <section aria-labelledby="brands-expressions-heading">
                       <h3
                         id="brands-expressions-heading"
@@ -382,10 +386,14 @@ export function ContractDetailView({
                         ))}
                       </div>
                     </section>
-                  ) : (
+                  ) : !nyweLicense ? (
                     <Detail label="Brands" value={contract.brands_poured} />
-                  )}
-                  <Detail label="Sales Rep" value={contract.sales_rep_name ?? contract.sales_rep_email ?? '—'} />
+                  ) : contract.brands_poured ? (
+                    <Detail label="Wine" value={contract.brands_poured} />
+                  ) : null}
+                  {!nyweLicense ? (
+                    <Detail label="Sales Rep" value={contract.sales_rep_name ?? contract.sales_rep_email ?? '—'} />
+                  ) : null}
                   {(contract.status === 'signed' || contract.status === 'executed') &&
                     contract.countersigned_at &&
                     (contract.countersigned_by_name || contract.countersigned_by_email) && (
@@ -402,7 +410,9 @@ export function ContractDetailView({
                   <h2 className="font-serif text-lg font-semibold">Pricing</h2>
                 </div>
                 <CardContent className="space-y-3 p-6 text-sm">
-                  <Detail label="Deal type" value={dealKindLabel(dealKind)} />
+                  {!nyweLicense ? (
+                    <Detail label="Deal type" value={dealKindLabel(dealKind)} />
+                  ) : null}
                   {isSponsorshipOnlyOrder(contract) ? (
                     <>
                       <p className="wf-label-caps text-[0.6rem] text-muted-foreground">Sponsorship only</p>
