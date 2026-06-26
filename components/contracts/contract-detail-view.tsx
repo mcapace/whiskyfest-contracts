@@ -326,7 +326,8 @@ export function ContractDetailView({
                           contract.signer_1_email?.trim() ? (
                             <a
                               href={`mailto:${contract.signer_1_email.trim()}`}
-                              className="font-medium text-foreground underline decoration-primary underline-offset-2 transition-colors hover:text-primary"
+                              title={contract.signer_1_email.trim()}
+                              className="block truncate font-medium text-foreground underline decoration-primary underline-offset-2 transition-colors hover:text-primary"
                             >
                               {contract.signer_1_email.trim()}
                             </a>
@@ -757,13 +758,14 @@ function Detail({
   const empty =
     value == null || value === false || (typeof value === 'string' && value.trim() === '');
   return (
-    <div className="flex items-baseline justify-between gap-4">
-      <span className="text-muted-foreground">{label}</span>
+    <div className="flex min-w-0 items-baseline justify-between gap-4">
+      <span className="shrink-0 text-muted-foreground">{label}</span>
       <span
         className={cn(
-          'text-right',
+          'min-w-0 text-right',
           mono && 'font-mono tabular-nums',
           multiline && 'max-w-[min(100%,20rem)] whitespace-pre-wrap text-right text-sm leading-snug',
+          !multiline && 'truncate',
         )}
       >
         {empty ? '—' : value}

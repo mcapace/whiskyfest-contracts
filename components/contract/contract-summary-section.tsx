@@ -53,11 +53,13 @@ export function ContractSummarySection({
         <SummaryField label="Signer" value={contract.signer_1_name?.trim() || '—'} />
         <SummaryField
           label="Email"
+          className="sm:col-span-2 lg:col-span-2"
           value={
             contract.signer_1_email?.trim() ? (
               <a
                 href={`mailto:${contract.signer_1_email.trim()}`}
-                className="underline decoration-primary/40 underline-offset-2 transition-colors hover:text-primary hover:decoration-primary"
+                title={contract.signer_1_email.trim()}
+                className="block truncate underline decoration-primary/40 underline-offset-2 transition-colors hover:text-primary hover:decoration-primary"
               >
                 {contract.signer_1_email.trim()}
               </a>
@@ -80,18 +82,20 @@ function SummaryField({
   value,
   mono,
   emphasis,
+  className,
 }: {
   label: string;
   value: ReactNode;
   mono?: boolean;
   emphasis?: boolean;
+  className?: string;
 }) {
   return (
-    <div>
+    <div className={cn('min-w-0', className)}>
       <p className="wf-label-caps text-[0.6rem]">{label}</p>
       <div
         className={cn(
-          'mt-1.5 text-foreground',
+          'mt-1.5 min-w-0 text-foreground',
           emphasis && 'font-mono text-xl font-semibold tabular-nums tracking-tight md:text-2xl',
           mono && !emphasis && 'font-mono text-sm tabular-nums',
           !mono && !emphasis && 'text-base font-medium',

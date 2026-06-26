@@ -1162,7 +1162,7 @@ function StatusLine({
     }
     return (
       <p className="text-sm italic text-muted-foreground" suppressHydrationWarning>
-        {sentAt && hydrated ? `Sent ${sentRelative}` : 'Sent'} · Waiting for {signerEmail ?? 'signer'} to sign
+        {sentAt && hydrated ? `Sent ${sentRelative}` : 'Sent'} · Waiting for {signerWaitLabel} to sign
         {(isAdmin || isEventsTeam) && docusignEnvelopeId ? (
           <> · If they already signed in DocuSign, open <span className="font-medium text-foreground">Actions</span> and use Sync from DocuSign.</>
         ) : null}
