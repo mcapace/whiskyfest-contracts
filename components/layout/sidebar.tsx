@@ -329,9 +329,9 @@ export function Sidebar({
                   </Link>
                 );
               })}
-            {canAccounting && !nywePortal && !accountingPortal && !accountingOnly && (
+            {canAccounting && !accountingPortal && !accountingOnly && (
               <Link
-                href="/accounting"
+                href={nywePortal ? nyweHref('/accounting/nywe', portalKind) : '/accounting'}
                 className={cn(
                   'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
                   portalNavLinkActive(pathname, '/accounting')

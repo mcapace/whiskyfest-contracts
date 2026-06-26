@@ -75,11 +75,20 @@ export function MobileBottomNav({
     const homeHref = nyweHref('/wine-spectator', portalKind);
     const newHref = nyweHref('/wine-spectator/contracts/new', portalKind);
     const listHref = nyweHref('/wine-spectator/contracts', portalKind);
+    const accountingHref = nyweHref('/accounting/nywe', portalKind);
     return (
       <nav className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t border-border/60 bg-bg-surface-raised/95 px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md lg:hidden">
         <NavIcon href={homeHref} active={nywePathActive(pathname, '/wine-spectator')} label="Home" icon={LayoutDashboard} />
         <NavIcon href={newHref} active={nywePathActive(pathname, '/wine-spectator/contracts/new')} label="New" icon={Plus} />
         <NavIcon href={listHref} active={nywePathActive(pathname, '/wine-spectator/contracts')} label="Contracts" icon={Home} />
+        {showAccountingNav ? (
+          <NavIcon
+            href={accountingHref}
+            active={pathname === '/accounting' || pathname.startsWith('/accounting/')}
+            label="AR"
+            icon={Landmark}
+          />
+        ) : null}
         <div className="flex min-w-[3rem] flex-col items-center gap-0.5 py-1">
           <CommandPaletteTrigger />
           <span className="text-[10px] text-muted-foreground">Search</span>
