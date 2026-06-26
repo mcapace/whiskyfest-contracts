@@ -77,12 +77,20 @@ export function MobileBottomNav({
     const listHref = nyweHref('/wine-spectator/contracts', portalKind);
     const accountingHref = nyweHref('/accounting/nywe', portalKind);
     return (
-      <nav className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t border-border/60 bg-bg-surface-raised/95 px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md lg:hidden">
-        <NavIcon href={homeHref} active={nywePathActive(pathname, '/wine-spectator')} label="Home" icon={LayoutDashboard} />
-        <NavIcon href={newHref} active={nywePathActive(pathname, '/wine-spectator/contracts/new')} label="New" icon={Plus} />
-        <NavIcon href={listHref} active={nywePathActive(pathname, '/wine-spectator/contracts')} label="Contracts" icon={Home} />
+      <nav
+        className={cn(
+          'fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md lg:hidden',
+          nywePortal
+            ? 'border-rose-900/30 bg-rose-950/95'
+            : 'border-border/60 bg-bg-surface-raised/95',
+        )}
+      >
+        <NavIcon nywe={nywePortal} href={homeHref} active={nywePathActive(pathname, '/wine-spectator')} label="Home" icon={LayoutDashboard} />
+        <NavIcon nywe={nywePortal} href={newHref} active={nywePathActive(pathname, '/wine-spectator/contracts/new')} label="New" icon={Plus} />
+        <NavIcon nywe={nywePortal} href={listHref} active={nywePathActive(pathname, '/wine-spectator/contracts')} label="Contracts" icon={Home} />
         {showAccountingNav ? (
           <NavIcon
+            nywe={nywePortal}
             href={accountingHref}
             active={pathname === '/accounting' || pathname.startsWith('/accounting/')}
             label="AR"
@@ -91,7 +99,7 @@ export function MobileBottomNav({
         ) : null}
         <div className="flex min-w-[3rem] flex-col items-center gap-0.5 py-1">
           <CommandPaletteTrigger />
-          <span className="text-[10px] text-muted-foreground">Search</span>
+          <span className={cn('text-[10px]', nywePortal ? 'text-parchment-400/80' : 'text-muted-foreground')}>Search</span>
         </div>
       </nav>
     );
@@ -118,21 +126,35 @@ function NavIcon({
   active,
   label,
   icon: Icon,
+  nywe = false,
 }: {
   href: string;
   active: boolean;
   label: string;
   icon: LucideIcon;
+  nywe?: boolean;
 }) {
   return (
     <Link
       href={href}
       className={cn(
         'flex min-w-[3.25rem] flex-col items-center gap-0.5 rounded-lg px-2 py-1 text-[10px] font-medium transition-colors',
-        active ? 'text-accent-brand' : 'text-muted-foreground hover:text-foreground',
+        nywe
+          ? active
+            ? 'text-brass-200'
+            : 'text-parchment-400/80 hover:text-parchment-100'
+          : active
+            ? 'text-accent-brand'
+            : 'text-muted-foreground hover:text-foreground',
       )}
     >
-      <Icon className={cn('h-5 w-5', active && 'text-accent-brand')} strokeWidth={2} />
+      <Icon
+        className={cn(
+          'h-5 w-5',
+          nywe ? (active ? 'text-brass-200' : 'text-parchment-400/80') : active && 'text-accent-brand',
+        )}
+        strokeWidth={2}
+      />
       {label}
     </Link>
   );

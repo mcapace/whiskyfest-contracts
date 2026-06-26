@@ -2,17 +2,24 @@
 
 export type BrandLogoVariant = 'default' | 'onDark';
 
+export const NYWE_EVENT_LOGO = {
+  src: '/images/nywe-logo.png',
+  width: 514,
+  height: 174,
+  alt: 'New York Wine Experience',
+} as const;
+
 export const WINE_SPECTATOR_LOGO = {
   default: {
     src: '/images/wine-spectator-logo.png',
-    width: 1024,
-    height: 277,
+    width: 1044,
+    height: 290,
     alt: 'Wine Spectator',
   },
   onDark: {
     src: '/images/wine-spectator-logo-white.png',
-    width: 1024,
-    height: 278,
+    width: 1044,
+    height: 290,
     alt: 'Wine Spectator',
   },
 } as const;

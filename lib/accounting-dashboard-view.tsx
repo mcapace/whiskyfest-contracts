@@ -1,7 +1,8 @@
 import Link from 'next/link';
+import { CheckCircle2, Clock, DollarSign, FileText, Send } from 'lucide-react';
 import { requireAccountingPageAccess } from '@/lib/auth-accounting';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { formatCurrency, formatTimestamp } from '@/lib/utils';
+import { cn, formatCurrency, formatTimestamp } from '@/lib/utils';
 import { formatInvoiceStatus, invoiceStatusBadgeClass } from '@/lib/invoice-status';
 import {
   accountingDashboardHref,
@@ -19,6 +20,18 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import type { ContractWithTotals, Event, InvoiceStatus } from '@/types/db';
 import { ExportBilledButton } from '@/components/accounting/export-billed-button';
+
+function portalChrome(productKey: AccountingPortalKey) {
+  const isNywe = productKey === 'wine_spectator';
+  return {
+    cardBorder: isNywe ? 'border-rose-600/15' : 'border-fest-600/15',
+    cardHeaderBorder: isNywe ? 'border-rose-600/10' : 'border-fest-600/10',
+    activePill: isNywe
+      ? 'border-rose-700 bg-rose-50 text-rose-950 ring-1 ring-rose-600/30'
+      : 'border-fest-700 bg-fest-50 text-fest-950 ring-1 ring-fest-600/30',
+    activeRing: isNywe ? 'ring-2 ring-rose-600/35' : 'ring-2 ring-fest-600/35',
+  };
+}
 
 export async function AccountingDashboardView({
   productKey,
@@ -107,6 +120,18 @@ export async function AccountingDashboardView({
   const portalLabel = accountingPortalLabel(productKey);
   const showSalesRep = productKey !== 'wine_spectator';
   const showBillingColumns = productKey === 'wine_spectator';
+  const chrome = portalChrome(productKey);
+
+  const filterDescription = (() => {
+    if (invoice === 'all' && !q && !repQ) {
+      return `${allExecuted.length} executed contract${allExecuted.length === 1 ? '' : 's'} · showing up to 500`;
+    }
+    const parts: string[] = [];
+    if (invoice !== 'all') parts.push(formatInvoiceStatus(invoice));
+    if (q) parts.push(`company “${q}”`);
+    if (repQ) parts.push(`rep “${repQ}”`);
+    return `${contracts.length} match${contracts.length === 1 ? '' : 'es'} · ${parts.join(' · ')}`;
+  })();
 
   return (
     <div className="space-y-10">
@@ -115,8 +140,8 @@ export async function AccountingDashboardView({
         title={accountingPortalTitle(productKey)}
         subtitle={
           productKey === 'wine_spectator'
-            ? 'New York Wine Experience exhibitor contracts ready for invoicing'
-            : 'WhiskyFest sponsor contracts ready for invoicing'
+            ? 'Executed exhibitor contracts ready for invoicing and payment tracking'
+            : 'Executed sponsor contracts ready for invoicing and payment tracking'
         }
         arTotalCents={sumFor('all')}
         pendingCount={countFor('pending')}
@@ -125,61 +150,90 @@ export async function AccountingDashboardView({
         dashboardBase={base}
       />
 
-      <div className="grid grid-cols-1 gap-0 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
-        <ARStatCard
-          href={href('pending')}
-          title="Pending Invoicing"
-          count={countFor('pending')}
-          cents={sumFor('pending')}
-          active={invoice === 'pending'}
-        />
-        <ARStatCard
-          href={href('invoice_sent')}
-          title="Invoice Sent"
-          count={countFor('invoice_sent')}
-          cents={sumFor('invoice_sent')}
-          active={invoice === 'invoice_sent'}
-        />
-        <ARStatCard href={href('paid')} title="Paid" count={countFor('paid')} cents={sumFor('paid')} active={invoice === 'paid'} />
-        <ARStatCard
-          href={href('all')}
-          title={`Total ${portalLabel} AR`}
-          count={countFor('all')}
-          cents={sumFor('all')}
-          subtitle="All executed"
-          active={invoice === 'all'}
-        />
-      </div>
+      <section className="space-y-4">
+        <h2 className="font-display text-2xl font-medium text-foreground">Overview</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <ARStatCard
+            href={href('pending')}
+            title="Pending invoicing"
+            count={countFor('pending')}
+            cents={sumFor('pending')}
+            active={invoice === 'pending'}
+            icon={Clock}
+            accent="amber"
+            activeRingClass={chrome.activeRing}
+          />
+          <ARStatCard
+            href={href('invoice_sent')}
+            title="Invoice sent"
+            count={countFor('invoice_sent')}
+            cents={sumFor('invoice_sent')}
+            active={invoice === 'invoice_sent'}
+            icon={Send}
+            accent="fest"
+            activeRingClass={chrome.activeRing}
+          />
+          <ARStatCard
+            href={href('paid')}
+            title="Paid"
+            count={countFor('paid')}
+            cents={sumFor('paid')}
+            active={invoice === 'paid'}
+            icon={CheckCircle2}
+            accent="emerald"
+            activeRingClass={chrome.activeRing}
+          />
+          <ARStatCard
+            href={href('all')}
+            title={`Total ${portalLabel} AR`}
+            count={countFor('all')}
+            cents={sumFor('all')}
+            subtitle="All executed"
+            active={invoice === 'all'}
+            icon={DollarSign}
+            accent="whisky"
+            activeRingClass={chrome.activeRing}
+          />
+        </div>
+      </section>
 
-      <Card className="border-fest-600/15">
-        <CardContent className="space-y-4 p-6">
+      <Card className={cn('overflow-hidden', chrome.cardBorder)}>
+        <div className={cn('flex flex-col gap-4 border-b px-6 py-4 sm:flex-row sm:items-end sm:justify-between', chrome.cardHeaderBorder)}>
+          <div>
+            <h2 className="font-serif text-lg font-semibold">Executed contracts</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">{filterDescription}</p>
+          </div>
+          <ExportBilledButton productKey={productKey} />
+        </div>
+
+        <div className="space-y-4 border-b border-border/50 px-6 py-4">
           <form className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end" action={base} method="get">
             {invoice !== 'all' ? <input type="hidden" name="invoice" value={invoice} /> : null}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Company</label>
+            <div className="min-w-0 flex-1 space-y-1.5 md:max-w-xs">
+              <label className="text-xs font-medium text-muted-foreground">Search</label>
               <Input
                 name="q"
-                placeholder={showBillingColumns ? 'Search company or billing…' : 'Search company…'}
+                placeholder={showBillingColumns ? 'Company, billing name, or email…' : 'Company or contact…'}
                 defaultValue={q}
-                className="w-full md:w-56"
               />
             </div>
             {showSalesRep ? (
-              <div className="space-y-1.5">
+              <div className="min-w-0 space-y-1.5 md:max-w-xs">
                 <label className="text-xs font-medium text-muted-foreground">Sales rep</label>
-                <Input name="rep" placeholder="Name or email…" defaultValue={repQ} className="w-full md:w-56" />
+                <Input name="rep" placeholder="Name or email…" defaultValue={repQ} />
               </div>
             ) : null}
-            <Button type="submit">Search</Button>
-            {(q || repQ || invoice !== 'all') && (
-              <Button variant="outline" type="button" asChild>
-                <Link href={base}>Clear</Link>
-              </Button>
-            )}
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit">Search</Button>
+              {(q || repQ || invoice !== 'all') && (
+                <Button variant="outline" type="button" asChild>
+                  <Link href={base}>Clear</Link>
+                </Button>
+              )}
+            </div>
           </form>
 
-          <div className="flex flex-col gap-4 border-b border-border/60 pb-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2">
             {(
               [
                 { key: 'all' as const, label: 'All' },
@@ -191,21 +245,33 @@ export async function AccountingDashboardView({
               <Link
                 key={tab.key}
                 href={href(tab.key)}
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                  invoice === tab.key ? 'border-fest-700 bg-fest-50 text-fest-950' : 'border-border bg-background hover:bg-muted/60'
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all hover:-translate-y-0.5 hover:shadow-sm ${
+                  invoice === tab.key ? chrome.activePill : 'border-border bg-background hover:bg-muted/60'
                 }`}
               >
                 {tab.label}
+                <span className="font-mono tabular-nums opacity-80">{countFor(tab.key)}</span>
               </Link>
             ))}
-            </div>
-            <ExportBilledButton productKey={productKey} />
           </div>
+        </div>
 
+        <CardContent className="p-0">
           {contracts.length === 0 ? (
-            <p className="py-12 text-center text-sm text-muted-foreground">
-              No {portalLabel} contracts match these filters.
-            </p>
+            <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <FileText className="h-6 w-6" />
+              </div>
+              <h3 className="font-serif text-lg font-semibold">No contracts match these filters</h3>
+              <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+                Try another status or clear search filters to see executed {portalLabel} contracts.
+              </p>
+              {(q || repQ || invoice !== 'all') && (
+                <Button variant="outline" className="mt-6" asChild>
+                  <Link href={base}>Clear filters</Link>
+                </Button>
+              )}
+            </div>
           ) : (
             <>
               <div className="divide-y divide-border/50 md:hidden">
@@ -216,9 +282,9 @@ export async function AccountingDashboardView({
                     <Link
                       key={c.id}
                       href={`/accounting/${c.id}`}
-                      className="block py-4 first:pt-0 transition-colors hover:bg-muted/30"
+                      className="block px-4 py-4 transition-colors hover:bg-muted/40"
                     >
-                      <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="font-medium leading-snug">{c.exhibitor_company_name}</p>
                           <p className="mt-0.5 text-xs text-muted-foreground">{ev?.name ?? '—'}</p>
@@ -226,10 +292,11 @@ export async function AccountingDashboardView({
                         <span className="font-mono text-sm font-semibold tabular-nums">{formatCurrency(c.grand_total_cents)}</span>
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        {showSalesRep ? <span>{c.sales_rep_name ?? c.sales_rep_email ?? '—'}</span> : null}
+                        {showBillingColumns && c.billing_contact_name ? <span>{c.billing_contact_name}</span> : null}
                         {showBillingColumns && c.billing_contact_email ? (
-                          <span>{c.billing_contact_email}</span>
+                          <span className="truncate font-mono">{c.billing_contact_email}</span>
                         ) : null}
+                        {showSalesRep ? <span>{c.sales_rep_name ?? c.sales_rep_email ?? '—'}</span> : null}
                         <span className={`inline-flex rounded-full px-2 py-0.5 font-medium ${invoiceStatusBadgeClass(inv)}`}>
                           {formatInvoiceStatus(inv)}
                         </span>
@@ -239,7 +306,7 @@ export async function AccountingDashboardView({
                 })}
               </div>
               <div className="hidden md:block overflow-x-auto">
-                <Table>
+                <Table className="[&_tbody_tr:hover]:bg-muted/40">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Company</TableHead>
@@ -251,10 +318,10 @@ export async function AccountingDashboardView({
                       ) : null}
                       <TableHead>Event</TableHead>
                       <TableHead className="text-right">Total</TableHead>
-                      {showSalesRep ? <TableHead>Sales Rep</TableHead> : null}
+                      {showSalesRep ? <TableHead>Sales rep</TableHead> : null}
                       <TableHead>Executed</TableHead>
                       <TableHead>Invoice</TableHead>
-                      <TableHead className="w-10" />
+                      <TableHead className="w-12" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -262,18 +329,28 @@ export async function AccountingDashboardView({
                       const ev = eventMap.get(c.event_id);
                       const inv = (c.invoice_status ?? 'pending') as InvoiceStatus;
                       return (
-                        <TableRow key={c.id}>
-                          <TableCell className="font-medium">{c.exhibitor_company_name}</TableCell>
+                        <TableRow key={c.id} className="group">
+                          <TableCell>
+                            <Link href={`/accounting/${c.id}`} className="block font-medium hover:text-accent-brand">
+                              {c.exhibitor_company_name}
+                            </Link>
+                          </TableCell>
                           {showBillingColumns ? (
                             <>
                               <TableCell className="text-sm">{c.billing_contact_name?.trim() || '—'}</TableCell>
-                              <TableCell className="text-sm font-mono">{c.billing_contact_email ?? '—'}</TableCell>
+                              <TableCell className="max-w-[12rem] truncate text-sm font-mono text-muted-foreground">
+                                {c.billing_contact_email ?? '—'}
+                              </TableCell>
                             </>
                           ) : null}
                           <TableCell className="text-sm text-muted-foreground">{ev?.name ?? '—'}</TableCell>
-                          <TableCell className="text-right font-mono tabular-nums">{formatCurrency(c.grand_total_cents)}</TableCell>
+                          <TableCell className="text-right font-mono tabular-nums font-semibold">
+                            {formatCurrency(c.grand_total_cents)}
+                          </TableCell>
                           {showSalesRep ? (
-                            <TableCell className="text-sm">{c.sales_rep_name ?? c.sales_rep_email ?? '—'}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {c.sales_rep_name ?? c.sales_rep_email ?? '—'}
+                            </TableCell>
                           ) : null}
                           <TableCell className="text-xs text-muted-foreground">
                             {c.executed_at ? formatTimestamp(c.executed_at) : '—'}
@@ -284,7 +361,10 @@ export async function AccountingDashboardView({
                             </span>
                           </TableCell>
                           <TableCell>
-                            <Link href={`/accounting/${c.id}`} className="text-accent-brand hover:underline">
+                            <Link
+                              href={`/accounting/${c.id}`}
+                              className="text-accent-brand opacity-0 transition-opacity group-hover:opacity-100"
+                            >
                               →
                             </Link>
                           </TableCell>

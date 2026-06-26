@@ -169,6 +169,32 @@ function mapNavForPortal(items: SidebarNavItem[], portalKind: PortalKind): Sideb
   return items.map((item) => ({ ...item, href: nyweHref(item.href, portalKind) }));
 }
 
+function nyweNavLinkClass(active: boolean) {
+  return cn(
+    'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
+    active
+      ? 'border-brass-200 bg-gradient-to-r from-rose-900/45 to-transparent text-parchment-50'
+      : 'border-transparent text-parchment-300/85 hover:border-rose-800/50 hover:bg-rose-900/25 hover:text-parchment-50',
+  );
+}
+
+function nyweNavIconClass(active: boolean) {
+  return cn('h-4 w-4', active ? 'text-brass-200' : 'text-parchment-400/75 group-hover:text-parchment-200');
+}
+
+function defaultNavLinkClass(active: boolean) {
+  return cn(
+    'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
+    active
+      ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
+      : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
+  );
+}
+
+function defaultNavIconClass(active: boolean) {
+  return cn('h-4 w-4', active ? 'text-accent-brand' : 'text-muted-foreground/70');
+}
+
 export function Sidebar({
   user,
   canImpersonate = false,
@@ -214,22 +240,38 @@ export function Sidebar({
       ? wineSpectatorNav
       : whiskyfestNav;
   const nav = mapNavForPortal(rawNav, portalKind);
+  const nyweChrome = nywePortal;
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border/60 bg-bg-surface/95 backdrop-blur-md lg:flex">
+    <aside
+      className={cn(
+        'fixed inset-y-0 left-0 z-30 hidden w-64 flex-col backdrop-blur-md lg:flex',
+        nyweChrome
+          ? 'border-r border-rose-900/30 bg-rose-950 text-parchment-200'
+          : 'border-r border-border/60 bg-bg-surface/95',
+      )}
+    >
       <div
         className={cn(
-          'shrink-0 border-b border-border/50 px-3 py-4',
-          wineSpectatorPortal
-            ? 'bg-gradient-to-b from-fest-600/[0.07] via-bg-surface-raised to-bg-surface'
-            : accountingPortal
-              ? 'bg-gradient-to-b from-brass-700/[0.08] via-bg-surface-raised to-bg-surface'
-              : 'bg-gradient-to-b from-fest-600/[0.07] via-bg-surface-raised to-bg-surface',
+          'shrink-0 border-b px-3 py-4',
+          nyweChrome
+            ? 'border-rose-900/25 bg-gradient-to-b from-rose-950 via-rose-900/95 to-rose-950/90'
+            : wineSpectatorPortal
+              ? 'border-border/50 bg-gradient-to-b from-fest-600/[0.07] via-bg-surface-raised to-bg-surface'
+              : accountingPortal
+                ? 'border-border/50 bg-gradient-to-b from-brass-700/[0.08] via-bg-surface-raised to-bg-surface'
+                : 'border-border/50 bg-gradient-to-b from-fest-600/[0.07] via-bg-surface-raised to-bg-surface',
         )}
       >
         <div className="mx-auto max-w-[220px] px-3 py-2">
           {wineSpectatorPortal ? (
-            <NyweLogo href={homeHref} priority imageClassName="max-h-12" />
+            nyweChrome ? (
+              <div className="rounded-lg bg-parchment-50 px-3 py-2.5 shadow-sm ring-1 ring-rose-900/10">
+                <NyweLogo href={homeHref} priority mark="event" imageClassName="max-h-11" />
+              </div>
+            ) : (
+              <NyweLogo href={homeHref} priority mark="event" imageClassName="max-h-12" />
+            )
           ) : accountingPortal ? (
             <Link href={homeHref} className="block rounded-lg border border-brass-700/25 bg-stone-950/60 px-4 py-3 text-center">
               <Landmark className="mx-auto h-6 w-6 text-brass-400" />
@@ -252,14 +294,9 @@ export function Sidebar({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={cn(
-                    'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
-                    active
-                      ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
-                      : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
-                  )}
+                  className={nyweChrome ? nyweNavLinkClass(active) : defaultNavLinkClass(active)}
                 >
-                  <Icon className={cn('h-4 w-4', active ? 'text-accent-brand' : 'text-muted-foreground/70')} />
+                  <Icon className={nyweChrome ? nyweNavIconClass(active) : defaultNavIconClass(active)} />
                   {item.label}
                 </Link>
               );
@@ -308,14 +345,9 @@ export function Sidebar({
                           ? 'sidebar-users'
                           : undefined
                     }
-                    className={cn(
-                      'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
-                      active
-                        ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
-                        : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
-                    )}
+                    className={nyweChrome ? nyweNavLinkClass(active) : defaultNavLinkClass(active)}
                   >
-                    <Icon className={cn('h-4 w-4', active ? 'text-accent-brand' : 'text-muted-foreground/70')} />
+                    <Icon className={nyweChrome ? nyweNavIconClass(active) : defaultNavIconClass(active)} />
                     {item.label}
                   </Link>
                 );
@@ -323,31 +355,57 @@ export function Sidebar({
             {canAccounting && !accountingPortal && !accountingOnly && (
               <Link
                 href={nywePortal ? nyweHref('/accounting/nywe', portalKind) : '/accounting'}
-                className={cn(
-                  'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
-                  portalNavLinkActive(pathname, '/accounting')
-                    ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
-                    : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
-                )}
+                className={
+                  nyweChrome
+                    ? nyweNavLinkClass(portalNavLinkActive(pathname, '/accounting'))
+                    : defaultNavLinkClass(portalNavLinkActive(pathname, '/accounting'))
+                }
               >
-                <Landmark className="h-4 w-4 text-muted-foreground/70" />
+                <Landmark
+                  className={
+                    nyweChrome
+                      ? nyweNavIconClass(portalNavLinkActive(pathname, '/accounting'))
+                      : defaultNavIconClass(portalNavLinkActive(pathname, '/accounting'))
+                  }
+                />
                 Accounts receivable
               </Link>
             )}
             {isAdmin ? (
               <div className="pt-6">
-                <p className="mb-2 px-[10px] wf-label-caps text-[10px]">Admin</p>
-                <Link
-                  href="/admin/access-requests"
+                <p
                   className={cn(
-                    'group flex items-center justify-between rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
-                    pathname.startsWith('/admin/access-requests')
-                      ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
-                      : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
+                    'mb-2 px-[10px] wf-label-caps text-[10px]',
+                    nyweChrome ? 'text-parchment-400/80' : undefined,
                   )}
                 >
+                  Admin
+                </p>
+                <Link
+                  href="/admin/access-requests"
+                  className={
+                    nyweChrome
+                      ? cn(
+                          'group flex items-center justify-between rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
+                          pathname.startsWith('/admin/access-requests')
+                            ? 'border-brass-200 bg-gradient-to-r from-rose-900/45 to-transparent text-parchment-50'
+                            : 'border-transparent text-parchment-300/85 hover:border-rose-800/50 hover:bg-rose-900/25 hover:text-parchment-50',
+                        )
+                      : cn(
+                          'group flex items-center justify-between rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
+                          pathname.startsWith('/admin/access-requests')
+                            ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
+                            : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
+                        )
+                  }
+                >
                   <span className="inline-flex items-center gap-3">
-                    <UserPlus className="h-4 w-4 text-muted-foreground/70" />
+                    <UserPlus
+                      className={cn(
+                        'h-4 w-4',
+                        nyweChrome ? 'text-parchment-400/75' : 'text-muted-foreground/70',
+                      )}
+                    />
                     Access Requests
                   </span>
                   {pendingAccessRequests > 0 ? (
@@ -362,23 +420,45 @@ export function Sidebar({
         )}
       </nav>
 
-      <div className="border-t border-border/50 bg-bg-surface-raised/50 p-4">
+      <div
+        className={cn(
+          'border-t p-4',
+          nyweChrome ? 'border-rose-900/25 bg-rose-950/90' : 'border-border/50 bg-bg-surface-raised/50',
+        )}
+      >
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="flex w-full items-center gap-3 rounded-md p-2 text-left transition-colors hover:bg-accent/60"
+              className={cn(
+                'flex w-full items-center gap-3 rounded-md p-2 text-left transition-colors',
+                nyweChrome ? 'hover:bg-rose-900/35' : 'hover:bg-accent/60',
+              )}
             >
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted font-serif text-sm font-semibold text-foreground ring-1 ring-border">
+              <div
+                className={cn(
+                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-serif text-sm font-semibold ring-1',
+                  nyweChrome
+                    ? 'bg-rose-900/60 text-parchment-100 ring-rose-800/50'
+                    : 'bg-muted text-foreground ring-border',
+                )}
+              >
                 {user.name?.[0] ?? user.email?.[0]?.toUpperCase() ?? '?'}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-medium text-foreground">{user.name ?? user.email}</p>
-                <p className="truncate text-[11px] uppercase tracking-wider text-muted-foreground">
+                <p className={cn('truncate text-xs font-medium', nyweChrome ? 'text-parchment-50' : 'text-foreground')}>
+                  {user.name ?? user.email}
+                </p>
+                <p
+                  className={cn(
+                    'truncate text-[11px] uppercase tracking-wider',
+                    nyweChrome ? 'text-parchment-400/80' : 'text-muted-foreground',
+                  )}
+                >
                   {accountingOnly ? 'Accounting' : user.role ?? 'viewer'}
                 </p>
               </div>
-              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <ChevronDown className={cn('h-4 w-4 shrink-0', nyweChrome ? 'text-parchment-400' : 'text-muted-foreground')} />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">

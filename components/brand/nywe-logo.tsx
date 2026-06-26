@@ -1,15 +1,18 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { brandLogoAsset, type BrandLogoVariant } from '@/lib/brand-assets';
+import { brandLogoAsset, NYWE_EVENT_LOGO, type BrandLogoVariant } from '@/lib/brand-assets';
 import { cn } from '@/lib/utils';
 
-/** Wine Spectator wordmark — used across the NYWE contracts portal. */
+export type NyweLogoMark = 'event' | 'wineSpectator';
+
+/** NYWE portal logos — event mark (sidebar) or Wine Spectator wordmark (hero, login). */
 export function NyweLogo({
   href,
   className,
   imageClassName,
   priority = false,
   subtitle,
+  mark = 'wineSpectator',
   variant = 'default',
   /** @deprecated Use `variant="onDark"` instead. */
   onDark = false,
@@ -19,11 +22,13 @@ export function NyweLogo({
   imageClassName?: string;
   priority?: boolean;
   subtitle?: string;
+  /** `event` = NYWE logo file; `wineSpectator` = Wine Spectator wordmark. */
+  mark?: NyweLogoMark;
   variant?: BrandLogoVariant;
   onDark?: boolean;
 }) {
   const resolvedVariant = onDark ? 'onDark' : variant;
-  const asset = brandLogoAsset('wineSpectator', resolvedVariant);
+  const asset = mark === 'event' ? NYWE_EVENT_LOGO : brandLogoAsset('wineSpectator', resolvedVariant);
 
   const content = (
     <div className={cn('block', className)}>
@@ -34,8 +39,8 @@ export function NyweLogo({
         height={asset.height}
         priority={priority}
         className={cn(
-          'h-auto w-full object-contain',
-          resolvedVariant === 'onDark' && 'drop-shadow-[0_2px_18px_rgba(0,0,0,0.55)]',
+          'h-auto w-full max-w-full object-contain object-left',
+          mark === 'wineSpectator' && resolvedVariant === 'onDark' && 'drop-shadow-[0_2px_18px_rgba(0,0,0,0.55)]',
           imageClassName,
         )}
       />

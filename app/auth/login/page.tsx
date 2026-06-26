@@ -57,7 +57,7 @@ export default async function LoginPage({
                 <div className="max-w-md">
                   <NyweLogo priority variant="onDark" imageClassName="max-h-14" />
                 </div>
-                <p className="mt-8 font-sans text-xs uppercase tracking-[0.25em] text-amber-500">NY Wine Experience</p>
+                <p className="mt-8 font-sans text-xs uppercase tracking-[0.25em] text-brass-200">NY Wine Experience</p>
                 <h1 className="mt-3 font-display text-5xl font-medium tracking-tight text-stone-50 sm:text-6xl">
                   {NYWE_LOGIN_HEADLINE}
                 </h1>
