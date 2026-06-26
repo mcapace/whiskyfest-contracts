@@ -28,6 +28,8 @@ import {
   PRODUCT_WHISKYFEST,
 } from '@/lib/product-portal';
 import { isNyweAccountingPath } from '@/lib/accounting-portal';
+import { nyweHref, nywePortalOrigin, type PortalKind } from '@/lib/portal-host';
+import { usePortalKind } from '@/components/portal/portal-context';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -129,19 +131,42 @@ const accountingNav: SidebarNavItem[] = [
 ];
 
 function portalNavLinkActive(pathname: string, href: string): boolean {
-  if (href === '/' || href === '/wine-spectator') {
-    return pathname === href;
+  const equivalents = new Set([href]);
+  if (href === '/') equivalents.add('/wine-spectator');
+  if (href === '/wine-spectator') equivalents.add('/');
+  if (href === '/roster') equivalents.add('/wine-spectator/roster');
+  if (href === '/wine-spectator/roster') equivalents.add('/roster');
+  if (href === '/contracts') equivalents.add('/wine-spectator/contracts');
+  if (href === '/wine-spectator/contracts') equivalents.add('/contracts');
+  if (href === '/accounting') equivalents.add('/accounting/nywe');
+  if (href === '/accounting/nywe') equivalents.add('/accounting');
+
+  for (const candidate of equivalents) {
+    if (candidate === '/' || candidate === '/wine-spectator') {
+      if (pathname === candidate) return true;
+      continue;
+    }
+    if (candidate === '/accounting') {
+      if (pathname === '/accounting' || (pathname.startsWith('/accounting/') && !pathname.startsWith('/accounting/nywe'))) {
+        return true;
+      }
+      continue;
+    }
+    if (candidate === '/accounting/nywe') {
+      if (pathname === '/accounting/nywe' || pathname.startsWith('/accounting/nywe/')) return true;
+      continue;
+    }
+    if (candidate === '/#start-deal') {
+      if (pathname === '/') return true;
+      continue;
+    }
+    if (pathname === candidate || pathname.startsWith(`${candidate}/`)) return true;
   }
-  if (href === '/accounting') {
-    return pathname === '/accounting' || (pathname.startsWith('/accounting/') && !pathname.startsWith('/accounting/nywe'));
-  }
-  if (href === '/accounting/nywe') {
-    return pathname === '/accounting/nywe' || pathname.startsWith('/accounting/nywe/');
-  }
-  if (href === '/#start-deal') {
-    return pathname === '/';
-  }
-  return pathname === href || pathname.startsWith(`${href}/`);
+  return false;
+}
+
+function mapNavForPortal(items: SidebarNavItem[], portalKind: PortalKind): SidebarNavItem[] {
+  return items.map((item) => ({ ...item, href: nyweHref(item.href, portalKind) }));
 }
 
 export function Sidebar({
@@ -165,6 +190,7 @@ export function Sidebar({
   pendingAccessRequests?: number;
 }) {
   const pathname = usePathname();
+  const portalKind = usePortalKind();
   const isAdmin = user.role === 'admin';
   const wineSpectatorAdmin = Boolean(user.wineSpectatorAdmin);
   const pipelineAccess = Boolean(user.pipelineAccess);
@@ -172,16 +198,24 @@ export function Sidebar({
   const canAccounting = isAccounting || isAdmin;
   const canWineSpectator = Boolean(user.wineSpectatorAccess);
   const accountingOnly = isAccounting && !pipelineAccess;
-  const accountingPortal = isAccountingPath(pathname);
-  const wineSpectatorPortal = isWineSpectatorPath(pathname);
+  const nywePortal = portalKind === 'nywe';
+  const accountingPortal = isAccountingPath(pathname) || (nywePortal && pathname.startsWith('/accounting'));
+  const wineSpectatorPortal = isWineSpectatorPath(pathname) || nywePortal;
   const homeHref = accountingOnly || accountingPortal
-    ? isNyweAccountingPath(pathname)
-      ? '/accounting/nywe'
+    ? isNyweAccountingPath(pathname, portalKind)
+      ? nyweHref('/accounting/nywe', portalKind)
       : '/accounting'
     : wineSpectatorPortal
-      ? '/wine-spectator'
+      ? nyweHref('/wine-spectator', portalKind)
       : '/';
-  const nav = accountingPortal ? accountingNav : wineSpectatorPortal ? wineSpectatorNav : whiskyfestNav;
+  const rawNav = accountingPortal
+    ? nywePortal
+      ? accountingNav.filter((item) => item.href.startsWith('/accounting/nywe') || item.href === '/settings')
+      : accountingNav
+    : wineSpectatorPortal
+      ? wineSpectatorNav
+      : whiskyfestNav;
+  const nav = mapNavForPortal(rawNav, portalKind);
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border/60 bg-bg-surface/95 backdrop-blur-md lg:flex">
@@ -222,7 +256,7 @@ export function Sidebar({
       <nav className="flex-1 space-y-0.5 px-3 py-5">
         {accountingOnly ? (
           <div className="space-y-1">
-            {accountingNav.map((item) => {
+            {mapNavForPortal(accountingNav, portalKind).map((item) => {
               const active = portalNavLinkActive(pathname, item.href);
               const Icon = item.icon;
               return (
@@ -244,6 +278,7 @@ export function Sidebar({
           </div>
         ) : (
           <>
+            {!nywePortal ? (
             <div className="mb-5 space-y-1">
               <p className="mb-2 px-[10px] wf-label-caps text-[10px]">Portal</p>
               <Link
@@ -261,7 +296,7 @@ export function Sidebar({
               </Link>
               {canWineSpectator ? (
                 <Link
-                  href="/wine-spectator"
+                  href={nywePortalOrigin()}
                   className={cn(
                     'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
                     wineSpectatorPortal
@@ -288,6 +323,7 @@ export function Sidebar({
                 </Link>
               ) : null}
             </div>
+            ) : null}
             {nav
               .filter((item) => {
                 if ('adminOnly' in item && item.adminOnly) {
@@ -301,7 +337,10 @@ export function Sidebar({
               .map((item) => {
                 const active = portalNavLinkActive(pathname, item.href);
                 const Icon = item.icon;
-                const isNewContract = item.href === '/#start-deal' || item.href === '/wine-spectator/contracts/new';
+                const isNewContract =
+                  item.href === '/#start-deal' ||
+                  item.href === '/wine-spectator/contracts/new' ||
+                  item.href === '/contracts/new';
                 const navDisabled = readOnlyImpersonation && isNewContract;
                 if (navDisabled) {
                   return (

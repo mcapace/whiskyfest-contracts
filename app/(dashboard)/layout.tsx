@@ -12,6 +12,9 @@ import { TutorialProvider } from '@/components/tutorial/tutorial-provider';
 import { DailyBubbleSlot } from '@/components/daily-bubble/daily-bubble-slot';
 import { DailyBubblePathGate } from '@/components/daily-bubble/daily-bubble-path-gate';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { PortalProvider } from '@/components/portal/portal-context';
+import { portalKindFromHost } from '@/lib/portal-host';
+import { headers } from 'next/headers';
 import { canAccessWineSpectator } from '@/lib/wine-spectator-access';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -40,8 +43,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
     pendingAccessRequests = error ? 0 : count ?? 0;
   }
 
+  const portalKind = portalKindFromHost(headers().get('host'));
+
   return (
-    <AuthSessionProvider>
+    <PortalProvider kind={portalKind}>
+      <AuthSessionProvider>
       <DashboardKeyboardShortcuts>
       <CommandPaletteProvider>
         <ImpersonationBanner />
@@ -81,6 +87,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </div>
       </CommandPaletteProvider>
       </DashboardKeyboardShortcuts>
-    </AuthSessionProvider>
+      </AuthSessionProvider>
+    </PortalProvider>
   );
 }

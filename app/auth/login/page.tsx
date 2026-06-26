@@ -1,38 +1,88 @@
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 import { auth, signIn } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { LoginHero } from '@/components/auth/login-hero';
+import { NyweLogo } from '@/components/brand/nywe-logo';
+import { portalKindFromHost, postLoginPath } from '@/lib/portal-host';
+import { canAccessWineSpectator } from '@/lib/wine-spectator-access';
 
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
+  const host = headers().get('host');
+  const portalKind = portalKindFromHost(host);
+  const nywePortal = portalKind === 'nywe';
+
   const session = await auth();
-  if (session?.user) redirect('/');
+  if (session?.user) {
+    redirect(
+      postLoginPath(portalKind, {
+        pipeline_access: session.user.pipeline_access,
+        is_accounting: session.user.is_accounting,
+        wine_spectator_access: canAccessWineSpectator({
+          role: session.user.role,
+          is_events_team: session.user.is_events_team,
+          email: session.user.email,
+        }),
+        role: session.user.role ?? undefined,
+      }),
+    );
+  }
+
   const err =
     typeof searchParams?.error === 'string' && searchParams.error === 'account_deactivated'
       ? 'Account deactivated. Contact Michael Capace for access.'
       : null;
 
+  const redirectTo = postLoginPath(portalKind, {});
+
   return (
-    <div className="min-h-screen bg-parchment-50">
+    <div className={nywePortal ? 'min-h-screen bg-stone-950' : 'min-h-screen bg-parchment-50'}>
       <div className="grid min-h-screen grid-cols-1 lg:grid-cols-5">
         <div className="relative h-[min(40vh,300px)] min-h-[200px] overflow-hidden lg:col-span-3 lg:h-screen">
-          <LoginHero />
-          <div className="absolute inset-0 bg-gradient-to-br from-oak-900/75 via-oak-900/40 to-oak-900/85" />
-          <div className="relative flex h-full animate-login-mount flex-col justify-center px-6 py-8 text-parchment-50 sm:px-10 lg:px-12">
-            <p className="font-sans text-xs uppercase tracking-[0.25em] text-amber-500">WhiskyFest 2026</p>
-            <h1 className="mt-3 font-display text-5xl font-medium tracking-tight text-parchment-50 sm:text-6xl">
-              Welcome back
-            </h1>
-            <p className="mt-4 font-display text-lg italic text-parchment-100 sm:text-2xl">
-              WhiskyFest New York · November 20, 2026
-            </p>
-          </div>
+          {nywePortal ? (
+            <>
+              <div className="absolute inset-0 bg-gradient-to-br from-rose-950 via-stone-900 to-stone-950" />
+              <div className="relative flex h-full animate-login-mount flex-col justify-center px-6 py-8 text-stone-50 sm:px-10 lg:px-12">
+                <div className="max-w-md">
+                  <NyweLogo priority onDark imageClassName="max-h-14" />
+                </div>
+                <p className="mt-8 font-sans text-xs uppercase tracking-[0.25em] text-rose-300/90">NY Wine Experience</p>
+                <h1 className="mt-3 font-display text-5xl font-medium tracking-tight text-stone-50 sm:text-6xl">
+                  Vendor licenses
+                </h1>
+                <p className="mt-4 font-display text-lg italic text-stone-300 sm:text-2xl">
+                  New York Wine Experience · Contracts portal
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <LoginHero />
+              <div className="absolute inset-0 bg-gradient-to-br from-oak-900/75 via-oak-900/40 to-oak-900/85" />
+              <div className="relative flex h-full animate-login-mount flex-col justify-center px-6 py-8 text-parchment-50 sm:px-10 lg:px-12">
+                <p className="font-sans text-xs uppercase tracking-[0.25em] text-amber-500">WhiskyFest 2026</p>
+                <h1 className="mt-3 font-display text-5xl font-medium tracking-tight text-parchment-50 sm:text-6xl">
+                  Welcome back
+                </h1>
+                <p className="mt-4 font-display text-lg italic text-parchment-100 sm:text-2xl">
+                  WhiskyFest New York · November 20, 2026
+                </p>
+              </div>
+            </>
+          )}
         </div>
 
-        <div className="flex items-center justify-center bg-parchment-50 px-6 py-10 sm:px-10 lg:col-span-2 lg:p-12">
+        <div
+          className={
+            nywePortal
+              ? 'flex items-center justify-center bg-stone-50 px-6 py-10 sm:px-10 lg:col-span-2 lg:p-12'
+              : 'flex items-center justify-center bg-parchment-50 px-6 py-10 sm:px-10 lg:col-span-2 lg:p-12'
+          }
+        >
           <div className="w-full max-w-md animate-login-mount">
             <p className="font-sans text-xs font-medium uppercase tracking-[0.2em] text-ink-500">Sign in</p>
             <h2 className="mt-3 font-display text-4xl font-medium tracking-tight text-oak-800 sm:text-5xl">
@@ -40,18 +90,28 @@ export default async function LoginPage({
             </h2>
             <p className="mt-4 text-sm text-ink-700">Use your @mshanken.com Google account</p>
 
-            <div className="mt-8 rounded-xl border border-parchment-200/90 bg-parchment-50/90 p-7 shadow-[0_18px_40px_-24px_rgba(42,31,15,0.55)] backdrop-blur-sm">
+            <div
+              className={
+                nywePortal
+                  ? 'mt-8 rounded-xl border border-stone-200/90 bg-white/90 p-7 shadow-[0_18px_40px_-24px_rgba(28,25,23,0.45)] backdrop-blur-sm'
+                  : 'mt-8 rounded-xl border border-parchment-200/90 bg-parchment-50/90 p-7 shadow-[0_18px_40px_-24px_rgba(42,31,15,0.55)] backdrop-blur-sm'
+              }
+            >
               {err ? <p className="mb-4 text-sm text-danger-base">{err}</p> : null}
               <form
                 action={async () => {
                   'use server';
-                  await signIn('google', { redirectTo: '/' });
+                  await signIn('google', { redirectTo });
                 }}
               >
                 <Button
                   type="submit"
                   size="lg"
-                  className="h-12 w-full border border-oak-700/90 bg-oak-800 font-sans text-base font-medium tracking-tight text-parchment-50 shadow-sm transition hover:bg-oak-900 hover:text-parchment-50"
+                  className={
+                    nywePortal
+                      ? 'h-12 w-full border border-rose-900/90 bg-rose-950 font-sans text-base font-medium tracking-tight text-stone-50 shadow-sm transition hover:bg-rose-900 hover:text-stone-50'
+                      : 'h-12 w-full border border-oak-700/90 bg-oak-800 font-sans text-base font-medium tracking-tight text-parchment-50 shadow-sm transition hover:bg-oak-900 hover:text-parchment-50'
+                  }
                 >
                   <GoogleIcon /> Continue with Google
                 </Button>
@@ -64,7 +124,9 @@ export default async function LoginPage({
             </div>
 
             <p className="mt-10 text-xs font-medium uppercase tracking-[0.14em] text-ink-500">
-              WhiskyFest 2026 · Marriott Marquis · New York
+              {nywePortal
+                ? 'New York Wine Experience · Wine Spectator'
+                : 'WhiskyFest 2026 · Marriott Marquis · New York'}
             </p>
           </div>
         </div>

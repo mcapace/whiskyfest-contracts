@@ -32,6 +32,43 @@
    - Add env vars (below)
    - Deploy and validate smoke checks
 
+## NYWE portal domain (`nywecontracts.winespectator.com`)
+
+The NYWE vendor licenses portal runs on the **same Vercel deployment** as WhiskyFest, with a second custom domain. Middleware rewrites clean paths on the NYWE host:
+
+| Browser URL (NYWE host) | Internal route |
+| --- | --- |
+| `/` | `/wine-spectator` (dashboard) |
+| `/roster` | `/wine-spectator/roster` |
+| `/contracts`, `/contracts/*` | `/wine-spectator/contracts/*` |
+| `/accounting` | `/accounting/nywe` |
+| `/accounting/{id}` | `/accounting/{id}` (shared contract detail) |
+
+WhiskyFest-only paths (`/sales-reps`, `/events`, etc.) redirect to `/` on the NYWE host. Visiting `/wine-spectator/*` on the WhiskyFest host redirects to the NYWE domain with clean paths.
+
+### DNS + Vercel
+
+1. In Vercel → Project → Settings → Domains, add `nywecontracts.winespectator.com`.
+2. In DNS (Wine Spectator), add a **CNAME** for `nywecontracts` pointing to Vercel (`cname.vercel-dns.com` or the target Vercel shows).
+3. Wait for SSL provisioning; confirm both domains resolve to the same deployment.
+
+### Google OAuth
+
+In Google Cloud Console → OAuth client → Authorized redirect URIs, add:
+
+`https://nywecontracts.winespectator.com/api/auth/callback/google`
+
+Keep the existing WhiskyFest redirect URI (`https://wacontracts.whiskyadvocate.com/api/auth/callback/google` or your `NEXTAUTH_URL`).
+
+### Optional env vars
+
+| Name | Description |
+| --- | --- |
+| `NYWE_PORTAL_HOST` | NYWE hostname (default: `nywecontracts.winespectator.com`) |
+| `NYWE_PORTAL_ORIGIN` | Full origin for NYWE email/deep links |
+| `WHISKYFEST_PORTAL_HOST` | WhiskyFest hostname (default: `wacontracts.whiskyadvocate.com`) |
+| `WHISKYFEST_PORTAL_ORIGIN` | Full origin for WhiskyFest email/deep links (falls back to `NEXTAUTH_URL`) |
+
 ## Environment variables
 
 | Name | Description | Example | Required | Service |

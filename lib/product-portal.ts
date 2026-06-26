@@ -1,27 +1,32 @@
 import type { ContractWithTotals, Event } from '@/types/db';
+import { isNywePortalHost, isNywePortalPath } from '@/lib/portal-host';
 
 export const PRODUCT_WHISKYFEST = 'whiskyfest';
 export const PRODUCT_WINE_SPECTATOR = 'wine_spectator';
 
 export type ProductKey = typeof PRODUCT_WHISKYFEST | typeof PRODUCT_WINE_SPECTATOR | string;
 
-export function productFromPathname(pathname: string): ProductKey {
-  if (pathname === '/wine-spectator' || pathname.startsWith('/wine-spectator/')) {
+export function productFromPathname(pathname: string, host?: string | null): ProductKey {
+  if (isNywePortalPath(pathname, host)) {
     return PRODUCT_WINE_SPECTATOR;
   }
   return PRODUCT_WHISKYFEST;
 }
 
-export function isWineSpectatorPath(pathname: string): boolean {
-  return productFromPathname(pathname) === PRODUCT_WINE_SPECTATOR;
+export function isWineSpectatorPath(pathname: string, host?: string | null): boolean {
+  return isNywePortalPath(pathname, host);
 }
 
 export function isAccountingPath(pathname: string): boolean {
   return pathname === '/accounting' || pathname.startsWith('/accounting/');
 }
 
-export function isNyweAccountingPathname(pathname: string): boolean {
-  return pathname === '/accounting/nywe' || pathname.startsWith('/accounting/nywe/');
+export function isNyweAccountingPathname(pathname: string, host?: string | null): boolean {
+  if (pathname === '/accounting/nywe' || pathname.startsWith('/accounting/nywe/')) return true;
+  if (host && isNywePortalHost(host) && (pathname === '/accounting' || pathname.startsWith('/accounting/'))) {
+    return true;
+  }
+  return false;
 }
 
 export function accountingDashboardHref(productKey: ProductKey): string {

@@ -7,19 +7,25 @@ import type { ContractWithTotals, Event, InvoiceStatus } from '@/types/db';
 
 export type AccountingPortalKey = typeof PRODUCT_WHISKYFEST | typeof PRODUCT_WINE_SPECTATOR;
 
-export function accountingPortalFromPathname(pathname: string): AccountingPortalKey {
+export function accountingPortalFromPathname(pathname: string, portalKind?: 'nywe' | 'whiskyfest'): AccountingPortalKey {
   if (pathname === '/accounting/nywe' || pathname.startsWith('/accounting/nywe/')) {
+    return PRODUCT_WINE_SPECTATOR;
+  }
+  if (portalKind === 'nywe' && (pathname === '/accounting' || pathname.startsWith('/accounting/'))) {
     return PRODUCT_WINE_SPECTATOR;
   }
   return PRODUCT_WHISKYFEST;
 }
 
-export function isNyweAccountingPath(pathname: string): boolean {
-  return accountingPortalFromPathname(pathname) === PRODUCT_WINE_SPECTATOR;
+export function isNyweAccountingPath(pathname: string, portalKind?: 'nywe' | 'whiskyfest'): boolean {
+  return accountingPortalFromPathname(pathname, portalKind) === PRODUCT_WINE_SPECTATOR;
 }
 
-export function accountingDashboardHref(productKey: ProductKey): string {
-  return productKey === PRODUCT_WINE_SPECTATOR ? '/accounting/nywe' : '/accounting';
+export function accountingDashboardHref(productKey: ProductKey, portalKind?: 'nywe' | 'whiskyfest'): string {
+  if (productKey === PRODUCT_WINE_SPECTATOR) {
+    return portalKind === 'nywe' ? '/accounting' : '/accounting/nywe';
+  }
+  return '/accounting';
 }
 
 export function accountingPortalLabel(productKey: AccountingPortalKey): string {

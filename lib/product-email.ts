@@ -4,16 +4,19 @@ import {
   productKeyFromEvent,
   type ProductKey,
 } from '@/lib/product-portal';
+import { nywePortalOrigin, nywePublicPath, whiskyfestPortalOrigin } from '@/lib/portal-host';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { Event } from '@/types/db';
 
 export type EventEmailContext = Pick<Event, 'product_key' | 'name'>;
 
 export function appBaseUrl(): string {
-  const explicit = process.env['NEXTAUTH_URL']?.replace(/\/$/, '');
-  if (explicit) return explicit;
-  if (process.env['VERCEL_URL']) return `https://${process.env['VERCEL_URL']}`;
-  return 'http://localhost:3000';
+  return whiskyfestPortalOrigin();
+}
+
+export function appBaseUrlForProduct(productKey: ProductKey | null | undefined): string {
+  if (productKey === PRODUCT_WINE_SPECTATOR) return nywePortalOrigin();
+  return whiskyfestPortalOrigin();
 }
 
 export function isWineSpectatorProduct(productKey: string | null | undefined): boolean {
@@ -67,8 +70,14 @@ export function workspaceLabelForEvent(event: EventEmailContext | null | undefin
 }
 
 export function appContractUrl(contractId: string, event: EventEmailContext | null | undefined): string {
-  const href = contractDetailHref(productKeyFromEvent(event), contractId);
-  return `${appBaseUrl()}${href}`;
+  const productKey = productKeyFromEvent(event);
+  const href = contractDetailHref(productKey, contractId);
+  const publicHref = productKey === PRODUCT_WINE_SPECTATOR ? nywePublicPath(href) : href;
+  return `${appBaseUrlForProduct(productKey)}${publicHref}`;
+}
+
+export function accountingContractUrl(contractId: string, productKey: ProductKey | null | undefined): string {
+  return `${appBaseUrlForProduct(productKey)}/accounting/${contractId}`;
 }
 
 /** Optional DocuSign brand — controls exhibitor-facing signing email from-name/logo. */

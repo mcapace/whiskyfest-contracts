@@ -11,17 +11,12 @@ import {
   downloadImportedContractPdf,
 } from '@/lib/contract-pdf-storage';
 import { sendAccountingEmail } from '@/lib/email';
+import { accountingContractUrl } from '@/lib/product-email';
+import { productKeyFromEvent } from '@/lib/product-portal';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { updateContractRow } from '@/lib/sheets-tracker';
 import { syncExhibitorRosterWriteback } from '@/lib/exhibitor-roster-sync-hook';
 import type { ContractWithTotals, Event } from '@/types/db';
-
-function appBaseUrl(): string {
-  const explicit = process.env['NEXTAUTH_URL']?.replace(/\/$/, '');
-  if (explicit) return explicit;
-  if (process.env['VERCEL_URL']) return `https://${process.env['VERCEL_URL']}`;
-  return 'http://localhost:3000';
-}
 
 export type ReleaseToAccountingResult =
   | { ok: true; executedAt: string }
@@ -162,7 +157,7 @@ export async function releaseContractToAccounting(options: {
     executedAtFormatted: formatTimestamp(now),
     countersignedByName: isLegacyImportedContract(contract) ? null : contract.countersigned_by_name,
     signedPdfBytes,
-    accountingContractUrl: `${appBaseUrl()}/accounting/${contract.id}`,
+    accountingContractUrl: accountingContractUrl(contract.id, productKeyFromEvent(event)),
     salesRepEmail: contract.sales_rep_email ?? contract.created_by,
     productKey: event.product_key,
   });

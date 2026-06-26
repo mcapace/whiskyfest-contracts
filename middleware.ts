@@ -2,6 +2,16 @@ import { auth } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 import type { Session } from 'next-auth';
 import { IMPERSONATION_READ_ONLY_MESSAGE } from '@/lib/impersonation-read-only';
+import {
+  isNywePortalHost,
+  isNywePortalPath,
+  isWhiskyfestOnlyPath,
+  nyweCrossDomainPath,
+  nyweInternalPath,
+  nywePortalOrigin,
+  nywePublicPath,
+  portalKindFromHost,
+} from '@/lib/portal-host';
 import { canAccessWineSpectator } from '@/lib/wine-spectator-access';
 
 type SessionUserFlags = {
@@ -15,8 +25,15 @@ type SessionUserFlags = {
 
 const READ_ONLY_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
+function applyPortalHeader(res: NextResponse, host: string | null): NextResponse {
+  res.headers.set('x-portal-kind', portalKindFromHost(host));
+  return res;
+}
+
 export default auth((req) => {
+  const host = req.headers.get('host');
   const { pathname } = req.nextUrl;
+  const nyweHost = isNywePortalHost(host);
 
   const isPublic =
     pathname.startsWith('/auth') ||
@@ -26,7 +43,45 @@ export default auth((req) => {
 
   if (!req.auth && !isPublic) {
     const loginUrl = new URL('/auth/login', req.nextUrl.origin);
-    return NextResponse.redirect(loginUrl);
+    return applyPortalHeader(NextResponse.redirect(loginUrl), host);
+  }
+
+  let response: NextResponse | null = null;
+
+  if (nyweHost) {
+    if (pathname.startsWith('/wine-spectator')) {
+      const clean = nywePublicPath(pathname);
+      if (clean !== pathname) {
+        response = NextResponse.redirect(new URL(clean, req.url));
+      }
+    } else if (pathname.startsWith('/accounting/nywe')) {
+      const clean = nywePublicPath(pathname);
+      if (clean !== pathname) {
+        response = NextResponse.redirect(new URL(clean, req.url));
+      }
+    } else {
+      const internal = nyweInternalPath(pathname);
+      if (internal && internal !== pathname) {
+        const url = req.nextUrl.clone();
+        url.pathname = internal;
+        response = NextResponse.rewrite(url);
+      } else if (isWhiskyfestOnlyPath(pathname) && !pathname.startsWith('/api/')) {
+        response = NextResponse.redirect(new URL('/', req.url));
+      }
+    }
+  } else if (
+    !pathname.startsWith('/api/') &&
+    (pathname === '/wine-spectator' ||
+      pathname.startsWith('/wine-spectator/') ||
+      pathname === '/accounting/nywe' ||
+      pathname.startsWith('/accounting/nywe/'))
+  ) {
+    const target = `${nywePortalOrigin()}${nyweCrossDomainPath(pathname)}`;
+    response = NextResponse.redirect(target);
+  }
+
+  if (response) {
+    return applyPortalHeader(response, host);
   }
 
   const session = req.auth as (Session & { is_read_only_impersonation?: boolean }) | null;
@@ -54,21 +109,33 @@ export default auth((req) => {
     const canOpenAccounting = accounting || admin;
 
     if (accountingOnly) {
-      const allowed =
-        pathname.startsWith('/accounting') ||
-        pathname.startsWith('/api/accounting') ||
-        isPublic;
+      const accountingPath = nyweHost
+        ? pathname === '/accounting' || pathname.startsWith('/accounting/')
+        : pathname.startsWith('/accounting');
+      const allowed = accountingPath || pathname.startsWith('/api/accounting') || isPublic;
       if (!allowed) {
-        return NextResponse.redirect(new URL('/accounting', req.nextUrl.origin));
+        const dest = nyweHost ? '/accounting' : '/accounting';
+        return applyPortalHeader(NextResponse.redirect(new URL(dest, req.nextUrl.origin)), host);
       }
     }
 
-    if (pathname.startsWith('/accounting') && !canOpenAccounting) {
-      return NextResponse.redirect(new URL('/', req.nextUrl.origin));
+    const whiskyfestAccountingPath =
+      pathname === '/accounting' || (pathname.startsWith('/accounting/') && !pathname.startsWith('/accounting/nywe'));
+    if (whiskyfestAccountingPath && !canOpenAccounting && !nyweHost) {
+      return applyPortalHeader(NextResponse.redirect(new URL('/', req.nextUrl.origin)), host);
+    }
+
+    const nyweAccountingPath =
+      pathname === '/accounting/nywe' ||
+      pathname.startsWith('/accounting/nywe/') ||
+      (nyweHost && (pathname === '/accounting' || pathname.startsWith('/accounting/')));
+    if (nyweAccountingPath && !canOpenAccounting) {
+      const dest = nyweHost ? '/' : '/';
+      return applyPortalHeader(NextResponse.redirect(new URL(dest, req.nextUrl.origin)), host);
     }
 
     const wineSpectatorPath =
-      pathname === '/wine-spectator' || pathname.startsWith('/wine-spectator/') || pathname.startsWith('/api/wine-spectator');
+      isNywePortalPath(pathname, host) || pathname.startsWith('/api/wine-spectator');
     if (
       wineSpectatorPath &&
       !canAccessWineSpectator({
@@ -77,12 +144,18 @@ export default auth((req) => {
         email: u.email,
       })
     ) {
-      const dest = accountingOnly ? '/accounting' : '/';
-      return NextResponse.redirect(new URL(dest, req.nextUrl.origin));
+      const dest = accountingOnly ? (nyweHost ? '/accounting' : '/accounting') : nyweHost ? '/' : '/';
+      return applyPortalHeader(NextResponse.redirect(new URL(dest, req.nextUrl.origin)), host);
+    }
+
+    if (nyweHost && !admin && !canAccessWineSpectator({ role: u.role, is_events_team: u.is_events_team, email: u.email })) {
+      if (!accountingOnly) {
+        return applyPortalHeader(NextResponse.redirect(new URL('/auth/login', req.nextUrl.origin)), host);
+      }
     }
   }
 
-  return NextResponse.next();
+  return applyPortalHeader(NextResponse.next(), host);
 });
 
 export const config = {

@@ -6,7 +6,25 @@ import { usePathname } from 'next/navigation';
 import { Calculator, Home, Landmark, LayoutDashboard, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isAccountingPath, isWineSpectatorPath } from '@/lib/product-portal';
+import { nyweHref } from '@/lib/portal-host';
+import { usePortalKind } from '@/components/portal/portal-context';
 import { CommandPaletteTrigger } from '@/components/command-palette/command-palette';
+
+function nywePathActive(pathname: string, internalHref: string): boolean {
+  const href = internalHref;
+  if (href === '/wine-spectator') return pathname === '/' || pathname === '/wine-spectator';
+  if (href === '/wine-spectator/contracts/new') {
+    return pathname === '/contracts/new' || pathname.startsWith('/wine-spectator/contracts/new');
+  }
+  if (href === '/wine-spectator/contracts') {
+    return (
+      pathname === '/contracts' ||
+      pathname.startsWith('/contracts/') ||
+      (pathname.startsWith('/wine-spectator/contracts') && !pathname.includes('/new'))
+    );
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function MobileBottomNav({
   accountingOnly,
@@ -18,13 +36,21 @@ export function MobileBottomNav({
   wineSpectatorAccess: boolean;
 }) {
   const pathname = usePathname();
-  const wineSpectatorPortal = isWineSpectatorPath(pathname) && wineSpectatorAccess;
-  const accountingPortal = isAccountingPath(pathname);
+  const portalKind = usePortalKind();
+  const nywePortal = portalKind === 'nywe';
+  const wineSpectatorPortal = (nywePortal || isWineSpectatorPath(pathname)) && wineSpectatorAccess;
+  const accountingPortal = isAccountingPath(pathname) || (nywePortal && pathname.startsWith('/accounting'));
 
   if (accountingOnly) {
+    const accountingHref = nywePortal ? '/accounting' : '/accounting';
     return (
       <nav className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t border-border/60 bg-bg-surface-raised/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md lg:hidden">
-        <NavIcon href="/accounting" active={pathname.startsWith('/accounting')} label="AR" icon={Landmark} />
+        <NavIcon
+          href={accountingHref}
+          active={pathname.startsWith('/accounting')}
+          label="AR"
+          icon={Landmark}
+        />
         <div className="flex flex-col items-center gap-0.5 py-1">
           <CommandPaletteTrigger />
           <span className="text-[10px] text-muted-foreground">Search</span>
@@ -33,7 +59,7 @@ export function MobileBottomNav({
     );
   }
 
-  if (accountingPortal && showAccountingNav) {
+  if (accountingPortal && showAccountingNav && !wineSpectatorPortal) {
     return (
       <nav className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t border-border/60 bg-bg-surface-raised/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md lg:hidden">
         <NavIcon href="/accounting" active={pathname === '/accounting'} label="AR" icon={Landmark} />
@@ -46,21 +72,14 @@ export function MobileBottomNav({
   }
 
   if (wineSpectatorPortal) {
+    const homeHref = nyweHref('/wine-spectator', portalKind);
+    const newHref = nyweHref('/wine-spectator/contracts/new', portalKind);
+    const listHref = nyweHref('/wine-spectator/contracts', portalKind);
     return (
       <nav className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t border-border/60 bg-bg-surface-raised/95 px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md lg:hidden">
-        <NavIcon href="/wine-spectator" active={pathname === '/wine-spectator'} label="Home" icon={LayoutDashboard} />
-        <NavIcon
-          href="/wine-spectator/contracts/new"
-          active={pathname.startsWith('/wine-spectator/contracts/new')}
-          label="New"
-          icon={Plus}
-        />
-        <NavIcon
-          href="/wine-spectator/contracts"
-          active={pathname.startsWith('/wine-spectator/contracts') && !pathname.includes('/new')}
-          label="Licenses"
-          icon={Home}
-        />
+        <NavIcon href={homeHref} active={nywePathActive(pathname, '/wine-spectator')} label="Home" icon={LayoutDashboard} />
+        <NavIcon href={newHref} active={nywePathActive(pathname, '/wine-spectator/contracts/new')} label="New" icon={Plus} />
+        <NavIcon href={listHref} active={nywePathActive(pathname, '/wine-spectator/contracts')} label="Licenses" icon={Home} />
         <div className="flex min-w-[3rem] flex-col items-center gap-0.5 py-1">
           <CommandPaletteTrigger />
           <span className="text-[10px] text-muted-foreground">Search</span>
