@@ -1,5 +1,5 @@
 import { isEventsManagedWorkflow, isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
-import { NYWE_COUNTERSIGNER_EMAILS } from '@/lib/nywe-auto-release-accounting';
+import { NYWE_COUNTERSIGNER_EMAILS } from '@/lib/nywe-countersigner';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { Event } from '@/types/db';
 

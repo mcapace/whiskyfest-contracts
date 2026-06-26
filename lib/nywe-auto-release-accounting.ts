@@ -1,10 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
+import { NYWE_COUNTERSIGNER_EMAILS } from '@/lib/nywe-countersigner';
 import { releaseContractToAccounting } from '@/lib/release-to-accounting';
 import type { ContractWithTotals, Event } from '@/types/db';
 
-/** Known NYWE countersigner emails (Susannah Nolan). */
-export const NYWE_COUNTERSIGNER_EMAILS = new Set(['snolan@mshanken.com']);
+export { NYWE_COUNTERSIGNER_EMAILS } from '@/lib/nywe-countersigner';
 
 export function nyweCountersignerCompleted(
   contract: Pick<ContractWithTotals, 'countersigned_by_email'>,
