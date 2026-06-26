@@ -216,7 +216,7 @@ export function EventsAdmin({ initialEvents, wineSpectatorOnly = false }: Props)
                   onChange={e => set('contract_template_profile', e.target.value as 'whiskyfest' | 'nywe_vendor')}
                 >
                   <option value="whiskyfest">WhiskyFest contract</option>
-                  <option value="nywe_vendor">NYWE vendor license</option>
+                  <option value="nywe_vendor">NYWE exhibitor contract</option>
                 </select>
               </Field>
               <Field label="Workflow">

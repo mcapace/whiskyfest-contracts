@@ -38,7 +38,7 @@ export function NyweApprovalChecklist({ pendingReview, inProgress, approvedCount
         <div>
           <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-sky-900/80">
             <ShieldCheck className="h-4 w-4" aria-hidden />
-            Step 2 — Approve each license before sending
+            Step 2 — Approve each contract before sending
           </p>
           <h3 className="mt-1 font-serif text-lg font-semibold text-foreground">
             {pendingReview.length > 0
@@ -48,8 +48,8 @@ export function NyweApprovalChecklist({ pendingReview, inProgress, approvedCount
                 : `${approvedCount} approved — ready for bulk send`}
           </h3>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-            Open each license, scroll the PDF, confirm the address and $14,000 fee, then click{' '}
-            <strong>Approve Contract</strong>. Bulk send only includes approved licenses.
+            Open each contract, scroll the PDF, confirm the address and $14,000 fee, then click{' '}
+            <strong>Approve Contract</strong>. Bulk send only includes approved contracts.
           </p>
         </div>
         {total > 0 ? (
@@ -86,11 +86,11 @@ export function NyweApprovalChecklist({ pendingReview, inProgress, approvedCount
       {inProgress.length > 0 ? (
         <div className={cn(pendingReview.length > 0 && 'mt-5 border-t border-sky-200/80 pt-5')}>
           <p className="mb-3 text-sm font-medium text-muted-foreground">
-            Not submitted for review yet — open the license and use <strong>Generate Draft PDF</strong> first.
+            Not submitted for review yet — open the contract and use <strong>Generate Draft PDF</strong> first.
           </p>
           <ul className="space-y-3">
             {inProgress.map((row) => (
-              <ChecklistCard key={row.rowKey} row={row} actionLabel="Open license" actionTone="outline" />
+              <ChecklistCard key={row.rowKey} row={row} actionLabel="Open contract" actionTone="outline" />
             ))}
           </ul>
         </div>
@@ -98,7 +98,7 @@ export function NyweApprovalChecklist({ pendingReview, inProgress, approvedCount
 
       {approvedCount > 0 && pendingReview.length === 0 && inProgress.length === 0 ? (
         <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50/90 px-4 py-3 text-sm text-emerald-950">
-          All licenses in the pipeline are approved. Go to <strong>Step 3 — Send to wineries</strong> below.
+          All contracts in the pipeline are approved. Go to <strong>Step 3 — Send to wineries</strong> below.
         </p>
       ) : null}
     </section>
@@ -140,7 +140,7 @@ function ChecklistCard({
           ) : null}
           {row.grandTotalCents != null ? (
             <p className="text-sm font-medium tabular-nums text-foreground">
-              {formatCurrency(row.grandTotalCents)} license fee
+              {formatCurrency(row.grandTotalCents)} contract fee
             </p>
           ) : null}
         </div>

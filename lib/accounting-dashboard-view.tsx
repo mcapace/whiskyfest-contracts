@@ -115,7 +115,7 @@ export async function AccountingDashboardView({
         title={accountingPortalTitle(productKey)}
         subtitle={
           productKey === 'wine_spectator'
-            ? 'New York Wine Experience vendor licenses ready for invoicing'
+            ? 'New York Wine Experience exhibitor contracts ready for invoicing'
             : 'WhiskyFest sponsor contracts ready for invoicing'
         }
         arTotalCents={sumFor('all')}

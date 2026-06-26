@@ -92,7 +92,7 @@ export function NyweBulkSendWizard({ open, onOpenChange, sendable, onComplete }:
         <DialogHeader>
           <DialogTitle className="font-serif text-xl">Bulk send to clients</DialogTitle>
           <DialogDescription>
-            Generates each PDF, marks it approved from roster data, and emails DocuSign — no need to open licenses
+            Generates each PDF, marks it approved from roster data, and emails DocuSign — no need to open contracts
             individually.
           </DialogDescription>
         </DialogHeader>
@@ -106,7 +106,7 @@ export function NyweBulkSendWizard({ open, onOpenChange, sendable, onComplete }:
                     Send {sendable.length} DocuSign email{sendable.length === 1 ? '' : 's'}?
                   </p>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Each draft license is treated as <strong>pre-approved</strong> from the roster. PDFs are generated
+                    Each draft contract is treated as <strong>pre-approved</strong> from the roster. PDFs are generated
                     fresh, then DocuSign emails go to each winery signer immediately.
                   </p>
                 </div>
@@ -121,7 +121,7 @@ export function NyweBulkSendWizard({ open, onOpenChange, sendable, onComplete }:
 
               {sendable.length === 0 ? (
                 <p className="mt-4 text-sm text-muted-foreground">
-                  No draft licenses ready to send. Create licenses from the roster first, then try again.
+                  No draft contracts ready to send. Create contracts from the roster first, then try again.
                 </p>
               ) : null}
 
@@ -129,7 +129,7 @@ export function NyweBulkSendWizard({ open, onOpenChange, sendable, onComplete }:
                 <div className="mt-4 flex gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
                   <p>
-                    {missingAddressCount} approved license{missingAddressCount === 1 ? '' : 's'} missing a street address.
+                    {missingAddressCount} approved contract{missingAddressCount === 1 ? '' : 's'} missing a street address.
                     Fix in Google Sheets, refresh the roster, and approve again before sending.
                   </p>
                 </div>
@@ -179,7 +179,7 @@ export function NyweBulkSendWizard({ open, onOpenChange, sendable, onComplete }:
                   What happens next
                 </p>
                 <ol className="mt-2 list-decimal space-y-1 pl-4 text-sky-900/90">
-                  <li>Each winery receives a DocuSign email to sign their license.</li>
+                  <li>Each winery receives a DocuSign email to sign their contract.</li>
                   <li>When they sign, you get a DocuSign email to countersign.</li>
                   <li>After you countersign, accounting is notified automatically.</li>
                 </ol>

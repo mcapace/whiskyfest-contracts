@@ -326,7 +326,7 @@ export async function notifyPartialSignature(
     : `${exhibitorPerson} from ${company} signed — awaiting countersignature`;
 
   const para1 = nywe
-    ? `${company} has signed the ${eventTitle} license agreement.`
+    ? `${company} has signed the ${eventTitle} contract.`
     : `${exhibitorPerson} at ${company} has signed the ${eventTitle} contract.`;
   const para2 = nywe
     ? `Open the DocuSign email in your inbox to countersign as ${signatoryName}. Accounting is notified automatically after you sign.`

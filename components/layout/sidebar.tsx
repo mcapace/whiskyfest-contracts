@@ -71,7 +71,7 @@ function AccountPermissionSummary({
   const rows = [
     { label: 'Role', value: formatRoleLabel(user.role) },
     { label: 'Contract pipeline', value: pipeline ? 'Yes' : 'No' },
-    { label: 'Wine Spectator', value: wine ? 'Yes' : 'No' },
+    { label: 'NYWE', value: wine ? 'Yes' : 'No' },
     { label: 'Events team', value: events ? 'Yes' : 'No' },
     { label: 'Accounting', value: accounting ? 'Yes' : 'No' },
   ];
@@ -115,7 +115,7 @@ const whiskyfestNav: SidebarNavItem[] = [
 const wineSpectatorNav: SidebarNavItem[] = [
   { href: '/wine-spectator', label: 'Home', icon: LayoutDashboard },
   { href: '/wine-spectator/roster', label: 'Exhibitor list', icon: Users },
-  { href: '/wine-spectator/contracts', label: 'All licenses', icon: FileText },
+  { href: '/wine-spectator/contracts', label: 'All contracts', icon: FileText },
   { href: '/settings', label: 'Settings', icon: Settings },
   { href: '/events', label: 'Events', icon: CalendarDays, adminOnly: true, wineSpectatorAdminOk: true },
 ];

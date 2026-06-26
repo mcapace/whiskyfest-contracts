@@ -100,7 +100,7 @@ export default async function WineSpectatorDashboardPage() {
       {sendBlocked ? (
         <div className="rounded-xl border border-amber-300/80 bg-amber-50/95 px-5 py-4 text-amber-950">
           <p className="text-sm font-semibold">DocuSign send is turned off for now</p>
-          <p className="mt-1 text-sm opacity-90">You can still review licenses here. Mike can turn on sending when you&apos;re ready.</p>
+          <p className="mt-1 text-sm opacity-90">You can still review contracts here. Mike can turn on sending when you&apos;re ready.</p>
         </div>
       ) : null}
 
@@ -144,8 +144,8 @@ export default async function WineSpectatorDashboardPage() {
         <Card className="border-border/60 shadow-sm">
           <CardHeader className="flex flex-row items-end justify-between space-y-0">
             <div>
-              <CardTitle className="font-display text-xl font-medium">Recent licenses</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">Latest updates across all vendor licenses</p>
+              <CardTitle className="font-display text-xl font-medium">Recent contracts</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">Latest updates across all exhibitor contracts</p>
             </div>
             <Link href="/wine-spectator/contracts" className="text-sm font-medium text-accent-brand hover:underline">
               View all
@@ -153,7 +153,7 @@ export default async function WineSpectatorDashboardPage() {
           </CardHeader>
           <CardContent className="p-0">
             {recent.length === 0 ? (
-              <p className="p-6 text-sm text-muted-foreground">No licenses yet — start from the exhibitor roster.</p>
+              <p className="p-6 text-sm text-muted-foreground">No contracts yet — start from the exhibitor roster.</p>
             ) : (
               <Table>
                 <TableHeader>

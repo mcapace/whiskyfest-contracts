@@ -6,6 +6,12 @@ import { LoginHero } from '@/components/auth/login-hero';
 import { NyweLogo } from '@/components/brand/nywe-logo';
 import { nywePortalOrigin, portalKindFromHost, postLoginPath, requestOrigin } from '@/lib/portal-host';
 import { canAccessWineSpectator } from '@/lib/wine-spectator-access';
+import {
+  NYWE_LOGIN_FOOTER,
+  NYWE_LOGIN_HEADLINE,
+  NYWE_LOGIN_TAGLINE,
+  STAFF_LOGIN_HEADLINE,
+} from '@/lib/nywe-copy';
 
 export default async function LoginPage({
   searchParams,
@@ -54,10 +60,10 @@ export default async function LoginPage({
                 </div>
                 <p className="mt-8 font-sans text-xs uppercase tracking-[0.25em] text-rose-300/90">NY Wine Experience</p>
                 <h1 className="mt-3 font-display text-5xl font-medium tracking-tight text-stone-50 sm:text-6xl">
-                  Vendor licenses
+                  {NYWE_LOGIN_HEADLINE}
                 </h1>
                 <p className="mt-4 font-display text-lg italic text-stone-300 sm:text-2xl">
-                  New York Wine Experience · Contracts portal
+                  {NYWE_LOGIN_TAGLINE}
                 </p>
               </div>
             </>
@@ -88,7 +94,7 @@ export default async function LoginPage({
           <div className="w-full max-w-md animate-login-mount">
             <p className="font-sans text-xs font-medium uppercase tracking-[0.2em] text-ink-500">Sign in</p>
             <h2 className="mt-3 font-display text-4xl font-medium tracking-tight text-oak-800 sm:text-5xl">
-              M. Shanken Operations
+              {STAFF_LOGIN_HEADLINE}
             </h2>
             <p className="mt-4 text-sm text-ink-700">Use your @mshanken.com Google account</p>
 
@@ -126,9 +132,7 @@ export default async function LoginPage({
             </div>
 
             <p className="mt-10 text-xs font-medium uppercase tracking-[0.14em] text-ink-500">
-              {nywePortal
-                ? 'New York Wine Experience · Wine Spectator'
-                : 'WhiskyFest 2026 · Marriott Marquis · New York'}
+              {nywePortal ? NYWE_LOGIN_FOOTER : 'WhiskyFest 2026 · Marriott Marquis · New York'}
             </p>
           </div>
         </div>

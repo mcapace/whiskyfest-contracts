@@ -19,7 +19,7 @@ export default async function WineSpectatorRosterPage() {
     return (
       <div className="space-y-2">
         <h1 className="font-display text-3xl font-medium">Exhibitor roster</h1>
-        <p className="text-sm text-muted-foreground">No active Wine Spectator event configured.</p>
+        <p className="text-sm text-muted-foreground">No active NYWE event configured.</p>
       </div>
     );
   }

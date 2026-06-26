@@ -151,7 +151,7 @@ export function NyweSusannahDashboard({
         {reviewCount > 0 ? (
           <section className="rounded-xl border border-sky-200 bg-sky-50/80 p-4">
             <p className="text-sm font-medium text-sky-950">
-              {reviewCount} license{reviewCount === 1 ? '' : 's'} awaiting approval
+              {reviewCount} contract{reviewCount === 1 ? '' : 's'} awaiting approval
             </p>
             <Button asChild size="sm" className="mt-3">
               <Link href="/wine-spectator/contracts?status=pending_events_review">Review now</Link>

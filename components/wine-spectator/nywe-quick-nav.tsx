@@ -12,14 +12,14 @@ export function NyweQuickNav() {
     },
     {
       href: '/wine-spectator/contracts',
-      title: 'All licenses',
-      description: 'Search, filter, and open any vendor license',
+      title: 'All contracts',
+      description: 'Search, filter, and open any exhibitor contract',
       icon: List,
     },
     {
       href: '/wine-spectator/contracts/new',
-      title: 'New license',
-      description: 'Add a one-off vendor outside the roster',
+      title: 'New contract',
+      description: 'Add a one-off exhibitor outside the roster',
       icon: Plus,
     },
   ] as const;
@@ -50,10 +50,10 @@ export function NyweRosterPageHeader({ eventName }: { eventName: string }) {
   return (
     <div className="flex flex-col gap-4 border-b border-border/60 pb-6 lg:flex-row lg:items-end lg:justify-between">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-800/70">Vendor operations</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-800/70">Contract workflow</p>
         <h1 className="mt-1 font-display text-3xl font-medium tracking-tight text-foreground">Exhibitor roster</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          {eventName} — create licenses from Google Sheets, track DocuSign signing, and write status back automatically.
+          {eventName} — create contracts from Google Sheets, send via DocuSign, and write status back automatically.
         </p>
       </div>
       <Button asChild variant="outline" size="sm" className="shrink-0">

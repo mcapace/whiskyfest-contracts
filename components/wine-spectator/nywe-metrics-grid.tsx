@@ -69,7 +69,7 @@ export function NyweMetricsGrid({ metrics, compact }: { metrics: NyweDashboardMe
       <MetricCard
         label="Total pipeline"
         value={formatCurrency(metrics.pipelineRevenueCents)}
-        detail={`${metrics.totalLicenses} licenses across ${metrics.rosterWineries} roster wineries`}
+        detail={`${metrics.totalLicenses} contracts across ${metrics.rosterWineries} roster wineries`}
         icon={TrendingUp}
         tone="slate"
         featured
@@ -105,7 +105,7 @@ export function NyweMetricsGrid({ metrics, compact }: { metrics: NyweDashboardMe
       <MetricCard
         label="Roster wineries"
         value={String(metrics.rosterWineries)}
-        detail={`${metrics.totalLicenses} licenses in the system`}
+        detail={`${metrics.totalLicenses} contracts in the system`}
         icon={Users}
         tone="slate"
       />

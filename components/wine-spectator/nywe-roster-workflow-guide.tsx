@@ -75,7 +75,7 @@ export function NyweRosterWorkflowGuide({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Workflow</p>
-          <h2 className="mt-1 font-display text-lg font-medium">Bulk license operations</h2>
+          <h2 className="mt-1 font-display text-lg font-medium">Bulk contract operations</h2>
         </div>
         <ol className="flex flex-wrap gap-2">
           {STEPS.map((step, index) => {

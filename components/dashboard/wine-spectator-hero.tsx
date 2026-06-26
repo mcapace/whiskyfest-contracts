@@ -8,6 +8,7 @@ import { CountdownTimer } from '@/components/countdown-timer';
 import { HeroParallaxLayer } from '@/components/dashboard/hero-parallax-layer';
 import { eventCountdownTargetIso, formatEventScheduleLine } from '@/lib/event-schedule';
 import { cn } from '@/lib/utils';
+import { nyweContractCount } from '@/lib/nywe-copy';
 import type { Event } from '@/types/db';
 
 export function WineSpectatorHero({
@@ -110,7 +111,7 @@ export function WineSpectatorHero({
       <div className="grid gap-5 border-t border-parchment-300/15 bg-rose-950/90 p-6 text-parchment-100 sm:grid-cols-[1fr_auto] sm:items-center sm:gap-8 sm:p-8">
         <div className="min-w-0 space-y-1">
           <p className="text-base font-medium leading-relaxed text-parchment-50">
-            {contractsCount} vendor license{contractsCount !== 1 ? 's' : ''}
+            {nyweContractCount(contractsCount)}
           </p>
           <p className="text-sm leading-relaxed text-parchment-200/90">{completionLabel}</p>
         </div>
@@ -120,7 +121,7 @@ export function WineSpectatorHero({
           </Button>
           <Button asChild className="bg-amber-600 text-parchment-50 shadow-lg shadow-amber-950/25 hover:bg-amber-700">
             <Link href="/wine-spectator/contracts/new">
-              <Plus className="h-4 w-4" /> New vendor license
+              <Plus className="h-4 w-4" /> New contract
             </Link>
           </Button>
         </div>

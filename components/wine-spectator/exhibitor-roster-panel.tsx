@@ -460,10 +460,10 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
       const selectedWithLicense = data.rows.filter((r) => selected.has(r.rowKey) && r.contractId).length;
       if (selectedWithLicense > 0) {
         setMessage(
-          `None of your ${selectedWithLicense} selected row${selectedWithLicense === 1 ? '' : 's'} need new drafts — they already have licenses. Filter "Not in system" or use Step 1 in the workflow guide.`,
+          `None of your ${selectedWithLicense} selected row${selectedWithLicense === 1 ? '' : 's'} need new drafts — they already have contracts. Filter "Not in system" or use Step 1 in the workflow guide.`,
         );
       } else {
-        setMessage('Select exhibitors without a license, then click Create drafts.');
+        setMessage('Select exhibitors without a contract, then click Create drafts.');
       }
       return;
     }
@@ -497,7 +497,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
           const detail =
             typeof json.error === 'string'
               ? json.error
-              : 'Create failed — try again; licenses created so far are saved.';
+              : 'Create failed — try again; contracts created so far are saved.';
           setMessage(
             `Stopped on batch ${batchIndex + 1} of ${batches.length}: ${detail} Created ${totalCreated} draft${totalCreated === 1 ? '' : 's'} before stopping.`,
           );
@@ -579,7 +579,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
       return;
     }
     if (sendableRows.length === 0) {
-      setMessage('No draft licenses to send. Create licenses from the roster first.');
+      setMessage('No draft contracts to send. Create contracts from the roster first.');
       return;
     }
     setBulkSendOpen(true);
@@ -589,7 +589,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
     <div className="space-y-4">
       {!data.event.client_send_enabled ? (
         <div className="rounded-md border border-amber-300/80 bg-amber-50/95 p-4 text-sm text-amber-950">
-          Client send is disabled — create and approve licenses internally. Status still writes back to Google Sheets.
+          Client send is disabled — create and approve contracts internally. Status still writes back to Google Sheets.
         </div>
       ) : null}
 
@@ -653,7 +653,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
                 `Sent ${summary.sent} DocuSign email${summary.sent === 1 ? '' : 's'}${summary.failed > 0 ? ` · ${summary.failed} failed` : ''}. Countersign in DocuSign when wineries sign.`,
               );
             } else if (summary.failed > 0) {
-              setMessage(`Bulk send failed for ${summary.failed} license${summary.failed === 1 ? '' : 's'}.`);
+              setMessage(`Bulk send failed for ${summary.failed} contract${summary.failed === 1 ? '' : 's'}.`);
             }
           });
         }}

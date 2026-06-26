@@ -1,5 +1,6 @@
 import type { ContractWithTotals, Event } from '@/types/db';
 import { isNywePortalHost, isNywePortalPath } from '@/lib/portal-host';
+import { NYWE_PORTAL_TITLE, NYWE_SHORT_LABEL } from '@/lib/nywe-copy';
 
 export const PRODUCT_WHISKYFEST = 'whiskyfest';
 export const PRODUCT_WINE_SPECTATOR = 'wine_spectator';
@@ -38,21 +39,21 @@ export function productBasePath(productKey: ProductKey): string {
 }
 
 export function productDisplayLabel(productKey: ProductKey): string {
-  return productKey === PRODUCT_WINE_SPECTATOR ? 'Wine Spectator' : 'WhiskyFest';
+  return productKey === PRODUCT_WINE_SPECTATOR ? NYWE_SHORT_LABEL : 'WhiskyFest';
 }
 
 /** Sticky header label when no page-specific title is set. */
 export function portalTopbarLabel(pathname: string): string {
-  if (isWineSpectatorPath(pathname)) return 'Wine Spectator · NYWE';
-  if (isNyweAccountingPathname(pathname)) return 'Accounting · NYWE';
+  if (isWineSpectatorPath(pathname)) return `${NYWE_SHORT_LABEL} · Contracts`;
+  if (isNyweAccountingPathname(pathname)) return `Accounting · ${NYWE_SHORT_LABEL}`;
   if (isAccountingPath(pathname)) return 'Accounting · WhiskyFest';
   return 'WhiskyFest · Contracts';
 }
 
 export function portalDocumentTitle(pathname: string): string {
-  if (isWineSpectatorPath(pathname)) return 'NYWE Contracts | Wine Spectator';
-  if (isNyweAccountingPathname(pathname)) return 'NYWE Accounting | M. Shanken';
-  if (isAccountingPath(pathname)) return 'WhiskyFest Accounting | M. Shanken';
+  if (isWineSpectatorPath(pathname)) return NYWE_PORTAL_TITLE;
+  if (isNyweAccountingPathname(pathname)) return `NYWE Accounting`;
+  if (isAccountingPath(pathname)) return 'WhiskyFest Accounting';
   return 'WhiskyFest Contracts';
 }
 

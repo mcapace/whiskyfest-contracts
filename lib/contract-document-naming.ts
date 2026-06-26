@@ -33,7 +33,7 @@ export function defaultDocuSignEmailSubjectTemplate(
   event: Pick<Event, 'product_key' | 'contract_document_label'>,
 ): string {
   if (isWineSpectatorProduct(event.product_key)) {
-    return '{{winery_name}} — Please sign your {{event_name}} vendor license';
+    return '{{winery_name}} — Please sign your {{event_name}} contract';
   }
   return '{{winery_name}} — Please sign your {{event_name}} {{document_label}}';
 }
@@ -77,7 +77,7 @@ export function contractDocuSignEmailBlurb(
 ): string {
   const label = eventContractDocumentLabel(event);
   if (isWineSpectatorProduct(event.product_key)) {
-    return `Please review and sign your Wine Spectator ${event.name} vendor license for ${companyName}.`;
+    return `Please review and sign your ${event.name} contract for ${companyName}.`;
   }
   return `Attached is the ${event.name} ${label} for ${companyName}. Please review and sign.`;
 }

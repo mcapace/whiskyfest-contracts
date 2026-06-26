@@ -60,7 +60,7 @@ export function sendGridFromForEvent(event: EventEmailContext | null | undefined
 /** In-app workspace label used in email footers and CTAs. */
 export function workspaceLabelForProduct(productKey: ProductKey | null | undefined): string {
   if (isWineSpectatorProduct(productKey)) {
-    return process.env['WINE_SPECTATOR_WORKSPACE_LABEL']?.trim() || 'Wine Spectator Contracts';
+    return process.env['WINE_SPECTATOR_WORKSPACE_LABEL']?.trim() || 'NYWE Contracts';
   }
   return 'WhiskyFest Contracts';
 }

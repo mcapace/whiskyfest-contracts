@@ -264,15 +264,15 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
           >
             {canCreateContract && (
               <Command.Item
-                value={nywePortal ? 'new license vendor contract' : 'new contract create'}
+                value={nywePortal ? 'new contract nywe create' : 'new contract create'}
                 onSelect={() => go(nywePortal ? '/contracts/new' : '/contracts/new')}
                 className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
               >
                 <Plus className="h-4 w-4 shrink-0 opacity-70" />
                 <div>
-                  <p className="font-medium">{nywePortal ? 'Create New License' : 'Create New Contract'}</p>
+                  <p className="font-medium">Create New Contract</p>
                   <p className="text-xs text-muted-foreground">
-                    {nywePortal ? 'Start a NYWE vendor license' : 'Create a participation contract'}
+                    {nywePortal ? 'Start a new NYWE exhibitor contract' : 'Create a participation contract'}
                   </p>
                 </div>
               </Command.Item>
@@ -471,14 +471,14 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
             )}
             {nywePortal && wineAccess && (
             <Command.Item
-              value="all licenses nywe contracts"
+              value="all contracts nywe"
               onSelect={() => go('/contracts')}
               className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
             >
               <FileText className="h-4 w-4 shrink-0 opacity-70" />
               <div>
-                <p className="font-medium">Licenses</p>
-                <p className="text-xs text-muted-foreground">All NYWE vendor licenses</p>
+                <p className="font-medium">Contracts</p>
+                <p className="text-xs text-muted-foreground">All NYWE exhibitor contracts</p>
               </div>
             </Command.Item>
             )}
