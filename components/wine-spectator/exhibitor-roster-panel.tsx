@@ -205,13 +205,13 @@ function renderUiCell(row: RosterRow, columnId: string) {
       );
     case 'licenseStatus':
       return (
-        <div className="flex min-w-[8.5rem] flex-col gap-1">
+        <div className="min-w-0 max-w-full overflow-hidden">
           {row.recalledToDraft ? (
-            <Badge className="w-fit border border-amber-600/35 bg-amber-50 text-amber-950 hover:bg-amber-50">
+            <Badge className="w-fit max-w-full truncate border border-amber-600/35 bg-amber-50 text-amber-950 hover:bg-amber-50">
               Recalled
             </Badge>
           ) : row.contractStatus ? (
-            <StatusBadge status={row.contractStatus} />
+            <StatusBadge status={row.contractStatus} className="max-w-full truncate" />
           ) : (
             <span className="text-sm text-muted-foreground">Not started</span>
           )}
@@ -219,7 +219,7 @@ function renderUiCell(row: RosterRow, columnId: string) {
       );
     case 'licenseFee':
       return row.contractGrandTotalCents != null ? (
-        <span className="tabular-nums text-sm font-medium">{formatCurrency(row.contractGrandTotalCents)}</span>
+        <span className="whitespace-nowrap tabular-nums text-sm font-medium">{formatCurrency(row.contractGrandTotalCents)}</span>
       ) : (
         <span className="text-sm text-muted-foreground">—</span>
       );
@@ -879,7 +879,11 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
                     </TableHead>
                   ))
                 : uiColumns.map((col) => (
-                    <TableHead key={col.id} className="whitespace-nowrap" style={{ width: col.minWidth }}>
+                    <TableHead
+                      key={col.id}
+                      className="whitespace-nowrap"
+                      style={{ minWidth: col.minWidth, width: col.minWidth }}
+                    >
                       {col.label}
                     </TableHead>
                   ))}
@@ -914,7 +918,11 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
                       </TableCell>
                     ))
                   : uiColumns.map((col) => (
-                      <TableCell key={col.id} className="align-top">
+                      <TableCell
+                        key={col.id}
+                        className="align-top"
+                        style={{ minWidth: col.minWidth, width: col.minWidth }}
+                      >
                         {renderUiCell(row, col.id)}
                       </TableCell>
                     ))}
