@@ -73,7 +73,9 @@ In Google Cloud Console → OAuth client → Authorized redirect URIs, add:
 
 `https://nywecontracts.winespectator.com/api/auth/callback/google`
 
-Keep the existing WhiskyFest redirect URI (`https://wacontracts.whiskyadvocate.com/api/auth/callback/google` or your `NEXTAUTH_URL`).
+Keep the existing WhiskyFest redirect URI (`https://wacontracts.whiskyadvocate.com/api/auth/callback/google`).
+
+**Important:** Do **not** set `AUTH_URL` or `NEXTAUTH_URL` in Vercel for this project. Both custom domains share one deployment; static auth base URLs break Google login on the NYWE hostname. Auth.js uses `trustHost: true` and derives the callback URL from each request. Use `WHISKYFEST_PORTAL_ORIGIN` / `NYWE_PORTAL_ORIGIN` for email deep links instead.
 
 ### Optional env vars
 

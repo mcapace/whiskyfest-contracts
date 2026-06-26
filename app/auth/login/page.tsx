@@ -4,7 +4,7 @@ import { auth, signIn } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { LoginHero } from '@/components/auth/login-hero';
 import { NyweLogo } from '@/components/brand/nywe-logo';
-import { nywePortalOrigin, portalKindFromHost, postLoginPath, requestOrigin } from '@/lib/portal-host';
+import { portalKindFromHost, postLoginPath } from '@/lib/portal-host';
 import { canAccessWineSpectator } from '@/lib/wine-spectator-access';
 import {
   NYWE_LOGIN_FOOTER,
@@ -43,9 +43,7 @@ export default async function LoginPage({
       ? 'Account deactivated. Contact Michael Capace for access.'
       : null;
 
-  const redirectPath = postLoginPath(portalKind, {});
-  const loginOrigin = requestOrigin({ headers: headers() });
-  const redirectTo = `${loginOrigin}${redirectPath}`;
+  const redirectTo = postLoginPath(portalKind, {});
 
   return (
     <div className={nywePortal ? 'min-h-screen bg-stone-950' : 'min-h-screen bg-parchment-50'}>

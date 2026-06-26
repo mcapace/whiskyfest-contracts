@@ -13,6 +13,20 @@ const IMPERSONATION_TTL_MS = 30 * 60 * 1000;
 /** Min interval between `last_seen_at` writes per user (JWT refreshes often). */
 const LAST_SEEN_THROTTLE_MS = 5 * 60 * 1000;
 
+/**
+ * One Vercel deployment serves both hostnames. A static AUTH_URL / NEXTAUTH_URL (WhiskyFest)
+ * breaks Google OAuth on nywecontracts.winespectator.com — Auth.js must use trustHost per request.
+ * Email/deep links use WHISKYFEST_PORTAL_ORIGIN / NYWE_PORTAL_ORIGIN instead.
+ */
+function clearStaticAuthBaseUrlForMultiDomain(): void {
+  if (process.env['VERCEL'] || process.env['VERCEL_ENV']) {
+    delete process.env['AUTH_URL'];
+    delete process.env['NEXTAUTH_URL'];
+  }
+}
+
+clearStaticAuthBaseUrlForMultiDomain();
+
 async function computeAccessFlagsForEmail(
   email: string,
   supabase: ReturnType<typeof getSupabaseAdmin>,
@@ -94,21 +108,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async redirect({ url, baseUrl }) {
       const allowedOrigins = new Set([nywePortalOrigin(), whiskyfestPortalOrigin()]);
       if (url.startsWith('/')) {
-        try {
-          const base = new URL(baseUrl);
-          if (allowedOrigins.has(base.origin)) return `${base.origin}${url}`;
-        } catch {
-          /* fall through */
-        }
-        return `${whiskyfestPortalOrigin()}${url}`;
+        return `${baseUrl}${url}`;
       }
       try {
         const parsed = new URL(url);
         if (allowedOrigins.has(parsed.origin)) return url;
+        if (parsed.origin === new URL(baseUrl).origin) return url;
       } catch {
         /* fall through */
       }
-      return whiskyfestPortalOrigin();
+      return baseUrl;
     },
     async signIn({ user }) {
       const email = user.email?.trim().toLowerCase();
