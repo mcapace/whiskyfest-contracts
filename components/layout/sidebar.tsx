@@ -223,10 +223,12 @@ export function Sidebar({
   const isAccounting = Boolean(user.isAccounting);
   const canAccounting = isAccounting || isAdmin;
   const accountingOnly = isAccounting && !pipelineAccess;
+  const useAccountingOnlyNav = accountingOnly && !isAdmin;
   const nywePortal = portalKind === 'nywe';
   const accountingPortal = isAccountingPath(pathname) || (nywePortal && pathname.startsWith('/accounting'));
   const wineSpectatorPortal = isWineSpectatorPath(pathname) || nywePortal;
-  const homeHref = accountingOnly || accountingPortal
+  const showAccountingChrome = accountingPortal && useAccountingOnlyNav;
+  const homeHref = accountingOnly
     ? isNyweAccountingPath(pathname, portalKind)
       ? nyweHref('/accounting/nywe', portalKind)
       : '/accounting'
@@ -234,11 +236,12 @@ export function Sidebar({
       ? nyweHref('/wine-spectator', portalKind)
       : '/';
   const accountingNavItems = nywePortal ? nyweAccountingNav : whiskyfestAccountingNav;
-  const rawNav = accountingPortal
-    ? accountingNavItems
-    : wineSpectatorPortal
-      ? wineSpectatorNav
-      : whiskyfestNav;
+  const rawNav =
+    useAccountingOnlyNav && accountingPortal
+      ? accountingNavItems
+      : wineSpectatorPortal
+        ? wineSpectatorNav
+        : whiskyfestNav;
   const nav = mapNavForPortal(rawNav, portalKind);
   const nyweChrome = nywePortal;
 
@@ -249,15 +252,22 @@ export function Sidebar({
           'shrink-0 border-b border-border/50 px-3 py-4',
           wineSpectatorPortal
             ? 'bg-gradient-to-b from-bg-surface-raised to-bg-surface'
-            : accountingPortal
+            : showAccountingChrome
               ? 'bg-gradient-to-b from-brass-700/[0.08] via-bg-surface-raised to-bg-surface'
               : 'bg-gradient-to-b from-fest-600/[0.07] via-bg-surface-raised to-bg-surface',
         )}
       >
-        <div className="mx-auto max-w-[220px] px-3 py-2">
+        <div className="flex justify-center px-3 py-2">
           {wineSpectatorPortal ? (
-            <NyweLogo href={homeHref} priority mark="event" imageClassName="max-h-12" />
-          ) : accountingPortal ? (
+            <NyweLogo
+              href={homeHref}
+              priority
+              mark="event"
+              centered
+              className="w-full max-w-[200px]"
+              imageClassName="max-h-12"
+            />
+          ) : showAccountingChrome ? (
             <Link href={homeHref} className="block rounded-lg border border-brass-700/25 bg-stone-950/60 px-4 py-3 text-center">
               <Landmark className="mx-auto h-6 w-6 text-brass-400" />
               <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-brass-300">Accounting</p>
@@ -270,7 +280,7 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 space-y-0.5 px-3 py-5">
-        {accountingOnly ? (
+        {useAccountingOnlyNav ? (
           <div className="space-y-1">
             {mapNavForPortal(accountingNavItems, portalKind).map((item) => {
               const active = portalNavLinkActive(pathname, item.href);
@@ -337,7 +347,7 @@ export function Sidebar({
                   </Link>
                 );
               })}
-            {canAccounting && !accountingPortal && !accountingOnly && (
+            {canAccounting && !useAccountingOnlyNav && (
               <Link
                 href={nywePortal ? nyweHref('/accounting/nywe', portalKind) : '/accounting'}
                 className={

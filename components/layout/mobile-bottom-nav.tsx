@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Calculator, Home, Landmark, LayoutDashboard, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { isAccountingPath, isWineSpectatorPath } from '@/lib/product-portal';
+import { isWineSpectatorPath } from '@/lib/product-portal';
 import { nyweHref } from '@/lib/portal-host';
 import { usePortalKind } from '@/components/portal/portal-context';
 import { CommandPaletteTrigger } from '@/components/command-palette/command-palette';
@@ -39,10 +39,9 @@ export function MobileBottomNav({
   const portalKind = usePortalKind();
   const nywePortal = portalKind === 'nywe';
   const wineSpectatorPortal = (nywePortal || isWineSpectatorPath(pathname)) && wineSpectatorAccess;
-  const accountingPortal = isAccountingPath(pathname) || (nywePortal && pathname.startsWith('/accounting'));
 
   if (accountingOnly) {
-    const accountingHref = nywePortal ? '/accounting' : '/accounting';
+    const accountingHref = nywePortal ? '/accounting/nywe' : '/accounting';
     return (
       <nav className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t border-border/60 bg-bg-surface-raised/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md lg:hidden">
         <NavIcon
@@ -51,18 +50,6 @@ export function MobileBottomNav({
           label="AR"
           icon={Landmark}
         />
-        <div className="flex flex-col items-center gap-0.5 py-1">
-          <CommandPaletteTrigger />
-          <span className="text-[10px] text-muted-foreground">Search</span>
-        </div>
-      </nav>
-    );
-  }
-
-  if (accountingPortal && showAccountingNav && !wineSpectatorPortal) {
-    return (
-      <nav className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t border-border/60 bg-bg-surface-raised/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md lg:hidden">
-        <NavIcon href="/accounting" active={pathname === '/accounting'} label="AR" icon={Landmark} />
         <div className="flex flex-col items-center gap-0.5 py-1">
           <CommandPaletteTrigger />
           <span className="text-[10px] text-muted-foreground">Search</span>

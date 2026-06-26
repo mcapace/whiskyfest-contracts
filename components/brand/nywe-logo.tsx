@@ -14,6 +14,7 @@ export function NyweLogo({
   subtitle,
   mark = 'wineSpectator',
   variant = 'default',
+  centered = false,
   /** @deprecated Use `variant="onDark"` instead. */
   onDark = false,
 }: {
@@ -25,13 +26,14 @@ export function NyweLogo({
   /** `event` = NYWE logo file; `wineSpectator` = Wine Spectator wordmark. */
   mark?: NyweLogoMark;
   variant?: BrandLogoVariant;
+  centered?: boolean;
   onDark?: boolean;
 }) {
   const resolvedVariant = onDark ? 'onDark' : variant;
   const asset = mark === 'event' ? NYWE_EVENT_LOGO : brandLogoAsset('wineSpectator', resolvedVariant);
 
   const content = (
-    <div className={cn('block', className)}>
+    <div className={cn('block', centered && 'mx-auto text-center', className)}>
       <Image
         src={asset.src}
         alt={asset.alt}
@@ -39,7 +41,8 @@ export function NyweLogo({
         height={asset.height}
         priority={priority}
         className={cn(
-          'h-auto w-full max-w-full object-contain object-left',
+          'h-auto w-full max-w-full object-contain',
+          centered ? 'mx-auto object-center' : 'object-left',
           mark === 'wineSpectator' && resolvedVariant === 'onDark' && 'drop-shadow-[0_2px_18px_rgba(0,0,0,0.55)]',
           imageClassName,
         )}

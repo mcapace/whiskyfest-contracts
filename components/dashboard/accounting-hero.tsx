@@ -54,7 +54,9 @@ export function AccountingHero({
 
         <div className="relative px-6 py-10 sm:px-10 sm:py-12 lg:px-12">
           {isNywe ? (
-            <NyweLogo variant="onDark" className="mb-6 max-w-[220px]" imageClassName="max-h-10" />
+            <div className="mb-6 inline-block rounded-lg bg-parchment-50 px-3 py-2 shadow-sm ring-1 ring-rose-900/10">
+              <NyweLogo mark="event" className="max-w-[220px]" imageClassName="max-h-10 w-auto" />
+            </div>
           ) : (
             <WhiskyAdvocateLogo variant="onDark" className="mb-6 max-w-[200px]" imageClassName="max-h-12" />
           )}
