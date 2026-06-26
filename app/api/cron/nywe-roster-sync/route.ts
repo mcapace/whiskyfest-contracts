@@ -30,5 +30,6 @@ export async function GET(request: Request) {
     syncedAt: outcome.syncedAt,
     rowCount: outcome.rowCount,
     writebackCount: outcome.writebackCount,
+    contractsUpdated: outcome.contractsUpdated,
   });
 }

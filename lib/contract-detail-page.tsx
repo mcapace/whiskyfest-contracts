@@ -15,6 +15,7 @@ import {
 } from '@/lib/contract-pdf-preview';
 import { syncDraftPdfFromDocuSign } from '@/lib/contract-pdf-sync-docusign';
 import { syncContractFromDocuSign } from '@/lib/docusign-envelope-sync';
+import { refreshContractFromLinkedRoster } from '@/lib/nywe-roster-contract-sync';
 import type {
   AuditLogEntry,
   ContractBoothBrand,
@@ -115,6 +116,25 @@ export async function ContractDetailPage({
       }
     } catch (err) {
       console.error('[contract detail] DocuSign status sync failed', err);
+    }
+  }
+
+  if (
+    eventRow &&
+    isNyweVendorEvent(eventRow) &&
+    contract.source_sheet_id &&
+    contract.source_sheet_tab &&
+    contract.source_row_number
+  ) {
+    try {
+      const rosterRefresh = await refreshContractFromLinkedRoster(supabase, contract, eventRow, {
+        revalidate: false,
+      });
+      if (rosterRefresh.updated) {
+        contract = rosterRefresh.contract;
+      }
+    } catch (err) {
+      console.error('[contract detail] roster field sync failed', err);
     }
   }
 

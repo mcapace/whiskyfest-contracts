@@ -6,6 +6,7 @@ import {
   rosterSheetsFromEvent,
 } from '@/lib/exhibitor-roster';
 import { syncExhibitorRosterWriteback } from '@/lib/exhibitor-roster-sync-hook';
+import { syncLinkedContractsFromRosterRows } from '@/lib/nywe-roster-contract-sync';
 import { getActiveWineSpectatorEvent } from '@/lib/wine-spectator-event';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { ContractWithTotals, Event } from '@/types/db';
@@ -27,6 +28,7 @@ export type ExhibitorRosterSyncResult =
       syncedAt: string;
       rowCount: number;
       writebackCount: number;
+      contractsUpdated: number;
     }
   | { status: 'skipped'; reason: string }
   | { status: 'error'; error: string };
@@ -119,6 +121,7 @@ export async function syncExhibitorRosterMaster(event?: Event | null): Promise<E
   try {
     const writebackCount = await writebackLinkedContracts(activeEvent.id);
     const roster = await fetchExhibitorRoster(activeEvent);
+    const contractsUpdated = await syncLinkedContractsFromRosterRows(activeEvent.id, roster.rows);
     const payload: ExhibitorRosterPayload = {
       syncedAt: roster.syncedAt,
       sheets: roster.sheets,
@@ -136,6 +139,7 @@ export async function syncExhibitorRosterMaster(event?: Event | null): Promise<E
       syncedAt: payload.syncedAt,
       rowCount: payload.rows.length,
       writebackCount,
+      contractsUpdated,
     };
   } catch (err) {
     return {
@@ -187,6 +191,7 @@ export async function loadExhibitorRoster(
     const sheetLoadFailed = roster.warnings.some((w) => w.includes('could not load'));
     if (!sheetLoadFailed) {
       await persistRosterSnapshot(event.id, payload);
+      await syncLinkedContractsFromRosterRows(event.id, payload.rows);
     } else {
       console.warn('[loadExhibitorRoster] skipped cache persist — one or more sheets failed to load');
     }

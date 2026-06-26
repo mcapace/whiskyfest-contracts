@@ -49,6 +49,8 @@ export type ExhibitorRosterRow = {
   billingStreet: string;
   billingCity: string;
   billingState: string;
+  billingZip: string;
+  billingCountry: string;
   primaryContactName: string;
   primaryContactEmail: string;
   primaryPhone: string;
@@ -425,6 +427,8 @@ export function buildContractPayloadFromRosterRow(
   booth_count: number;
   booth_rate_cents: number;
   billing: NyweBillingFields | null;
+  event_contact_name: string | null;
+  event_contact_email: string | null;
 } {
   const map = headers?.length ? buildColumnMapFromHeaders(headers, listKey) : columnMapForList(listKey);
   const winery = cell(row, map.wineryName);
@@ -433,6 +437,9 @@ export function buildContractPayloadFromRosterRow(
   const wineName = cell(row, map.wineName);
   const vintage = cell(row, map.vintage);
   const brandLine = formatRosterWineDisplay(wineName, vintage);
+  const primaryFirst = cell(row, map.primaryFirst);
+  const primaryLast = cell(row, map.primaryLast);
+  const primaryEmail = cell(row, map.primaryEmail);
 
   return {
     exhibitor_legal_name: billingCompany,
@@ -443,6 +450,8 @@ export function buildContractPayloadFromRosterRow(
     booth_count: 1,
     booth_rate_cents: nyweLicenseFeeCents(event),
     billing: billingFieldsFromRosterRow(row, map),
+    event_contact_name: [primaryFirst, primaryLast].filter(Boolean).join(' ').trim() || null,
+    event_contact_email: primaryEmail || null,
   };
 }
 
@@ -537,6 +546,8 @@ export async function fetchExhibitorRoster(event: Event): Promise<{
           billingStreet: cell(row, map.billingStreet),
           billingCity: cell(row, map.billingCity),
           billingState: cell(row, map.billingState),
+          billingZip: cell(row, map.billingZip),
+          billingCountry: cell(row, map.billingCountry),
           primaryContactName: [primaryFirst, primaryLast].filter(Boolean).join(' ').trim(),
           primaryContactEmail: cell(row, map.primaryEmail),
           primaryPhone: cell(row, map.primaryPhone),

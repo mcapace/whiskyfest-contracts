@@ -31,5 +31,6 @@ export async function POST() {
     syncedAt: outcome.syncedAt,
     rowCount: outcome.rowCount,
     writebackCount: outcome.writebackCount,
+    contractsUpdated: outcome.contractsUpdated,
   });
 }
