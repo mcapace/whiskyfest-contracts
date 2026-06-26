@@ -491,6 +491,8 @@ export function NewContractForm({
         ...formForSave,
         sales_rep_id: eventsManaged ? null : form.sales_rep_id,
         order_type: orderType,
+        contract_template_profile: selectedEvent?.contract_template_profile ?? 'whiskyfest',
+        brands_poured: boothOnlyEvent ? form.exhibitor_company_name.trim() || null : null,
         sponsor_brand: sponsorshipOnly ? sponsorBrand.trim() || null : null,
         line_items: boothOnlyEvent ? [] : parsedLines.rows,
         booth_brands,

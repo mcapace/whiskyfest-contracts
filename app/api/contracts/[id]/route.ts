@@ -7,6 +7,7 @@ import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { assertContractAccess } from '@/lib/auth-contract';
 import {
   clearedRepEnteredBilling,
+  firstContractBodyValidationError,
   newContractBodySchema,
   signerContactPatchSchema,
   sponsorBrandFromBody,
@@ -45,7 +46,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   ) {
     const parsed = newContractBodySchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 400 });
+      const flat = parsed.error.flatten();
+      return NextResponse.json(
+        { error: firstContractBodyValidationError(flat), details: flat },
+        { status: 400 },
+      );
     }
 
     if (contract.status === 'imported' || contract.status === 'voided') {
@@ -119,8 +124,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         exhibitor_legal_name: p.exhibitor_legal_name,
         exhibitor_company_name: p.exhibitor_company_name,
         order_type: p.order_type ?? 'booth',
-        brands_poured:
-          p.order_type === 'sponsorship_only' ? sponsorBrandFromBody(p) : null,
+        brands_poured: nyweEvent
+          ? (p.brands_poured?.trim() || p.exhibitor_company_name.trim() || null)
+          : p.order_type === 'sponsorship_only'
+            ? sponsorBrandFromBody(p)
+            : null,
         booth_count: nywePricing.booth_count,
         booth_rate_cents: nywePricing.booth_rate_cents,
         signer_1_name: p.signer_1_name ?? null,

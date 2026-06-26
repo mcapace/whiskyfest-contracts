@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { BRAND_CATEGORIES } from '@/lib/brand-category';
 import { CONTRACT_ORDER_TYPES } from '@/lib/contract-order-type';
+import { CONTRACT_TEMPLATE_PROFILES } from '@/lib/contract-template-profile';
 import { MAX_LINE_ITEM_AMOUNT_CENTS } from '@/lib/contract-line-items';
 
 const lineItemInputSchema = z.object({
@@ -35,7 +36,12 @@ export const newContractBodySchema = z
     signer_1_email: z.string().email().optional().or(z.literal('')).nullable(),
     signer_cc_name: z.string().max(200).optional().nullable(),
     signer_cc_email: z.string().email().optional().or(z.literal('')).nullable(),
-    sales_rep_id: z.string().uuid({ message: 'Sales Rep is required' }).optional().nullable(),
+    sales_rep_id: z.preprocess(
+      (v) => (v === '' ? null : v),
+      z.string().uuid({ message: 'Sales Rep is required' }).optional().nullable(),
+    ),
+    /** Sent by the order form so NYWE vendor licenses skip WhiskyFest booth-brand rules. */
+    contract_template_profile: z.enum(CONTRACT_TEMPLATE_PROFILES).optional(),
     notes: z.string().max(20000).optional().nullable(),
     exhibitor_notes: z.string().max(50000).optional().nullable(),
     billing_contact_name: z.string().max(200).optional().nullable(),
@@ -99,6 +105,10 @@ export const newContractBodySchema = z
       return;
     }
 
+    if (data.contract_template_profile === 'nywe_vendor') {
+      return;
+    }
+
     const seen = new Set<number>();
     for (const row of data.booth_brands ?? []) {
       if (seen.has(row.booth_index)) {
@@ -134,6 +144,14 @@ export const newContractBodySchema = z
   });
 
 export type NewContractBody = z.infer<typeof newContractBodySchema>;
+
+export function firstContractBodyValidationError(flat: ReturnType<z.ZodError['flatten']>): string {
+  for (const msgs of Object.values(flat.fieldErrors)) {
+    if (Array.isArray(msgs) && typeof msgs[0] === 'string') return msgs[0];
+  }
+  const formErr = flat.formErrors[0];
+  return typeof formErr === 'string' ? formErr : 'Invalid input';
+}
 
 /** Exhibitor-provided columns (mailing, phone, billing) are not rep-edited; cleared until DocuSign capture. */
 export function clearedRepEnteredBilling() {

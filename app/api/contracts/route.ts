@@ -5,7 +5,7 @@ import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { resolveContractActor } from '@/lib/auth-contract';
 import { portalKindFromHost, productKeyForPortalKind } from '@/lib/portal-host';
 import { scopeContractsByProduct } from '@/lib/product-portal';
-import { clearedRepEnteredBilling, newContractBodySchema, sponsorBrandFromBody } from '@/lib/contract-schemas';
+import { clearedRepEnteredBilling, firstContractBodyValidationError, newContractBodySchema, sponsorBrandFromBody } from '@/lib/contract-schemas';
 import {
   normalizeSignerCcEmail,
   normalizeSignerCcName,
@@ -114,7 +114,8 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const parsed = newContractBodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 400 });
+    const flat = parsed.error.flatten();
+    return NextResponse.json({ error: firstContractBodyValidationError(flat), details: flat }, { status: 400 });
   }
 
   const p = parsed.data;
@@ -172,7 +173,11 @@ export async function POST(req: Request) {
       exhibitor_legal_name: p.exhibitor_legal_name,
       exhibitor_company_name: p.exhibitor_company_name,
       order_type: p.order_type ?? 'booth',
-      brands_poured: p.order_type === 'sponsorship_only' ? sponsorBrandFromBody(p) : null,
+      brands_poured: isNyweVendorEvent(eventRow)
+        ? (p.brands_poured?.trim() || p.exhibitor_company_name.trim() || null)
+        : p.order_type === 'sponsorship_only'
+          ? sponsorBrandFromBody(p)
+          : null,
       booth_count: nywePricing.booth_count,
       booth_rate_cents: nywePricing.booth_rate_cents,
       signer_1_name: p.signer_1_name ?? null,
