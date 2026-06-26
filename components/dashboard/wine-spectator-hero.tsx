@@ -63,7 +63,7 @@ export function WineSpectatorHero({
               variant="onDark"
               className={cn('mb-5 max-w-sm sm:max-w-md', compact && 'mb-4 max-w-[11rem] sm:max-w-xs')}
               imageClassName={cn(
-                'max-h-16 w-auto sm:max-h-[4.5rem]',
+                'max-h-16 w-auto origin-left sm:max-h-[4.5rem]',
                 compact && 'max-h-12 sm:max-h-14',
               )}
             />
