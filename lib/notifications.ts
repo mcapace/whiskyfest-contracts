@@ -11,6 +11,7 @@ import {
   type EventEmailContext,
 } from '@/lib/product-email';
 import { isEventsManagedWorkflow, isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
+import { NYWE_COUNTERSIGNER_EMAILS } from '@/lib/nywe-auto-release-accounting';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/utils';
 import type { Contract, Event } from '@/types/db';
@@ -859,11 +860,19 @@ async function invoiceNotificationRecipients(params: {
   }
 
   if (eventsManaged) {
-    for (const email of await getActiveEventsTeamEmails()) recipientSet.add(email);
-    if (recipientSet.size === 0) {
+    const configured = process.env['EVENTS_MANAGED_INVOICE_NOTIFICATION_EMAILS']?.trim();
+    if (configured) {
+      for (const email of configured.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)) {
+        recipientSet.add(email);
+      }
+    } else {
       const creator = params.createdBy?.trim().toLowerCase();
       if (creator) recipientSet.add(creator);
     }
+  }
+
+  for (const countersigner of NYWE_COUNTERSIGNER_EMAILS) {
+    recipientSet.delete(countersigner);
   }
 
   return { recipients: [...recipientSet], eventsManaged };

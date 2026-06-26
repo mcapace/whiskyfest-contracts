@@ -31,9 +31,9 @@ export const CONTRACT_ACTION_HELP = {
   voidImportedRecord:
     'Permanently marks this imported record void when the deal should not continue in the system. No DocuSign envelope is involved.',
 
-  markInvoiceSent: 'Records invoice sent. Sales rep notified.',
+  markInvoiceSent: 'Records invoice sent. Sales rep (or configured NYWE ops inbox) notified.',
 
-  markPaid: 'Records payment received. Sales rep notified.',
+  markPaid: 'Records payment received. Sales rep (or configured NYWE ops inbox) notified.',
 
   generateDraftPdf:
     'Creates a PDF version of the contract from the current data. Submits to the events team for approval before DocuSign sending.',
