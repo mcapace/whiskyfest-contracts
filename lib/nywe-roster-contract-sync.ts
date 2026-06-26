@@ -12,37 +12,8 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { getSheetsClient } from '@/lib/sheets-tracker';
 import type { ContractStatus, ContractWithTotals, Event } from '@/types/db';
 
-/** In-flight or completed DocuSign — sheet edits must not overwrite the sent agreement. */
-export const ROSTER_SYNC_LOCKED_STATUSES: ContractStatus[] = [
-  'sent',
-  'partially_signed',
-  'signed',
-  'executed',
-];
-
-export const ROSTER_DRIFT_FIELD_LABELS: Record<string, string> = {
-  exhibitor_legal_name: 'Legal name',
-  exhibitor_company_name: 'Company name',
-  brands_poured: 'Wine / vintage',
-  billing_contact_name: 'Billing contact',
-  billing_contact_email: 'Billing email',
-  billing_address_line1: 'Billing address',
-  billing_city: 'Billing city',
-  billing_state: 'Billing state',
-  billing_zip: 'Billing ZIP',
-  billing_country: 'Billing country',
-  signer_1_name: 'Signer',
-  signer_1_email: 'Signer email',
-  event_contact_name: 'Primary contact',
-  event_contact_email: 'Primary contact email',
-};
-
-export type RosterDriftResult = {
-  needsResend: boolean;
-  fields: string[];
-};
-
-const RESEND_DRIFT_STATUSES: ContractStatus[] = ['sent', 'partially_signed'];
+/** After countersign / execution, DocuSign owns signer identity on the envelope. */
+const SIGNER_LOCKED_STATUSES: ContractStatus[] = ['partially_signed', 'signed', 'executed'];
 
 function tabRange(tab: string, a1: string): string {
   const needsQuote = /\s|'/.test(tab);
@@ -71,19 +42,9 @@ function patchChanged(
   return false;
 }
 
-function shouldLockRosterSignerFields(
-  status: ContractStatus,
-  options?: { lockSigner?: boolean },
-): boolean {
-  if (options?.lockSigner === false) return false;
-  if (options?.lockSigner === true) return true;
-  return ROSTER_SYNC_LOCKED_STATUSES.includes(status);
-}
-
 export function contractPatchFromExhibitorRosterRow(
   row: ExhibitorRosterRow,
   contract: Pick<ContractWithTotals, 'status'>,
-  options?: { lockSigner?: boolean },
 ): Record<string, string | null | boolean> | null {
   const resolved = resolveContractStreetFromSheetCells(row.billingStreet, row.wineryAddress);
   if (!resolved) return null;
@@ -103,7 +64,7 @@ export function contractPatchFromExhibitorRosterRow(
     billing_same_as_corporate: resolved.usedWineryStreet,
   };
 
-  if (!shouldLockRosterSignerFields(contract.status, options)) {
+  if (!SIGNER_LOCKED_STATUSES.includes(contract.status)) {
     patch.signer_1_name = row.signerName.trim() || null;
     patch.signer_1_email = row.signerEmail.trim() || null;
     patch.event_contact_name = row.primaryContactName.trim() || null;
@@ -111,35 +72,6 @@ export function contractPatchFromExhibitorRosterRow(
   }
 
   return patch;
-}
-
-export function detectRosterDriftFromPatch(
-  contract: ContractWithTotals,
-  patch: Record<string, string | null | boolean> | null,
-): RosterDriftResult {
-  if (!RESEND_DRIFT_STATUSES.includes(contract.status) || !patch) {
-    return { needsResend: false, fields: [] };
-  }
-
-  const fields: string[] = [];
-  for (const [key, value] of Object.entries(patch)) {
-    const current = contract[key as keyof ContractWithTotals];
-    const left = normalize(typeof current === 'string' ? current : current == null ? '' : String(current));
-    const right = normalize(typeof value === 'string' ? value : value == null ? '' : String(value));
-    if (left !== right) {
-      fields.push(ROSTER_DRIFT_FIELD_LABELS[key] ?? key);
-    }
-  }
-
-  return { needsResend: fields.length > 0, fields };
-}
-
-export function detectRosterDriftFromRow(
-  row: ExhibitorRosterRow,
-  contract: ContractWithTotals,
-): RosterDriftResult {
-  const patch = contractPatchFromExhibitorRosterRow(row, contract, { lockSigner: false });
-  return detectRosterDriftFromPatch(contract, patch);
 }
 
 async function loadRosterPayloadForContract(
@@ -173,7 +105,6 @@ async function loadRosterPayloadForContract(
 function patchFromPayload(
   contract: ContractWithTotals,
   payload: NonNullable<Awaited<ReturnType<typeof loadRosterPayloadForContract>>>,
-  options?: { lockSigner?: boolean },
 ): Record<string, string | null | boolean> | null {
   if (!payload.billing) return null;
 
@@ -184,7 +115,7 @@ function patchFromPayload(
     ...payload.billing,
   };
 
-  if (!shouldLockRosterSignerFields(contract.status, options)) {
+  if (!SIGNER_LOCKED_STATUSES.includes(contract.status)) {
     patch.signer_1_name = payload.signer_1_name;
     patch.signer_1_email = payload.signer_1_email;
     patch.event_contact_name = payload.event_contact_name;
@@ -192,25 +123,6 @@ function patchFromPayload(
   }
 
   return patch;
-}
-
-/** Compare linked Google Sheet row to the contract without applying updates. */
-export async function detectLinkedRosterDrift(
-  contract: ContractWithTotals,
-  event: Event,
-): Promise<RosterDriftResult> {
-  if (eventTemplateProfile(event) !== 'nywe_vendor') {
-    return { needsResend: false, fields: [] };
-  }
-  if (!contract.source_sheet_id || !contract.source_sheet_tab || !contract.source_row_number) {
-    return { needsResend: false, fields: [] };
-  }
-
-  const payload = await loadRosterPayloadForContract(contract, event);
-  if (!payload) return { needsResend: false, fields: [] };
-
-  const patch = patchFromPayload(contract, payload, { lockSigner: false });
-  return detectRosterDriftFromPatch(contract, patch);
 }
 
 export type RosterContractRefreshResult = {
@@ -236,10 +148,6 @@ export async function refreshContractFromLinkedRoster(
   const payload = await loadRosterPayloadForContract(contract, event);
   if (!payload) {
     return { updated: false, skipped: 'load_failed', contract };
-  }
-
-  if (ROSTER_SYNC_LOCKED_STATUSES.includes(contract.status)) {
-    return { updated: false, skipped: 'envelope_locked', contract };
   }
 
   const patch = patchFromPayload(contract, payload);
@@ -285,8 +193,6 @@ export async function syncLinkedContractsFromRosterRows(
     const rowKey = rosterRowKey(contract.source_sheet_id, contract.source_sheet_tab, contract.source_row_number);
     const row = rowByKey.get(rowKey);
     if (!row) continue;
-
-    if (ROSTER_SYNC_LOCKED_STATUSES.includes(contract.status)) continue;
 
     const patch = contractPatchFromExhibitorRosterRow(row, contract);
     if (!patch || !patchChanged(contract, patch)) continue;

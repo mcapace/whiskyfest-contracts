@@ -15,10 +15,7 @@ import {
 } from '@/lib/contract-pdf-preview';
 import { syncDraftPdfFromDocuSign } from '@/lib/contract-pdf-sync-docusign';
 import { syncContractFromDocuSign } from '@/lib/docusign-envelope-sync';
-import {
-  detectLinkedRosterDrift,
-  refreshContractFromLinkedRoster,
-} from '@/lib/nywe-roster-contract-sync';
+import { refreshContractFromLinkedRoster } from '@/lib/nywe-roster-contract-sync';
 import type {
   AuditLogEntry,
   ContractBoothBrand,
@@ -141,18 +138,6 @@ export async function ContractDetailPage({
     }
   }
 
-  let rosterNeedsResend = false;
-  let rosterDriftFields: string[] = [];
-  if (eventRow && isNyweVendorEvent(eventRow) && contract.source_sheet_id) {
-    try {
-      const drift = await detectLinkedRosterDrift(contract, eventRow);
-      rosterNeedsResend = drift.needsResend;
-      rosterDriftFields = drift.fields;
-    } catch (err) {
-      console.error('[contract detail] roster drift check failed', err);
-    }
-  }
-
   const audit =
     contract !== loadedContract ? await loadAudit(contract.id) : (auditInitial ?? []);
   const activityTimeline = buildContractActivityTimeline(audit, contract);
@@ -252,8 +237,6 @@ export async function ContractDetailPage({
       pdfPreviewUrl={pdfPreviewUrl}
       pdfPreviewCaption={pdfPreviewCaption}
       legacyPdfUrl={legacyPdfUrl}
-      rosterNeedsResend={rosterNeedsResend}
-      rosterDriftFields={rosterDriftFields}
     />
   );
 }

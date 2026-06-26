@@ -1,4 +1,3 @@
-import { detectRosterDriftFromRow } from '@/lib/nywe-roster-contract-sync';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getSheetsClient } from '@/lib/sheets-tracker';
 import { formatRosterWineDisplay } from '@/lib/exhibitor-roster-columns';
@@ -68,9 +67,6 @@ export type ExhibitorRosterRow = {
   contractBillingCity: string | null;
   contractBillingState: string | null;
   contractBillingZip: string | null;
-  /** Google Sheet row differs from the sent DocuSign agreement — use Resend with Changes. */
-  rosterNeedsResend: boolean;
-  rosterDriftFields: string[];
   /** Contract was recalled from DocuSign and returned to draft. */
   recalledToDraft: boolean;
   sheetStatus: string | null;
@@ -363,8 +359,6 @@ export async function hydrateRosterRowsWithContracts(
         contractBillingCity: null,
         contractBillingState: null,
         contractBillingZip: null,
-        rosterNeedsResend: false,
-        rosterDriftFields: [],
         recalledToDraft: false,
         sheetStatus: null,
         sheetContractId: null,
@@ -372,9 +366,7 @@ export async function hydrateRosterRowsWithContracts(
     }
 
     const recalledToDraft = recalledIds.has(contract.id);
-    const drift = detectRosterDriftFromRow(row, contract);
     const statusLabel = rosterStatusLabel(contract.status, { recalled: recalledToDraft });
-    const sheetStatus = drift.needsResend ? `${statusLabel} — sheet changed` : statusLabel;
 
     return {
       ...row,
@@ -385,10 +377,8 @@ export async function hydrateRosterRowsWithContracts(
       contractBillingCity: contract.billing_city ?? null,
       contractBillingState: contract.billing_state ?? null,
       contractBillingZip: contract.billing_zip ?? null,
-      rosterNeedsResend: drift.needsResend,
-      rosterDriftFields: drift.fields,
       recalledToDraft,
-      sheetStatus,
+      sheetStatus: statusLabel,
       sheetContractId: contract.id,
       sheetLastUpdated: contract.updated_at ?? row.sheetLastUpdated,
     };
@@ -599,8 +589,6 @@ export async function fetchExhibitorRoster(event: Event): Promise<{
           contractBillingCity: contract?.billing_city ?? null,
           contractBillingState: contract?.billing_state ?? null,
           contractBillingZip: contract?.billing_zip ?? null,
-          rosterNeedsResend: false,
-          rosterDriftFields: [],
           recalledToDraft: false,
           sheetStatus: cell(row, statusStart) || null,
           sheetContractId: cell(row, statusStart + 1) || null,
