@@ -5,8 +5,9 @@ import { getAccessibleSalesRepIds } from '@/lib/rep-access';
 import { loadImpersonationTargetDisplay } from '@/lib/effective-user';
 import { logImpersonationEnded, logImpersonationStarted } from '@/lib/impersonation-audit';
 import { ensureAccessRequestForUnknownUser } from '@/lib/access-requests';
-import type { UserRole } from '@/types/db';
+import { nywePortalOrigin, whiskyfestPortalOrigin } from '@/lib/portal-host';
 import { canAccessWineSpectator, isWineSpectatorAdmin } from '@/lib/wine-spectator-access';
+import type { UserRole } from '@/types/db';
 
 const IMPERSONATION_TTL_MS = 30 * 60 * 1000;
 /** Min interval between `last_seen_at` writes per user (JWT refreshes often). */
@@ -90,6 +91,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: '/auth/login',
   },
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      const allowedOrigins = new Set([nywePortalOrigin(), whiskyfestPortalOrigin()]);
+      if (url.startsWith('/')) {
+        try {
+          const base = new URL(baseUrl);
+          if (allowedOrigins.has(base.origin)) return `${base.origin}${url}`;
+        } catch {
+          /* fall through */
+        }
+        return `${whiskyfestPortalOrigin()}${url}`;
+      }
+      try {
+        const parsed = new URL(url);
+        if (allowedOrigins.has(parsed.origin)) return url;
+      } catch {
+        /* fall through */
+      }
+      return whiskyfestPortalOrigin();
+    },
     async signIn({ user }) {
       const email = user.email?.trim().toLowerCase();
       if (!email) return false;

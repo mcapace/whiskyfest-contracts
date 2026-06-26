@@ -16,6 +16,7 @@ import {
   nywePortalOrigin,
   nywePublicPath,
   portalKindFromHost,
+  requestUrl,
   whiskyfestPortalOrigin,
 } from '@/lib/portal-host';
 import { canAccessWineSpectator } from '@/lib/wine-spectator-access';
@@ -48,8 +49,7 @@ export default auth((req) => {
     pathname.startsWith('/api/cron');
 
   if (!req.auth && !isPublic) {
-    const loginUrl = new URL('/auth/login', req.nextUrl.origin);
-    return applyPortalHeader(NextResponse.redirect(loginUrl), host);
+    return applyPortalHeader(NextResponse.redirect(requestUrl(req, '/auth/login')), host);
   }
 
   let response: NextResponse | null = null;
@@ -121,14 +121,14 @@ export default auth((req) => {
       const allowed = accountingPath || pathname.startsWith('/api/accounting') || isPublic;
       if (!allowed) {
         const dest = nyweHost ? '/accounting' : '/accounting';
-        return applyPortalHeader(NextResponse.redirect(new URL(dest, req.nextUrl.origin)), host);
+        return applyPortalHeader(NextResponse.redirect(requestUrl(req, dest)), host);
       }
     }
 
     const whiskyfestAccountingPath =
       pathname === '/accounting' || (pathname.startsWith('/accounting/') && !pathname.startsWith('/accounting/nywe'));
     if (whiskyfestAccountingPath && !canOpenAccounting && !nyweHost) {
-      return applyPortalHeader(NextResponse.redirect(new URL('/', req.nextUrl.origin)), host);
+      return applyPortalHeader(NextResponse.redirect(requestUrl(req, '/')), host);
     }
 
     const nyweAccountingPath =
@@ -137,7 +137,7 @@ export default auth((req) => {
       (nyweHost && (pathname === '/accounting' || pathname.startsWith('/accounting/')));
     if (nyweAccountingPath && !canOpenAccounting) {
       const dest = nyweHost ? '/' : '/';
-      return applyPortalHeader(NextResponse.redirect(new URL(dest, req.nextUrl.origin)), host);
+      return applyPortalHeader(NextResponse.redirect(requestUrl(req, dest)), host);
     }
 
     const wineSpectatorPath =
@@ -151,12 +151,12 @@ export default auth((req) => {
       })
     ) {
       const dest = accountingOnly ? (nyweHost ? '/accounting' : '/accounting') : nyweHost ? '/' : '/';
-      return applyPortalHeader(NextResponse.redirect(new URL(dest, req.nextUrl.origin)), host);
+      return applyPortalHeader(NextResponse.redirect(requestUrl(req, dest)), host);
     }
 
     if (nyweHost && !admin && !canAccessWineSpectator({ role: u.role, is_events_team: u.is_events_team, email: u.email })) {
       if (!accountingOnly) {
-        return applyPortalHeader(NextResponse.redirect(new URL('/auth/login', req.nextUrl.origin)), host);
+        return applyPortalHeader(NextResponse.redirect(requestUrl(req, '/auth/login')), host);
       }
     }
 

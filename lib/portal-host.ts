@@ -163,6 +163,19 @@ export function productKeyForPortalKind(portalKind: PortalKind): 'wine_spectator
   return portalKind === 'nywe' ? 'wine_spectator' : 'whiskyfest';
 }
 
+export function requestOrigin(req: { headers: Headers; nextUrl?: { origin: string } }): string {
+  const host = req.headers.get('host');
+  if (host) {
+    const proto = req.headers.get('x-forwarded-proto') ?? 'https';
+    return `${proto}://${normalizeHost(host)}`;
+  }
+  return req.nextUrl?.origin ?? whiskyfestPortalOrigin();
+}
+
+export function requestUrl(req: { headers: Headers; nextUrl?: { origin: string } }, pathname: string): URL {
+  return new URL(pathname, requestOrigin(req));
+}
+
 export function postLoginPath(portalKind: PortalKind, user: PortalUserFlags): string {
   const accountingOnly = Boolean(user.is_accounting) && !Boolean(user.pipeline_access);
   if (accountingOnly) {
