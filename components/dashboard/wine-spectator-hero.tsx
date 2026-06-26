@@ -44,17 +44,17 @@ export function WineSpectatorHero({
     <section
       data-tour="wine-spectator-hero"
       className={cn(
-        'overflow-hidden rounded-xl border border-oak-800/30 bg-oak-900 shadow-wf-editorial',
+        'overflow-hidden rounded-xl border border-rose-900/25 bg-rose-950 shadow-wf-editorial',
         className,
       )}
     >
-      <div className={cn('relative overflow-hidden bg-oak-900', compact ? 'min-h-[300px] sm:min-h-[340px]' : 'h-[480px]')}>
+      <div className={cn('relative overflow-hidden bg-rose-950', compact ? 'min-h-[300px] sm:min-h-[340px]' : 'h-[480px]')}>
         <HeroParallaxLayer
           src="/images/nywe-hero.png"
           objectPosition="center 42%"
           imageClassName="opacity-75 sm:opacity-70"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-oak-900/10 via-oak-900/40 to-oak-900/95" />
+        <div className="absolute inset-0 bg-gradient-to-b from-rose-950/25 via-rose-950/55 to-rose-950/95" />
 
         <div className="relative flex h-full flex-col justify-end gap-6 p-6 sm:p-10 lg:p-12">
           <div>
@@ -113,7 +113,7 @@ export function WineSpectatorHero({
         </div>
       </div>
 
-      <div className="grid gap-4 border-t border-parchment-300/20 bg-oak-900/85 p-6 text-parchment-100 sm:grid-cols-[1fr_auto] sm:items-end">
+      <div className="grid gap-4 border-t border-parchment-300/15 bg-rose-950/90 p-6 text-parchment-100 sm:grid-cols-[1fr_auto] sm:items-end">
         <div className="min-w-0">
           <p className="text-sm leading-relaxed text-parchment-100/90">{nyweContractCount(contractsCount)}</p>
           <p className="mt-2 text-xs text-parchment-200/90">{completionLabel}</p>

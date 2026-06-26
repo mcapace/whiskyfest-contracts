@@ -1,18 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { usePortalKind } from '@/components/portal/portal-context';
 import { isWineSpectatorPath } from '@/lib/product-portal';
 
-/** Hides the daily bubble on Wine Spectator / NYWE routes after hydration (avoids pathname SSR mismatch). */
+/** Hides the WhiskyFest daily bubble on NYWE / Wine Spectator routes. */
 export function DailyBubblePathGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? '';
-  const [visible, setVisible] = useState(true);
+  const portalKind = usePortalKind();
 
-  useEffect(() => {
-    setVisible(!isWineSpectatorPath(pathname));
-  }, [pathname]);
+  if (portalKind === 'nywe' || isWineSpectatorPath(pathname)) {
+    return null;
+  }
 
-  if (!visible) return null;
   return <>{children}</>;
 }

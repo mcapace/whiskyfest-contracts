@@ -2,7 +2,9 @@
 
 import type { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
-import { portalTopbarLabel } from '@/lib/product-portal';
+import { usePortalKind } from '@/components/portal/portal-context';
+import { isAccountingPath, isNyweAccountingPathname, isWineSpectatorPath } from '@/lib/product-portal';
+import { NYWE_SHORT_LABEL } from '@/lib/nywe-copy';
 import { cn } from '@/lib/utils';
 
 /**
@@ -18,7 +20,19 @@ export function Topbar({
   endSlot?: ReactNode;
 }) {
   const pathname = usePathname() ?? '';
-  const portalLabel = portalTopbarLabel(pathname);
+  const portalKind = usePortalKind();
+  const nywePortal = portalKind === 'nywe';
+  const portalLabel = nywePortal
+    ? isNyweAccountingPathname(pathname, 'nywe')
+      ? `Accounting · ${NYWE_SHORT_LABEL}`
+      : `${NYWE_SHORT_LABEL} · Contracts`
+    : isWineSpectatorPath(pathname)
+      ? `${NYWE_SHORT_LABEL} · Contracts`
+      : isNyweAccountingPathname(pathname)
+        ? `Accounting · ${NYWE_SHORT_LABEL}`
+        : isAccountingPath(pathname)
+          ? 'Accounting · WhiskyFest'
+          : 'WhiskyFest · Contracts';
 
   return (
     <header
