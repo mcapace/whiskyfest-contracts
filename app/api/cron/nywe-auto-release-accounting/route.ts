@@ -13,10 +13,10 @@ export async function POST(req: Request) {
   }
 
   const result = await reconcileNyweDocuSignPipeline({
-    exhibitorBatchSize: 25,
-    exhibitorAll: true,
+    exhibitorBatchSize: 20,
+    exhibitorAll: false,
     notify: false,
-    releaseLimit: 50,
+    releaseLimit: 25,
   }).catch((err) => {
     console.error('[nywe-auto-release-accounting cron] reconcile failed', err);
     return null;

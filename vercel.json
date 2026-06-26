@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/nywe-auto-release-accounting",
-      "schedule": "*/15 * * * *"
+      "schedule": "*/30 * * * *"
     }
   ]
 }

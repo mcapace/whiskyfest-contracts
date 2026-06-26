@@ -88,6 +88,10 @@ function normalizeRestApiBase(baseUri: string): string {
 async function resolveApiContext(accessToken: string): Promise<{ accountId: string; restApiBase: string }> {
   const envAccountId = process.env['DOCUSIGN_ACCOUNT_ID']?.trim();
   const envBase = process.env['DOCUSIGN_BASE_URL']?.trim();
+  if (envAccountId && envBase) {
+    return { accountId: envAccountId, restApiBase: envBase.replace(/\/$/, '') };
+  }
+
   const authUrl = process.env['DOCUSIGN_AUTH_URL'] ?? 'https://account-d.docusign.com';
   const oAuthBasePath = authHostFromUrl(authUrl);
 
@@ -138,6 +142,45 @@ async function resolveApiContext(accessToken: string): Promise<{ accountId: stri
   return { accountId, restApiBase };
 }
 
+export type DocuSignSession = {
+  accessToken: string;
+  accountId: string;
+  restApiBase: string;
+};
+
+let cachedSession: { session: DocuSignSession; expiresAt: number } | null = null;
+const SESSION_REFRESH_MS = 50 * 60 * 1000;
+
+/** Reuse OAuth token + account context — avoids 2 extra API calls per DocuSign request. */
+export async function getDocuSignSession(): Promise<DocuSignSession> {
+  const now = Date.now();
+  if (cachedSession && cachedSession.expiresAt > now) {
+    return cachedSession.session;
+  }
+
+  const accessToken = await getAccessToken();
+  const { accountId, restApiBase } = await resolveApiContext(accessToken);
+  const session = { accessToken, accountId, restApiBase };
+  cachedSession = { session, expiresAt: now + SESSION_REFRESH_MS };
+  return session;
+}
+
+export function isDocuSignRateLimitError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    msg.includes('HOURLY_APIINVOCATION_LIMIT_EXCEEDED') ||
+    msg.includes('API_INVOCATION_LIMIT') ||
+    msg.includes('BURST_APIINVOCATION_LIMIT_EXCEEDED')
+  );
+}
+
+export function formatDocuSignErrorForUser(err: unknown): string {
+  if (isDocuSignRateLimitError(err)) {
+    return 'DocuSign hourly API limit reached (3,000 calls/hour on your account). Wait about an hour for the limit to reset, then try again. Background sync has been reduced to avoid hitting this limit.';
+  }
+  return err instanceof Error ? err.message : String(err);
+}
+
 function anchorOnly(anchor: string) {
   return {
     anchorString: anchor,
@@ -164,8 +207,7 @@ export interface SendEnvelopeParams {
 }
 
 export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelopeId: string }> {
-  const accessToken = await getAccessToken();
-  const { accountId, restApiBase } = await resolveApiContext(accessToken);
+  const { accessToken, accountId, restApiBase } = await getDocuSignSession();
 
   const signHere1 = anchorOnly(DOCUSIGN_ANCHORS.sig1);
   const date1 = anchorOnly(DOCUSIGN_ANCHORS.date1);
@@ -265,8 +307,7 @@ export async function fetchRecipientTextTabs(
   envelopeId: string,
   recipientId: string,
 ): Promise<{ tabLabel: string; value: string }[]> {
-  const accessToken = await getAccessToken();
-  const { accountId, restApiBase } = await resolveApiContext(accessToken);
+  const { accessToken, accountId, restApiBase } = await getDocuSignSession();
   const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}/recipients/${encodeURIComponent(recipientId)}/tabs`;
   const res = await fetch(url, {
     headers: {
@@ -291,8 +332,7 @@ export async function fetchRecipientTextTabs(
 
 /** Current envelope status from DocuSign (e.g. sent, delivered, completed, voided). */
 export async function fetchEnvelopeStatus(envelopeId: string): Promise<{ status: string }> {
-  const accessToken = await getAccessToken();
-  const { accountId, restApiBase } = await resolveApiContext(accessToken);
+  const { accessToken, accountId, restApiBase } = await getDocuSignSession();
   const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}`;
   const res = await fetch(url, {
     headers: {
@@ -311,8 +351,7 @@ export async function fetchEnvelopeStatus(envelopeId: string): Promise<{ status:
 }
 
 export async function fetchEnvelopeSigners(envelopeId: string): Promise<DocuSignSignerRow[]> {
-  const accessToken = await getAccessToken();
-  const { accountId, restApiBase } = await resolveApiContext(accessToken);
+  const { accessToken, accountId, restApiBase } = await getDocuSignSession();
   const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}/recipients`;
   const res = await fetch(url, {
     headers: {
@@ -360,8 +399,7 @@ export function extractCountersignerFromSigners(signers: DocuSignSignerRow[]): {
 
 /** Void an in-flight envelope so recipients can no longer sign; use before correcting email and re-sending from the app. */
 export async function voidEnvelope(envelopeId: string, voidedReason: string): Promise<void> {
-  const accessToken = await getAccessToken();
-  const { accountId, restApiBase } = await resolveApiContext(accessToken);
+  const { accessToken, accountId, restApiBase } = await getDocuSignSession();
   const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}`;
   const res = await fetch(url, {
     method: 'PUT',
@@ -386,8 +424,7 @@ export async function voidEnvelope(envelopeId: string, voidedReason: string): Pr
  * Same recipient emails as the live envelope — use Recall if you need to change the address.
  */
 export async function resendEnvelopeNotifications(envelopeId: string): Promise<void> {
-  const accessToken = await getAccessToken();
-  const { accountId, restApiBase } = await resolveApiContext(accessToken);
+  const { accessToken, accountId, restApiBase } = await getDocuSignSession();
   const base = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}/recipients`;
   const getRes = await fetch(base, {
     headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
@@ -432,8 +469,7 @@ async function downloadEnvelopePdfFromUrl(url: string, accessToken: string): Pro
 
 /** Fully executed envelope (combined PDF with certificate). */
 export async function downloadCompletedPdf(envelopeId: string): Promise<Buffer> {
-  const accessToken = await getAccessToken();
-  const { accountId, restApiBase } = await resolveApiContext(accessToken);
+  const { accessToken, accountId, restApiBase } = await getDocuSignSession();
 
   const q = new URLSearchParams({ certificate: 'true' });
   const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}/documents/combined?${q}`;
@@ -443,10 +479,19 @@ export async function downloadCompletedPdf(envelopeId: string): Promise<Buffer> 
 
 /** Contract PDF from an in-flight or completed envelope (document 1 = sent agreement). */
 export async function downloadEnvelopeContractPdf(envelopeId: string): Promise<Buffer> {
-  const accessToken = await getAccessToken();
-  const { accountId, restApiBase } = await resolveApiContext(accessToken);
+  const { accessToken, accountId, restApiBase } = await getDocuSignSession();
 
-  const { status } = await fetchEnvelopeStatus(envelopeId);
+  const statusUrl = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}`;
+  const statusRes = await fetch(statusUrl, {
+    headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+  });
+  const statusText = await statusRes.text();
+  if (!statusRes.ok) {
+    throw new Error(`DocuSign getEnvelope ${statusRes.status}: ${statusText}`);
+  }
+  const statusData = JSON.parse(statusText) as { status?: string; Status?: string };
+  const status = String(statusData.status ?? statusData.Status ?? '').trim();
+
   if (status.toLowerCase() === 'completed') {
     try {
       return await downloadCompletedPdf(envelopeId);

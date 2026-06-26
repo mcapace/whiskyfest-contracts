@@ -1,3 +1,4 @@
+import { isDocuSignRateLimitError } from '@/lib/docusign';
 import { syncContractFromDocuSign } from '@/lib/docusign-envelope-sync';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
 import { releaseNyweSignedLicensesToAccounting } from '@/lib/nywe-release-stuck-on-load';
@@ -92,6 +93,10 @@ export async function syncNyweExhibitorSignaturesFromDocuSign(options?: {
   if (ids.length === 0) return result;
 
   await mapWithConcurrency(ids, concurrency, async (id) => {
+    if (result.errors > 0 && result.errorSamples.some((e) => isDocuSignRateLimitError(new Error(e.error)))) {
+      return;
+    }
+
     const contract = await fetchContractWithTotalsById(supabase, id);
     if (!contract || contract.status !== 'sent' || !contract.docusign_envelope_id?.trim()) {
       return;
@@ -110,6 +115,7 @@ export async function syncNyweExhibitorSignaturesFromDocuSign(options?: {
             error: sync.error,
           });
         }
+        if (isDocuSignRateLimitError(new Error(sync.error))) return;
         return;
       }
 
@@ -193,6 +199,7 @@ export async function syncAllNyweExhibitorSignaturesFromDocuSign(options?: {
 export async function syncNyweCountersignaturesFromDocuSign(options?: {
   notify?: boolean;
   concurrency?: number;
+  limit?: number;
 }): Promise<Pick<NyweExhibitorSyncResult, 'scanned' | 'fullySigned' | 'unchanged' | 'errors' | 'errorSamples'>> {
   const event = await getActiveWineSpectatorEvent();
   const empty = { scanned: 0, fullySigned: 0, unchanged: 0, errors: 0, errorSamples: [] as NyweExhibitorSyncResult['errorSamples'] };
@@ -204,13 +211,19 @@ export async function syncNyweCountersignaturesFromDocuSign(options?: {
     .select('id')
     .eq('event_id', event.id)
     .eq('status', 'partially_signed')
-    .not('docusign_envelope_id', 'is', null);
+    .not('docusign_envelope_id', 'is', null)
+    .order('updated_at', { ascending: false })
+    .limit(options?.limit ?? 25);
 
   const result = { ...empty };
   const ids = (pendingIds ?? []).map((row) => row.id);
   if (ids.length === 0) return result;
 
   await mapWithConcurrency(ids, options?.concurrency ?? 3, async (id) => {
+    if (result.errors > 0 && result.errorSamples.some((e) => isDocuSignRateLimitError(new Error(e.error)))) {
+      return;
+    }
+
     const contract = await fetchContractWithTotalsById(supabase, id);
     if (!contract || contract.status !== 'partially_signed' || !contract.docusign_envelope_id?.trim()) {
       return;
@@ -231,6 +244,7 @@ export async function syncNyweCountersignaturesFromDocuSign(options?: {
             error: sync.error,
           });
         }
+        if (isDocuSignRateLimitError(new Error(sync.error))) return;
         return;
       }
       if (sync.changed && sync.toStatus === 'signed') result.fullySigned += 1;
@@ -282,7 +296,7 @@ export async function reconcileNyweDocuSignPipeline(options?: {
         concurrency: 3,
       });
 
-  const countersign = await syncNyweCountersignaturesFromDocuSign({ notify });
+  const countersign = await syncNyweCountersignaturesFromDocuSign({ notify, limit: batchSize });
   const accounting = await releaseNyweSignedLicensesToAccounting({ limit: options?.releaseLimit ?? 50 });
 
   return { exhibitor, countersign, accounting };

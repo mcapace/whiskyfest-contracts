@@ -4,7 +4,7 @@ import { assertContractAccess } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { renderContractPdfFromTemplate } from '@/lib/google';
 import { persistContractDraftPdf } from '@/lib/contract-pdf-storage';
-import { sendEnvelope } from '@/lib/docusign';
+import { formatDocuSignErrorForUser, isDocuSignRateLimitError, sendEnvelope } from '@/lib/docusign';
 import { fetchContractBoothBrandsOrdered } from '@/lib/contract-booth-brands';
 import { fetchContractLineItemsOrdered } from '@/lib/contract-line-items';
 import {
@@ -195,7 +195,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       exhibitor_signer_email: signerEmail,
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = formatDocuSignErrorForUser(err);
     console.error('[send DocuSign]', contract.id, message);
 
     await supabase
@@ -217,9 +217,9 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
     return NextResponse.json(
       {
-        error: message || 'DocuSign send failed',
+        error: message,
       },
-      { status: 500 },
+      { status: isDocuSignRateLimitError(err) ? 429 : 500 },
     );
   }
 }
