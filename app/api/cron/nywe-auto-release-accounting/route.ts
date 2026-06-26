@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { autoReleaseNyweAfterCountersign } from '@/lib/nywe-auto-release-accounting';
 import {
   syncAllNyweExhibitorSignaturesFromDocuSign,
+  syncNyweCountersignaturesFromDocuSign,
   syncNyweExhibitorSignaturesFromDocuSign,
 } from '@/lib/nywe-sync-exhibitor-signatures';
 import { getActiveWineSpectatorEvent } from '@/lib/wine-spectator-event';
@@ -36,6 +37,11 @@ export async function POST(req: Request) {
       hasMore: false,
       remainingSent: 0,
     };
+  });
+
+  const countersignSync = await syncNyweCountersignaturesFromDocuSign({ notify: false }).catch((err) => {
+    console.error('[nywe-auto-release-accounting cron] countersign sync failed', err);
+    return { scanned: 0, fullySigned: 0, unchanged: 0, errors: 0, errorSamples: [] };
   });
 
   const event = await getActiveWineSpectatorEvent();
@@ -74,6 +80,7 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ok: true,
     exhibitorSync,
+    countersignSync,
     scanned: stuck?.length ?? 0,
     released,
     failed,

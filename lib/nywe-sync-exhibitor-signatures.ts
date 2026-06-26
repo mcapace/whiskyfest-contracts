@@ -187,3 +187,64 @@ export async function syncAllNyweExhibitorSignaturesFromDocuSign(options?: {
 
   return totals;
 }
+
+/** Reconcile NYWE licenses at `partially_signed` when Susannah already countersigned in DocuSign. */
+export async function syncNyweCountersignaturesFromDocuSign(options?: {
+  notify?: boolean;
+  concurrency?: number;
+}): Promise<Pick<NyweExhibitorSyncResult, 'scanned' | 'fullySigned' | 'unchanged' | 'errors' | 'errorSamples'>> {
+  const event = await getActiveWineSpectatorEvent();
+  const empty = { scanned: 0, fullySigned: 0, unchanged: 0, errors: 0, errorSamples: [] as NyweExhibitorSyncResult['errorSamples'] };
+  if (!event) return empty;
+
+  const supabase = getSupabaseAdmin();
+  const { data: pendingIds } = await supabase
+    .from('contracts')
+    .select('id')
+    .eq('event_id', event.id)
+    .eq('status', 'partially_signed')
+    .not('docusign_envelope_id', 'is', null);
+
+  const result = { ...empty };
+  const ids = (pendingIds ?? []).map((row) => row.id);
+  if (ids.length === 0) return result;
+
+  await mapWithConcurrency(ids, options?.concurrency ?? 3, async (id) => {
+    const contract = await fetchContractWithTotalsById(supabase, id);
+    if (!contract || contract.status !== 'partially_signed' || !contract.docusign_envelope_id?.trim()) {
+      return;
+    }
+
+    result.scanned += 1;
+
+    try {
+      const sync = await syncContractFromDocuSign(supabase, contract, event, null, {
+        notify: options?.notify !== false,
+      });
+      if (!sync.ok) {
+        result.errors += 1;
+        if (result.errorSamples.length < 8) {
+          result.errorSamples.push({
+            id: contract.id,
+            company: contract.exhibitor_company_name,
+            error: sync.error,
+          });
+        }
+        return;
+      }
+      if (sync.changed && sync.toStatus === 'signed') result.fullySigned += 1;
+      else result.unchanged += 1;
+    } catch (err) {
+      result.errors += 1;
+      if (result.errorSamples.length < 8) {
+        result.errorSamples.push({
+          id: contract.id,
+          company: contract.exhibitor_company_name,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+  });
+
+  return result;
+}
