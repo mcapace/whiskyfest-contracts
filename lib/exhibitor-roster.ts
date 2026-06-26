@@ -1,3 +1,4 @@
+import { detectRosterDriftFromRow } from '@/lib/nywe-roster-contract-sync';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getSheetsClient } from '@/lib/sheets-tracker';
 import { formatRosterWineDisplay } from '@/lib/exhibitor-roster-columns';
@@ -67,6 +68,11 @@ export type ExhibitorRosterRow = {
   contractBillingCity: string | null;
   contractBillingState: string | null;
   contractBillingZip: string | null;
+  /** Google Sheet row differs from the sent DocuSign agreement — use Resend with Changes. */
+  rosterNeedsResend: boolean;
+  rosterDriftFields: string[];
+  /** Contract was recalled from DocuSign and returned to draft. */
+  recalledToDraft: boolean;
   sheetStatus: string | null;
   sheetContractId: string | null;
   sheetLastUpdated: string | null;
@@ -296,9 +302,23 @@ export function parseRosterRowKey(rowKey: string): { spreadsheetId: string; tab:
   return { spreadsheetId, tab, rowNumber };
 }
 
-export function rosterStatusLabel(status: ContractStatus | null): string {
+export function rosterStatusLabel(status: ContractStatus | null, options?: { recalled?: boolean }): string {
+  if (options?.recalled) return 'Recalled';
   if (!status) return 'Not started';
   return formatStatus(status);
+}
+
+export async function recalledContractIds(eventId: string, contractIds: string[]): Promise<Set<string>> {
+  if (contractIds.length === 0) return new Set();
+
+  const supabase = getSupabaseAdmin();
+  const { data: recalls } = await supabase
+    .from('audit_log')
+    .select('contract_id')
+    .eq('action', 'contract_recalled_to_draft')
+    .in('contract_id', contractIds);
+
+  return new Set((recalls ?? []).map((row) => row.contract_id as string));
 }
 
 /** Merge live contract status onto cached roster rows (Sheets data can be cached; license status cannot). */
@@ -326,6 +346,11 @@ export async function hydrateRosterRowsWithContracts(
     );
   }
 
+  const recalledIds = await recalledContractIds(
+    eventId,
+    [...contractByRowKey.values()].filter((c) => c.status === 'draft' && !c.sent_at).map((c) => c.id),
+  );
+
   return rows.map((row) => {
     const contract = contractByRowKey.get(row.rowKey) ?? null;
     if (!contract) {
@@ -338,11 +363,19 @@ export async function hydrateRosterRowsWithContracts(
         contractBillingCity: null,
         contractBillingState: null,
         contractBillingZip: null,
+        rosterNeedsResend: false,
+        rosterDriftFields: [],
+        recalledToDraft: false,
         sheetStatus: null,
         sheetContractId: null,
       };
     }
-    const statusLabel = rosterStatusLabel(contract.status);
+
+    const recalledToDraft = recalledIds.has(contract.id);
+    const drift = detectRosterDriftFromRow(row, contract);
+    const statusLabel = rosterStatusLabel(contract.status, { recalled: recalledToDraft });
+    const sheetStatus = drift.needsResend ? `${statusLabel} — sheet changed` : statusLabel;
+
     return {
       ...row,
       contractId: contract.id,
@@ -352,7 +385,10 @@ export async function hydrateRosterRowsWithContracts(
       contractBillingCity: contract.billing_city ?? null,
       contractBillingState: contract.billing_state ?? null,
       contractBillingZip: contract.billing_zip ?? null,
-      sheetStatus: statusLabel,
+      rosterNeedsResend: drift.needsResend,
+      rosterDriftFields: drift.fields,
+      recalledToDraft,
+      sheetStatus,
       sheetContractId: contract.id,
       sheetLastUpdated: contract.updated_at ?? row.sheetLastUpdated,
     };
@@ -563,6 +599,9 @@ export async function fetchExhibitorRoster(event: Event): Promise<{
           contractBillingCity: contract?.billing_city ?? null,
           contractBillingState: contract?.billing_state ?? null,
           contractBillingZip: contract?.billing_zip ?? null,
+          rosterNeedsResend: false,
+          rosterDriftFields: [],
+          recalledToDraft: false,
           sheetStatus: cell(row, statusStart) || null,
           sheetContractId: cell(row, statusStart + 1) || null,
           sheetLastUpdated: cell(row, statusStart + 2) || null,

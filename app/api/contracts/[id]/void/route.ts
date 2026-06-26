@@ -6,7 +6,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { voidEnvelope } from '@/lib/docusign';
 import { notifyContractVoided } from '@/lib/notifications';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
-import { updateContractRow } from '@/lib/sheets-tracker';
+import { syncExhibitorRosterWriteback } from '@/lib/exhibitor-roster-sync-hook';
 import type { Contract, ContractWithTotals, Event } from '@/types/db';
 
 const schema = z.object({
@@ -97,9 +97,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   if (latest) {
     try {
-      await updateContractRow(latest, { trackerStatus: 'voided' });
+      await syncExhibitorRosterWriteback(latest, { trackerStatus: 'voided' });
     } catch (err) {
-      console.error('Failed to update Sheets tracker', err);
+      console.error('Failed to update exhibitor roster sheet', err);
     }
   }
 

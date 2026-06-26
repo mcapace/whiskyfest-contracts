@@ -1,12 +1,15 @@
 import {
   fetchExhibitorRoster,
   hydrateRosterRowsWithContracts,
+  recalledContractIds,
+  rosterRowKey,
+  rosterStatusLabel,
   type ExhibitorRosterRow,
   type ExhibitorRosterSheetConfig,
   rosterSheetsFromEvent,
 } from '@/lib/exhibitor-roster';
 import { syncExhibitorRosterWriteback } from '@/lib/exhibitor-roster-sync-hook';
-import { syncLinkedContractsFromRosterRows } from '@/lib/nywe-roster-contract-sync';
+import { detectRosterDriftFromRow, syncLinkedContractsFromRosterRows } from '@/lib/nywe-roster-contract-sync';
 import { getActiveWineSpectatorEvent } from '@/lib/wine-spectator-event';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { ContractWithTotals, Event } from '@/types/db';
@@ -92,17 +95,38 @@ async function persistRosterSnapshot(eventId: string, roster: ExhibitorRosterPay
   if (error) throw new Error(error.message);
 }
 
-async function writebackLinkedContracts(eventId: string): Promise<number> {
+async function writebackLinkedContracts(eventId: string, rows: ExhibitorRosterRow[]): Promise<number> {
   const supabase = getSupabaseAdmin();
   const { data: contracts } = await supabase
     .from('contracts_with_totals')
-    .select('id, status, source_sheet_id, source_sheet_tab, source_row_number, updated_at, event_id')
+    .select('id, status, source_sheet_id, source_sheet_tab, source_row_number, updated_at, event_id, sent_at')
     .eq('event_id', eventId)
     .not('source_sheet_id', 'is', null);
 
+  const rowByKey = new Map(rows.map((row) => [row.rowKey, row]));
+  const recalledIds = await recalledContractIds(
+    eventId,
+    ((contracts ?? []) as ContractWithTotals[])
+      .filter((c) => c.status === 'draft' && !c.sent_at)
+      .map((c) => c.id),
+  );
+
   let count = 0;
   for (const contract of (contracts ?? []) as ContractWithTotals[]) {
-    await syncExhibitorRosterWriteback(contract);
+    if (!contract.source_sheet_id || !contract.source_sheet_tab || !contract.source_row_number) continue;
+    const rowKey = rosterRowKey(contract.source_sheet_id, contract.source_sheet_tab, contract.source_row_number);
+    const row = rowByKey.get(rowKey);
+    const recalled = recalledIds.has(contract.id);
+    const drift = row ? detectRosterDriftFromRow(row, contract) : { needsResend: false, fields: [] };
+
+    let statusLabel: string | undefined;
+    if (recalled) {
+      statusLabel = 'Recalled';
+    } else if (drift.needsResend) {
+      statusLabel = `${rosterStatusLabel(contract.status)} — sheet changed`;
+    }
+
+    await syncExhibitorRosterWriteback(contract, statusLabel ? { statusLabel } : undefined);
     count += 1;
   }
   return count;
@@ -119,9 +143,9 @@ export async function syncExhibitorRosterMaster(event?: Event | null): Promise<E
   }
 
   try {
-    const writebackCount = await writebackLinkedContracts(activeEvent.id);
     const roster = await fetchExhibitorRoster(activeEvent);
     const contractsUpdated = await syncLinkedContractsFromRosterRows(activeEvent.id, roster.rows);
+    const writebackCount = await writebackLinkedContracts(activeEvent.id, roster.rows);
     const payload: ExhibitorRosterPayload = {
       syncedAt: roster.syncedAt,
       sheets: roster.sheets,

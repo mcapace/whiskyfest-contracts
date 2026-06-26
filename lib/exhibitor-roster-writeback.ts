@@ -52,7 +52,7 @@ export async function writeExhibitorRosterStatusForContract(
     ContractWithTotals,
     'id' | 'status' | 'source_sheet_id' | 'source_sheet_tab' | 'source_row_number' | 'updated_at'
   >,
-  options?: { trackerStatus?: ContractStatus },
+  options?: { trackerStatus?: ContractStatus; statusLabel?: string },
 ): Promise<void> {
   const spreadsheetId = contract.source_sheet_id?.trim();
   const tab = contract.source_sheet_tab?.trim();
@@ -60,6 +60,7 @@ export async function writeExhibitorRosterStatusForContract(
   if (!spreadsheetId || !tab || !rowNumber || rowNumber < 2) return;
 
   const status = options?.trackerStatus ?? contract.status;
+  const label = options?.statusLabel ?? rosterStatusLabel(status);
   const sheets = getSheetsClient();
   const headerRes = await sheets.spreadsheets.values.get({
     spreadsheetId,
@@ -81,7 +82,7 @@ export async function writeExhibitorRosterStatusForContract(
     range,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
-      values: [[rosterStatusLabel(status), contract.id, updatedLabel]],
+      values: [[label, contract.id, updatedLabel]],
     },
   });
 }

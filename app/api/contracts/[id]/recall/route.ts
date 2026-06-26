@@ -5,6 +5,7 @@ import { resolveContractActor } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { clearedRepEnteredBilling } from '@/lib/contract-schemas';
 import { voidEnvelope } from '@/lib/docusign';
+import { syncExhibitorRosterWriteback } from '@/lib/exhibitor-roster-sync-hook';
 import { notifySalesRepContractRecalled } from '@/lib/notifications';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import type { Contract, ContractWithTotals, Event } from '@/types/db';
@@ -98,6 +99,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   ]);
 
   if (withTotals) {
+    try {
+      await syncExhibitorRosterWriteback(withTotals, { statusLabel: 'Recalled' });
+    } catch (err) {
+      console.error('[exhibitor-roster] recall writeback failed', err);
+    }
     try {
       await notifySalesRepContractRecalled({
         contract: withTotals,

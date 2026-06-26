@@ -61,6 +61,8 @@ export type ContractDetailViewProps = {
   pdfPreviewUrl: string;
   pdfPreviewCaption: string;
   legacyPdfUrl: string | null;
+  rosterNeedsResend?: boolean;
+  rosterDriftFields?: string[];
 };
 
 /** Entire contract detail UI — client-only to avoid hydration crashes on corporate PCs. */
@@ -90,6 +92,8 @@ export function ContractDetailView({
   pdfPreviewUrl,
   pdfPreviewCaption,
   legacyPdfUrl,
+  rosterNeedsResend = false,
+  rosterDriftFields = [],
 }: ContractDetailViewProps) {
   const nyweLicense = isNyweVendorEvent(event);
 
@@ -121,6 +125,21 @@ export function ContractDetailView({
           showSalesRep={!nyweLicense}
           vendorLicense={nyweLicense}
         />
+
+        {rosterNeedsResend ? (
+          <div className="rounded-md border border-amber-400/70 bg-amber-50 p-4 text-amber-950">
+            <p className="text-sm font-semibold">Google Sheet changed — resend required</p>
+            <p className="mt-1 text-sm text-amber-950/90">
+              The linked exhibitor row in Google Sheets no longer matches what was sent in DocuSign. Use{' '}
+              <strong>Resend with Changes</strong> from Actions so the winery receives an updated agreement.
+            </p>
+            {rosterDriftFields.length ? (
+              <p className="mt-2 text-xs text-amber-900/80">
+                Changed fields: {rosterDriftFields.join(', ')}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="grid gap-6 xl:grid-cols-[240px_minmax(0,1fr)]">
           <div className="hidden xl:block">
@@ -179,6 +198,19 @@ export function ContractDetailView({
                 <p className="mt-2 text-xs text-muted-foreground">
                   Cancelled {formatTimestamp(contract.cancelled_at)}
                   {contract.cancelled_by && ` by ${contract.cancelled_by}`}
+                </p>
+              </div>
+            )}
+
+            {contract.status === 'voided' && (
+              <div className="rounded-md border border-danger-base/30 bg-danger-bg p-4 text-danger-base">
+                <p className="text-sm font-semibold">Contract voided</p>
+                {contract.voided_reason ? (
+                  <p className="mt-1 text-sm">{contract.voided_reason}</p>
+                ) : null}
+                <p className="mt-2 text-xs opacity-90">
+                  Voided {contract.voided_at ? formatTimestamp(contract.voided_at) : '—'}
+                  {contract.voided_by ? ` by ${contract.voided_by}` : ''}
                 </p>
               </div>
             )}

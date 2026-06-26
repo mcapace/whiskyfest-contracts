@@ -8,7 +8,7 @@ export async function syncExhibitorRosterWriteback(
     ContractWithTotals,
     'id' | 'status' | 'source_sheet_id' | 'source_sheet_tab' | 'source_row_number' | 'updated_at' | 'event_id'
   >,
-  options?: { trackerStatus?: ContractStatus },
+  options?: { trackerStatus?: ContractStatus; statusLabel?: string },
 ): Promise<void> {
   if (!contract.source_sheet_id || !contract.source_sheet_tab || !contract.source_row_number) return;
   try {
@@ -20,7 +20,7 @@ export async function syncExhibitorRosterWriteback(
 
 export async function syncExhibitorRosterWritebackById(
   contractId: string,
-  options?: { trackerStatus?: ContractStatus },
+  options?: { trackerStatus?: ContractStatus; statusLabel?: string },
 ): Promise<void> {
   const supabase = getSupabaseAdmin();
   const { data } = await supabase

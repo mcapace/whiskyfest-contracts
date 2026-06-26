@@ -21,6 +21,7 @@ import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { sendEnvelope, voidEnvelope } from '@/lib/docusign';
+import { syncExhibitorRosterWritebackById } from '@/lib/exhibitor-roster-sync-hook';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { docusignBrandIdForEvent } from '@/lib/product-email';
 import { parseSignerCc, validateSignerCcDistinct } from '@/lib/docusign-signer-cc';
@@ -198,6 +199,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   });
 
   revalidateContractPaths(contract.id);
+  await syncExhibitorRosterWritebackById(contract.id);
 
   return NextResponse.json({ ok: true, envelope_id: newEnvelopeId });
 }

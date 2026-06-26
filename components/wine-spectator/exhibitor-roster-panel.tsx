@@ -4,9 +4,10 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { LucideIcon } from 'lucide-react';
-import { Columns3, Loader2, RefreshCw, Send, FilePlus2, ListFilter, CircleDashed, Clock, CheckCircle2, Mail, BadgeCheck, PenLine, Search, X } from 'lucide-react';
+import { Columns3, Loader2, RefreshCw, Send, FilePlus2, ListFilter, CircleDashed, Clock, CheckCircle2, Mail, BadgeCheck, PenLine, Search, X, AlertTriangle, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/contracts/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
@@ -73,6 +74,9 @@ type RosterRow = {
   contractBillingCity: string | null;
   contractBillingState: string | null;
   contractBillingZip: string | null;
+  rosterNeedsResend: boolean;
+  rosterDriftFields: string[];
+  recalledToDraft: boolean;
   sheetStatus: string | null;
   sheetLastUpdated: string | null;
   sheetFields: { label: string; value: string }[];
@@ -115,6 +119,8 @@ const FILTERS = [
   { key: 'sent', label: 'Waiting on winery', icon: Mail },
   { key: 'countersign', label: 'Ready to countersign', icon: PenLine },
   { key: 'done', label: 'Signed / executed', icon: BadgeCheck },
+  { key: 'needs_resend', label: 'Sheet changed', icon: AlertTriangle },
+  { key: 'voided', label: 'Voided / recalled', icon: Ban },
 ] as const;
 
 function matchesFilter(row: RosterRow, filter: string): boolean {
@@ -136,6 +142,12 @@ function matchesFilter(row: RosterRow, filter: string): boolean {
       return inPipeline && status === 'partially_signed';
     case 'done':
       return inPipeline && Boolean(status && ['signed', 'executed'].includes(status));
+    case 'needs_resend':
+      return Boolean(row.rosterNeedsResend);
+    case 'voided':
+      return Boolean(
+        status && ['voided', 'cancelled', 'declined'].includes(status),
+      ) || row.recalledToDraft;
     default:
       return true;
   }
@@ -197,10 +209,30 @@ function renderUiCell(row: RosterRow, columnId: string) {
         </div>
       );
     case 'licenseStatus':
-      return row.contractStatus ? (
-        <StatusBadge status={row.contractStatus} />
-      ) : (
-        <span className="text-sm text-muted-foreground">Not started</span>
+      return (
+        <div className="flex min-w-[8.5rem] flex-col gap-1">
+          {row.recalledToDraft ? (
+            <Badge className="w-fit border border-amber-600/35 bg-amber-50 text-amber-950 hover:bg-amber-50">
+              Recalled
+            </Badge>
+          ) : row.contractStatus ? (
+            <StatusBadge status={row.contractStatus} />
+          ) : (
+            <span className="text-sm text-muted-foreground">Not started</span>
+          )}
+          {row.rosterNeedsResend ? (
+            <Badge
+              className="w-fit border border-amber-600/40 bg-amber-100 text-amber-950 hover:bg-amber-100"
+              title={
+                row.rosterDriftFields.length
+                  ? `Changed in Google Sheets: ${row.rosterDriftFields.join(', ')}`
+                  : 'Google Sheet differs from the sent DocuSign agreement'
+              }
+            >
+              Sheet changed — resend
+            </Badge>
+          ) : null}
+        </div>
       );
     case 'licenseFee':
       return row.contractGrandTotalCents != null ? (
@@ -315,6 +347,12 @@ function licenseStatusFilterClass(filterKey: string, active: boolean, count: num
   }
   if (filterKey === 'sent' && count > 0) {
     return 'border-amber-300/80 bg-amber-50 text-amber-950 hover:bg-amber-100';
+  }
+  if (filterKey === 'needs_resend' && count > 0) {
+    return 'border-amber-400/80 bg-amber-100 text-amber-950 hover:bg-amber-200/80';
+  }
+  if (filterKey === 'voided' && count > 0) {
+    return 'border-danger-base/25 bg-danger-bg text-danger-base hover:bg-danger-bg/90';
   }
   return 'border-border/70 bg-background text-foreground hover:bg-muted/50';
 }
