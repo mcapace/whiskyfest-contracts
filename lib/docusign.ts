@@ -88,9 +88,6 @@ function normalizeRestApiBase(baseUri: string): string {
 async function resolveApiContext(accessToken: string): Promise<{ accountId: string; restApiBase: string }> {
   const envAccountId = process.env['DOCUSIGN_ACCOUNT_ID']?.trim();
   const envBase = process.env['DOCUSIGN_BASE_URL']?.trim();
-  if (envAccountId && envBase) {
-    return { accountId: envAccountId, restApiBase: envBase.replace(/\/$/, '') };
-  }
 
   const authUrl = process.env['DOCUSIGN_AUTH_URL'] ?? 'https://account-d.docusign.com';
   const oAuthBasePath = authHostFromUrl(authUrl);
@@ -151,7 +148,12 @@ export type DocuSignSession = {
 let cachedSession: { session: DocuSignSession; expiresAt: number } | null = null;
 const SESSION_REFRESH_MS = 50 * 60 * 1000;
 
-/** Reuse OAuth token + account context — avoids 2 extra API calls per DocuSign request. */
+/** Drop cached token/context — e.g. after USER_AUTHENTICATION_FAILED on REST calls. */
+export function clearDocuSignSessionCache(): void {
+  cachedSession = null;
+}
+
+/** Reuse OAuth token + account context — avoids repeat userinfo calls within the same session window. */
 export async function getDocuSignSession(): Promise<DocuSignSession> {
   const now = Date.now();
   if (cachedSession && cachedSession.expiresAt > now) {
@@ -163,6 +165,11 @@ export async function getDocuSignSession(): Promise<DocuSignSession> {
   const session = { accessToken, accountId, restApiBase };
   cachedSession = { session, expiresAt: now + SESSION_REFRESH_MS };
   return session;
+}
+
+export function isDocuSignAuthError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.includes('USER_AUTHENTICATION_FAILED') || msg.includes('AUTHORIZATION_INVALID_TOKEN');
 }
 
 export function isDocuSignRateLimitError(err: unknown): boolean {
@@ -177,6 +184,9 @@ export function isDocuSignRateLimitError(err: unknown): boolean {
 export function formatDocuSignErrorForUser(err: unknown): string {
   if (isDocuSignRateLimitError(err)) {
     return 'DocuSign hourly API limit reached (3,000 calls/hour on your account). Wait about an hour for the limit to reset, then try again. Background sync has been reduced to avoid hitting this limit.';
+  }
+  if (isDocuSignAuthError(err)) {
+    return 'DocuSign authentication failed. Confirm production env vars (DOCUSIGN_AUTH_URL, DOCUSIGN_ACCOUNT_ID, DOCUSIGN_USER_ID) match your live account, JWT consent is granted, and DOCUSIGN_BASE_URL is not pointing at the demo cluster. Then try again.';
   }
   return err instanceof Error ? err.message : String(err);
 }
@@ -285,6 +295,9 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
 
   const text = await res.text();
   if (!res.ok) {
+    if (text.includes('USER_AUTHENTICATION_FAILED') || text.includes('AUTHORIZATION_INVALID_TOKEN')) {
+      clearDocuSignSessionCache();
+    }
     throw new Error(`DocuSign createEnvelope ${res.status}: ${text}`);
   }
   const summary = JSON.parse(text) as { envelopeId?: string; status?: string };
