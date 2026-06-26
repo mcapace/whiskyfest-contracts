@@ -35,7 +35,7 @@ export function AccountingHero({
       className={cn(
         'overflow-hidden rounded-xl border shadow-wf-editorial',
         isNywe
-          ? 'border-rose-900/30 bg-gradient-to-br from-stone-900 via-rose-950 to-stone-950'
+          ? 'border-oak-800/30 bg-gradient-to-br from-stone-900 via-oak-900 to-stone-950'
           : 'border-brass-700/25 bg-gradient-to-br from-stone-900 via-oak-900 to-stone-950',
         className,
       )}
@@ -45,7 +45,7 @@ export function AccountingHero({
           className={cn(
             'absolute inset-0',
             isNywe
-              ? 'bg-[radial-gradient(ellipse_at_top_right,rgba(190,24,93,0.12),transparent_55%)]'
+              ? 'bg-[radial-gradient(ellipse_at_top_right,rgba(212,175,55,0.12),transparent_55%)]'
               : 'bg-[radial-gradient(ellipse_at_top_right,rgba(212,175,55,0.14),transparent_55%)]',
           )}
         />
@@ -53,7 +53,7 @@ export function AccountingHero({
           <div
             className={cn(
               'mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em]',
-              isNywe ? 'border-rose-500/30 bg-rose-950/40 text-rose-200' : 'border-brass-500/30 bg-brass-950/40 text-brass-300',
+              isNywe ? 'border-amber-500/30 bg-oak-950/40 text-amber-200' : 'border-brass-500/30 bg-brass-950/40 text-brass-300',
             )}
           >
             <Landmark className="h-3.5 w-3.5" />

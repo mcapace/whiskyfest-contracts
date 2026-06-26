@@ -1,8 +1,10 @@
 import '@/lib/polyfills/url-parse';
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { Inter, JetBrains_Mono, Spectral } from 'next/font/google';
 import { SessionProvider } from 'next-auth/react';
 import { auth } from '@/lib/auth';
+import { portalMetadataForHost } from '@/lib/portal-metadata';
 import { ThemeRoot } from '@/components/theme/theme-root';
 import './globals.css';
 
@@ -27,11 +29,13 @@ const jetbrainsMono = JetBrains_Mono({
   display: 'swap',
 });
 
-export const metadata: Metadata = {
-  title: 'WhiskyFest Contracts',
-  description: 'Participation contract management — M. Shanken Communications',
-  robots: { index: false, follow: false }, // internal tool; no indexing
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const host = headers().get('host');
+  return {
+    ...portalMetadataForHost(host),
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();

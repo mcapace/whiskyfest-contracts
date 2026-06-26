@@ -105,9 +105,9 @@ export function NyweSusannahDashboard({
     reviewCount > 0 || readyToCountersign.length > 0 || stuck.length > 0 || waitingOnWineryCount > 0;
 
   return (
-    <Card className="h-full border-border/60 shadow-sm">
+    <Card className="h-full border-fest-600/15">
       <CardHeader className="pb-4">
-        <CardTitle className="font-display text-xl font-medium">Your action queue</CardTitle>
+        <CardTitle className="font-serif text-lg font-semibold">Your action queue</CardTitle>
         <p className="text-sm text-muted-foreground">What needs attention right now</p>
       </CardHeader>
       <CardContent className="space-y-4">

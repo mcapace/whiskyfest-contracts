@@ -4,6 +4,7 @@ import { auth, signIn } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { LoginHero } from '@/components/auth/login-hero';
 import { NyweLogo } from '@/components/brand/nywe-logo';
+import { WhiskyAdvocateLogo } from '@/components/brand/whisky-advocate-logo';
 import { portalKindFromHost, postLoginPath } from '@/lib/portal-host';
 import { canAccessWineSpectator } from '@/lib/wine-spectator-access';
 import {
@@ -51,12 +52,12 @@ export default async function LoginPage({
         <div className="relative h-[min(40vh,300px)] min-h-[200px] overflow-hidden lg:col-span-3 lg:h-screen">
           {nywePortal ? (
             <>
-              <div className="absolute inset-0 bg-gradient-to-br from-rose-950 via-stone-900 to-stone-950" />
+              <div className="absolute inset-0 bg-gradient-to-br from-oak-900 via-stone-900 to-stone-950" />
               <div className="relative flex h-full animate-login-mount flex-col justify-center px-6 py-8 text-stone-50 sm:px-10 lg:px-12">
                 <div className="max-w-md">
-                  <NyweLogo priority onDark imageClassName="max-h-14" />
+                  <NyweLogo priority variant="onDark" imageClassName="max-h-14" />
                 </div>
-                <p className="mt-8 font-sans text-xs uppercase tracking-[0.25em] text-rose-300/90">NY Wine Experience</p>
+                <p className="mt-8 font-sans text-xs uppercase tracking-[0.25em] text-amber-500">NY Wine Experience</p>
                 <h1 className="mt-3 font-display text-5xl font-medium tracking-tight text-stone-50 sm:text-6xl">
                   {NYWE_LOGIN_HEADLINE}
                 </h1>
@@ -70,7 +71,10 @@ export default async function LoginPage({
               <LoginHero />
               <div className="absolute inset-0 bg-gradient-to-br from-oak-900/75 via-oak-900/40 to-oak-900/85" />
               <div className="relative flex h-full animate-login-mount flex-col justify-center px-6 py-8 text-parchment-50 sm:px-10 lg:px-12">
-                <p className="font-sans text-xs uppercase tracking-[0.25em] text-amber-500">WhiskyFest 2026</p>
+                <div className="max-w-xs">
+                  <WhiskyAdvocateLogo priority variant="onDark" className="max-w-[220px]" imageClassName="max-h-16" />
+                </div>
+                <p className="mt-8 font-sans text-xs uppercase tracking-[0.25em] text-amber-500">WhiskyFest 2026</p>
                 <h1 className="mt-3 font-display text-5xl font-medium tracking-tight text-parchment-50 sm:text-6xl">
                   Welcome back
                 </h1>
@@ -115,7 +119,7 @@ export default async function LoginPage({
                   size="lg"
                   className={
                     nywePortal
-                      ? 'h-12 w-full border border-rose-900/90 bg-rose-950 font-sans text-base font-medium tracking-tight text-stone-50 shadow-sm transition hover:bg-rose-900 hover:text-stone-50'
+                      ? 'h-12 w-full border border-oak-700/90 bg-oak-800 font-sans text-base font-medium tracking-tight text-parchment-50 shadow-sm transition hover:bg-oak-900 hover:text-parchment-50'
                       : 'h-12 w-full border border-oak-700/90 bg-oak-800 font-sans text-base font-medium tracking-tight text-parchment-50 shadow-sm transition hover:bg-oak-900 hover:text-parchment-50'
                   }
                 >

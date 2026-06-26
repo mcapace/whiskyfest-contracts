@@ -20,6 +20,7 @@ import {
   whiskyfestPortalOrigin,
 } from '@/lib/portal-host';
 import { canAccessWineSpectator } from '@/lib/wine-spectator-access';
+import { portalFaviconPath } from '@/lib/portal-metadata';
 
 type SessionUserFlags = {
   pipeline_access?: boolean;
@@ -40,6 +41,11 @@ function applyPortalHeader(res: NextResponse, host: string | null): NextResponse
 export default auth((req) => {
   const host = req.headers.get('host');
   const { pathname } = req.nextUrl;
+
+  if (pathname === '/favicon.ico') {
+    return NextResponse.rewrite(new URL(portalFaviconPath(portalKindFromHost(host)), req.url));
+  }
+
   const nyweHost = isNywePortalHost(host);
 
   const isPublic =
@@ -196,5 +202,5 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 };

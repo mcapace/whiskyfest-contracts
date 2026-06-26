@@ -99,7 +99,7 @@ export function NyweBulkSendWizard({ open, onOpenChange, sendable, onComplete }:
 
         <div className="space-y-4">
           {phase === 'confirm' ? (
-            <div className="rounded-lg border border-rose-200 bg-rose-50/40 p-4">
+            <div className="rounded-lg border border-fest-200 bg-fest-50/40 p-4">
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
                   <p className="font-medium text-foreground">
@@ -110,8 +110,8 @@ export function NyweBulkSendWizard({ open, onOpenChange, sendable, onComplete }:
                     fresh, then DocuSign emails go to each winery signer immediately.
                   </p>
                 </div>
-                <div className="rounded-lg border border-rose-200 bg-white/90 px-4 py-2 text-center">
-                  <p className="text-2xl font-semibold tabular-nums text-rose-950">{sendable.length}</p>
+                <div className="rounded-lg border border-fest-200 bg-white/90 px-4 py-2 text-center">
+                  <p className="text-2xl font-semibold tabular-nums text-fest-950">{sendable.length}</p>
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Wineries</p>
                   {totalFeesCents > 0 ? (
                     <p className="mt-1 text-xs tabular-nums text-muted-foreground">{formatCurrency(totalFeesCents)} total</p>
@@ -146,7 +146,7 @@ export function NyweBulkSendWizard({ open, onOpenChange, sendable, onComplete }:
               <p className="mt-2 text-sm text-muted-foreground">Keep this window open until finished.</p>
               <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full bg-rose-700 transition-all duration-300"
+                  className="h-full bg-fest-700 transition-all duration-300"
                   style={{
                     width: progress.total > 0 ? `${Math.round((progress.current / progress.total) * 100)}%` : '0%',
                   }}

@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
@@ -35,6 +34,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { NyweLogo } from '@/components/brand/nywe-logo';
+import { WhiskyAdvocateLogo } from '@/components/brand/whisky-advocate-logo';
 import { ImpersonationMenu } from '@/components/impersonation/impersonation-menu';
 import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
 
@@ -221,7 +221,7 @@ export function Sidebar({
         className={cn(
           'shrink-0 border-b border-border/50 px-3 py-4',
           wineSpectatorPortal
-            ? 'bg-gradient-to-b from-rose-900/[0.08] via-bg-surface-raised to-bg-surface'
+            ? 'bg-gradient-to-b from-fest-600/[0.07] via-bg-surface-raised to-bg-surface'
             : accountingPortal
               ? 'bg-gradient-to-b from-brass-700/[0.08] via-bg-surface-raised to-bg-surface'
               : 'bg-gradient-to-b from-fest-600/[0.07] via-bg-surface-raised to-bg-surface',
@@ -237,16 +237,7 @@ export function Sidebar({
               <p className="mt-0.5 text-[10px] text-muted-foreground">Accounts receivable</p>
             </Link>
           ) : (
-            <Link href={homeHref} className="relative mx-auto block h-12 w-full max-w-[200px]">
-              <Image
-                src="/images/WA_BLUE-removebg-preview%20%282%29.png"
-                alt="Whisky Advocate"
-                fill
-                className="object-contain object-center mix-blend-multiply dark:mix-blend-normal dark:brightness-0 dark:invert"
-                sizes="200px"
-                priority
-              />
-            </Link>
+            <WhiskyAdvocateLogo href={homeHref} priority className="mx-auto max-w-[200px]" imageClassName="max-h-12" />
           )}
         </div>
       </div>

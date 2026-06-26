@@ -305,13 +305,13 @@ function RosterListFilterPill({
 
 function licenseStatusFilterClass(filterKey: string, active: boolean, count: number): string {
   if (active) {
-    if (filterKey === 'countersign') return 'border-rose-600 bg-rose-600 text-white shadow-sm hover:bg-rose-700';
+    if (filterKey === 'countersign') return 'border-fest-600 bg-fest-600 text-white shadow-sm hover:bg-fest-700';
     if (filterKey === 'sent') return 'border-amber-700 bg-amber-700 text-white shadow-sm hover:bg-amber-800';
     if (filterKey === 'done') return 'border-emerald-700 bg-emerald-700 text-white shadow-sm hover:bg-emerald-800';
     return 'border-foreground bg-foreground text-background shadow-sm hover:opacity-95';
   }
   if (filterKey === 'countersign' && count > 0) {
-    return 'border-rose-300 bg-rose-50 text-rose-900 hover:bg-rose-100';
+    return 'border-fest-300 bg-fest-50 text-fest-900 hover:bg-fest-100';
   }
   if (filterKey === 'sent' && count > 0) {
     return 'border-amber-300/80 bg-amber-50 text-amber-950 hover:bg-amber-100';
@@ -622,14 +622,14 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
       />
 
       {createProgress ? (
-        <div className="rounded-xl border border-rose-200 bg-rose-50/80 px-4 py-3 text-sm text-rose-950">
+        <div className="rounded-xl border border-fest-200 bg-fest-50/80 px-4 py-3 text-sm text-fest-950">
           <p className="flex items-center gap-2 font-medium">
             <Loader2 className="h-4 w-4 animate-spin shrink-0" aria-hidden />
             Creating drafts… {createProgress.current} of {createProgress.total}
           </p>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-rose-200">
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-fest-200">
             <div
-              className="h-full bg-rose-700 transition-all duration-300"
+              className="h-full bg-fest-700 transition-all duration-300"
               style={{
                 width:
                   createProgress.total > 0

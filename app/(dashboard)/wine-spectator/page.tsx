@@ -9,7 +9,8 @@ import { getDashboardData } from '@/app/(dashboard)/page';
 import { WineSpectatorHero } from '@/components/dashboard/wine-spectator-hero';
 import { StatusBadge } from '@/components/contracts/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { isEventsManagedWorkflow } from '@/lib/contract-template-profile';
 import { wineSpectatorContractIsAdmin } from '@/lib/wine-spectator-access';
 import { NyweSusannahDashboard } from '@/components/wine-spectator/nywe-susannah-dashboard';
@@ -85,11 +86,10 @@ export default async function WineSpectatorDashboardPage() {
   const sendBlocked = primaryEvent?.client_send_enabled === false;
 
   return (
-    <div className="mx-auto max-w-[1600px] space-y-10 px-4 pb-12 pt-4 sm:px-6 lg:space-y-12 lg:px-8">
+    <div className="space-y-10">
       <DashboardLiveRefresh />
 
       <WineSpectatorHero
-        compact
         event={primaryEvent}
         contractsCount={metrics.totalLicenses}
         completionLabel={`${formatCurrency(totalValueCents)} total pipeline · ${metrics.completionPct}% executed`}
@@ -104,17 +104,13 @@ export default async function WineSpectatorDashboardPage() {
         </div>
       ) : null}
 
-      <section className="space-y-5">
-        <div>
-          <h2 className="font-display text-2xl font-medium tracking-tight text-foreground">Overview</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Revenue and signing progress at a glance</p>
-        </div>
-        <NyweMetricsGrid metrics={metrics} />
-      </section>
+      <NyweMetricsGrid metrics={metrics} />
 
-      <div className="grid gap-8 2xl:grid-cols-[1.35fr_1fr] 2xl:gap-10">
-        <NywePipelinePanel data={pipeline} />
-        <NyweSusannahDashboard
+      <NyweQuickNav />
+
+      <NywePipelinePanel data={pipeline} />
+
+      <NyweSusannahDashboard
           stuck={stuckForAccounting.map((c) => ({
             id: c.id,
             exhibitorCompanyName: c.exhibitor_company_name,
@@ -136,60 +132,74 @@ export default async function WineSpectatorDashboardPage() {
           }))}
           canFixStuck={canFixStuck}
         />
-      </div>
 
-      <NyweQuickNav />
-
-      <section>
-        <Card className="border-border/60 shadow-sm">
-          <CardHeader className="flex flex-row items-end justify-between space-y-0">
-            <div>
-              <CardTitle className="font-display text-xl font-medium">Recent contracts</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">Latest updates across all exhibitor contracts</p>
-            </div>
-            <Link href="/wine-spectator/contracts" className="text-sm font-medium text-accent-brand hover:underline">
-              View all
-            </Link>
-          </CardHeader>
-          <CardContent className="p-0">
-            {recent.length === 0 ? (
-              <p className="p-6 text-sm text-muted-foreground">No contracts yet — start from the exhibitor roster.</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Winery</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">License fee</TableHead>
-                    <TableHead className="text-right">Updated</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recent.map((c) => (
-                    <TableRow key={c.id} className="hover:bg-muted/30">
-                      <TableCell>
-                        <Link
-                          href={`/wine-spectator/contracts/${c.id}`}
-                          className="font-medium hover:text-accent-brand"
-                        >
-                          {c.exhibitor_company_name}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={c.status} />
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{formatCurrency(c.grand_total_cents)}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        <RelativeTime iso={c.updated_at} />
-                      </TableCell>
+      <Card className="overflow-hidden border-fest-600/15" data-tour="dashboard-contracts-table">
+        <div className="flex items-center justify-between border-b border-fest-600/10 px-6 py-4">
+          <div>
+            <h2 className="font-serif text-lg font-semibold">Recent contracts</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">Latest updates across all exhibitor contracts</p>
+          </div>
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/wine-spectator/contracts">View all →</Link>
+          </Button>
+        </div>
+        <CardContent className="p-0">
+          {recent.length === 0 ? (
+            <p className="p-6 text-sm text-muted-foreground">No contracts yet — start from the exhibitor roster.</p>
+          ) : (
+            <>
+              <div className="divide-y divide-border/50 md:hidden">
+                {recent.map((c) => (
+                  <Link
+                    key={c.id}
+                    href={`/wine-spectator/contracts/${c.id}`}
+                    className="block px-4 py-4 transition-colors hover:bg-muted/40"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="min-w-0 font-medium leading-snug">{c.exhibitor_company_name}</p>
+                      <span className="font-mono text-sm font-semibold tabular-nums">{formatCurrency(c.grand_total_cents)}</span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <StatusBadge status={c.status} />
+                      <RelativeTime iso={c.updated_at} className="text-xs text-muted-foreground" />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              <div className="hidden md:block">
+                <Table className="[&_tbody_tr:hover]:bg-muted/40">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Winery</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">License fee</TableHead>
+                      <TableHead className="text-right">Updated</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      </section>
+                  </TableHeader>
+                  <TableBody>
+                    {recent.map((c) => (
+                      <TableRow key={c.id} className="group">
+                        <TableCell>
+                          <Link href={`/wine-spectator/contracts/${c.id}`} className="block font-medium hover:text-accent-brand">
+                            {c.exhibitor_company_name}
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={c.status} />
+                        </TableCell>
+                        <TableCell className="text-right font-mono tabular-nums">{formatCurrency(c.grand_total_cents)}</TableCell>
+                        <TableCell className="text-right text-xs text-muted-foreground">
+                          <RelativeTime iso={c.updated_at} />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

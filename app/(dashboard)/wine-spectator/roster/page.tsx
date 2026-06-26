@@ -35,7 +35,7 @@ export default async function WineSpectatorRosterPage() {
     const metrics = buildNyweDashboardMetrics(active, event, { rosterWineryCount: roster.rows.length });
 
     return (
-      <div className="mx-auto max-w-[1600px] space-y-6 px-4 pb-10 pt-2 sm:px-6 lg:px-8">
+      <div className="space-y-10">
         <NyweRosterPageHeader eventName={event.name} />
         <NyweMetricsGrid metrics={metrics} compact />
         <ExhibitorRosterPanel

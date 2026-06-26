@@ -3,27 +3,21 @@ import Link from 'next/link';
 import { brandLogoAsset, type BrandLogoVariant } from '@/lib/brand-assets';
 import { cn } from '@/lib/utils';
 
-/** Wine Spectator wordmark — used across the NYWE contracts portal. */
-export function NyweLogo({
+/** Whisky Advocate wordmark — used across the WhiskyFest contracts portal. */
+export function WhiskyAdvocateLogo({
   href,
   className,
   imageClassName,
   priority = false,
-  subtitle,
   variant = 'default',
-  /** @deprecated Use `variant="onDark"` instead. */
-  onDark = false,
 }: {
   href?: string;
   className?: string;
   imageClassName?: string;
   priority?: boolean;
-  subtitle?: string;
   variant?: BrandLogoVariant;
-  onDark?: boolean;
 }) {
-  const resolvedVariant = onDark ? 'onDark' : variant;
-  const asset = brandLogoAsset('wineSpectator', resolvedVariant);
+  const asset = brandLogoAsset('whiskyAdvocate', variant);
 
   const content = (
     <div className={cn('block', className)}>
@@ -35,13 +29,11 @@ export function NyweLogo({
         priority={priority}
         className={cn(
           'h-auto w-full object-contain',
-          resolvedVariant === 'onDark' && 'drop-shadow-[0_2px_18px_rgba(0,0,0,0.55)]',
+          variant === 'onDark' && 'drop-shadow-[0_2px_18px_rgba(0,0,0,0.55)]',
           imageClassName,
         )}
+        sizes="(max-width: 768px) 240px, 320px"
       />
-      {subtitle ? (
-        <p className="mt-1.5 text-center text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{subtitle}</p>
-      ) : null}
     </div>
   );
 
