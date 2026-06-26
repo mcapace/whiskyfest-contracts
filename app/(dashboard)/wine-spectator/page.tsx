@@ -18,9 +18,9 @@ import { NyweMetricsGrid } from '@/components/wine-spectator/nywe-metrics-grid';
 import { NywePipelinePanel } from '@/components/wine-spectator/nywe-pipeline-panel';
 import { NyweQuickNav } from '@/components/wine-spectator/nywe-quick-nav';
 import { buildNyweDashboardMetrics, getNywePipelineData } from '@/lib/nywe-dashboard-metrics';
-import { releaseStuckNyweSignedLicenses } from '@/lib/nywe-release-stuck-on-load';
 import { runNyweBackgroundDocuSignSync } from '@/lib/nywe-background-docusign-sync';
 import { DashboardLiveRefresh } from '@/components/dashboard/dashboard-live-refresh';
+import { NyweDocuSignRefreshButton } from '@/components/wine-spectator/nywe-docusign-refresh-button';
 import type { ContractWithTotals } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
@@ -34,12 +34,7 @@ const RECENT_SENT_DAYS = 14;
 export default async function WineSpectatorDashboardPage() {
   const session = await auth();
   const actor = await requireContractActorForPage();
-  await Promise.all([
-    releaseStuckNyweSignedLicenses().catch((err) =>
-      console.error('[wine-spectator dashboard] auto-release retry failed', err),
-    ),
-    runNyweBackgroundDocuSignSync(),
-  ]);
+  await runNyweBackgroundDocuSignSync();
   const { contracts: allScoped, events } = await getDashboardData(actor, PRODUCT_WINE_SPECTATOR);
 
   const activeScoped = allScoped.filter((c) => c.status !== 'cancelled' && c.status !== 'voided');
@@ -105,6 +100,10 @@ export default async function WineSpectatorDashboardPage() {
       ) : null}
 
       <NyweMetricsGrid metrics={metrics} />
+
+      <div className="flex justify-end">
+        <NyweDocuSignRefreshButton />
+      </div>
 
       <NyweQuickNav />
 

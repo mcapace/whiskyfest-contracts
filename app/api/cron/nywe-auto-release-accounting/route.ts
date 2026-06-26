@@ -1,18 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseAdmin } from '@/lib/supabase';
-import { autoReleaseNyweAfterCountersign } from '@/lib/nywe-auto-release-accounting';
-import {
-  syncAllNyweExhibitorSignaturesFromDocuSign,
-  syncNyweCountersignaturesFromDocuSign,
-  syncNyweExhibitorSignaturesFromDocuSign,
-} from '@/lib/nywe-sync-exhibitor-signatures';
-import { getActiveWineSpectatorEvent } from '@/lib/wine-spectator-event';
-import type { ContractWithTotals } from '@/types/db';
+import { reconcileNyweDocuSignPipeline } from '@/lib/nywe-sync-exhibitor-signatures';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
 
-/** Retry NYWE DocuSign reconciliation: winery signatures stuck at `sent`, and countersigned licenses stuck in `signed`. */
+/** Retry NYWE DocuSign reconciliation: signatures, countersignatures, and release to accounting. */
 export async function POST(req: Request) {
   const authHeader = req.headers.get('authorization');
   const cronSecret = process.env['CRON_SECRET'];
@@ -20,70 +12,27 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const exhibitorSync = await syncAllNyweExhibitorSignaturesFromDocuSign({
-    batchSize: 25,
-    maxBatches: 40,
+  const result = await reconcileNyweDocuSignPipeline({
+    exhibitorBatchSize: 25,
+    exhibitorAll: true,
     notify: false,
+    releaseLimit: 50,
   }).catch((err) => {
-    console.error('[nywe-auto-release-accounting cron] exhibitor sync failed', err);
-    return {
-      scanned: 0,
-      partiallySigned: 0,
-      fullySigned: 0,
-      unchanged: 0,
-      errors: 0,
-      errorSamples: [],
-      nextAfterId: null,
-      hasMore: false,
-      remainingSent: 0,
-    };
+    console.error('[nywe-auto-release-accounting cron] reconcile failed', err);
+    return null;
   });
 
-  const countersignSync = await syncNyweCountersignaturesFromDocuSign({ notify: false }).catch((err) => {
-    console.error('[nywe-auto-release-accounting cron] countersign sync failed', err);
-    return { scanned: 0, fullySigned: 0, unchanged: 0, errors: 0, errorSamples: [] };
-  });
-
-  const event = await getActiveWineSpectatorEvent();
-  if (!event) {
-    return NextResponse.json({ error: 'No active Wine Spectator event.' }, { status: 404 });
-  }
-
-  const supabase = getSupabaseAdmin();
-  const { data: stuck } = await supabase
-    .from('contracts_with_totals')
-    .select('*')
-    .eq('event_id', event.id)
-    .eq('status', 'signed')
-    .is('executed_at', null)
-    .limit(50);
-
-  let released = 0;
-  let failed = 0;
-  const errors: { id: string; company: string; error: string }[] = [];
-
-  for (const row of (stuck ?? []) as ContractWithTotals[]) {
-    const result = await autoReleaseNyweAfterCountersign({
-      supabase,
-      contractId: row.id,
-      event,
-      countersignerEmail: row.countersigned_by_email,
-    });
-    if (result.released) {
-      released += 1;
-    } else if (result.error) {
-      failed += 1;
-      errors.push({ id: row.id, company: row.exhibitor_company_name, error: result.error });
-    }
+  if (!result) {
+    return NextResponse.json({ error: 'Reconcile failed' }, { status: 500 });
   }
 
   return NextResponse.json({
     ok: true,
-    exhibitorSync,
-    countersignSync,
-    scanned: stuck?.length ?? 0,
-    released,
-    failed,
-    errors,
+    exhibitorSync: result.exhibitor,
+    countersignSync: result.countersign,
+    scanned: result.accounting.scanned,
+    released: result.accounting.released,
+    failed: result.accounting.failed,
+    errors: result.accounting.errorSamples,
   });
 }

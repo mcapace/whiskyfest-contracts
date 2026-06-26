@@ -1,15 +1,14 @@
 #!/usr/bin/env npx tsx
 /**
- * Bulk-sync NYWE licenses stuck at `sent` with DocuSign (winery signed but webhook missed).
+ * Full NYWE DocuSign refresh: sent → partially_signed → signed → executed.
  *
  * Usage:
  *   npx tsx scripts/sync-nywe-exhibitor-signatures.mts
  *   npx tsx scripts/sync-nywe-exhibitor-signatures.mts --dry-run
- *   npx tsx scripts/sync-nywe-exhibitor-signatures.mts --limit=50
  */
 import {
+  reconcileNyweDocuSignPipeline,
   syncAllNyweExhibitorSignaturesFromDocuSign,
-  syncNyweExhibitorSignaturesFromDocuSign,
 } from '../lib/nywe-sync-exhibitor-signatures.ts';
 
 const dryRun = process.argv.includes('--dry-run');
@@ -55,8 +54,21 @@ async function main() {
     return;
   }
 
-  const result = await syncAllNyweExhibitorSignaturesFromDocuSign({ batchSize: limit, maxBatches: 40, notify: true });
-  console.log(result);
+  const result = await reconcileNyweDocuSignPipeline({
+    exhibitorAll: true,
+    exhibitorBatchSize: 25,
+    notify: false,
+    releaseLimit: 100,
+  });
+
+  console.log(JSON.stringify(result, null, 2));
+  console.log('\nSummary:', {
+    winerySigned: result.exhibitor.partiallySigned,
+    fullySigned: result.exhibitor.fullySigned + result.countersign.fullySigned,
+    releasedToAccounting: result.accounting.released,
+    errors: result.exhibitor.errors + result.countersign.errors + result.accounting.failed,
+    remainingSent: result.exhibitor.remainingSent,
+  });
 }
 
 main().catch((e) => {

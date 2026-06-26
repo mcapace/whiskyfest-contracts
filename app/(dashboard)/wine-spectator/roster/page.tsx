@@ -8,6 +8,7 @@ import { buildNyweDashboardMetrics } from '@/lib/nywe-dashboard-metrics';
 import { ExhibitorRosterPanel } from '@/components/wine-spectator/exhibitor-roster-panel';
 import { NyweMetricsGrid } from '@/components/wine-spectator/nywe-metrics-grid';
 import { NyweRosterPageHeader } from '@/components/wine-spectator/nywe-quick-nav';
+import { NyweDocuSignRefreshButton } from '@/components/wine-spectator/nywe-docusign-refresh-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +38,9 @@ export default async function WineSpectatorRosterPage() {
     return (
       <div className="space-y-10">
         <NyweRosterPageHeader eventName={event.name} />
+        <div className="flex justify-end">
+          <NyweDocuSignRefreshButton />
+        </div>
         <NyweMetricsGrid metrics={metrics} compact />
         <ExhibitorRosterPanel
           initial={{

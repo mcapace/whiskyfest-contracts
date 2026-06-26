@@ -1,5 +1,6 @@
 import { syncContractFromDocuSign } from '@/lib/docusign-envelope-sync';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
+import { releaseNyweSignedLicensesToAccounting } from '@/lib/nywe-release-stuck-on-load';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getActiveWineSpectatorEvent } from '@/lib/wine-spectator-event';
 
@@ -247,4 +248,42 @@ export async function syncNyweCountersignaturesFromDocuSign(options?: {
   });
 
   return result;
+}
+
+export type NyweDocuSignReconcileResult = {
+  exhibitor: NyweExhibitorSyncResult;
+  countersign: Awaited<ReturnType<typeof syncNyweCountersignaturesFromDocuSign>>;
+  accounting: Awaited<ReturnType<typeof releaseNyweSignedLicensesToAccounting>>;
+};
+
+/**
+ * Full NYWE DocuSign pipeline refresh: winery signatures, countersignatures, and release to accounting.
+ */
+export async function reconcileNyweDocuSignPipeline(options?: {
+  exhibitorBatchSize?: number;
+  exhibitorAll?: boolean;
+  afterId?: string | null;
+  notify?: boolean;
+  releaseLimit?: number;
+}): Promise<NyweDocuSignReconcileResult> {
+  const batchSize = options?.exhibitorBatchSize ?? 25;
+  const notify = options?.notify !== false;
+
+  const exhibitor = options?.exhibitorAll
+    ? await syncAllNyweExhibitorSignaturesFromDocuSign({
+        batchSize,
+        maxBatches: 40,
+        notify,
+      })
+    : await syncNyweExhibitorSignaturesFromDocuSign({
+        batchSize,
+        afterId: options?.afterId ?? null,
+        notify,
+        concurrency: 3,
+      });
+
+  const countersign = await syncNyweCountersignaturesFromDocuSign({ notify });
+  const accounting = await releaseNyweSignedLicensesToAccounting({ limit: options?.releaseLimit ?? 50 });
+
+  return { exhibitor, countersign, accounting };
 }
