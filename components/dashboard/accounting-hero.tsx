@@ -53,25 +53,26 @@ export function AccountingHero({
         )}
 
         <div className="relative px-6 py-10 sm:px-10 sm:py-12 lg:px-12">
-          {isNywe ? (
-            <div className="mb-6 inline-block rounded-lg bg-parchment-50 px-3 py-2 shadow-sm ring-1 ring-rose-900/10">
-              <NyweLogo mark="event" className="max-w-[220px]" imageClassName="max-h-10 w-auto" />
-            </div>
-          ) : (
-            <WhiskyAdvocateLogo variant="onDark" className="mb-6 max-w-[200px]" imageClassName="max-h-12" />
-          )}
-
-          <div
-            className={cn(
-              'mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em]',
-              isNywe
-                ? 'border-rose-400/30 bg-rose-950/50 text-rose-100'
-                : 'border-brass-500/30 bg-brass-950/40 text-brass-300',
+          <div className="mb-6 flex max-w-xl flex-col items-start gap-4">
+            {isNywe ? (
+              <NyweLogo variant="onDark" className="max-w-[220px]" imageClassName="max-h-10 w-auto" />
+            ) : (
+              <WhiskyAdvocateLogo variant="onDark" className="max-w-[200px]" imageClassName="max-h-12" />
             )}
-          >
-            <Landmark className="h-3.5 w-3.5" />
-            Accounts Receivable
+
+            <div
+              className={cn(
+                'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em]',
+                isNywe
+                  ? 'border-rose-400/30 bg-rose-950/50 text-rose-100'
+                  : 'border-brass-500/30 bg-brass-950/40 text-brass-300',
+              )}
+            >
+              <Landmark className="h-3.5 w-3.5" />
+              Accounts Receivable
+            </div>
           </div>
+
           <h1 className="font-display text-4xl font-medium tracking-tight text-parchment-50 sm:text-5xl">{title}</h1>
           <p className="mt-3 max-w-2xl text-lg leading-relaxed text-parchment-200/95 sm:text-xl">{subtitle}</p>
           <p className="mt-6 font-mono text-3xl font-semibold tabular-nums text-parchment-50 sm:text-4xl">

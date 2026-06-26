@@ -62,7 +62,10 @@ export function WineSpectatorHero({
               priority
               variant="onDark"
               className={cn('mb-5 max-w-sm sm:max-w-md', compact && 'mb-4 max-w-[11rem] sm:max-w-xs')}
-              imageClassName={cn('max-h-16 w-auto sm:max-h-[4.5rem]', compact && 'max-h-12 sm:max-h-14')}
+              imageClassName={cn(
+                'max-h-16 w-auto sm:max-h-[4.5rem]',
+                compact && 'max-h-12 sm:max-h-14',
+              )}
             />
             <p className="mb-3 font-sans text-xs uppercase tracking-[0.24em] text-brass-200">
               New York Wine Experience
