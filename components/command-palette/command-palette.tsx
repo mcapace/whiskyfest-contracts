@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 import { formatStatus } from '@/lib/status-display';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { StatusBadge } from '@/components/contracts/status-badge';
+import { usePortalKind } from '@/components/portal/portal-context';
 import type { ContractWithTotals } from '@/types/db';
 
 type ImpersonationCand = { email: string; name: string | null; role_description: string; segment: string };
@@ -101,9 +102,18 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
   const canImpersonate = Boolean(session?.user?.can_impersonate);
   const showAccounting = isAccounting || isAdmin;
   const pipeline = Boolean(session?.user?.pipeline_access);
-  const canSearchContracts = pipeline || isAccounting;
-  const canCreateContract = isAdmin || isEventsTeam || session?.user?.role === 'sales' || session?.user?.role === 'sales_rep';
+  const wineAccess = Boolean(session?.user?.wine_spectator_access);
+  const portalKind = usePortalKind();
+  const nywePortal = portalKind === 'nywe';
+  const canSearchContracts = nywePortal ? wineAccess || isAccounting || isAdmin : pipeline || isAccounting;
+  const canCreateContract = nywePortal
+    ? isAdmin || isEventsTeam || wineAccess
+    : isAdmin || isEventsTeam || session?.user?.role === 'sales' || session?.user?.role === 'sales_rep';
   const canGenerateReport = isAdmin || isEventsTeam || isAccounting;
+
+  function contractDetailPath(id: string) {
+    return nywePortal ? `/contracts/${id}` : `/contracts/${id}`;
+  }
 
   useEffect(() => {
     try {
@@ -254,18 +264,20 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
           >
             {canCreateContract && (
               <Command.Item
-                value="new contract create"
-                onSelect={() => go('/contracts/new')}
+                value={nywePortal ? 'new license vendor contract' : 'new contract create'}
+                onSelect={() => go(nywePortal ? '/contracts/new' : '/contracts/new')}
                 className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
               >
                 <Plus className="h-4 w-4 shrink-0 opacity-70" />
                 <div>
-                  <p className="font-medium">Create New Contract</p>
-                  <p className="text-xs text-muted-foreground">Create a participation contract</p>
+                  <p className="font-medium">{nywePortal ? 'Create New License' : 'Create New Contract'}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {nywePortal ? 'Start a NYWE vendor license' : 'Create a participation contract'}
+                  </p>
                 </div>
               </Command.Item>
             )}
-            {canCreateContract && (
+            {canCreateContract && !nywePortal && (
               <Command.Item
                 value="import contract legacy signed pdf"
                 onSelect={() => go('/contracts/import')}
@@ -302,7 +314,7 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 <p className="text-xs text-muted-foreground">Invert theme (full persistence in preferences)</p>
               </div>
             </Command.Item>
-            {canGenerateReport && (
+            {canGenerateReport && !nywePortal && (
               <Command.Item
                 value="generate report contracts export csv"
                 onSelect={() => go('/api/contracts/export')}
@@ -431,7 +443,7 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 <p className="text-xs text-muted-foreground">Contract pipeline</p>
               </div>
             </Command.Item>
-            {pipeline && (
+            {pipeline && !nywePortal && (
             <Command.Item
               value="all contracts list"
               onSelect={() => go('/contracts')}
@@ -457,7 +469,33 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 </div>
               </Command.Item>
             )}
-            {pipeline && (
+            {nywePortal && wineAccess && (
+            <Command.Item
+              value="all licenses nywe contracts"
+              onSelect={() => go('/contracts')}
+              className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
+            >
+              <FileText className="h-4 w-4 shrink-0 opacity-70" />
+              <div>
+                <p className="font-medium">Licenses</p>
+                <p className="text-xs text-muted-foreground">All NYWE vendor licenses</p>
+              </div>
+            </Command.Item>
+            )}
+            {nywePortal && wineAccess && (
+            <Command.Item
+              value="exhibitor roster nywe"
+              onSelect={() => go('/roster')}
+              className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
+            >
+              <Users className="h-4 w-4 shrink-0 opacity-70" />
+              <div>
+                <p className="font-medium">Exhibitor list</p>
+                <p className="text-xs text-muted-foreground">NYWE roster</p>
+              </div>
+            </Command.Item>
+            )}
+            {pipeline && !nywePortal && (
             <Command.Item
               value="sponsors directory"
               onSelect={() => go('/sponsors')}
@@ -470,7 +508,7 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
               </div>
             </Command.Item>
             )}
-            {(isAdmin || isEventsTeam) && (
+            {(isAdmin || isEventsTeam) && !nywePortal && (
               <Command.Item
                 value="floor plan"
                 onSelect={() => go('/floor-plan')}
@@ -483,7 +521,7 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 </div>
               </Command.Item>
             )}
-            {(isAdmin || isEventsTeam) && (
+            {(isAdmin || isEventsTeam) && !nywePortal && (
               <Command.Item
                 value="event items"
                 onSelect={() => go('/event-items')}
@@ -496,7 +534,7 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 </div>
               </Command.Item>
             )}
-            {isAdmin && (
+            {isAdmin && !nywePortal && (
               <>
                 <Command.Item
                   value="users app"
@@ -521,6 +559,19 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                   </div>
                 </Command.Item>
               </>
+            )}
+            {isAdmin && nywePortal && (
+              <Command.Item
+                value="events nywe admin"
+                onSelect={() => go('/events')}
+                className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
+              >
+                <Home className="h-4 w-4 shrink-0 opacity-70" />
+                <div>
+                  <p className="font-medium">Events</p>
+                  <p className="text-xs text-muted-foreground">NYWE event settings</p>
+                </div>
+              </Command.Item>
             )}
             <Command.Item
               value="settings"
@@ -559,7 +610,7 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                     value={`contract ${c.id} ${c.exhibitor_company_name} ${c.brands_poured ?? ''} ${signer} ${rep}`}
                     onSelect={() => {
                       rememberContract(c.id);
-                      go(`/contracts/${c.id}`);
+                      go(contractDetailPath(c.id));
                     }}
                     className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
                   >

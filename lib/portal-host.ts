@@ -96,9 +96,9 @@ export function nyweCrossDomainPath(pathname: string): string {
 const WHISKYFEST_ONLY_PREFIXES = [
   '/sales-reps',
   '/users',
-  '/events',
   '/contracts/import',
   '/admin',
+  '/sponsors',
 ];
 
 export function isWhiskyfestOnlyPath(pathname: string): boolean {
@@ -114,19 +114,60 @@ export function isWhiskyfestOnlyPath(pathname: string): boolean {
   return false;
 }
 
-export function postLoginPath(portalKind: PortalKind, user: {
+/** Paths that only exist on the NYWE hostname (block on WhiskyFest domain). */
+export function isNyweOnlyPath(pathname: string): boolean {
+  if (pathname === '/roster' || pathname.startsWith('/roster/')) return true;
+  if (pathname === '/wine-spectator' || pathname.startsWith('/wine-spectator/')) return true;
+  if (pathname === '/accounting/nywe' || pathname.startsWith('/accounting/nywe/')) return true;
+  return false;
+}
+
+export type PortalUserFlags = {
   pipeline_access?: boolean;
   is_accounting?: boolean;
   wine_spectator_access?: boolean;
   role?: string;
-}): string {
+};
+
+export function isFullPortalAdmin(user: PortalUserFlags): boolean {
+  return user.role === 'admin';
+}
+
+/** NYWE team member without WhiskyFest pipeline (admins excluded — they use both domains). */
+export function isNyweExclusiveUser(user: PortalUserFlags): boolean {
+  if (isFullPortalAdmin(user)) return false;
+  return Boolean(user.wine_spectator_access) && !Boolean(user.pipeline_access);
+}
+
+/** WhiskyFest sales/events user without NYWE access (admins excluded). */
+export function isWhiskyfestExclusiveUser(user: PortalUserFlags): boolean {
+  if (isFullPortalAdmin(user)) return false;
+  return Boolean(user.pipeline_access) && !Boolean(user.wine_spectator_access);
+}
+
+/** Accounting-only user who should use WhiskyFest AR on the WF domain (no NYWE portal access). */
+export function isWhiskyfestAccountingOnlyUser(user: PortalUserFlags): boolean {
+  if (isFullPortalAdmin(user)) return false;
+  const accountingOnly = Boolean(user.is_accounting) && !Boolean(user.pipeline_access);
+  return accountingOnly && !Boolean(user.wine_spectator_access);
+}
+
+/** Accounting-only user who should use NYWE AR on the NYWE domain. */
+export function isNyweAccountingOnlyUser(user: PortalUserFlags): boolean {
+  if (isFullPortalAdmin(user)) return false;
+  const accountingOnly = Boolean(user.is_accounting) && !Boolean(user.pipeline_access);
+  return accountingOnly && Boolean(user.wine_spectator_access);
+}
+
+export function productKeyForPortalKind(portalKind: PortalKind): 'wine_spectator' | 'whiskyfest' {
+  return portalKind === 'nywe' ? 'wine_spectator' : 'whiskyfest';
+}
+
+export function postLoginPath(portalKind: PortalKind, user: PortalUserFlags): string {
   const accountingOnly = Boolean(user.is_accounting) && !Boolean(user.pipeline_access);
   if (accountingOnly) {
-    return portalKind === 'nywe' ? '/accounting' : '/accounting';
+    return '/accounting';
   }
   if (portalKind === 'nywe') return '/';
-  if (user.wine_spectator_access && !user.pipeline_access && user.role !== 'admin') {
-    return '/wine-spectator';
-  }
   return '/';
 }

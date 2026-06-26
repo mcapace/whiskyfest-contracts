@@ -3,14 +3,20 @@ import { NextResponse } from 'next/server';
 import type { Session } from 'next-auth';
 import { IMPERSONATION_READ_ONLY_MESSAGE } from '@/lib/impersonation-read-only';
 import {
+  isNyweAccountingOnlyUser,
+  isNyweExclusiveUser,
   isNywePortalHost,
   isNywePortalPath,
+  isWhiskyfestAccountingOnlyUser,
+  isWhiskyfestExclusiveUser,
   isWhiskyfestOnlyPath,
+  isFullPortalAdmin,
   nyweCrossDomainPath,
   nyweInternalPath,
   nywePortalOrigin,
   nywePublicPath,
   portalKindFromHost,
+  whiskyfestPortalOrigin,
 } from '@/lib/portal-host';
 import { canAccessWineSpectator } from '@/lib/wine-spectator-access';
 
@@ -151,6 +157,37 @@ export default auth((req) => {
     if (nyweHost && !admin && !canAccessWineSpectator({ role: u.role, is_events_team: u.is_events_team, email: u.email })) {
       if (!accountingOnly) {
         return applyPortalHeader(NextResponse.redirect(new URL('/auth/login', req.nextUrl.origin)), host);
+      }
+    }
+
+    const portalUser = {
+      pipeline_access: u.pipeline_access,
+      is_accounting: u.is_accounting,
+      wine_spectator_access: canAccessWineSpectator({
+        role: u.role,
+        is_events_team: u.is_events_team,
+        email: u.email,
+      }),
+      role: u.role,
+    };
+
+    const crossPortalPath =
+      !pathname.startsWith('/api/') && !pathname.startsWith('/auth') && !pathname.startsWith('/_next');
+
+    if (crossPortalPath && !isFullPortalAdmin(portalUser)) {
+      if (!nyweHost && (isNyweExclusiveUser(portalUser) || isNyweAccountingOnlyUser(portalUser))) {
+        let targetPath = '/';
+        if (pathname.startsWith('/accounting')) {
+          targetPath = '/accounting';
+        } else if (!isWhiskyfestOnlyPath(pathname) && pathname !== '/') {
+          targetPath = nyweCrossDomainPath(pathname);
+        }
+        return applyPortalHeader(NextResponse.redirect(`${nywePortalOrigin()}${targetPath}`), host);
+      }
+
+      if (nyweHost && (isWhiskyfestExclusiveUser(portalUser) || isWhiskyfestAccountingOnlyUser(portalUser))) {
+        const dest = `${whiskyfestPortalOrigin()}/`;
+        return applyPortalHeader(NextResponse.redirect(dest), host);
       }
     }
   }

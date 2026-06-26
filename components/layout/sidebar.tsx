@@ -23,12 +23,9 @@ import { cn } from '@/lib/utils';
 import {
   isAccountingPath,
   isWineSpectatorPath,
-  productDisplayLabel,
-  PRODUCT_WINE_SPECTATOR,
-  PRODUCT_WHISKYFEST,
 } from '@/lib/product-portal';
 import { isNyweAccountingPath } from '@/lib/accounting-portal';
-import { nyweHref, nywePortalOrigin, type PortalKind } from '@/lib/portal-host';
+import { nyweHref, type PortalKind } from '@/lib/portal-host';
 import { usePortalKind } from '@/components/portal/portal-context';
 import {
   DropdownMenu,
@@ -121,12 +118,15 @@ const wineSpectatorNav: SidebarNavItem[] = [
   { href: '/wine-spectator/contracts', label: 'All licenses', icon: FileText },
   { href: '/settings', label: 'Settings', icon: Settings },
   { href: '/events', label: 'Events', icon: CalendarDays, adminOnly: true, wineSpectatorAdminOk: true },
-  { href: '/users', label: 'Users', icon: Users, adminOnly: true },
 ];
 
-const accountingNav: SidebarNavItem[] = [
-  { href: '/accounting', label: 'WhiskyFest AR', icon: Landmark },
-  { href: '/accounting/nywe', label: 'NYWE AR', icon: Landmark },
+const whiskyfestAccountingNav: SidebarNavItem[] = [
+  { href: '/accounting', label: 'Accounts receivable', icon: Landmark },
+  { href: '/settings', label: 'Settings', icon: Settings },
+];
+
+const nyweAccountingNav: SidebarNavItem[] = [
+  { href: '/accounting/nywe', label: 'Accounts receivable', icon: Landmark },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -196,7 +196,6 @@ export function Sidebar({
   const pipelineAccess = Boolean(user.pipelineAccess);
   const isAccounting = Boolean(user.isAccounting);
   const canAccounting = isAccounting || isAdmin;
-  const canWineSpectator = Boolean(user.wineSpectatorAccess);
   const accountingOnly = isAccounting && !pipelineAccess;
   const nywePortal = portalKind === 'nywe';
   const accountingPortal = isAccountingPath(pathname) || (nywePortal && pathname.startsWith('/accounting'));
@@ -208,10 +207,9 @@ export function Sidebar({
     : wineSpectatorPortal
       ? nyweHref('/wine-spectator', portalKind)
       : '/';
+  const accountingNavItems = nywePortal ? nyweAccountingNav : whiskyfestAccountingNav;
   const rawNav = accountingPortal
-    ? nywePortal
-      ? accountingNav.filter((item) => item.href.startsWith('/accounting/nywe') || item.href === '/settings')
-      : accountingNav
+    ? accountingNavItems
     : wineSpectatorPortal
       ? wineSpectatorNav
       : whiskyfestNav;
@@ -256,7 +254,7 @@ export function Sidebar({
       <nav className="flex-1 space-y-0.5 px-3 py-5">
         {accountingOnly ? (
           <div className="space-y-1">
-            {mapNavForPortal(accountingNav, portalKind).map((item) => {
+            {mapNavForPortal(accountingNavItems, portalKind).map((item) => {
               const active = portalNavLinkActive(pathname, item.href);
               const Icon = item.icon;
               return (
@@ -278,52 +276,6 @@ export function Sidebar({
           </div>
         ) : (
           <>
-            {!nywePortal ? (
-            <div className="mb-5 space-y-1">
-              <p className="mb-2 px-[10px] wf-label-caps text-[10px]">Portal</p>
-              <Link
-                href="/"
-                className={cn(
-                  'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
-                  !wineSpectatorPortal && !accountingPortal
-                    ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
-                    : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
-                )}
-              >
-                <span className="text-xs font-semibold uppercase tracking-wide">
-                  {productDisplayLabel(PRODUCT_WHISKYFEST)}
-                </span>
-              </Link>
-              {canWineSpectator ? (
-                <Link
-                  href={nywePortalOrigin()}
-                  className={cn(
-                    'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
-                    wineSpectatorPortal
-                      ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
-                      : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
-                  )}
-                >
-                  <span className="text-xs font-semibold uppercase tracking-wide">
-                    {productDisplayLabel(PRODUCT_WINE_SPECTATOR)}
-                  </span>
-                </Link>
-              ) : null}
-              {canAccounting ? (
-                <Link
-                  href="/accounting"
-                  className={cn(
-                    'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
-                    accountingPortal
-                      ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
-                      : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
-                  )}
-                >
-                  <span className="text-xs font-semibold uppercase tracking-wide">Accounting</span>
-                </Link>
-              ) : null}
-            </div>
-            ) : null}
             {nav
               .filter((item) => {
                 if ('adminOnly' in item && item.adminOnly) {
@@ -377,6 +329,20 @@ export function Sidebar({
                   </Link>
                 );
               })}
+            {canAccounting && !nywePortal && !accountingPortal && !accountingOnly && (
+              <Link
+                href="/accounting"
+                className={cn(
+                  'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
+                  portalNavLinkActive(pathname, '/accounting')
+                    ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
+                    : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
+                )}
+              >
+                <Landmark className="h-4 w-4 text-muted-foreground/70" />
+                Accounts receivable
+              </Link>
+            )}
             {isAdmin ? (
               <div className="pt-6">
                 <p className="mb-2 px-[10px] wf-label-caps text-[10px]">Admin</p>

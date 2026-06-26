@@ -3,6 +3,8 @@ import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { resolveContractActor } from '@/lib/auth-contract';
+import { portalKindFromHost, productKeyForPortalKind } from '@/lib/portal-host';
+import { scopeContractsByProduct } from '@/lib/product-portal';
 import { clearedRepEnteredBilling, newContractBodySchema, sponsorBrandFromBody } from '@/lib/contract-schemas';
 import {
   normalizeSignerCcEmail,
@@ -92,7 +94,16 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ contracts: data ?? [] });
+  const portalKind = portalKindFromHost(req.headers.get('host'));
+  const productKey = productKeyForPortalKind(portalKind);
+  const { data: eventsData } = await supabase.from('events').select('*');
+  const scoped = scopeContractsByProduct(
+    (data ?? []) as ContractWithTotals[],
+    (eventsData ?? []) as Event[],
+    productKey,
+  );
+
+  return NextResponse.json({ contracts: scoped });
 }
 
 export async function POST(req: Request) {

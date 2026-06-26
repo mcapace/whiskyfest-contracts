@@ -46,6 +46,21 @@ The NYWE vendor licenses portal runs on the **same Vercel deployment** as Whisky
 
 WhiskyFest-only paths (`/sales-reps`, `/events`, etc.) redirect to `/` on the NYWE host. Visiting `/wine-spectator/*` on the WhiskyFest host redirects to the NYWE domain with clean paths.
 
+### Portal independence
+
+Each hostname behaves as its own product surface:
+
+| | WhiskyFest domain | NYWE domain |
+| --- | --- | --- |
+| Dashboard | WF pipeline | NYWE licenses |
+| Contracts / roster | WF contracts | NYWE licenses + roster |
+| Accounting | WhiskyFest AR only | NYWE AR only |
+| Events admin | WhiskyFest events only | NYWE events only |
+| Users / sponsors / import | Yes | Blocked (redirect) |
+| Cross-links in UI | None to NYWE | None to WhiskyFest |
+
+Users with access to **only one** product are redirected to the correct domain. **Admins** can use both domains (separate login sessions per domain). Contract search API results are scoped to the current domain's product.
+
 ### DNS + Vercel
 
 1. In Vercel → Project → Settings → Domains, add `nywecontracts.winespectator.com`.
