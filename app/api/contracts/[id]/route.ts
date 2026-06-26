@@ -20,6 +20,7 @@ import {
 import type { Contract, ContractStatus } from '@/types/db';
 import { isLegacyImportedContract } from '@/lib/legacy-import';
 import { billingFieldsFromOptionalBody } from '@/lib/nywe-billing';
+import { refreshNyweBillingFromRosterForContract } from '@/lib/nywe-roster-billing-sync';
 import { applyNyweLicensePricingIfNeeded, isNyweVendorEvent, signerTitleForContract } from '@/lib/nywe-pricing';
 import type { Event } from '@/types/db';
 
@@ -82,33 +83,34 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
 
     const incomingBoothRate = p.booth_rate_cents;
-    const bill = clearedRepEnteredBilling();
     const { data: patchEvent } = await supabase
       .from('events')
       .select('contract_template_profile, booth_rate_cents')
       .eq('id', p.event_id)
       .maybeSingle<Pick<Event, 'contract_template_profile' | 'booth_rate_cents'>>();
+    const nyweEvent = patchEvent && isNyweVendorEvent(patchEvent);
+    const bill = nyweEvent ? {} : clearedRepEnteredBilling();
     const nywePricing = patchEvent
       ? applyNyweLicensePricingIfNeeded(patchEvent, {
           booth_count: p.booth_count,
           booth_rate_cents: incomingBoothRate,
         })
       : { booth_count: p.booth_count, booth_rate_cents: incomingBoothRate };
-    const nyweLineItems = patchEvent && isNyweVendorEvent(patchEvent) ? [] : (p.line_items ?? []);
     const boothRateChanged = nywePricing.booth_rate_cents !== contract.booth_rate_cents;
+    const nyweLineItems = nyweEvent ? [] : (p.line_items ?? []);
     const shouldResetDiscountApproval =
-      !isNyweVendorEvent(patchEvent) &&
+      !nyweEvent &&
       boothRateChanged &&
       (nywePricing.booth_rate_cents >= STANDARD_BOOTH_RATE_CENTS ||
         nywePricing.booth_rate_cents < contract.booth_rate_cents);
 
-    const nyweBilling =
-      patchEvent && isNyweVendorEvent(patchEvent) ? billingFieldsFromOptionalBody(p) : null;
+    const nyweBilling = nyweEvent ? billingFieldsFromOptionalBody(p) : null;
 
-    const nyweEvent = patchEvent && isNyweVendorEvent(patchEvent);
     if (nyweEvent) {
       effectiveSalesRepId = null;
     }
+
+    const reopeningVoided = contract.status === 'voided';
 
     const { error } = await supabase
       .from('contracts')
@@ -129,14 +131,22 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         sales_rep_id: effectiveSalesRepId,
         notes: p.notes ?? null,
         exhibitor_notes: p.exhibitor_notes?.trim() || null,
-        ...(contract.status === 'voided'
+        ...(reopeningVoided
           ? {
               status: 'draft',
               docusign_envelope_id: null,
               sent_at: null,
+              signed_at: null,
+              countersigned_at: null,
+              countersigned_by_email: null,
+              countersigned_by_name: null,
+              executed_at: null,
               voided_at: null,
               voided_by: null,
               voided_reason: null,
+              events_approved_at: null,
+              events_approved_by: null,
+              events_approval_reason: null,
             }
           : {}),
         ...bill,
@@ -195,6 +205,18 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     });
 
     revalidateContractPaths(params.id);
+
+    if (reopeningVoided && patchEvent && nyweEvent) {
+      const { data: withTotals } = await supabase
+        .from('contracts_with_totals')
+        .select('*')
+        .eq('id', params.id)
+        .maybeSingle();
+      if (withTotals) {
+        await refreshNyweBillingFromRosterForContract(supabase, withTotals, patchEvent as Event);
+      }
+    }
+
     if (contract.status === 'voided') {
       await supabase.from('audit_log').insert({
         contract_id: params.id,

@@ -104,6 +104,8 @@ interface Props {
   eventsManagedWorkflow?: boolean;
   /** When false, DocuSign send is blocked for this event (internal prep). */
   clientSendEnabled?: boolean;
+  /** Product portal base path, e.g. `/wine-spectator` for NYWE. */
+  portalBasePath?: string;
   /** When set, contract was imported from a legacy signed PDF (skips DocuSign send). */
   importedAt?: string | null;
 }
@@ -141,8 +143,10 @@ export function ContractActions({
   isEventsTeam,
   eventsManagedWorkflow = false,
   clientSendEnabled = true,
+  portalBasePath = '',
   importedAt = null,
 }: Props) {
+  const contractEditHref = `${portalBasePath}/contracts/${contractId}/edit`;
   const legacyImport = Boolean(importedAt?.trim());
   const router = useRouter();
   const { data: session } = useSession();
@@ -181,7 +185,7 @@ export function ContractActions({
         emitContractActionSuccessFeedback(Boolean(session?.user?.sound_enabled));
         setOpenRecall(false);
         setRecallReason('');
-        router.push(`/contracts/${contractId}/edit`);
+        router.push(contractEditHref);
         router.refresh();
       } else {
         contractLive?.setOptimisticStatus(null);
@@ -352,7 +356,7 @@ export function ContractActions({
               ) : (
                 <ActionWithHelp helpText={CONTRACT_ACTION_HELP.editContract}>
                   <Button className={btnSecondary} asChild>
-                    <Link href={`/contracts/${contractId}/edit`}>
+                    <Link href={contractEditHref}>
                       <ContractActionButtonLabel icon={Pencil} label="Edit Contract" />
                     </Link>
                   </Button>
@@ -611,7 +615,7 @@ export function ContractActions({
           {canEditImported && (
             <ActionWithHelp helpText={CONTRACT_ACTION_HELP.editImportedContract}>
               <Button className={btnSecondary} asChild>
-                <Link href={`/contracts/${contractId}/edit`}>
+                <Link href={contractEditHref}>
                   <ContractActionButtonLabel icon={Pencil} label="Edit imported details" />
                 </Link>
               </Button>
@@ -647,7 +651,7 @@ export function ContractActions({
           {canEditVoided && (
             <ActionWithHelp helpText={CONTRACT_ACTION_HELP.editVoidedContract}>
               <Button className={btnSecondary} asChild>
-                <Link href={`/contracts/${contractId}/edit`}>
+                <Link href={contractEditHref}>
                   <ContractActionButtonLabel icon={Repeat2} label="Edit and re-send" />
                 </Link>
               </Button>

@@ -300,6 +300,7 @@ export function ContractDetailView({
                 isEventsTeam={isEventsTeam}
                 eventsManagedWorkflow={eventsManagedWorkflow}
                 clientSendEnabled={clientSendEnabled}
+                portalBasePath={portalBasePath}
                 importedAt={contract.imported_at}
               />
             </div>
