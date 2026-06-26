@@ -128,9 +128,11 @@ export async function applyExhibitorPartialSignature(
   }
 
   if (options?.notify !== false) {
-    void notifyPartialSignature(contract, event).catch((err) =>
-      console.error('[notifyPartialSignature]', err),
-    );
+    if (!event || !isNyweEventsManagedEvent(event)) {
+      void notifyPartialSignature(contract, event).catch((err) =>
+        console.error('[notifyPartialSignature]', err),
+      );
+    }
   }
 
   return { updated: true };

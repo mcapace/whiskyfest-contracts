@@ -10,9 +10,14 @@ import {
   workspaceLabelForEvent,
   type EventEmailContext,
 } from '@/lib/product-email';
-import { isEventsManagedWorkflow, isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
-import { NYWE_COUNTERSIGNER_EMAILS } from '@/lib/nywe-auto-release-accounting';
+import { isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import {
+  mergeAssistantCc,
+  resolveNotificationRecipients,
+  type ContractNotificationContext,
+  type NotificationKind,
+} from '@/lib/notification-routing';
 import { formatCurrency } from '@/lib/utils';
 import type { Contract, Event } from '@/types/db';
 
@@ -38,33 +43,63 @@ function formatCents(n: number): string {
   return `$${(n / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-/** Active events-team inboxes for workflow notifications. */
-async function getActiveEventsTeamEmails(): Promise<string[]> {
-  const supabase = getSupabaseAdmin();
-  const { data: members } = await supabase
-    .from('app_users')
-    .select('email')
-    .eq('is_events_team', true)
-    .eq('is_active', true);
-
-  return [
-    ...new Set(
-      (members ?? [])
-        .map((m) => String((m as { email: string }).email ?? '').trim().toLowerCase())
-        .filter(Boolean),
-    ),
-  ];
+function contractNotifyContext(
+  contract: { id?: string; event_id?: string | null; sales_rep_id?: string | null; created_by?: string | null },
+  event?: Partial<Pick<Event, 'workflow_profile' | 'product_key' | 'shanken_signatory_email'>> | null,
+  createdBy?: string | null,
+): ContractNotificationContext {
+  return {
+    contractId: contract.id,
+    eventId: contract.event_id,
+    salesRepId: contract.sales_rep_id ?? null,
+    createdBy: createdBy ?? contract.created_by ?? null,
+    event: event ?? null,
+  };
 }
 
-async function eventUsesEventsManagedWorkflow(eventId: string | null | undefined): Promise<boolean> {
-  if (!eventId) return false;
-  const supabase = getSupabaseAdmin();
-  const { data: event } = await supabase
-    .from('events')
-    .select('workflow_profile')
-    .eq('id', eventId)
-    .maybeSingle();
-  return isEventsManagedWorkflow((event ?? { workflow_profile: 'sales_rep' }) as Pick<Event, 'workflow_profile'>);
+async function sendRoutedContractEmail(params: {
+  kind: NotificationKind;
+  ctx: ContractNotificationContext;
+  logLabel: string;
+  from: { email: string; name: string };
+  subject: string;
+  text: string;
+  html: string;
+  /** WhiskyFest only — CC rep assistants on rep-owned mail. */
+  assistantRepId?: string | null;
+}): Promise<void> {
+  const apiKey = process.env['SENDGRID_API_KEY'];
+  if (!apiKey) {
+    console.warn(`[${params.logLabel}] SENDGRID_API_KEY not set — skipping email`);
+    return;
+  }
+
+  let routed = await resolveNotificationRecipients(params.kind, params.ctx);
+  if (routed.skip) {
+    console.info(`[${params.logLabel}] skipped — ${routed.skipReason ?? 'no recipients'}`);
+    return;
+  }
+
+  if (params.assistantRepId) {
+    const assistants = await getAssistantEmailsForRep(params.assistantRepId);
+    routed = mergeAssistantCc(routed, assistants);
+  }
+
+  if (routed.to.length === 0) {
+    console.warn(`[${params.logLabel}] No recipients — skipping`);
+    return;
+  }
+
+  sgMail.setApiKey(apiKey);
+  await sgMail.send({
+    from: params.from,
+    to: routed.to,
+    ...(routed.cc.length > 0 ? { cc: routed.cc } : {}),
+    ...(routed.bcc.length > 0 ? { bcc: routed.bcc } : {}),
+    subject: params.subject,
+    text: params.text,
+    html: params.html,
+  });
 }
 
 /** Active app_users assistant emails mapped to support this rep's contracts. */
@@ -190,19 +225,9 @@ export async function notifySalesRepDiscountApproved(
   }
 
   if (!contract.sales_rep_id) {
-    return;
+    const routed = await resolveNotificationRecipients('discount_approved', contractNotifyContext(contract));
+    if (routed.skip || routed.to.length === 0) return;
   }
-
-  const supabase = getSupabaseAdmin();
-  const { data: rep } = await supabase.from('sales_reps').select('email').eq('id', contract.sales_rep_id).maybeSingle();
-
-  const toAddress = rep?.email?.trim();
-  if (!toAddress) {
-    console.warn('[notifySalesRepDiscountApproved] No sales rep email — skipping');
-    return;
-  }
-
-  sgMail.setApiKey(apiKey);
 
   const mail = await contractMailMeta(contract);
   const detailUrl = mail.detailUrl;
@@ -241,17 +266,15 @@ export async function notifySalesRepDiscountApproved(
     </div>
   `;
 
-  const ccAssistants = (await getAssistantEmailsForRep(contract.sales_rep_id)).filter(
-    (a) => a.toLowerCase() !== toAddress.toLowerCase(),
-  );
-
-  await sgMail.send({
+  await sendRoutedContractEmail({
+    kind: 'discount_approved',
+    ctx: contractNotifyContext(contract),
+    logLabel: 'notifySalesRepDiscountApproved',
     from: mail.from,
-    to: toAddress,
-    ...(ccAssistants.length > 0 ? { cc: ccAssistants } : {}),
     subject,
     text,
     html,
+    assistantRepId: contract.sales_rep_id,
   });
 }
 
@@ -278,43 +301,6 @@ export async function notifyPartialSignature(
 
   const nywe = event ? isNyweEventsManagedEvent(event) : false;
   const mail = await contractMailMeta(contract, event);
-  const supabase = getSupabaseAdmin();
-
-  const { data: eventsTeam } = await supabase
-    .from('app_users')
-    .select('email')
-    .eq('is_events_team', true)
-    .eq('is_active', true);
-
-  const recipientSet = new Set<string>(
-    (eventsTeam ?? []).map((u) => String((u as { email: string }).email ?? '').trim().toLowerCase()).filter(Boolean),
-  );
-
-  let repEmail = contract.sales_rep_email?.trim().toLowerCase() ?? null;
-  if (!repEmail && contract.sales_rep_id) {
-    const { data: repRow } = await supabase.from('sales_reps').select('email').eq('id', contract.sales_rep_id).maybeSingle();
-    repEmail = repRow?.email?.trim().toLowerCase() ?? null;
-  }
-
-  if (repEmail) recipientSet.add(repEmail);
-
-  if (contract.sales_rep_id) {
-    const assistants = await getAssistantEmailsForRep(contract.sales_rep_id);
-    for (const a of assistants) recipientSet.add(a);
-  }
-
-  const countersignerEmail = event?.shanken_signatory_email?.trim().toLowerCase();
-  if (nywe && countersignerEmail) {
-    recipientSet.add(countersignerEmail);
-  }
-
-  const recipients = [...recipientSet];
-  if (recipients.length === 0) {
-    console.warn('[notifyPartialSignature] No recipients — skipping');
-    return;
-  }
-
-  sgMail.setApiKey(apiKey);
 
   const eventTitle = event ? `${event.name} ${event.year}`.trim() : 'WhiskyFest';
   const detailUrl = mail.detailUrl;
@@ -358,12 +344,15 @@ export async function notifyPartialSignature(
     </div>
   `;
 
-  await sgMail.send({
+  await sendRoutedContractEmail({
+    kind: 'partial_signature',
+    ctx: contractNotifyContext(contract, event),
+    logLabel: 'notifyPartialSignature',
     from: mail.from,
-    to: recipients,
     subject,
     text,
     html,
+    assistantRepId: nywe ? null : contract.sales_rep_id,
   });
 }
 
@@ -390,37 +379,6 @@ export async function notifyContractFullySigned(
   }
 
   const mail = await contractMailMeta(contract, event);
-  const supabase = getSupabaseAdmin();
-
-  const { data: eventsTeam } = await supabase
-    .from('app_users')
-    .select('email')
-    .eq('is_events_team', true)
-    .eq('is_active', true);
-
-  const recipientSet = new Set<string>(
-    (eventsTeam ?? []).map((u) => String((u as { email: string }).email ?? '').trim().toLowerCase()).filter(Boolean),
-  );
-
-  let repEmail = contract.sales_rep_email?.trim().toLowerCase() ?? null;
-  if (!repEmail && contract.sales_rep_id) {
-    const { data: repRow } = await supabase.from('sales_reps').select('email').eq('id', contract.sales_rep_id).maybeSingle();
-    repEmail = repRow?.email?.trim().toLowerCase() ?? null;
-  }
-  if (repEmail) recipientSet.add(repEmail);
-
-  if (contract.sales_rep_id) {
-    const assistants = await getAssistantEmailsForRep(contract.sales_rep_id);
-    for (const a of assistants) recipientSet.add(a);
-  }
-
-  const recipients = [...recipientSet];
-  if (recipients.length === 0) {
-    console.warn('[notifyContractFullySigned] No recipients — skipping');
-    return;
-  }
-
-  sgMail.setApiKey(apiKey);
 
   const eventTitle = event ? `${event.name} ${event.year}`.trim() : 'WhiskyFest';
   const company = contract.exhibitor_company_name.trim();
@@ -471,12 +429,15 @@ export async function notifyContractFullySigned(
     </div>
   `;
 
-  await sgMail.send({
+  await sendRoutedContractEmail({
+    kind: 'fully_signed',
+    ctx: contractNotifyContext(contract, event),
+    logLabel: 'notifyContractFullySigned',
     from: mail.from,
-    to: recipients,
     subject,
     text,
     html,
+    assistantRepId: contract.sales_rep_id,
   });
 }
 
@@ -493,22 +454,6 @@ export async function notifyEventsTeamOfPendingReview(
   const apiKey = process.env['SENDGRID_API_KEY'];
   if (!apiKey) {
     console.warn('[notifyEventsTeamOfPendingReview] SENDGRID_API_KEY not set — skipping email');
-    return;
-  }
-
-  const supabase = getSupabaseAdmin();
-  const { data: members } = await supabase
-    .from('app_users')
-    .select('email')
-    .eq('is_events_team', true)
-    .eq('is_active', true);
-
-  const recipients = (members ?? [])
-    .map((m) => String((m as { email: string }).email ?? '').trim().toLowerCase())
-    .filter(Boolean);
-
-  if (recipients.length === 0) {
-    console.warn('[notifyEventsTeamOfPendingReview] No events team recipients — skipping');
     return;
   }
 
@@ -562,9 +507,11 @@ export async function notifyEventsTeamOfPendingReview(
     </div>
   `;
 
-  await sgMail.send({
+  await sendRoutedContractEmail({
+    kind: 'pending_review',
+    ctx: contractNotifyContext(contract),
+    logLabel: 'notifyEventsTeamOfPendingReview',
     from: mail.from,
-    to: recipients,
     subject,
     text,
     html,
@@ -580,13 +527,6 @@ export async function notifySalesRepEventsApproved(
     console.warn('[notifySalesRepEventsApproved] SENDGRID_API_KEY not set — skipping email');
     return;
   }
-
-  if (!contract.sales_rep_id) return;
-
-  const supabase = getSupabaseAdmin();
-  const { data: rep } = await supabase.from('sales_reps').select('email').eq('id', contract.sales_rep_id).maybeSingle();
-  const toAddress = rep?.email?.trim();
-  if (!toAddress) return;
 
   sgMail.setApiKey(apiKey);
   const mail = await contractMailMeta(contract);
@@ -613,17 +553,15 @@ export async function notifySalesRepEventsApproved(
     </div>
   `;
 
-  const ccAssistants = (await getAssistantEmailsForRep(contract.sales_rep_id)).filter(
-    (a) => a.toLowerCase() !== toAddress.toLowerCase(),
-  );
-
-  await sgMail.send({
+  await sendRoutedContractEmail({
+    kind: 'events_approved',
+    ctx: contractNotifyContext(contract),
+    logLabel: 'notifySalesRepEventsApproved',
     from: mail.from,
-    to: toAddress,
-    ...(ccAssistants.length > 0 ? { cc: ccAssistants } : {}),
     subject,
     text,
     html,
+    assistantRepId: contract.sales_rep_id,
   });
 }
 
@@ -638,13 +576,6 @@ export async function notifySalesRepContractRecalled(params: {
     console.warn('[notifySalesRepContractRecalled] SENDGRID_API_KEY not set — skipping email');
     return;
   }
-
-  if (!params.contract.sales_rep_id) return;
-
-  const supabase = getSupabaseAdmin();
-  const { data: rep } = await supabase.from('sales_reps').select('email').eq('id', params.contract.sales_rep_id).maybeSingle();
-  const toAddress = rep?.email?.trim();
-  if (!toAddress) return;
 
   sgMail.setApiKey(apiKey);
   const mail = await contractMailMeta(params.contract, params.event);
@@ -676,17 +607,15 @@ export async function notifySalesRepContractRecalled(params: {
     </div>
   `;
 
-  const ccAssistants = (await getAssistantEmailsForRep(params.contract.sales_rep_id)).filter(
-    (a) => a.toLowerCase() !== toAddress.toLowerCase(),
-  );
-
-  await sgMail.send({
+  await sendRoutedContractEmail({
+    kind: 'contract_recalled',
+    ctx: contractNotifyContext(params.contract, params.event),
+    logLabel: 'notifySalesRepContractRecalled',
     from: mail.from,
-    to: toAddress,
-    ...(ccAssistants.length > 0 ? { cc: ccAssistants } : {}),
     subject,
     text,
     html,
+    assistantRepId: params.contract.sales_rep_id,
   });
 }
 
@@ -700,13 +629,6 @@ export async function notifySalesRepContractSentBack(
     console.warn('[notifySalesRepContractSentBack] SENDGRID_API_KEY not set — skipping email');
     return;
   }
-
-  if (!contract.sales_rep_id) return;
-
-  const supabase = getSupabaseAdmin();
-  const { data: rep } = await supabase.from('sales_reps').select('email').eq('id', contract.sales_rep_id).maybeSingle();
-  const toAddress = rep?.email?.trim();
-  if (!toAddress) return;
 
   sgMail.setApiKey(apiKey);
   const mail = await contractMailMeta(contract);
@@ -734,17 +656,15 @@ export async function notifySalesRepContractSentBack(
     </div>
   `;
 
-  const ccAssistants = (await getAssistantEmailsForRep(contract.sales_rep_id)).filter(
-    (a) => a.toLowerCase() !== toAddress.toLowerCase(),
-  );
-
-  await sgMail.send({
+  await sendRoutedContractEmail({
+    kind: 'contract_sent_back',
+    ctx: contractNotifyContext(contract),
+    logLabel: 'notifySalesRepContractSentBack',
     from: mail.from,
-    to: toAddress,
-    ...(ccAssistants.length > 0 ? { cc: ccAssistants } : {}),
     subject,
     text,
     html,
+    assistantRepId: contract.sales_rep_id,
   });
 }
 
@@ -769,27 +689,11 @@ export async function notifyContractVoided(params: {
   }
 
   const mail = await contractMailMeta(params.contract, params.event);
-  const supabase = getSupabaseAdmin();
   const detailUrl = mail.detailUrl;
   const eventTitle = params.event ? `${params.event.name} ${params.event.year}`.trim() : 'WhiskyFest';
   const company = params.contract.exhibitor_company_name;
   const voider = params.voidedBy.name ? `${params.voidedBy.name} <${params.voidedBy.email}>` : params.voidedBy.email;
   const atLabel = new Date(params.voidedAtIso).toLocaleString('en-US');
-
-  let repEmail = params.contract.sales_rep_email?.trim().toLowerCase() ?? null;
-  if (!repEmail && params.contract.sales_rep_id) {
-    const { data: repRow } = await supabase.from('sales_reps').select('email').eq('id', params.contract.sales_rep_id).maybeSingle();
-    repEmail = repRow?.email?.trim().toLowerCase() ?? null;
-  }
-
-  const { data: eventsRows } = await supabase
-    .from('app_users')
-    .select('email')
-    .eq('is_events_team', true)
-    .eq('is_active', true);
-  const eventRecipients = (eventsRows ?? [])
-    .map((u) => String((u as { email: string }).email ?? '').trim().toLowerCase())
-    .filter(Boolean);
 
   sgMail.setApiKey(apiKey);
 
@@ -819,66 +723,31 @@ export async function notifyContractVoided(params: {
     </div>
   `;
 
-  if (repEmail) {
-    const ccAssistants = params.contract.sales_rep_id
-      ? (await getAssistantEmailsForRep(params.contract.sales_rep_id)).filter((a) => a.toLowerCase() !== repEmail!.toLowerCase())
-      : [];
-    await sgMail.send({
-      from: mail.from,
-      to: repEmail,
-      ...(ccAssistants.length > 0 ? { cc: ccAssistants } : {}),
-      subject,
-      text,
-      html,
-    });
-  }
+  const ctx = contractNotifyContext(params.contract, params.event);
 
-  if (eventRecipients.length > 0) {
-    await sgMail.send({
-      from: mail.from,
-      to: eventRecipients,
-      subject: `${company} contract voided — visibility`,
-      text,
-      html,
-    });
-  }
+  await sendRoutedContractEmail({
+    kind: 'contract_voided',
+    ctx,
+    logLabel: 'notifyContractVoided',
+    from: mail.from,
+    subject,
+    text,
+    html,
+    assistantRepId: params.contract.sales_rep_id,
+  });
+
+  await sendRoutedContractEmail({
+    kind: 'contract_voided_visibility',
+    ctx,
+    logLabel: 'notifyContractVoided.visibility',
+    from: mail.from,
+    subject: `${company} contract voided — visibility`,
+    text,
+    html,
+  });
 }
 
-async function invoiceNotificationRecipients(params: {
-  salesRepId: string | null;
-  eventId: string | null | undefined;
-  createdBy?: string | null;
-}): Promise<{ recipients: string[]; eventsManaged: boolean }> {
-  const supabase = getSupabaseAdmin();
-  const eventsManaged = await eventUsesEventsManagedWorkflow(params.eventId);
-  const recipientSet = new Set<string>();
-
-  if (params.salesRepId) {
-    const { data: rep } = await supabase.from('sales_reps').select('email').eq('id', params.salesRepId).maybeSingle();
-    const repEmail = rep?.email?.trim().toLowerCase();
-    if (repEmail) recipientSet.add(repEmail);
-  }
-
-  if (eventsManaged) {
-    const configured = process.env['EVENTS_MANAGED_INVOICE_NOTIFICATION_EMAILS']?.trim();
-    if (configured) {
-      for (const email of configured.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)) {
-        recipientSet.add(email);
-      }
-    } else {
-      const creator = params.createdBy?.trim().toLowerCase();
-      if (creator) recipientSet.add(creator);
-    }
-  }
-
-  for (const countersigner of NYWE_COUNTERSIGNER_EMAILS) {
-    recipientSet.delete(countersigner);
-  }
-
-  return { recipients: [...recipientSet], eventsManaged };
-}
-
-/** Sales rep / events-team notification when AR marks invoice sent. */
+/** Sales rep / ops notification when AR marks invoice sent. */
 export async function notifySalesRepInvoiceSent(params: {
   contractId: string;
   companyName: string;
@@ -903,19 +772,6 @@ export async function notifySalesRepInvoiceSent(params: {
   const eventId = params.eventId ?? (contractRow as { event_id?: string } | null)?.event_id;
   const createdBy = params.createdBy ?? (contractRow as { created_by?: string } | null)?.created_by ?? null;
 
-  const { recipients, eventsManaged } = await invoiceNotificationRecipients({
-    salesRepId: params.salesRepId,
-    eventId,
-    createdBy,
-  });
-
-  if (recipients.length === 0) {
-    if (!params.salesRepId && !eventsManaged) return;
-    console.warn('[notifySalesRepInvoiceSent] No recipients — skipping');
-    return;
-  }
-
-  sgMail.setApiKey(apiKey);
   const eventCtx = await loadEventEmailContext(eventId);
   const mail = {
     from: sendGridFromForEvent(eventCtx),
@@ -943,20 +799,20 @@ export async function notifySalesRepInvoiceSent(params: {
     </div>
   `;
 
-  const ccAssistants =
-    params.salesRepId && !eventsManaged
-      ? (await getAssistantEmailsForRep(params.salesRepId)).filter(
-          (a) => !recipients.map((r) => r.toLowerCase()).includes(a.toLowerCase()),
-        )
-      : [];
-
-  await sgMail.send({
+  await sendRoutedContractEmail({
+    kind: 'invoice_sent',
+    ctx: {
+      contractId: params.contractId,
+      eventId,
+      salesRepId: params.salesRepId,
+      createdBy,
+    },
+    logLabel: 'notifySalesRepInvoiceSent',
     from: mail.from,
-    to: recipients,
-    ...(ccAssistants.length > 0 ? { cc: ccAssistants } : {}),
     subject,
     text,
     html,
+    assistantRepId: params.salesRepId,
   });
 }
 
@@ -983,19 +839,6 @@ export async function notifySalesRepInvoicePaid(params: {
   const eventId = params.eventId ?? (contractRow as { event_id?: string } | null)?.event_id;
   const createdBy = params.createdBy ?? (contractRow as { created_by?: string } | null)?.created_by ?? null;
 
-  const { recipients, eventsManaged } = await invoiceNotificationRecipients({
-    salesRepId: params.salesRepId,
-    eventId,
-    createdBy,
-  });
-
-  if (recipients.length === 0) {
-    if (!params.salesRepId && !eventsManaged) return;
-    console.warn('[notifySalesRepInvoicePaid] No recipients — skipping');
-    return;
-  }
-
-  sgMail.setApiKey(apiKey);
   const eventCtx = await loadEventEmailContext(eventId);
   const mail = {
     from: sendGridFromForEvent(eventCtx),
@@ -1018,20 +861,20 @@ export async function notifySalesRepInvoicePaid(params: {
     </div>
   `;
 
-  const ccAssistants =
-    params.salesRepId && !eventsManaged
-      ? (await getAssistantEmailsForRep(params.salesRepId)).filter(
-          (a) => !recipients.map((r) => r.toLowerCase()).includes(a.toLowerCase()),
-        )
-      : [];
-
-  await sgMail.send({
+  await sendRoutedContractEmail({
+    kind: 'invoice_paid',
+    ctx: {
+      contractId: params.contractId,
+      eventId,
+      salesRepId: params.salesRepId,
+      createdBy,
+    },
+    logLabel: 'notifySalesRepInvoicePaid',
     from: mail.from,
-    to: recipients,
-    ...(ccAssistants.length > 0 ? { cc: ccAssistants } : {}),
     subject,
     text,
     html,
+    assistantRepId: params.salesRepId,
   });
 }
 

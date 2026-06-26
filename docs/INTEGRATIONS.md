@@ -53,4 +53,8 @@
 
 - **Why**: reliable transactional delivery.
 - **Usage**: workflow notifications (release, void, cancel, accounting-relevant updates).
-- **From address**: typically `wfcontracts@whiskyadvocate.com`.
+- **From address**: typically `wfcontracts@whiskyadvocate.com` (WhiskyFest) or `WINE_SPECTATOR_FROM_EMAIL` (NYWE).
+- **Routing** (`lib/notification-routing.ts`): each notification type resolves recipients explicitly — no blanket “email the whole events team” for NYWE.
+  - **WhiskyFest**: sales rep in **To**, events team / assistants in **Bcc** / **Cc** where needed.
+  - **NYWE**: countersigner excluded from invoice/void noise; exhibitor-signed mail skipped (DocuSign only); invoice mail to `NYWE_OPS_NOTIFICATION_EMAILS`.
+  - **Env**: `NYWE_OPS_NOTIFICATION_EMAILS`, `NYWE_EVENTS_REVIEW_EMAILS`, `NOTIFICATION_EXCLUDED_EMAILS`.
