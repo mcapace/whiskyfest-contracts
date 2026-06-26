@@ -11,15 +11,15 @@ export const NYWE_EVENT_LOGO = {
 
 export const WINE_SPECTATOR_LOGO = {
   default: {
-    src: '/images/wine-spectator-logo.png',
-    width: 1044,
-    height: 289,
+    src: '/images/wine-spectator-logo.png?v=3',
+    width: 1040,
+    height: 292,
     alt: 'Wine Spectator',
   },
   onDark: {
-    src: '/images/wine-spectator-logo-white.png',
-    width: 1044,
-    height: 289,
+    src: '/images/wine-spectator-logo-white.png?v=3',
+    width: 1040,
+    height: 292,
     alt: 'Wine Spectator',
   },
 } as const;
