@@ -82,6 +82,9 @@ function parseResponse(raw: string, type: BubbleContentType): GeneratedBubble {
 
 type AnthropicContentBlock = { type: string; text?: string };
 
+/** Default Sonnet model for daily bubble copy. Override with ANTHROPIC_BUBBLE_MODEL in Vercel. */
+const DEFAULT_BUBBLE_MODEL = 'claude-sonnet-4-6';
+
 /**
  * Calls Claude to produce today's bubble copy. Throws on HTTP/parsing failure (caller skips DB insert).
  */
@@ -91,6 +94,7 @@ export async function generateDailyBubble(): Promise<GeneratedBubble> {
     throw new Error('ANTHROPIC_API_KEY is not set');
   }
 
+  const model = process.env['ANTHROPIC_BUBBLE_MODEL']?.trim() || DEFAULT_BUBBLE_MODEL;
   const type = pickRandomType();
   const prompt = buildPrompt(type);
 
@@ -102,7 +106,7 @@ export async function generateDailyBubble(): Promise<GeneratedBubble> {
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model,
       max_tokens: 300,
       messages: [{ role: 'user', content: prompt }],
     }),
@@ -110,11 +114,12 @@ export async function generateDailyBubble(): Promise<GeneratedBubble> {
 
   const data = (await response.json()) as {
     content?: AnthropicContentBlock[];
-    error?: { message?: string };
+    error?: { type?: string; message?: string };
   };
 
   if (!response.ok) {
-    throw new Error(data.error?.message ?? `Anthropic API error ${response.status}`);
+    const detail = data.error?.message ?? `Anthropic API error ${response.status}`;
+    throw new Error(`${detail} (model: ${model})`);
   }
 
   const block = data.content?.find((c) => c.type === 'text');
