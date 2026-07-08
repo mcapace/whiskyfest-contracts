@@ -15,7 +15,7 @@ export type ContractStatus =
   | 'cancelled'
   | 'error';
 
-export type InvoiceStatus = 'pending' | 'invoice_sent' | 'paid';
+export type InvoiceStatus = 'pending' | 'invoice_sent' | 'paid' | 'not_invoiced';
 
 export type UserRole = 'admin' | 'sales' | 'sales_rep' | 'viewer';
 
@@ -113,6 +113,8 @@ export interface Contract {
   discount_approved_at: string | null;
   discount_approved_by: string | null;
   discount_approval_reason: string | null;
+  /** WhiskyFest complimentary booth — $0, skips discount approval, AR do-not-invoice. */
+  no_charge_booth: boolean;
   events_submitted_at: string | null;
   events_approved_at: string | null;
   events_approved_by: string | null;

@@ -11,6 +11,7 @@ import {
   productKeyFromEvent,
   scopeEventsByProduct,
 } from '@/lib/product-portal';
+import { actorCanUseNoChargeBooth, getStephenSenatoreRepId } from '@/lib/no-charge-booth';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,6 +72,11 @@ export async function EditDraftContractPage({
     return { description: row.description, amount_cents: row.amount_cents };
   });
 
+  const [canUseNoChargeBooth, stephenRepId] = await Promise.all([
+    actorCanUseNoChargeBooth(viewed.actor.email),
+    getStephenSenatoreRepId(),
+  ]);
+
   return (
     <div className="max-w-3xl space-y-6">
       <NewContractForm
@@ -114,6 +120,9 @@ export async function EditDraftContractPage({
             expressions: string[];
           }[]
         }
+        canUseNoChargeBooth={canUseNoChargeBooth}
+        stephenRepId={stephenRepId}
+        initialNoChargeBooth={Boolean(c.no_charge_booth)}
       />
     </div>
   );

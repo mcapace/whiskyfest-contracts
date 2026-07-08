@@ -23,6 +23,11 @@ import { isLegacyImportedContract } from '@/lib/legacy-import';
 import { billingFieldsFromOptionalBody } from '@/lib/nywe-billing';
 import { refreshNyweBillingFromRosterForContract } from '@/lib/nywe-roster-billing-sync';
 import { applyNyweLicensePricingIfNeeded, isNyweVendorEvent, signerTitleForContract } from '@/lib/nywe-pricing';
+import {
+  assertNoChargeBoothAllowed,
+  isNoChargeBoothContract,
+  noChargeBoothFieldsForInsert,
+} from '@/lib/no-charge-booth';
 import type { Event } from '@/types/db';
 
 const signerEditableStatuses: ContractStatus[] = ['approved', 'ready_for_review', 'pending_events_review'];
@@ -73,6 +78,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     const p = parsed.data;
 
+    const { data: patchEventFull } = await supabase.from('events').select('*').eq('id', p.event_id).maybeSingle<Event>();
+    if (!patchEventFull) {
+      return NextResponse.json({ error: 'Event not found' }, { status: 400 });
+    }
+
     let effectiveSalesRepId: string | null = p.sales_rep_id ?? null;
     if (effectiveSalesRepId) {
       if (actor.isAdmin) {
@@ -88,22 +98,33 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
 
     const incomingBoothRate = p.booth_rate_cents;
-    const { data: patchEvent } = await supabase
-      .from('events')
-      .select('contract_template_profile, booth_rate_cents')
-      .eq('id', p.event_id)
-      .maybeSingle<Pick<Event, 'contract_template_profile' | 'booth_rate_cents'>>();
-    const nyweEvent = patchEvent && isNyweVendorEvent(patchEvent);
+    const patchEvent = patchEventFull;
+    const nyweEvent = isNyweVendorEvent(patchEvent);
+    const noChargeRequested = Boolean(p.no_charge_booth);
+    const noChargeGate = await assertNoChargeBoothAllowed({
+      actorEmail: actor.email,
+      salesRepId: effectiveSalesRepId,
+      event: patchEvent,
+      orderType: p.order_type,
+      noChargeRequested,
+    });
+    if (!noChargeGate.ok) {
+      return NextResponse.json({ error: noChargeGate.error }, { status: 400 });
+    }
+
+    const wasNoCharge = isNoChargeBoothContract(contract as Contract);
+    const becomingNoCharge = noChargeRequested && !wasNoCharge;
+    const leavingNoCharge = !noChargeRequested && wasNoCharge;
+
     const bill = nyweEvent ? {} : clearedRepEnteredBilling();
-    const nywePricing = patchEvent
-      ? applyNyweLicensePricingIfNeeded(patchEvent, {
-          booth_count: p.booth_count,
-          booth_rate_cents: incomingBoothRate,
-        })
-      : { booth_count: p.booth_count, booth_rate_cents: incomingBoothRate };
+    const nywePricing = applyNyweLicensePricingIfNeeded(patchEvent, {
+      booth_count: p.booth_count,
+      booth_rate_cents: noChargeRequested ? 0 : incomingBoothRate,
+    });
     const boothRateChanged = nywePricing.booth_rate_cents !== contract.booth_rate_cents;
     const nyweLineItems = nyweEvent ? [] : (p.line_items ?? []);
     const shouldResetDiscountApproval =
+      !noChargeRequested &&
       !nyweEvent &&
       boothRateChanged &&
       (nywePricing.booth_rate_cents >= STANDARD_BOOTH_RATE_CENTS ||
@@ -139,6 +160,20 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         sales_rep_id: effectiveSalesRepId,
         notes: p.notes ?? null,
         exhibitor_notes: p.exhibitor_notes?.trim() || null,
+        no_charge_booth: noChargeRequested,
+        ...(becomingNoCharge ? noChargeBoothFieldsForInsert(actor.email) : {}),
+        ...(leavingNoCharge
+          ? {
+              invoice_status: 'pending',
+              ...(nywePricing.booth_rate_cents < STANDARD_BOOTH_RATE_CENTS
+                ? {
+                    discount_approved_at: null,
+                    discount_approved_by: null,
+                    discount_approval_reason: null,
+                  }
+                : {}),
+            }
+          : {}),
         ...(reopeningVoided
           ? {
               status: 'draft',
@@ -208,7 +243,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       contractId: params.id,
       before: contract as Contract,
       incomingBoothRate: nywePricing.booth_rate_cents,
-      shouldResetDiscountApproval,
+      shouldResetDiscountApproval: shouldResetDiscountApproval && !noChargeRequested,
       editor: { email: actor.email, name: actor.appUser?.name },
     });
 

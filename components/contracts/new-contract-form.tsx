@@ -113,6 +113,10 @@ interface Props {
   initialDealKind?: ContractDealKind;
   /** e.g. '' for WhiskyFest, '/wine-spectator' for Wine Spectator section */
   portalBasePath?: string;
+  /** Stephen Senatore / Katherine Brumley complimentary booth workflow. */
+  canUseNoChargeBooth?: boolean;
+  stephenRepId?: string | null;
+  initialNoChargeBooth?: boolean;
 }
 
 function resolveInitialDealKind(
@@ -175,6 +179,9 @@ export function NewContractForm({
   editImportMode = false,
   initialDealKind,
   portalBasePath = '',
+  canUseNoChargeBooth = false,
+  stephenRepId = null,
+  initialNoChargeBooth = false,
 }: Props) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -196,6 +203,7 @@ export function NewContractForm({
 
   const [dealKind, setDealKind] = useState<ContractDealKind>(resolvedDealKind);
   const orderType = orderTypeFromDealKind(dealKind);
+  const [noChargeBooth, setNoChargeBooth] = useState(initialNoChargeBooth);
   const [sponsorBrand, setSponsorBrand] = useState(initialValues?.sponsor_brand ?? '');
 
   const [form, setForm] = useState(() => ({
@@ -293,6 +301,8 @@ export function NewContractForm({
   const selectedEvent = events.find((e) => e.id === (resolvedEventId ?? form.event_id));
   const eventsManaged = selectedEvent ? isEventsManagedWorkflow(selectedEvent) : false;
   const boothOnlyEvent = selectedEvent?.contract_template_profile === 'nywe_vendor';
+  const showNoChargeOption =
+    canUseNoChargeBooth && !boothOnlyEvent && dealKind !== 'sponsorship_only';
   const listBoothRateCents = standardBoothRateCentsForEvent(selectedEvent);
   const boothSubtotal = form.booth_count * form.booth_rate_cents;
   const lineItemsSumCents = lineItems.reduce((acc, row) => {
@@ -355,6 +365,11 @@ export function NewContractForm({
 
   useEffect(() => {
     if (!selectedEvent || dealKind === 'sponsorship_only') return;
+    if (noChargeBooth) {
+      setForm((f) => ({ ...f, booth_rate_cents: 0 }));
+      setBoothRateInput('0.00');
+      return;
+    }
     const cents = boothOnlyEvent ? nyweLicenseFeeCents(selectedEvent) : (selectedEvent.booth_rate_cents ?? 1500000);
     setForm((f) => ({
       ...f,
@@ -363,7 +378,23 @@ export function NewContractForm({
     }));
     setBoothRateInput((cents / 100).toFixed(2));
     if (boothOnlyEvent) setBoothCountInput('1');
-  }, [selectedEvent?.id, dealKind, boothOnlyEvent]);
+  }, [selectedEvent?.id, dealKind, boothOnlyEvent, noChargeBooth]);
+
+  function setNoChargeMode(enabled: boolean) {
+    setNoChargeBooth(enabled);
+    if (enabled) {
+      setForm((f) => ({
+        ...f,
+        booth_rate_cents: 0,
+        ...(stephenRepId ? { sales_rep_id: stephenRepId } : {}),
+      }));
+      setBoothRateInput('0.00');
+    } else {
+      const rate = selectedEvent?.booth_rate_cents ?? 1500000;
+      setForm((f) => ({ ...f, booth_rate_cents: rate }));
+      setBoothRateInput((rate / 100).toFixed(2));
+    }
+  }
 
   function switchDealKind(next: ContractDealKind) {
     if (next === dealKind) return;
@@ -374,6 +405,7 @@ export function NewContractForm({
       if (hasBoothData && !window.confirm('Switch to sponsorship only? Booth brand details will be removed.')) {
         return;
       }
+      setNoChargeBooth(false);
       setDealKind('sponsorship_only');
       setBoothCountInput('0');
       setForm((f) => ({ ...f, booth_count: 0, booth_rate_cents: 0 }));
@@ -407,6 +439,12 @@ export function NewContractForm({
     if (!form.exhibitor_company_name) { setErr('Company name required'); return; }
     if (!form.exhibitor_legal_name)   { setErr('Legal name required'); return; }
     if (!eventsManaged && !form.sales_rep_id) { setErr('Sales rep is required'); return; }
+
+    const useNoCharge = showNoChargeOption && noChargeBooth;
+    if (useNoCharge && stephenRepId && form.sales_rep_id !== stephenRepId) {
+      setErr('No-charge contracts must be assigned to Stephen Senatore as sales rep.');
+      return;
+    }
 
     const parsedLines = parseLineItemsForSubmit(lineItems);
     if (!parsedLines.ok) {
@@ -475,9 +513,11 @@ export function NewContractForm({
         booth_count: boothOnlyEvent ? 1 : boothCountNorm,
         booth_rate_cents: sponsorshipOnly
           ? 0
-          : boothOnlyEvent && selectedEvent
-            ? nyweLicenseFeeCents(selectedEvent)
-            : form.booth_rate_cents,
+          : useNoCharge
+            ? 0
+            : boothOnlyEvent && selectedEvent
+              ? nyweLicenseFeeCents(selectedEvent)
+              : form.booth_rate_cents,
       };
       const booth_brands = boothOnlyEvent
         ? []
@@ -496,6 +536,7 @@ export function NewContractForm({
         sponsor_brand: sponsorshipOnly ? sponsorBrand.trim() || null : null,
         line_items: boothOnlyEvent ? [] : parsedLines.rows,
         booth_brands,
+        no_charge_booth: useNoCharge,
       };
 
       const res = await fetch(url, {
@@ -747,6 +788,34 @@ export function NewContractForm({
             </div>
             ) : null}
 
+            {showNoChargeOption ? (
+              <div className="space-y-2 rounded-lg border border-violet-200/80 bg-violet-50/40 p-4 dark:border-violet-900/50 dark:bg-violet-950/20">
+                <Label>Booth pricing</Label>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant={!noChargeBooth ? 'default' : 'outline'}
+                    onClick={() => setNoChargeMode(false)}
+                    disabled={busy}
+                  >
+                    Standard pricing
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={noChargeBooth ? 'default' : 'outline'}
+                    onClick={() => setNoChargeMode(true)}
+                    disabled={busy}
+                  >
+                    No charge (complimentary booth)
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Complimentary booths skip discount approval, are auto-approved for DocuSign, and appear in A/R as Do
+                  Not Invoice.
+                </p>
+              </div>
+            ) : null}
+
             {dealKind !== 'sponsorship_only' ? (
             boothOnlyEvent ? (
               <div className="rounded-lg border border-border/60 bg-muted/10 p-4">
@@ -779,6 +848,13 @@ export function NewContractForm({
                   onBlur={() => normalizeBoothCountOnBlur()}
                 />
               </Field>
+              {noChargeBooth ? (
+                <div className="rounded-lg border border-border/60 bg-muted/10 p-4">
+                  <p className="text-sm font-medium text-foreground">Complimentary booth</p>
+                  <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-fest-900">$0.00</p>
+                  <p className="mt-2 text-xs text-muted-foreground">No charge — contract total is $0 for booth fees.</p>
+                </div>
+              ) : (
               <Field label="Booth Rate (USD)" hint="Editable for custom booth pricing">
                 <Input
                   type="text"
@@ -812,6 +888,7 @@ export function NewContractForm({
                   </p>
                 )}
               </Field>
+              )}
             </div>
             )
             ) : (

@@ -16,6 +16,11 @@ import { eventTemplateProfile, isEventsManagedWorkflow } from '@/lib/contract-te
 import { isNyweVendorEvent, applyNyweLicensePricingIfNeeded, signerTitleForContract } from '@/lib/nywe-pricing';
 import { billingFieldsFromOptionalBody } from '@/lib/nywe-billing';
 import { isDiscountedRate } from '@/lib/contracts';
+import {
+  assertNoChargeBoothAllowed,
+  isNoChargeBoothContract,
+  noChargeBoothFieldsForInsert,
+} from '@/lib/no-charge-booth';
 import { notifyAdminsOfDiscountRequest } from '@/lib/notifications';
 import type { Contract, ContractWithTotals, Event } from '@/types/db';
 import type { ContractStatus } from '@/types/db';
@@ -158,6 +163,18 @@ export async function POST(req: Request) {
   });
   const nyweLineItems = isNyweVendorEvent(eventRow) ? [] : (p.line_items ?? []);
 
+  const noChargeRequested = Boolean(p.no_charge_booth);
+  const noChargeGate = await assertNoChargeBoothAllowed({
+    actorEmail: actor.email,
+    salesRepId: effectiveSalesRepId,
+    event: eventRow,
+    orderType: p.order_type,
+    noChargeRequested,
+  });
+  if (!noChargeGate.ok) {
+    return NextResponse.json({ error: noChargeGate.error }, { status: 400 });
+  }
+
   const { data: assignedRepLookup } = effectiveSalesRepId
     ? await supabase.from('sales_reps').select('name, email').eq('id', effectiveSalesRepId).single()
     : { data: null };
@@ -190,6 +207,7 @@ export async function POST(req: Request) {
       exhibitor_notes: p.exhibitor_notes?.trim() || null,
       created_by: actor.email,
       status: 'draft',
+      ...(noChargeRequested ? noChargeBoothFieldsForInsert(actor.email) : {}),
       ...bill,
       ...(rosterBilling ?? {}),
     })
@@ -236,7 +254,11 @@ export async function POST(req: Request) {
 
   revalidateContractPaths(row.id);
 
-  if (p.order_type !== 'sponsorship_only' && isDiscountedRate(row.booth_rate_cents, eventRow)) {
+  if (
+    !noChargeRequested &&
+    p.order_type !== 'sponsorship_only' &&
+    isDiscountedRate(row.booth_rate_cents, eventRow)
+  ) {
     try {
       const { data: withTotals } = await supabase
         .from('contracts_with_totals')

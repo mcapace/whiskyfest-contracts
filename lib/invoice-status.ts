@@ -8,6 +8,8 @@ export function formatInvoiceStatus(status: InvoiceStatus | string): string {
       return 'Invoice Sent';
     case 'paid':
       return 'Paid';
+    case 'not_invoiced':
+      return 'Do Not Invoice';
     default:
       return String(status);
   }
@@ -21,6 +23,8 @@ export function invoiceStatusBadgeClass(status: InvoiceStatus | string): string 
       return 'border border-blue-300 bg-blue-100 text-blue-900';
     case 'paid':
       return 'border border-emerald-300 bg-emerald-100 text-emerald-900';
+    case 'not_invoiced':
+      return 'border border-violet-300 bg-violet-100 text-violet-900';
     default:
       return 'border border-gray-300 bg-gray-100 text-gray-800';
   }

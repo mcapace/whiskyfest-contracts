@@ -6,6 +6,7 @@ import { getVisibleContractsFilter } from '@/lib/permissions';
 import { recentCompanyNames } from '@/lib/new-contract-hints';
 import { parseDealKindParam } from '@/lib/contract-deal-kind';
 import { PRODUCT_WHISKYFEST, scopeEventsByProduct } from '@/lib/product-portal';
+import { actorCanUseNoChargeBooth, getStephenSenatoreRepId } from '@/lib/no-charge-booth';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,6 +60,11 @@ export default async function NewContractPage({
 
   const scopedEvents = scopeEventsByProduct((events ?? []) as Event[], PRODUCT_WHISKYFEST);
 
+  const [canUseNoChargeBooth, stephenRepId] = await Promise.all([
+    actorCanUseNoChargeBooth(actor.email),
+    getStephenSenatoreRepId(),
+  ]);
+
   return (
     <NewContractForm
       events={scopedEvents}
@@ -66,6 +72,8 @@ export default async function NewContractPage({
       isAdmin={actor.isAdmin}
       smartHints={smartHints}
       initialDealKind={initialDealKind}
+      canUseNoChargeBooth={canUseNoChargeBooth}
+      stephenRepId={stephenRepId}
     />
   );
 }

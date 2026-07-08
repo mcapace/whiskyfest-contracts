@@ -83,6 +83,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
 
   if (mark_invoice_sent) {
+    if (inv === 'not_invoiced') {
+      return NextResponse.json({ error: 'This contract is marked Do Not Invoice and cannot be invoiced.' }, { status: 409 });
+    }
     if (inv !== 'pending') {
       return NextResponse.json({ error: 'Invoice can only be marked sent from pending state.' }, { status: 409 });
     }

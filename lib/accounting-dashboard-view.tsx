@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { CheckCircle2, Clock, DollarSign, FileText, Send } from 'lucide-react';
+import { CheckCircle2, Clock, DollarSign, FileText, Send, Ban } from 'lucide-react';
 import { requireAccountingPageAccess } from '@/lib/auth-accounting';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { cn, formatCurrency, formatTimestamp } from '@/lib/utils';
@@ -152,7 +152,7 @@ export async function AccountingDashboardView({
 
       <section className="space-y-4">
         <h2 className="font-display text-2xl font-medium text-foreground">Overview</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <ARStatCard
             href={href('pending')}
             title="Pending invoicing"
@@ -181,6 +181,16 @@ export async function AccountingDashboardView({
             active={invoice === 'paid'}
             icon={CheckCircle2}
             accent="emerald"
+            activeRingClass={chrome.activeRing}
+          />
+          <ARStatCard
+            href={href('not_invoiced')}
+            title="Do not invoice"
+            count={countFor('not_invoiced')}
+            cents={sumFor('not_invoiced')}
+            active={invoice === 'not_invoiced'}
+            icon={Ban}
+            accent="whisky"
             activeRingClass={chrome.activeRing}
           />
           <ARStatCard
@@ -240,6 +250,7 @@ export async function AccountingDashboardView({
                 { key: 'pending' as const, label: formatInvoiceStatus('pending') },
                 { key: 'invoice_sent' as const, label: formatInvoiceStatus('invoice_sent') },
                 { key: 'paid' as const, label: formatInvoiceStatus('paid') },
+                { key: 'not_invoiced' as const, label: formatInvoiceStatus('not_invoiced') },
               ] as const
             ).map((tab) => (
               <Link

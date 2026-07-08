@@ -1,4 +1,5 @@
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
+import { isNoChargeBoothContract } from '@/lib/no-charge-booth';
 import { isNyweVendorEvent } from '@/lib/nywe-pricing';
 import type { Contract, Event } from '@/types/db';
 
@@ -16,12 +17,13 @@ export function isDiscountedRate(boothCents: number, event?: Pick<Event, 'booth_
 
 // True if the contract requires discount approval right now.
 export function requiresDiscountApproval(
-  contract: Pick<Contract, 'booth_rate_cents' | 'discount_approved_at'> & {
+  contract: Pick<Contract, 'booth_rate_cents' | 'discount_approved_at' | 'no_charge_booth'> & {
     order_type?: Contract['order_type'] | null;
     booth_count?: number;
   },
   event?: Pick<Event, 'booth_rate_cents' | 'contract_template_profile'> | null,
 ): boolean {
+  if (isNoChargeBoothContract(contract)) return false;
   if (isSponsorshipOnlyOrder(contract)) return false;
   if (isNyweVendorEvent(event)) return false;
   return isDiscountedRate(contract.booth_rate_cents, event) && !contract.discount_approved_at;

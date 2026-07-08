@@ -55,6 +55,7 @@ export function AccountingDetailActions({
   const [err, setErr] = useState<string | null>(null);
 
   const sidebarVisible = invoiceStatus === 'pending' || invoiceStatus === 'invoice_sent';
+  const isDoNotInvoice = invoiceStatus === 'not_invoiced';
   const { open: sidebarOpen, setOpen: setSidebarOpen } = useContractActionsSidebar(
     false,
     ACCOUNTING_ACTIONS_SIDEBAR_STORAGE_KEY,
@@ -150,6 +151,15 @@ export function AccountingDetailActions({
       </TooltipProvider>
 
       <div className="space-y-6">
+        {isDoNotInvoice ? (
+          <div className="rounded-lg border border-violet-300/80 bg-violet-50/60 p-4 text-sm text-violet-950 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-100 md:p-6">
+            <p className="font-medium">Do Not Invoice</p>
+            <p className="mt-2 text-violet-900/90 dark:text-violet-200/90">
+              This is a complimentary WhiskyFest booth contract. It appears in A/R for tracking but should not be
+              invoiced.
+            </p>
+          </div>
+        ) : null}
         {invoiceStatus === 'paid' && (
           <div className="rounded-lg border border-border/60 bg-card/40 p-4 text-sm text-muted-foreground md:p-6">
             <p className="wf-label-caps text-[0.6rem] text-muted-foreground">Invoice history</p>

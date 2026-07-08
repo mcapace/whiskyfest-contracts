@@ -1,4 +1,5 @@
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
+import { isNoChargeBoothContract } from '@/lib/no-charge-booth';
 import { formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { exhibitorFieldMergeTokens } from '@/lib/exhibitor-docusign-fields';
 import {
@@ -61,6 +62,15 @@ export function buildPricingComposition(
   const lb = GOOGLE_DOCS_CELL_LINE_BREAK;
   const boothCount = contract.booth_count;
   const listRateCents = event ? event.booth_rate_cents : STANDARD_BOOTH_RATE_CENTS;
+
+  if (isNoChargeBoothContract(contract)) {
+    return {
+      pricing_description: `Complimentary booth (no charge)`,
+      pricing_qty: String(boothCount),
+      pricing_amount: formatMoney(0),
+    };
+  }
+
   const isDiscounted = isDiscountedRate(contract.booth_rate_cents, event);
 
   if (!isDiscounted) {

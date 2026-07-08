@@ -16,6 +16,7 @@ import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import { notifyEventsTeamOfPendingReview } from '@/lib/notifications';
 import { requiresDiscountApproval } from '@/lib/contracts';
+import { isNoChargeBoothContract, NO_CHARGE_DISCOUNT_REASON } from '@/lib/no-charge-booth';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import type { Contract, ContractWithTotals, Event } from '@/types/db';
 
@@ -103,6 +104,49 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ ok: true, pdf_url: webViewLink });
     }
 
+    // First submission — no-charge booths skip events queue and land on Approved.
+    if (
+      isNoChargeBoothContract(cur) &&
+      !cur.events_submitted_at &&
+      !cur.events_approved_at &&
+      (cur.status === 'draft' || cur.status === 'ready_for_review')
+    ) {
+      await supabase
+        .from('contracts')
+        .update({
+          ...pdfFields,
+          status: 'approved',
+          events_submitted_at: nowIso,
+          events_approved_at: nowIso,
+          events_approved_by: gate.actor.email,
+          events_approval_reason: NO_CHARGE_DISCOUNT_REASON,
+        })
+        .eq('id', contract.id);
+
+      await supabase.from('audit_log').insert([
+        {
+          contract_id: contract.id,
+          actor_email: gate.actor.email,
+          action: 'events_submitted',
+          from_status: cur.status,
+          to_status: 'approved',
+          metadata: { no_charge_booth: true },
+        },
+        {
+          contract_id: contract.id,
+          actor_email: gate.actor.email,
+          action: 'events_approved',
+          from_status: cur.status,
+          to_status: 'approved',
+          metadata: { no_charge_booth: true, auto: true },
+        },
+      ]);
+
+      await commonAudit();
+      revalidateContractPaths(contract.id);
+      return NextResponse.json({ ok: true, pdf_url: webViewLink });
+    }
+
     // First submission for events review (draft or legacy ready_for_review).
     if (
       !cur.events_submitted_at &&
@@ -142,6 +186,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     // Regeneration after a prior submission — clear events approval if present; no email.
     if (cur.events_submitted_at) {
+      if (isNoChargeBoothContract(cur)) {
+        await supabase.from('contracts').update({ ...pdfFields }).eq('id', contract.id);
+        await commonAudit();
+        revalidateContractPaths(contract.id);
+        return NextResponse.json({ ok: true, pdf_url: webViewLink });
+      }
+
       const hadApproval = Boolean(cur.events_approved_at);
 
       await supabase

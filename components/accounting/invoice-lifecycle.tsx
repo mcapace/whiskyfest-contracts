@@ -13,6 +13,19 @@ export function InvoiceLifecycleTimeline({
 }: {
   status: InvoiceStatus;
 }) {
+  if (status === 'not_invoiced') {
+    return (
+      <div className="rounded-lg border border-violet-300/80 bg-violet-50/60 px-4 py-3 dark:border-violet-900/50 dark:bg-violet-950/30">
+        <p className="text-sm font-medium text-violet-950 dark:text-violet-100">
+          {formatInvoiceStatus('not_invoiced')}
+        </p>
+        <p className="mt-1 text-xs text-violet-900/80 dark:text-violet-200/80">
+          Complimentary booth — tracked in A/R for visibility only. Do not send an invoice.
+        </p>
+      </div>
+    );
+  }
+
   const idx = STEPS.findIndex((s) => s.key === status);
   const currentIdx = idx >= 0 ? idx : 0;
 

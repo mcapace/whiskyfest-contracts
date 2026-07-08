@@ -54,6 +54,8 @@ export const newContractBodySchema = z
     billing_country: z.string().max(100).optional().nullable(),
     line_items: z.array(lineItemInputSchema).optional().default([]),
     booth_brands: z.array(boothBrandInputSchema).optional().default([]),
+    /** Complimentary WhiskyFest booth — Stephen Senatore / Katherine Brumley only. */
+    no_charge_booth: z.boolean().optional().default(false),
   })
   .superRefine((data, ctx) => {
     const ccEmail = data.signer_cc_email?.trim();
@@ -102,6 +104,25 @@ export const newContractBodySchema = z
         message: 'Booth count must be at least 1 for booth contracts.',
         path: ['booth_count'],
       });
+      return;
+    }
+
+    if (data.no_charge_booth) {
+      if (data.contract_template_profile === 'nywe_vendor') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'No-charge booth is only available for WhiskyFest contracts.',
+          path: ['no_charge_booth'],
+        });
+        return;
+      }
+      if (data.booth_rate_cents !== 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'No-charge booth contracts must have booth rate $0.',
+          path: ['booth_rate_cents'],
+        });
+      }
       return;
     }
 
