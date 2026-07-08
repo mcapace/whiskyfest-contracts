@@ -1,6 +1,7 @@
 import sgMail from '@sendgrid/mail';
 import { sendGridFromForProduct, workspaceLabelForProduct } from '@/lib/product-email';
 import { PRODUCT_WINE_SPECTATOR } from '@/lib/product-portal';
+import { formatInvoiceStatus } from '@/lib/invoice-status';
 
 /**
  * Accounting handoff email (SendGrid).
@@ -10,13 +11,27 @@ import { PRODUCT_WINE_SPECTATOR } from '@/lib/product-portal';
  */
 
 export interface AccountingEmailPayload {
+  contractId: string;
   sponsorCompanyName: string;
+  /** Legal entity on the contract — typically the bill-to company for invoicing. */
+  exhibitorLegalName: string;
   signerName: string | null;
   signerTitle: string | null;
   signerEmail: string | null;
   exhibitorTelephone: string | null;
   /** Single-line billing / invoice mailing address for the summary table (legacy or condensed). */
   billingAddressLine: string;
+  /** Corporate / mailing address from exhibitor DocuSign tabs when captured. */
+  exhibitorMailingAddress?: string | null;
+  /** Invoice workflow flag at release (pending, not_invoiced, etc.). */
+  invoiceStatusLabel: string;
+  /** Sponsor brand(s) or NYWE roster company label when present. */
+  brandsPoured?: string | null;
+  /** Human-readable deal type for AR context. */
+  orderTypeLabel: string;
+  lineItems?: { description: string; amountCents: number }[];
+  /** NYWE vendor license vs WhiskyFest booth package. */
+  isNyweVendor?: boolean;
   /** Set when exhibitor DocuSign tabs populated `exhibitor_fields_captured_at`. */
   exhibitorBillingContactName?: string | null;
   exhibitorBillingContactEmail?: string | null;
@@ -88,121 +103,182 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
   sgMail.setApiKey(apiKey);
 
   const recipients = accountingToRecipients();
-  const subject = `Contract Executed: ${p.sponsorCompanyName} — Ready for Invoicing`;
+  const doNotInvoice = p.invoiceStatusLabel === formatInvoiceStatus('not_invoiced');
+  const subject = doNotInvoice
+    ? `Contract Executed: ${p.sponsorCompanyName} — Do Not Invoice`
+    : `Contract Executed: ${p.sponsorCompanyName} — Ready for Invoicing`;
 
   const signerLine = [p.signerName, p.signerTitle].filter(Boolean).join(', ') || '—';
+  const productLabel = isWine ? 'NY Wine Experience' : 'WhiskyFest';
+  const intro = isWine
+    ? `An ${productLabel} vendor license has been executed and is ready for accounting.`
+    : `A ${productLabel} sponsor contract has been executed and is ready for accounting.`;
 
   const li = p.lineItemsSubtotalCents ?? 0;
+  const lineItemRows = (p.lineItems ?? []).filter((row) => row.description.trim());
   const amountLines =
-    li > 0
-      ? [
-          `Booth package: ${formatCents(p.boothSubtotalCents)}`,
-          `Line items: ${formatCents(li)}`,
-          `Total: ${formatCents(p.grandTotalCents)}`,
-        ]
-      : [`Total: ${formatCents(p.grandTotalCents)}`];
+    p.isNyweVendor
+      ? [`License fee: ${formatCents(p.grandTotalCents)}`]
+      : li > 0
+        ? [
+            `Booth package: ${formatCents(p.boothSubtotalCents)}`,
+            ...lineItemRows.map((row) => `  · ${row.description}: ${formatCents(row.amountCents)}`),
+            `Total: ${formatCents(p.grandTotalCents)}`,
+          ]
+        : [`Total: ${formatCents(p.grandTotalCents)}`];
 
   const hasDesignatedBilling = Boolean(p.exhibitorBillingContactName?.trim() && p.exhibitorBillingContactEmail?.trim());
-  const text = [
-    `A new contract has been executed and is ready for invoicing.`,
+  const mailingAddress = p.exhibitorMailingAddress?.trim() || null;
+  const billingAddressDetail = p.exhibitorBillingAddressDetail?.trim() || null;
+
+  const accountSection = [
+    `ACCOUNT / CLIENT`,
+    `Display name: ${p.sponsorCompanyName}`,
+    `Legal / bill-to name: ${p.exhibitorLegalName}`,
+    ...(p.brandsPoured?.trim() ? [`Brand / program: ${p.brandsPoured.trim()}`] : []),
+    `Deal type: ${p.orderTypeLabel}`,
+    `Contract ID: ${p.contractId}`,
+    `AR status: ${p.invoiceStatusLabel}${doNotInvoice ? ' (complimentary — do not send invoice)' : ''}`,
+  ];
+
+  const billingSection = [
     ``,
-    `Sponsor: ${p.sponsorCompanyName}`,
-    `Signer: ${signerLine}`,
-    `Email: ${p.signerEmail ?? '—'}`,
-    `Phone: ${p.exhibitorTelephone ?? '—'}`,
+    `BILLING / INVOICING`,
     ...(hasDesignatedBilling
       ? [
-          ``,
-          `Designated billing contact (exhibitor):`,
-          `  Name: ${p.exhibitorBillingContactName ?? '—'}`,
-          `  Email: ${p.exhibitorBillingContactEmail ?? '—'}`,
-          `  Address:`,
-          ...((p.exhibitorBillingAddressDetail ?? '')
-            .split('\n')
-            .map((ln) => ln.trim())
-            .filter(Boolean)
-            .map((ln) => `    ${ln}`)),
-          ...(p.exhibitorEventContactName?.trim() || p.exhibitorEventContactEmail?.trim()
-            ? [
-                ``,
-                `Event contact (optional):`,
-                `  Name: ${p.exhibitorEventContactName?.trim() || '—'}`,
-                `  Email: ${p.exhibitorEventContactEmail ?? '—'}`,
-              ]
-            : []),
-          ``,
-          `Summary billing line: ${p.billingAddressLine}`,
+          `Billing contact: ${p.exhibitorBillingContactName ?? '—'}`,
+          `Billing email: ${p.exhibitorBillingContactEmail ?? '—'}`,
+          ...(billingAddressDetail
+            ? ['Billing address:', ...billingAddressDetail.split('\n').map((ln) => `  ${ln.trim()}`).filter(Boolean)]
+            : [`Billing address: ${p.billingAddressLine}`]),
         ]
-      : [`Billing Address: ${p.billingAddressLine}`]),
+      : [`Billing summary: ${p.billingAddressLine}`]),
+    ...(mailingAddress
+      ? [
+          `Corporate / mailing address:`,
+          ...mailingAddress.split('\n').map((ln) => `  ${ln.trim()}`).filter(Boolean),
+        ]
+      : []),
+    ...(p.exhibitorEventContactName?.trim() || p.exhibitorEventContactEmail?.trim()
+      ? [
+          `Event contact: ${p.exhibitorEventContactName?.trim() || '—'}`,
+          `Event email: ${p.exhibitorEventContactEmail ?? '—'}`,
+        ]
+      : []),
+  ];
+
+  const contractSection = [
+    ``,
+    `CONTRACT / SIGNER`,
+    `Signer: ${signerLine}`,
+    `Signer email: ${p.signerEmail ?? '—'}`,
+    `Phone: ${p.exhibitorTelephone ?? '—'}`,
     `Event: ${p.eventName} ${p.eventYear}`,
-    `Booth Count: ${p.boothCount}`,
-    `Booth Rate: ${formatCents(p.boothRateCents)}`,
-    `Discount: ${p.discountLine}`,
+    ...(p.isNyweVendor
+      ? []
+      : [
+          `Booth count: ${p.boothCount}`,
+          `Booth rate: ${formatCents(p.boothRateCents)}`,
+          `Discount: ${p.discountLine}`,
+        ]),
     ...amountLines,
-    `Sales Rep: ${p.salesRepName ?? '—'}`,
-    `Executed Date: ${p.executedAtFormatted}`,
+    `Sales rep: ${p.salesRepName ?? '—'}${p.salesRepEmail ? ` (${p.salesRepEmail})` : ''}`,
+    `Executed: ${p.executedAtFormatted}`,
     `Countersigner: ${p.countersignedByName ?? '—'}`,
     ``,
     `View in ${workspaceLabel}: ${p.accountingContractUrl}`,
-  ].join('\n');
+  ];
+
+  const text = [intro, ``, ...accountSection, ...billingSection, ...contractSection].join('\n');
 
   const row = (label: string, value: string) =>
-    `<tr><td style="padding:8px 12px;border:1px solid #e5e5e5;color:#666;width:160px;">${escape(label)}</td>` +
-    `<td style="padding:8px 12px;border:1px solid #e5e5e5;">${value}</td></tr>`;
+    `<tr><td style="padding:8px 12px;border:1px solid #e5e5e5;color:#666;width:180px;vertical-align:top;">${escape(label)}</td>` +
+    `<td style="padding:8px 12px;border:1px solid #e5e5e5;vertical-align:top;">${value}</td></tr>`;
 
-  const designatedBillingHtml = hasDesignatedBilling
-    ? [
-        `<tr><td colspan="2" style="padding:10px 12px;background:#fff8e6;border:1px solid #e5e5e5;font-weight:600;">Designated billing (exhibitor)</td></tr>`,
-        row('Billing contact', escape(p.exhibitorBillingContactName ?? '—')),
-        row(
-          'Billing email',
-          p.exhibitorBillingContactEmail
-            ? `<a href="mailto:${escape(p.exhibitorBillingContactEmail)}">${escape(p.exhibitorBillingContactEmail)}</a>`
-            : '—',
-        ),
-        row(
-          'Billing address',
-          escape((p.exhibitorBillingAddressDetail ?? '—').replace(/\n/g, ' · ')),
-        ),
-        ...(p.exhibitorEventContactName?.trim() || p.exhibitorEventContactEmail?.trim()
-          ? [
-              `<tr><td colspan="2" style="padding:10px 12px;background:#f7f7f7;border:1px solid #e5e5e5;font-weight:600;">Event contact</td></tr>`,
-              row('Name', escape(p.exhibitorEventContactName?.trim() || '—')),
-              row(
-                'Email',
-                p.exhibitorEventContactEmail?.trim()
-                  ? `<a href="mailto:${escape(p.exhibitorEventContactEmail.trim())}">${escape(p.exhibitorEventContactEmail.trim())}</a>`
-                  : '—',
-              ),
-            ]
-          : []),
-        `<tr><td colspan="2" style="padding:6px 12px;font-size:12px;color:#666;border:1px solid #e5e5e5;">Also summarized as one line: ${escape(p.billingAddressLine)}</td></tr>`,
-      ].join('')
-    : row('Billing Address', escape(p.billingAddressLine));
+  const sectionHeader = (title: string) =>
+    `<tr><td colspan="2" style="padding:10px 12px;background:#f3f4f6;border:1px solid #e5e5e5;font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:0.04em;">${escape(title)}</td></tr>`;
+
+  const multilineCell = (raw: string | null | undefined) => {
+    const trimmed = raw?.trim();
+    if (!trimmed) return '—';
+    return escape(trimmed).replace(/\n/g, '<br/>');
+  };
+
+  const invoiceStatusHtml = doNotInvoice
+    ? `<strong style="color:#5b21b6;">${escape(p.invoiceStatusLabel)}</strong> — complimentary; do not send invoice`
+    : escape(p.invoiceStatusLabel);
+
+  const designatedBillingHtml = [
+    sectionHeader('Billing / invoicing'),
+    ...(hasDesignatedBilling
+      ? [
+          row('Billing contact', escape(p.exhibitorBillingContactName ?? '—')),
+          row(
+            'Billing email',
+            p.exhibitorBillingContactEmail
+              ? `<a href="mailto:${escape(p.exhibitorBillingContactEmail)}">${escape(p.exhibitorBillingContactEmail)}</a>`
+              : '—',
+          ),
+          row('Billing address', multilineCell(p.exhibitorBillingAddressDetail)),
+        ]
+      : [row('Billing summary', escape(p.billingAddressLine))]),
+    ...(mailingAddress ? [row('Corporate / mailing address', multilineCell(mailingAddress))] : []),
+    ...(p.exhibitorEventContactName?.trim() || p.exhibitorEventContactEmail?.trim()
+      ? [
+          row('Event contact', escape(p.exhibitorEventContactName?.trim() || '—')),
+          row(
+            'Event email',
+            p.exhibitorEventContactEmail?.trim()
+              ? `<a href="mailto:${escape(p.exhibitorEventContactEmail.trim())}">${escape(p.exhibitorEventContactEmail.trim())}</a>`
+              : '—',
+          ),
+        ]
+      : []),
+  ].join('');
+
+  const lineItemsHtml =
+    lineItemRows.length > 0
+      ? row(
+          'Line items',
+          lineItemRows
+            .map(
+              (item) =>
+                `${escape(item.description)} — <strong>${escape(formatCents(item.amountCents))}</strong>`,
+            )
+            .join('<br/>'),
+        )
+      : '';
 
   const html = `
-    <div style="font-family: system-ui, -apple-system, sans-serif; color: #1a1a1a; max-width: 640px;">
-      <p style="font-size:15px;">A new contract has been executed and is ready for invoicing.</p>
+    <div style="font-family: system-ui, -apple-system, sans-serif; color: #1a1a1a; max-width: 680px;">
+      <p style="font-size:15px;line-height:1.5;">${escape(intro)}</p>
       <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;">
         <tbody>
-          ${row('Sponsor', escape(p.sponsorCompanyName))}
+          ${sectionHeader('Account / client')}
+          ${row('Display name', escape(p.sponsorCompanyName))}
+          ${row('Legal / bill-to name', escape(p.exhibitorLegalName))}
+          ${p.brandsPoured?.trim() ? row('Brand / program', escape(p.brandsPoured.trim())) : ''}
+          ${row('Deal type', escape(p.orderTypeLabel))}
+          ${row('Contract ID', `<span style="font-family:ui-monospace,monospace;font-size:12px;">${escape(p.contractId)}</span>`)}
+          ${row('AR status', invoiceStatusHtml)}
+          ${designatedBillingHtml}
+          ${sectionHeader('Contract / signer')}
           ${row('Signer', escape(signerLine))}
           ${row('Email', p.signerEmail ? `<a href="mailto:${escape(p.signerEmail)}">${escape(p.signerEmail)}</a>` : '—')}
           ${row('Phone', escape(p.exhibitorTelephone ?? '—'))}
-          ${designatedBillingHtml}
           ${row('Event', escape(`${p.eventName} ${p.eventYear}`))}
-          ${row('Booth Count', escape(String(p.boothCount)))}
-          ${row('Booth Rate', escape(formatCents(p.boothRateCents)))}
-          ${row('Discount', escape(p.discountLine))}
           ${
-            li > 0
-              ? row('Booth package', escape(formatCents(p.boothSubtotalCents))) +
-                row('Line items', escape(formatCents(li))) +
+            p.isNyweVendor
+              ? row('License fee', escape(formatCents(p.grandTotalCents)))
+              : row('Booth count', escape(String(p.boothCount))) +
+                row('Booth rate', escape(formatCents(p.boothRateCents))) +
+                row('Discount', escape(p.discountLine)) +
+                row('Booth package', escape(formatCents(p.boothSubtotalCents))) +
+                lineItemsHtml +
                 row('Total', escape(formatCents(p.grandTotalCents)))
-              : row('Total', escape(formatCents(p.grandTotalCents)))
           }
-          ${row('Sales Rep', escape(p.salesRepName ?? '—'))}
-          ${row('Executed Date', escape(p.executedAtFormatted))}
+          ${row('Sales rep', escape([p.salesRepName, p.salesRepEmail].filter(Boolean).join(' · ') || '—'))}
+          ${row('Executed', escape(p.executedAtFormatted))}
           ${row('Countersigner', escape(p.countersignedByName ?? '—'))}
         </tbody>
       </table>

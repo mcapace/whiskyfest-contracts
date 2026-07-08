@@ -3,8 +3,13 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
 import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { calculateDiscountCents, isDiscountedRate, requiresDiscountApproval } from '@/lib/contracts';
+import { fetchContractLineItemsOrdered } from '@/lib/contract-line-items';
+import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
+import { formatInvoiceStatus } from '@/lib/invoice-status';
 import { isLegacyImportedContract } from '@/lib/legacy-import';
+import { isNoChargeBoothContract } from '@/lib/no-charge-booth';
 import { contractHasBillingInfo } from '@/lib/nywe-billing';
+import { isNyweVendorEvent } from '@/lib/nywe-pricing';
 import { downloadCompletedPdf } from '@/lib/docusign';
 import {
   downloadContractPdfFromStorage,
@@ -124,19 +129,48 @@ export async function releaseContractToAccounting(options: {
         ? (formatExhibitorAddressBlock(contract) || '—').replace(/\n/g, ', ')
         : (formatBillingAddressBlock(contract) || '—').replace(/\n/g, ', ');
 
-  const discountCents = calculateDiscountCents(contract.booth_count, contract.booth_rate_cents);
+  const discountCents = calculateDiscountCents(contract.booth_count, contract.booth_rate_cents, event);
   const discountLine =
-    isDiscountedRate(contract.booth_rate_cents) && discountCents > 0 ? `${formatCurrency(discountCents)} off list` : '—';
+    isDiscountedRate(contract.booth_rate_cents, event) && discountCents > 0
+      ? `${formatCurrency(discountCents)} off list`
+      : '—';
+
+  const nyweVendor = isNyweVendorEvent(event);
+  const lineItemRows = await fetchContractLineItemsOrdered(supabase, contract.id);
+  const exhibitorMailingAddress = formatExhibitorAddressBlock(contract) || null;
+
+  const invoiceStatusLabel = isNoChargeBoothContract(contract)
+    ? formatInvoiceStatus('not_invoiced')
+    : formatInvoiceStatus(contract.invoice_status ?? 'pending');
+
+  const orderTypeLabel = nyweVendor
+    ? 'NYWE vendor license'
+    : isSponsorshipOnlyOrder(contract)
+      ? 'Sponsorship only'
+      : lineItemRows.length > 0
+        ? 'Booth + sponsorship / line items'
+        : 'Booth package';
 
   const now = new Date().toISOString();
 
   await sendAccountingEmail({
+    contractId: contract.id,
     sponsorCompanyName: contract.exhibitor_company_name,
+    exhibitorLegalName: contract.exhibitor_legal_name,
     signerName: contract.signer_1_name,
     signerTitle: contract.signer_1_title,
     signerEmail: contract.signer_1_email,
     exhibitorTelephone: contract.exhibitor_telephone,
     billingAddressLine,
+    exhibitorMailingAddress,
+    invoiceStatusLabel,
+    brandsPoured: contract.brands_poured,
+    orderTypeLabel,
+    lineItems: lineItemRows.map((row) => ({
+      description: row.description,
+      amountCents: row.amount_cents,
+    })),
+    isNyweVendor: nyweVendor,
     exhibitorBillingContactName:
       exhibitorCaptured || contractHasBillingInfo(contract) ? contract.billing_contact_name : null,
     exhibitorBillingContactEmail:

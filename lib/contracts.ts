@@ -17,7 +17,8 @@ export function isDiscountedRate(boothCents: number, event?: Pick<Event, 'booth_
 
 // True if the contract requires discount approval right now.
 export function requiresDiscountApproval(
-  contract: Pick<Contract, 'booth_rate_cents' | 'discount_approved_at' | 'no_charge_booth'> & {
+  contract: Pick<Contract, 'booth_rate_cents' | 'discount_approved_at'> & {
+    no_charge_booth?: boolean | null;
     order_type?: Contract['order_type'] | null;
     booth_count?: number;
   },
