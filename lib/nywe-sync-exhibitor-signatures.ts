@@ -1,5 +1,6 @@
 import { isDocuSignRateLimitError } from '@/lib/docusign';
 import { syncContractFromDocuSign } from '@/lib/docusign-envelope-sync';
+import { docuSignPollCutoffIso } from '@/lib/docusign-poll-cooldown';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
 import { releaseSignedContractsToAccounting } from '@/lib/nywe-release-stuck-on-load';
 import { getSupabaseAdmin } from '@/lib/supabase';
@@ -71,12 +72,15 @@ export async function syncNyweExhibitorSignaturesFromDocuSign(options?: {
     .in('status', ['sent', 'error'])
     .not('docusign_envelope_id', 'is', null);
 
+  const pollCutoff = docuSignPollCutoffIso();
   let query = supabase
     .from('contracts')
     .select('id')
     .in('event_id', eventIds)
     .in('status', ['sent', 'error'])
     .not('docusign_envelope_id', 'is', null)
+    .or(`docusign_last_polled_at.is.null,docusign_last_polled_at.lt.${pollCutoff}`)
+    .order('docusign_last_polled_at', { ascending: true, nullsFirst: true })
     .order('sent_at', { ascending: false, nullsFirst: false })
     .order('id', { ascending: true })
     .limit(batchSize);
@@ -85,7 +89,22 @@ export async function syncNyweExhibitorSignaturesFromDocuSign(options?: {
     query = query.gt('id', options.afterId);
   }
 
-  const { data: pendingIds } = await query;
+  let { data: pendingIds, error: pendingErr } = await query;
+  if (pendingErr?.message?.includes('docusign_last_polled_at')) {
+    let fallback = supabase
+      .from('contracts')
+      .select('id')
+      .in('event_id', eventIds)
+      .in('status', ['sent', 'error'])
+      .not('docusign_envelope_id', 'is', null)
+      .order('sent_at', { ascending: false, nullsFirst: false })
+      .order('id', { ascending: true })
+      .limit(batchSize);
+    if (options?.afterId) {
+      fallback = fallback.gt('id', options.afterId);
+    }
+    ({ data: pendingIds } = await fallback);
+  }
 
   const result: NyweExhibitorSyncResult = {
     ...empty,

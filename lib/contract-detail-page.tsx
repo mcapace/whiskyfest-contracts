@@ -16,6 +16,7 @@ import {
 } from '@/lib/contract-pdf-preview';
 import { syncDraftPdfFromDocuSign } from '@/lib/contract-pdf-sync-docusign';
 import { syncContractFromDocuSign } from '@/lib/docusign-envelope-sync';
+import { docuSignPollEligible } from '@/lib/docusign-poll-cooldown';
 import { refreshContractFromLinkedRoster } from '@/lib/nywe-roster-contract-sync';
 import type {
   AuditLogEntry,
@@ -97,7 +98,8 @@ export async function ContractDetailPage({
 
   if (
     contract.docusign_envelope_id &&
-    (['sent', 'partially_signed', 'error'].includes(contract.status) || nyweSignedNeedsAccounting)
+    (['sent', 'partially_signed', 'error'].includes(contract.status) || nyweSignedNeedsAccounting) &&
+    docuSignPollEligible(contract.docusign_last_polled_at)
   ) {
     try {
       const sync = await syncContractFromDocuSign(

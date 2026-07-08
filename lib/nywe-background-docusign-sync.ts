@@ -1,21 +1,12 @@
-import { reconcileNyweDocuSignPipeline } from '@/lib/nywe-sync-exhibitor-signatures';
-import { runBackgroundAccountingRelease } from '@/lib/background-accounting-release';
+import { releaseSignedContractsToAccounting } from '@/lib/nywe-release-stuck-on-load';
 
 /**
- * Lightweight NYWE DocuSign reconciliation on dashboard/roster load.
- * Catches missed webhooks and stuck `signed` licenses without manual refresh.
+ * Lightweight NYWE dashboard hook — releases stuck accounting handoffs only.
+ * DocuSign reconciliation runs on the 10-minute cron (not every page refresh).
  */
 export async function runNyweBackgroundDocuSignSync(): Promise<void> {
   try {
-    await Promise.all([
-      reconcileNyweDocuSignPipeline({
-        exhibitorBatchSize: 25,
-        exhibitorAll: false,
-        notify: false,
-        releaseLimit: 40,
-      }),
-      runBackgroundAccountingRelease(),
-    ]);
+    await releaseSignedContractsToAccounting({ limit: 40 });
   } catch (err) {
     console.error('[nywe-background-docusign-sync]', err);
   }

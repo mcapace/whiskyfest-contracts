@@ -17,6 +17,7 @@ import { insertContractAudit } from '@/lib/audit-log';
 import { isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
 import { autoReleaseAfterFullySigned } from '@/lib/auto-release-accounting';
 import { eventCountersignerIdentity } from '@/lib/docusign-envelope-recipients';
+import { docuSignPollEligible, touchDocuSignPoll } from '@/lib/docusign-poll-cooldown';
 import { usesSingleSignerEnvelope } from '@/lib/single-signer-envelope';
 import {
   notifyContractFullySigned,
@@ -295,7 +296,7 @@ export async function syncContractFromDocuSign(
   contract: ContractWithTotals,
   event: Event | null,
   actorEmail?: string | null,
-  options?: { notify?: boolean },
+  options?: { notify?: boolean; forcePoll?: boolean },
 ): Promise<DocuSignSyncResult> {
   const notify = options?.notify !== false;
   const envelopeId = contract.docusign_envelope_id?.trim();
@@ -341,6 +342,17 @@ export async function syncContractFromDocuSign(
       status: contract.status,
     };
   }
+
+  if (!options?.forcePoll && !docuSignPollEligible(contract.docusign_last_polled_at)) {
+    return {
+      ok: true,
+      changed: false,
+      message: 'DocuSign was checked recently; skipping poll.',
+      status: contract.status,
+    };
+  }
+
+  await touchDocuSignPoll(supabase, contract.id);
 
   const { status: envelopeStatus } = await fetchEnvelopeStatus(envelopeId);
   const envLower = envelopeStatus.toLowerCase();

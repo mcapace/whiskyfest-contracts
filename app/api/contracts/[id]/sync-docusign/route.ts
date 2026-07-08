@@ -39,7 +39,9 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     .eq('id', contract.event_id)
     .maybeSingle<Event>();
 
-  const result = await syncContractFromDocuSign(supabase, contract, event ?? null, gate.actor.email);
+  const result = await syncContractFromDocuSign(supabase, contract, event ?? null, gate.actor.email, {
+    forcePoll: true,
+  });
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 502 });

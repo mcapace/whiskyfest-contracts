@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createExhibitorSigningViewUrl, fetchEnvelopeSigners } from '@/lib/docusign';
+import { createExhibitorSigningViewUrl, formatDocuSignErrorForUser } from '@/lib/docusign';
 import { verifyDocuSignSigningLinkToken } from '@/lib/docusign-signing-link';
 import { personalNudgeReturnUrl } from '@/lib/contract-personal-nudge-email';
 import { getSupabaseAdmin } from '@/lib/supabase';
@@ -42,32 +42,29 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     );
   }
 
+  if (contract.status === 'partially_signed') {
+    return htmlPage(
+      'Thank you',
+      'Your signature is already on file. You can close this window.',
+    );
+  }
+
   const { data: eventRow } = await supabase.from('events').select('*').eq('id', contract.event_id).maybeSingle();
   const event = eventRow as Event | null;
 
   try {
-    const signers = await fetchEnvelopeSigners(envelopeId);
-    const exhibitor = signers.find((s) => s.routingOrder === '1');
-    const exhibitorStatus = exhibitor?.status?.toLowerCase() ?? '';
-    if (exhibitorStatus === 'completed' || exhibitorStatus === 'signed') {
-      return htmlPage(
-        'Thank you',
-        'Your signature is already on file. You can close this window.',
-      );
-    }
-
     const signingUrl = await createExhibitorSigningViewUrl({
       envelopeId,
       signerEmail,
       signerName: contract.signer_1_name?.trim() || signerEmail,
       returnUrl: personalNudgeReturnUrl(event),
+      recipientId: '1',
     });
 
     return NextResponse.redirect(signingUrl, { status: 302 });
   } catch (err) {
     console.error('[docusign-sign]', err);
-    const msg = err instanceof Error ? err.message : String(err);
-    return htmlPage('Unable to open signing', msg);
+    return htmlPage('Unable to open signing', formatDocuSignErrorForUser(err));
   }
 }
 

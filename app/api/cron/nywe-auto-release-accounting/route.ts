@@ -16,8 +16,8 @@ export async function POST(req: Request) {
 
   try {
     const [exhibitor, countersign, accounting] = await Promise.all([
-      syncActiveEventExhibitorSignaturesFromDocuSign({ batchSize: 40, notify: false }),
-      syncNyweCountersignaturesFromDocuSign({ notify: false, limit: 30 }),
+      syncActiveEventExhibitorSignaturesFromDocuSign({ batchSize: 25, notify: false }),
+      syncNyweCountersignaturesFromDocuSign({ notify: false, limit: 20 }),
       releaseSignedContractsToAccounting({ limit: 100 }),
     ]);
 

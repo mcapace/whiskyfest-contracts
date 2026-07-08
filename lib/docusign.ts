@@ -175,15 +175,41 @@ export function isDocuSignAuthError(err: unknown): boolean {
 export function isDocuSignRateLimitError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
   return (
+    msg.includes('429') ||
     msg.includes('HOURLY_APIINVOCATION_LIMIT_EXCEEDED') ||
     msg.includes('API_INVOCATION_LIMIT') ||
     msg.includes('BURST_APIINVOCATION_LIMIT_EXCEEDED')
   );
 }
 
+let docuSignRateLimitedUntilMs = 0;
+
+export function isDocuSignRateLimitedNow(): boolean {
+  return Date.now() < docuSignRateLimitedUntilMs;
+}
+
+export function markDocuSignRateLimitedFromResponse(status: number, body: string): void {
+  if (
+    status === 429 ||
+    body.includes('HOURLY_APIINVOCATION_LIMIT_EXCEEDED') ||
+    body.includes('BURST_APIINVOCATION_LIMIT_EXCEEDED') ||
+    body.includes('API_INVOCATION_LIMIT')
+  ) {
+    docuSignRateLimitedUntilMs = Date.now() + 55 * 60 * 1000;
+  }
+}
+
+export function assertDocuSignApiAvailable(): void {
+  if (isDocuSignRateLimitedNow()) {
+    throw new Error(
+      'DocuSign hourly API limit reached (3,000 calls/hour). Wait about an hour for the limit to reset, then try again.',
+    );
+  }
+}
+
 export function formatDocuSignErrorForUser(err: unknown): string {
   if (isDocuSignRateLimitError(err)) {
-    return 'DocuSign hourly API limit reached (3,000 calls/hour on your account). Wait about an hour for the limit to reset, then try again. Background sync has been reduced to avoid hitting this limit.';
+    return 'DocuSign is temporarily busy (hourly API limit). Please wait about an hour and try your signing link again, or contact your Shanken representative if you need help right away.';
   }
   if (isDocuSignAuthError(err)) {
     return 'DocuSign authentication failed. Confirm production env vars (DOCUSIGN_AUTH_URL, DOCUSIGN_ACCOUNT_ID, DOCUSIGN_USER_ID) match your live account, JWT consent is granted, and DOCUSIGN_BASE_URL is not pointing at the demo cluster. Then try again.';
@@ -351,6 +377,7 @@ export async function fetchRecipientTextTabs(
 
 /** Current envelope status from DocuSign (e.g. sent, delivered, completed, voided). */
 export async function fetchEnvelopeStatus(envelopeId: string): Promise<{ status: string }> {
+  assertDocuSignApiAvailable();
   const { accessToken, accountId, restApiBase } = await getDocuSignSession();
   const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}`;
   const res = await fetch(url, {
@@ -361,6 +388,7 @@ export async function fetchEnvelopeStatus(envelopeId: string): Promise<{ status:
   });
   const text = await res.text();
   if (!res.ok) {
+    markDocuSignRateLimitedFromResponse(res.status, text);
     throw new Error(`DocuSign getEnvelope ${res.status}: ${text}`);
   }
   const data = JSON.parse(text) as { status?: string; Status?: string };
@@ -370,6 +398,7 @@ export async function fetchEnvelopeStatus(envelopeId: string): Promise<{ status:
 }
 
 export async function fetchEnvelopeSigners(envelopeId: string): Promise<DocuSignSignerRow[]> {
+  assertDocuSignApiAvailable();
   const { accessToken, accountId, restApiBase } = await getDocuSignSession();
   const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}/recipients`;
   const res = await fetch(url, {
@@ -380,6 +409,7 @@ export async function fetchEnvelopeSigners(envelopeId: string): Promise<DocuSign
   });
   const text = await res.text();
   if (!res.ok) {
+    markDocuSignRateLimitedFromResponse(res.status, text);
     throw new Error(`DocuSign getRecipients ${res.status}: ${text}`);
   }
   const data = JSON.parse(text) as { signers?: Record<string, unknown>[] };
@@ -471,15 +501,12 @@ export async function createExhibitorSigningViewUrl(options: {
   signerEmail: string;
   signerName: string;
   returnUrl: string;
+  /** Exhibitor recipient id — always "1" on envelopes created by this app. Skips getRecipients. */
+  recipientId?: string;
 }): Promise<string> {
+  assertDocuSignApiAvailable();
   const { accessToken, accountId, restApiBase } = await getDocuSignSession();
-  const signers = await fetchEnvelopeSigners(options.envelopeId);
-  const exhibitor =
-    signers.find((s) => s.routingOrder === '1') ??
-    signers.find((s) => s.email?.trim().toLowerCase() === options.signerEmail.trim().toLowerCase());
-  if (!exhibitor?.recipientId) {
-    throw new Error('DocuSign exhibitor signer not found on this envelope.');
-  }
+  const recipientId = options.recipientId?.trim() || '1';
 
   const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(options.envelopeId)}/views/recipient`;
   const res = await fetch(url, {
@@ -493,13 +520,23 @@ export async function createExhibitorSigningViewUrl(options: {
       authenticationMethod: 'email',
       email: options.signerEmail.trim(),
       userName: options.signerName.trim() || options.signerEmail.trim(),
-      recipientId: exhibitor.recipientId,
+      recipientId,
       returnUrl: options.returnUrl,
     }),
   });
 
   const text = await res.text();
   if (!res.ok) {
+    markDocuSignRateLimitedFromResponse(res.status, text);
+    if (!options.recipientId && (res.status === 400 || res.status === 404)) {
+      const signers = await fetchEnvelopeSigners(options.envelopeId);
+      const exhibitor =
+        signers.find((s) => s.routingOrder === '1') ??
+        signers.find((s) => s.email?.trim().toLowerCase() === options.signerEmail.trim().toLowerCase());
+      if (exhibitor?.recipientId && exhibitor.recipientId !== recipientId) {
+        return createExhibitorSigningViewUrl({ ...options, recipientId: exhibitor.recipientId });
+      }
+    }
     throw new Error(`DocuSign createRecipientView ${res.status}: ${text}`);
   }
 

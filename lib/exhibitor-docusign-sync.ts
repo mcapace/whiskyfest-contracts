@@ -1,5 +1,6 @@
 import { isDocuSignRateLimitError } from '@/lib/docusign';
 import { syncContractFromDocuSign } from '@/lib/docusign-envelope-sync';
+import { docuSignPollCutoffIso } from '@/lib/docusign-poll-cooldown';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { Event } from '@/types/db';
@@ -55,15 +56,31 @@ export async function syncActiveEventExhibitorSignaturesFromDocuSign(options?: {
   const notify = options?.notify !== false;
   const concurrency = options?.concurrency ?? 3;
 
-  const { data: pendingIds } = await supabase
+  const pollCutoff = docuSignPollCutoffIso();
+  let pendingQuery = supabase
     .from('contracts')
     .select('id')
     .in('event_id', eventIds)
     .in('status', ['sent', 'error'])
     .not('docusign_envelope_id', 'is', null)
+    .or(`docusign_last_polled_at.is.null,docusign_last_polled_at.lt.${pollCutoff}`)
+    .order('docusign_last_polled_at', { ascending: true, nullsFirst: true })
     .order('sent_at', { ascending: false, nullsFirst: false })
     .order('id', { ascending: true })
     .limit(batchSize);
+
+  let { data: pendingIds, error: pendingErr } = await pendingQuery;
+  if (pendingErr?.message?.includes('docusign_last_polled_at')) {
+    ({ data: pendingIds } = await supabase
+      .from('contracts')
+      .select('id')
+      .in('event_id', eventIds)
+      .in('status', ['sent', 'error'])
+      .not('docusign_envelope_id', 'is', null)
+      .order('sent_at', { ascending: false, nullsFirst: false })
+      .order('id', { ascending: true })
+      .limit(batchSize));
+  }
 
   const result = { ...empty };
   const ids = (pendingIds ?? []).map((row) => row.id as string);

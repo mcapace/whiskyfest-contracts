@@ -94,6 +94,8 @@ export interface Contract {
   /** Primary PDF in Supabase Storage: `{contract_id}/draft.pdf` or `{contract_id}/signed.pdf`. */
   pdf_storage_path: string | null;
   docusign_envelope_id: string | null;
+  /** Last DocuSign poll for this envelope (background sync throttle). */
+  docusign_last_polled_at: string | null;
   signed_pdf_drive_id: string | null;
   signed_pdf_url: string | null;
   drafted_at: string | null;
