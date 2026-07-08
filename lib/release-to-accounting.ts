@@ -65,6 +65,10 @@ export async function releaseContractToAccounting(options: {
     };
   }
 
+  if (contract.accounting_notified_at) {
+    return { ok: false, error: 'Already released to accounting.', status: 409 };
+  }
+
   if (!process.env['SENDGRID_API_KEY']) {
     return { ok: false, error: 'SENDGRID_API_KEY is not configured.', status: 500 };
   }
@@ -156,7 +160,25 @@ export async function releaseContractToAccounting(options: {
 
   const now = new Date().toISOString();
 
-  await sendAccountingEmail({
+  // One email per contract — claim before SendGrid so webhook + cron + dashboard cannot duplicate.
+  const { data: claimed, error: claimError } = await supabase
+    .from('contracts')
+    .update({ accounting_notified_at: now })
+    .eq('id', contract.id)
+    .eq('status', contract.status)
+    .is('accounting_notified_at', null)
+    .select('id')
+    .maybeSingle();
+
+  if (claimError) {
+    return { ok: false, error: claimError.message, status: 500 };
+  }
+  if (!claimed) {
+    return { ok: false, error: 'Already released to accounting.', status: 409 };
+  }
+
+  try {
+    await sendAccountingEmail({
     contractId: contract.id,
     sponsorCompanyName: contract.exhibitor_company_name,
     exhibitorLegalName: contract.exhibitor_legal_name,
@@ -198,11 +220,20 @@ export async function releaseContractToAccounting(options: {
     accountingContractUrl: accountingContractUrl(contract.id, productKeyFromEvent(event)),
     salesRepEmail: contract.sales_rep_email ?? contract.created_by,
     productKey: event.product_key,
-  });
+    });
+  } catch (err) {
+    await supabase
+      .from('contracts')
+      .update({ accounting_notified_at: null })
+      .eq('id', contract.id)
+      .eq('status', contract.status);
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: msg, status: 502 };
+  }
 
   await supabase
     .from('contracts')
-    .update({ status: 'executed', executed_at: now, accounting_notified_at: now })
+    .update({ status: 'executed', executed_at: now })
     .eq('id', contract.id);
 
   await supabase.from('audit_log').insert({

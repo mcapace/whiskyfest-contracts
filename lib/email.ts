@@ -6,8 +6,8 @@ import { formatInvoiceStatus } from '@/lib/invoice-status';
 /**
  * Accounting handoff email (SendGrid).
  *
- * SENDGRID_API_KEY, ACCOUNTING_EMAILS (comma-separated), ACCOUNTING_FROM_EMAIL
- * Falls back to legacy ACCOUNTING_EMAIL if ACCOUNTING_EMAILS is unset.
+ * SENDGRID_API_KEY, ACCOUNTING_HANDOFF_EMAIL (single TO on executed handoff; defaults to accountsreceivable@mshanken.com)
+ * Legacy ACCOUNTING_EMAILS / ACCOUNTING_EMAIL are not used for executed-contract emails.
  */
 
 export interface AccountingEmailPayload {
@@ -77,15 +77,12 @@ function escape(s: string): string {
     .replace(/'/g, '&#39;');
 }
 
-function accountingToRecipients(): string[] {
-  const raw =
-    process.env['ACCOUNTING_EMAILS']?.trim() ||
-    process.env['ACCOUNTING_EMAIL']?.trim() ||
-    'accountsreceivable@mshanken.com,dbixler@mshanken.com,aanderson@mshanken.com';
-  return raw
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
+function accountingHandoffRecipients(): string[] {
+  const email =
+    process.env['ACCOUNTING_HANDOFF_EMAIL']?.trim().toLowerCase() ||
+    process.env['ACCOUNTING_EMAIL']?.trim().toLowerCase()?.split(',')[0]?.trim() ||
+    'accountsreceivable@mshanken.com';
+  return email ? [email] : ['accountsreceivable@mshanken.com'];
 }
 
 export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<void> {
@@ -104,7 +101,7 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
 
   sgMail.setApiKey(apiKey);
 
-  const recipients = accountingToRecipients();
+  const recipients = accountingHandoffRecipients();
   const doNotInvoice = p.invoiceStatusLabel === formatInvoiceStatus('not_invoiced');
   const subject = doNotInvoice
     ? `Contract Executed: ${p.sponsorCompanyName} — Do Not Invoice`
@@ -296,16 +293,9 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
     </div>
   `;
 
-  const sales = p.salesRepEmail?.trim();
-  const cc =
-    sales && !recipients.map((r) => r.toLowerCase()).includes(sales.toLowerCase())
-      ? [sales]
-      : undefined;
-
   await sgMail.send({
     from: { email: fromAddress, name: fromName },
     to: recipients,
-    cc,
     subject,
     text,
     html,
