@@ -1,4 +1,4 @@
-import { isDocuSignRateLimitError } from '@/lib/docusign';
+import { isDocuSignRateLimitError, isDocuSignBackgroundSyncDisabled } from '@/lib/docusign';
 import { syncContractFromDocuSign } from '@/lib/docusign-envelope-sync';
 import { docuSignPollCutoffIso } from '@/lib/docusign-poll-cooldown';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
@@ -42,7 +42,6 @@ export async function syncNyweExhibitorSignaturesFromDocuSign(options?: {
   notify?: boolean;
   concurrency?: number;
 }): Promise<NyweExhibitorSyncResult> {
-  const eventIds = await getActiveWineSpectatorEventIds();
   const empty: NyweExhibitorSyncResult = {
     scanned: 0,
     partiallySigned: 0,
@@ -54,6 +53,9 @@ export async function syncNyweExhibitorSignaturesFromDocuSign(options?: {
     hasMore: false,
     remainingSent: 0,
   };
+  if (isDocuSignBackgroundSyncDisabled()) return empty;
+
+  const eventIds = await getActiveWineSpectatorEventIds();
   if (eventIds.length === 0) return empty;
 
   const events = await getActiveWineSpectatorEvents();
@@ -230,8 +232,10 @@ export async function syncNyweCountersignaturesFromDocuSign(options?: {
   concurrency?: number;
   limit?: number;
 }): Promise<Pick<NyweExhibitorSyncResult, 'scanned' | 'fullySigned' | 'unchanged' | 'errors' | 'errorSamples'>> {
-  const eventIds = await getActiveWineSpectatorEventIds();
   const empty = { scanned: 0, fullySigned: 0, unchanged: 0, errors: 0, errorSamples: [] as NyweExhibitorSyncResult['errorSamples'] };
+  if (isDocuSignBackgroundSyncDisabled()) return empty;
+
+  const eventIds = await getActiveWineSpectatorEventIds();
   if (eventIds.length === 0) return empty;
 
   const events = await getActiveWineSpectatorEvents();

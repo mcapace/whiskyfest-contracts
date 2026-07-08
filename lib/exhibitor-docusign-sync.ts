@@ -1,4 +1,4 @@
-import { isDocuSignRateLimitError } from '@/lib/docusign';
+import { isDocuSignRateLimitError, isDocuSignBackgroundSyncDisabled } from '@/lib/docusign';
 import { syncContractFromDocuSign } from '@/lib/docusign-envelope-sync';
 import { docuSignPollCutoffIso } from '@/lib/docusign-poll-cooldown';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
@@ -37,6 +37,17 @@ export async function syncActiveEventExhibitorSignaturesFromDocuSign(options?: {
   notify?: boolean;
   concurrency?: number;
 }): Promise<ExhibitorDocuSignSyncResult> {
+  if (isDocuSignBackgroundSyncDisabled()) {
+    return {
+      scanned: 0,
+      partiallySigned: 0,
+      fullySigned: 0,
+      unchanged: 0,
+      errors: 0,
+      errorSamples: [],
+    };
+  }
+
   const supabase = getSupabaseAdmin();
   const empty: ExhibitorDocuSignSyncResult = {
     scanned: 0,

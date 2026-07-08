@@ -89,6 +89,11 @@ async function resolveApiContext(accessToken: string): Promise<{ accountId: stri
   const envAccountId = process.env['DOCUSIGN_ACCOUNT_ID']?.trim();
   const envBase = process.env['DOCUSIGN_BASE_URL']?.trim();
 
+  // Production env vars are authoritative — skip userinfo (saves 1 API call per session).
+  if (envAccountId && envBase) {
+    return { accountId: envAccountId, restApiBase: envBase.replace(/\/$/, '') };
+  }
+
   const authUrl = process.env['DOCUSIGN_AUTH_URL'] ?? 'https://account-d.docusign.com';
   const oAuthBasePath = authHostFromUrl(authUrl);
 
@@ -207,9 +212,14 @@ export function assertDocuSignApiAvailable(): void {
   }
 }
 
+export function isDocuSignBackgroundSyncDisabled(): boolean {
+  const v = process.env['DOCUSIGN_BACKGROUND_SYNC_DISABLED']?.trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes';
+}
+
 export function formatDocuSignErrorForUser(err: unknown): string {
   if (isDocuSignRateLimitError(err)) {
-    return 'DocuSign is temporarily busy (hourly API limit). Please wait about an hour and try your signing link again, or contact your Shanken representative if you need help right away.';
+    return 'DocuSign is temporarily busy (hourly API limit). Please check your inbox for an email from DocuSign with the subject line about signing your agreement — you can sign directly from that email without using this link. If you do not see it, contact your Shanken representative and ask them to resend the DocuSign envelope.';
   }
   if (isDocuSignAuthError(err)) {
     return 'DocuSign authentication failed. Confirm production env vars (DOCUSIGN_AUTH_URL, DOCUSIGN_ACCOUNT_ID, DOCUSIGN_USER_ID) match your live account, JWT consent is granted, and DOCUSIGN_BASE_URL is not pointing at the demo cluster. Then try again.';
@@ -476,6 +486,7 @@ export async function resendEnvelopeNotifications(envelopeId: string): Promise<v
   });
   if (!getRes.ok) {
     const t = await getRes.text();
+    markDocuSignRateLimitedFromResponse(getRes.status, t);
     throw new Error(`DocuSign getRecipients ${getRes.status}: ${t}`);
   }
   const recipients = await getRes.json();
@@ -503,8 +514,12 @@ export async function createExhibitorSigningViewUrl(options: {
   returnUrl: string;
   /** Exhibitor recipient id — always "1" on envelopes created by this app. Skips getRecipients. */
   recipientId?: string;
+  /** When true, attempt even if a recent 429 was seen in this instance (client-facing links). */
+  bypassRateLimitGuard?: boolean;
 }): Promise<string> {
-  assertDocuSignApiAvailable();
+  if (!options.bypassRateLimitGuard) {
+    assertDocuSignApiAvailable();
+  }
   const { accessToken, accountId, restApiBase } = await getDocuSignSession();
   const recipientId = options.recipientId?.trim() || '1';
 
@@ -528,15 +543,6 @@ export async function createExhibitorSigningViewUrl(options: {
   const text = await res.text();
   if (!res.ok) {
     markDocuSignRateLimitedFromResponse(res.status, text);
-    if (!options.recipientId && (res.status === 400 || res.status === 404)) {
-      const signers = await fetchEnvelopeSigners(options.envelopeId);
-      const exhibitor =
-        signers.find((s) => s.routingOrder === '1') ??
-        signers.find((s) => s.email?.trim().toLowerCase() === options.signerEmail.trim().toLowerCase());
-      if (exhibitor?.recipientId && exhibitor.recipientId !== recipientId) {
-        return createExhibitorSigningViewUrl({ ...options, recipientId: exhibitor.recipientId });
-      }
-    }
     throw new Error(`DocuSign createRecipientView ${res.status}: ${text}`);
   }
 

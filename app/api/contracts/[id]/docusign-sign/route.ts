@@ -59,6 +59,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       signerName: contract.signer_1_name?.trim() || signerEmail,
       returnUrl: personalNudgeReturnUrl(event),
       recipientId: '1',
+      bypassRateLimitGuard: true,
     });
 
     return NextResponse.redirect(signingUrl, { status: 302 });

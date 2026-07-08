@@ -19,6 +19,8 @@ export type PersonalNudgeEmailParams = {
   senderEmail: string;
   internalCcEmail?: string | null;
   internalCcName?: string | null;
+  /** True when a fresh DocuSign signing email was also sent to the signer. */
+  docusignResent?: boolean;
 };
 
 function escapeHtml(s: string): string {
@@ -44,8 +46,14 @@ export async function sendPersonalContractNudgeEmail(p: PersonalNudgeEmailParams
   const eventLabel = p.event.year ? `${p.event.name} ${p.event.year}` : p.event.name;
   const subject = `Reminder: please sign your ${eventLabel} agreement`;
 
+  const docusignNote = p.docusignResent
+    ? 'We also sent a separate email from DocuSign with a direct signing link — you can use either email to sign.'
+    : 'If the button below does not work, check your inbox for an email from DocuSign about signing this agreement.';
+
   const text = [
     p.personalMessage.trim(),
+    '',
+    docusignNote,
     '',
     `Review and sign: ${signingUrl}`,
     '',
@@ -57,6 +65,7 @@ export async function sendPersonalContractNudgeEmail(p: PersonalNudgeEmailParams
   const html = `
     <div style="font-family: system-ui, -apple-system, sans-serif; color: #1a1a1a; max-width: 620px; line-height: 1.55;">
       <p style="font-size:15px;">${messageHtml}</p>
+      <p style="font-size:14px;color:#444;">${escapeHtml(docusignNote)}</p>
       <p style="margin:28px 0;">
         <a href="${escapeHtml(signingUrl)}"
            style="display:inline-block;padding:12px 20px;background:#6b3822;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">

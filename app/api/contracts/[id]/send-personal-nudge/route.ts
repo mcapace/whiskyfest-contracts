@@ -6,8 +6,10 @@ import { getEffectiveUserEmail } from '@/lib/effective-user';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
 import {
-  sendPersonalContractNudgeEmail,
-} from '@/lib/contract-personal-nudge-email';
+  formatDocuSignErrorForUser,
+  resendEnvelopeNotifications,
+} from '@/lib/docusign';
+import { sendPersonalContractNudgeEmail } from '@/lib/contract-personal-nudge-email';
 import { defaultPersonalNudgeMessage } from '@/lib/contract-personal-nudge-copy';
 import { insertContractAudit } from '@/lib/audit-log';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
@@ -82,7 +84,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       senderName,
     });
 
+  let docusignResent = false;
   try {
+    try {
+      await resendEnvelopeNotifications(envelopeId);
+      docusignResent = true;
+    } catch (resendErr) {
+      console.warn('[send-personal-nudge] DocuSign resend failed', resendErr);
+    }
+
     await sendPersonalContractNudgeEmail({
       contractId: contract.id,
       event,
@@ -94,10 +104,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       senderEmail: actorEmail,
       internalCcEmail,
       internalCcName: body.internal_cc_name?.trim() || null,
+      docusignResent,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 502 });
+    return NextResponse.json({ error: formatDocuSignErrorForUser(err) || msg }, { status: 502 });
   }
 
   await insertContractAudit(supabase, {
@@ -108,6 +119,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       signer_email: signerEmail,
       internal_cc_email: internalCcEmail,
       message_preview: message.slice(0, 240),
+      docusign_resent: docusignResent,
     },
   });
 
