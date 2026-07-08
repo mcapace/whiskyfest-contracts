@@ -49,6 +49,7 @@ export type ContractDetailViewProps = {
   isEventsTeam: boolean;
   clientSendEnabled: boolean;
   eventsManagedWorkflow: boolean;
+  autoReleaseToAccounting: boolean;
   releaseAudit: AuditLogEntry | undefined;
   discountPending: boolean;
   dealKind: ContractDealKind;
@@ -78,6 +79,7 @@ export function ContractDetailView({
   isEventsTeam,
   clientSendEnabled,
   eventsManagedWorkflow,
+  autoReleaseToAccounting,
   releaseAudit,
   discountPending,
   dealKind,
@@ -299,6 +301,7 @@ export function ContractDetailView({
                 discountApprovalPending={discountPending}
                 isEventsTeam={isEventsTeam}
                 eventsManagedWorkflow={eventsManagedWorkflow}
+                autoReleaseToAccounting={autoReleaseToAccounting}
                 clientSendEnabled={clientSendEnabled}
                 portalBasePath={portalBasePath}
                 importedAt={contract.imported_at}

@@ -1,16 +1,12 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useCallback, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { CheckCircle2, AlertTriangle, PenLine, Send } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
 import { RelativeTime } from '@/components/ui/relative-time';
-import { emitContractActionSuccessFeedback } from '@/lib/contract-action-feedback';
-import { useSession } from 'next-auth/react';
 
 export type NyweStuckLicense = {
   id: string;
@@ -25,20 +21,11 @@ export type NyweSentLicense = {
   executedAt: string | null;
 };
 
-export type NyweReadyToCountersignLicense = {
-  id: string;
-  exhibitorCompanyName: string;
-  grandTotalCents: number;
-  updatedAt: string;
-};
-
 type Props = {
   stuck: NyweStuckLicense[];
   recentlySent: NyweSentLicense[];
   reviewCount: number;
   waitingOnWineryCount: number;
-  readyToCountersign: NyweReadyToCountersignLicense[];
-  canFixStuck: boolean;
 };
 
 function QueueRow({
@@ -75,34 +62,8 @@ export function NyweSusannahDashboard({
   recentlySent,
   reviewCount,
   waitingOnWineryCount,
-  readyToCountersign,
-  canFixStuck,
 }: Props) {
-  const router = useRouter();
-  const { data: session } = useSession();
-  const [pendingId, setPendingId] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  const fixStuck = useCallback(
-    (contractId: string) => {
-      setPendingId(contractId);
-      startTransition(async () => {
-        const res = await fetch(`/api/contracts/${contractId}/release`, { method: 'POST' });
-        if (res.ok) {
-          emitContractActionSuccessFeedback(Boolean(session?.user?.sound_enabled));
-          router.refresh();
-        } else {
-          const j = await res.json().catch(() => ({}));
-          alert(`Something went wrong. Please ask Mike for help.\n\n${j.error ?? res.status}`);
-        }
-        setPendingId(null);
-      });
-    },
-    [router, session?.user?.sound_enabled],
-  );
-
-  const hasQueue =
-    reviewCount > 0 || readyToCountersign.length > 0 || stuck.length > 0 || waitingOnWineryCount > 0;
+  const hasQueue = reviewCount > 0 || stuck.length > 0 || waitingOnWineryCount > 0;
 
   return (
     <Card className="h-full border-fest-600/15">
@@ -118,34 +79,9 @@ export function NyweSusannahDashboard({
               All caught up
             </p>
             <p className="mt-1 text-sm text-emerald-900/80">
-              Countersign in DocuSign when wineries sign — accounting runs automatically after that.
+              Wineries sign in DocuSign — contracts execute and accounting is notified automatically.
             </p>
           </div>
-        ) : null}
-
-        {readyToCountersign.length > 0 ? (
-          <section>
-            <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-orange-800">
-              <PenLine className="h-3.5 w-3.5" aria-hidden />
-              Countersign in DocuSign ({readyToCountersign.length})
-            </p>
-            <ul className="space-y-2">
-              {readyToCountersign.slice(0, 5).map((row) => (
-                <QueueRow
-                  key={row.id}
-                  title={row.exhibitorCompanyName}
-                  subtitle={`Winery signed ${new Date(row.updatedAt).toLocaleDateString()}`}
-                  href={`/wine-spectator/contracts/${row.id}`}
-                  amount={row.grandTotalCents}
-                />
-              ))}
-            </ul>
-            {readyToCountersign.length > 5 ? (
-              <Link href="/wine-spectator/roster?filter=countersign" className="mt-2 inline-block text-xs font-medium text-accent-brand hover:underline">
-                View all {readyToCountersign.length} on roster
-              </Link>
-            ) : null}
-          </section>
         ) : null}
 
         {reviewCount > 0 ? (
@@ -163,7 +99,10 @@ export function NyweSusannahDashboard({
           <section>
             <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-800">
               <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
-              Release to accounting ({stuck.length})
+              Processing to accounting ({stuck.length})
+            </p>
+            <p className="mb-2 text-xs text-muted-foreground">
+              These signed licenses are finishing automatically — no action needed.
             </p>
             <ul className="space-y-2">
               {stuck.map((row) => (
@@ -175,37 +114,41 @@ export function NyweSusannahDashboard({
                     <p className="text-sm font-medium">{row.exhibitorCompanyName}</p>
                     <p className="text-xs text-muted-foreground">{formatCurrency(row.grandTotalCents)}</p>
                   </div>
-                  {canFixStuck ? (
-                    <Button size="sm" disabled={pending} onClick={() => fixStuck(row.id)}>
-                      {pending && pendingId === row.id ? 'Sending…' : 'Send to accounting'}
-                    </Button>
-                  ) : (
-                    <Link href={`/wine-spectator/contracts/${row.id}`} className="text-xs font-medium text-accent-brand hover:underline">
-                      Open
-                    </Link>
-                  )}
+                  <Link href={`/wine-spectator/contracts/${row.id}`} className="text-xs font-medium text-accent-brand hover:underline">
+                    Open
+                  </Link>
                 </li>
               ))}
             </ul>
           </section>
         ) : null}
 
-        {waitingOnWineryCount > 0 && readyToCountersign.length === 0 ? (
+        {waitingOnWineryCount > 0 ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <Send className="h-4 w-4 shrink-0" aria-hidden />
-            {waitingOnWineryCount} waiting on winery signature in DocuSign
+            {waitingOnWineryCount} license{waitingOnWineryCount === 1 ? '' : 's'} waiting on winery signature in DocuSign
           </p>
         ) : null}
 
         {recentlySent.length > 0 ? (
-          <section className="border-t border-border/50 pt-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recently executed</p>
-            <ul className="mt-2 space-y-2">
-              {recentlySent.slice(0, 4).map((row) => (
+          <section>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Recently executed
+            </p>
+            <ul className="space-y-2">
+              {recentlySent.slice(0, 5).map((row) => (
                 <QueueRow
                   key={row.id}
                   title={row.exhibitorCompanyName}
-                  subtitle={row.executedAt ? <RelativeTime iso={row.executedAt} /> : 'Recently'}
+                  subtitle={
+                    row.executedAt ? (
+                      <>
+                        Executed <RelativeTime iso={row.executedAt} />
+                      </>
+                    ) : (
+                      'Executed'
+                    )
+                  }
                   href={`/wine-spectator/contracts/${row.id}`}
                   amount={row.grandTotalCents}
                 />

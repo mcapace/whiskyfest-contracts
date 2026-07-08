@@ -14,6 +14,10 @@ import {
   contractPdfBaseName,
 } from '@/lib/contract-document-naming';
 import { eventUsesContractOrderTable, eventTemplateProfile } from '@/lib/contract-template-profile';
+import {
+  countersignerRequiredForEvent,
+  docusignCountersignerForEvent,
+} from '@/lib/docusign-envelope-recipients';
 import { contractHasBillingInfo, contractHasNyweLicenseAddress, nyweLicenseAddressError } from '@/lib/nywe-billing';
 import { refreshNyweBillingFromRosterForContract } from '@/lib/nywe-roster-billing-sync';
 import { resolveContractTemplateDocId } from '@/lib/contract-template';
@@ -95,9 +99,8 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: addressError }, { status: 400 });
   }
 
-  const countersignerEmail = event.shanken_signatory_email?.trim();
-  const countersignerName = event.shanken_signatory_name?.trim();
-  if (!countersignerEmail || !countersignerName) {
+  const countersigner = docusignCountersignerForEvent(event);
+  if (countersignerRequiredForEvent(event) && !countersigner) {
     return NextResponse.json(
       { error: 'Event countersigner name and email are required.' },
       { status: 500 },
@@ -109,7 +112,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   const carbonCopy = parseSignerCc(contract);
   const ccError = validateSignerCcDistinct({
     signerEmail,
-    countersignerEmail,
+    countersignerEmail: countersigner?.email ?? event.shanken_signatory_email?.trim() ?? '',
     cc: carbonCopy,
   });
   if (ccError) {
@@ -144,7 +147,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       emailSubject: contractDocuSignEmailSubject(contract.exhibitor_company_name, event),
       emailBlurb: contractDocuSignEmailBlurb(contract.exhibitor_company_name, event),
       signer1: { name: signerName, email: signerEmail },
-      countersigner: { name: countersignerName, email: countersignerEmail },
+      countersigner,
       carbonCopy,
       brandId: docusignBrandIdForEvent(event),
       skipExhibitorDataTabs:
@@ -181,8 +184,9 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
         envelope_status: 'sent',
         exhibitor_signer: contract.signer_1_email,
         signer_cc_email: carbonCopy?.email ?? null,
-        countersigner_email: countersignerEmail,
-        countersigner_name: countersignerName,
+        countersigner_email: countersigner?.email ?? event.shanken_signatory_email,
+        countersigner_name: countersigner?.name ?? event.shanken_signatory_name,
+        single_signer_envelope: countersigner == null,
       },
     });
 

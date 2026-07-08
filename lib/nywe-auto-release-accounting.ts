@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
+import { insertContractAudit } from '@/lib/audit-log';
 import { NYWE_COUNTERSIGNER_EMAILS } from '@/lib/nywe-countersigner';
 import { releaseContractToAccounting } from '@/lib/release-to-accounting';
 import type { ContractWithTotals, Event } from '@/types/db';
@@ -69,6 +70,12 @@ export async function autoReleaseNyweToAccounting(options: {
 
   if (!release.ok) {
     console.error('[NYWE auto-release]', contract.id, release.error);
+    await insertContractAudit(supabase, {
+      contract_id: contract.id,
+      actor_email: actorEmail,
+      action: 'auto_release_failed',
+      metadata: { error: release.error },
+    });
     return { released: false, error: release.error };
   }
 

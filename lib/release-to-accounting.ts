@@ -129,6 +129,9 @@ export async function releaseContractToAccounting(options: {
         ? (formatExhibitorAddressBlock(contract) || '—').replace(/\n/g, ', ')
         : (formatBillingAddressBlock(contract) || '—').replace(/\n/g, ', ');
 
+  const billingCompanyName =
+    contract.exhibitor_legal_name?.trim() || contract.exhibitor_company_name?.trim() || null;
+
   const discountCents = calculateDiscountCents(contract.booth_count, contract.booth_rate_cents, event);
   const discountLine =
     isDiscountedRate(contract.booth_rate_cents, event) && discountCents > 0
@@ -175,6 +178,7 @@ export async function releaseContractToAccounting(options: {
       exhibitorCaptured || contractHasBillingInfo(contract) ? contract.billing_contact_name : null,
     exhibitorBillingContactEmail:
       exhibitorCaptured || contractHasBillingInfo(contract) ? contract.billing_contact_email : null,
+    billingCompanyName,
     exhibitorBillingAddressDetail:
       exhibitorCaptured || contractHasBillingInfo(contract) ? formatBillingAddressBlock(contract) : null,
     exhibitorEventContactName: exhibitorCaptured ? contract.event_contact_name : null,

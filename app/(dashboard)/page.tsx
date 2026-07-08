@@ -38,6 +38,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { StatusBadge } from '@/components/contracts/status-badge';
 import { fetchBoothBrandsByContractIds } from '@/lib/contract-booth-brand-queries';
 import { getBrandMix, getDeadlines, getEventVitalSigns, getPipelineData, getRecentActivity, getSalesLeaderboard } from '@/lib/event-metrics';
+import { runBackgroundAccountingRelease } from '@/lib/background-accounting-release';
 import type { AuditLogEntry, ContractWithTotals, Event } from '@/types/db';
 import {
   PRODUCT_WHISKYFEST,
@@ -68,6 +69,7 @@ export async function getDashboardData(
   actor: Awaited<ReturnType<typeof requireContractActorForPage>>,
   productKey: ProductKey = PRODUCT_WHISKYFEST,
 ) {
+  void runBackgroundAccountingRelease();
   const supabase = getSupabaseAdmin();
 
   const { data: appUser } = await supabase

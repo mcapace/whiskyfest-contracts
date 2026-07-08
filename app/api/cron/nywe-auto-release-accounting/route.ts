@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
-import { reconcileNyweDocuSignPipeline } from '@/lib/nywe-sync-exhibitor-signatures';
+import { syncActiveEventExhibitorSignaturesFromDocuSign } from '@/lib/exhibitor-docusign-sync';
+import { releaseSignedContractsToAccounting } from '@/lib/nywe-release-stuck-on-load';
+import { syncNyweCountersignaturesFromDocuSign } from '@/lib/nywe-sync-exhibitor-signatures';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
 
-/** Retry NYWE DocuSign reconciliation: signatures, countersignatures, and release to accounting. */
+/** Reconcile DocuSign signatures and auto-release signed contracts (WhiskyFest + NYWE). */
 export async function POST(req: Request) {
   const authHeader = req.headers.get('authorization');
   const cronSecret = process.env['CRON_SECRET'];
@@ -12,27 +14,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const result = await reconcileNyweDocuSignPipeline({
-    exhibitorBatchSize: 20,
-    exhibitorAll: false,
-    notify: false,
-    releaseLimit: 25,
-  }).catch((err) => {
-    console.error('[nywe-auto-release-accounting cron] reconcile failed', err);
-    return null;
-  });
+  try {
+    const [exhibitor, countersign, accounting] = await Promise.all([
+      syncActiveEventExhibitorSignaturesFromDocuSign({ batchSize: 40, notify: false }),
+      syncNyweCountersignaturesFromDocuSign({ notify: false, limit: 30 }),
+      releaseSignedContractsToAccounting({ limit: 100 }),
+    ]);
 
-  if (!result) {
+    return NextResponse.json({
+      ok: true,
+      exhibitorSync: exhibitor,
+      countersignSync: countersign,
+      scanned: accounting.scanned,
+      released: accounting.released,
+      failed: accounting.failed,
+      errors: accounting.errorSamples,
+    });
+  } catch (err) {
+    console.error('[auto-release-accounting cron] reconcile failed', err);
     return NextResponse.json({ error: 'Reconcile failed' }, { status: 500 });
   }
-
-  return NextResponse.json({
-    ok: true,
-    exhibitorSync: result.exhibitor,
-    countersignSync: result.countersign,
-    scanned: result.accounting.scanned,
-    released: result.accounting.released,
-    failed: result.accounting.failed,
-    errors: result.accounting.errorSamples,
-  });
 }

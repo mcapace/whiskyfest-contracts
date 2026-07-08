@@ -11,8 +11,6 @@ import { StatusBadge } from '@/components/contracts/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { isEventsManagedWorkflow } from '@/lib/contract-template-profile';
-import { wineSpectatorContractIsAdmin } from '@/lib/wine-spectator-access';
 import { NyweSusannahDashboard } from '@/components/wine-spectator/nywe-susannah-dashboard';
 import { NyweMetricsGrid } from '@/components/wine-spectator/nywe-metrics-grid';
 import { NywePipelinePanel } from '@/components/wine-spectator/nywe-pipeline-panel';
@@ -20,7 +18,6 @@ import { NyweQuickNav } from '@/components/wine-spectator/nywe-quick-nav';
 import { buildNyweDashboardMetrics, getNywePipelineData } from '@/lib/nywe-dashboard-metrics';
 import { runNyweBackgroundDocuSignSync } from '@/lib/nywe-background-docusign-sync';
 import { DashboardLiveRefresh } from '@/components/dashboard/dashboard-live-refresh';
-import { NyweDocuSignRefreshButton } from '@/components/wine-spectator/nywe-docusign-refresh-button';
 import type { ContractWithTotals } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
@@ -41,9 +38,6 @@ export default async function WineSpectatorDashboardPage() {
   const primaryEvent = events.find((e) => e.is_active) ?? events[0] ?? null;
   const reviewCount = countByStatus(activeScoped, ['pending_events_review']);
   const waitingOnWineryCount = countByStatus(activeScoped, ['sent']);
-  const readyToCountersign = activeScoped
-    .filter((c) => c.status === 'partially_signed')
-    .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
   const totalValueCents = activeScoped.reduce((sum, c) => sum + c.grand_total_cents, 0);
   const metrics = buildNyweDashboardMetrics(activeScoped, primaryEvent);
   const pipeline = getNywePipelineData(activeScoped);
@@ -62,13 +56,6 @@ export default async function WineSpectatorDashboardPage() {
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
     .slice(0, 10);
 
-  const eventsManaged = primaryEvent ? isEventsManagedWorkflow(primaryEvent) : false;
-  const canFixStuck =
-    wineSpectatorContractIsAdmin(PRODUCT_WINE_SPECTATOR, {
-      isAdmin: actor.isAdmin,
-      isWineSpectatorAdmin: actor.isWineSpectatorAdmin,
-    }) ||
-    (actor.isEventsTeam && eventsManaged);
 
   const tz = process.env.NEXT_PUBLIC_DISPLAY_TIMEZONE ?? 'America/New_York';
   const hour = greetingHour(tz);
@@ -101,10 +88,6 @@ export default async function WineSpectatorDashboardPage() {
 
       <NyweMetricsGrid metrics={metrics} />
 
-      <div className="flex justify-end">
-        <NyweDocuSignRefreshButton />
-      </div>
-
       <NyweQuickNav />
 
       <NywePipelinePanel data={pipeline} />
@@ -123,13 +106,6 @@ export default async function WineSpectatorDashboardPage() {
           }))}
           reviewCount={reviewCount}
           waitingOnWineryCount={waitingOnWineryCount}
-          readyToCountersign={readyToCountersign.map((c) => ({
-            id: c.id,
-            exhibitorCompanyName: c.exhibitor_company_name,
-            grandTotalCents: c.grand_total_cents,
-            updatedAt: c.updated_at,
-          }))}
-          canFixStuck={canFixStuck}
         />
 
       <Card className="overflow-hidden border-fest-600/15" data-tour="dashboard-contracts-table">

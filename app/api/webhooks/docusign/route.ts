@@ -7,6 +7,7 @@ import {
   applyExhibitorPartialSignature,
   isDocuSignEnvelopeFullySigned,
 } from '@/lib/docusign-envelope-sync';
+import { autoReleaseAfterFullySigned, contractNeedsAutoReleaseToAccounting } from '@/lib/auto-release-accounting';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { updateContractRow } from '@/lib/sheets-tracker';
 import type { ContractWithTotals, Event } from '@/types/db';
@@ -205,6 +206,26 @@ export async function POST(req: Request) {
       revalidateContractPaths(contract.id);
       return new NextResponse(null, { status: 500 });
     }
+  }
+
+  // Signed but accounting handoff failed earlier — retry on later webhooks (WhiskyFest + NYWE).
+  if (
+    contract.status === 'signed' &&
+    event &&
+    contractNeedsAutoReleaseToAccounting(contract) &&
+    (completedEvent || recipientCompletedEvent)
+  ) {
+    try {
+      await autoReleaseAfterFullySigned({
+        supabase,
+        contractId: contract.id,
+        event,
+        countersignerEmail: contract.countersigned_by_email,
+      });
+    } catch (err) {
+      console.error('[docusign-webhook] auto-release retry failed', err);
+    }
+    return new NextResponse(null, { status: 200 });
   }
 
   // --- Exhibitor (routing order 1) completed → partially_signed ---

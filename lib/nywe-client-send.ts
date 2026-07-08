@@ -11,6 +11,10 @@ import { insertContractAudit } from '@/lib/audit-log';
 import { eventTemplateProfile, eventUsesContractOrderTable, isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
 import { persistContractDraftPdf } from '@/lib/contract-pdf-storage';
 import { resolveContractTemplateDocId } from '@/lib/contract-template';
+import {
+  countersignerRequiredForEvent,
+  docusignCountersignerForEvent,
+} from '@/lib/docusign-envelope-recipients';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
 import { sendEnvelope } from '@/lib/docusign';
@@ -85,9 +89,8 @@ export async function nyweClientSendContract(options: {
     return { ok: false, error: addressError, statusCode: 400 };
   }
 
-  const countersignerEmail = event.shanken_signatory_email?.trim();
-  const countersignerName = event.shanken_signatory_name?.trim();
-  if (!countersignerEmail || !countersignerName) {
+  const countersigner = docusignCountersignerForEvent(event);
+  if (countersignerRequiredForEvent(event) && !countersigner) {
     return { ok: false, error: 'Event countersigner name and email are required.', statusCode: 500 };
   }
 
@@ -96,7 +99,7 @@ export async function nyweClientSendContract(options: {
   const carbonCopy = parseSignerCc(contract);
   const ccError = validateSignerCcDistinct({
     signerEmail,
-    countersignerEmail,
+    countersignerEmail: countersigner?.email ?? event.shanken_signatory_email?.trim() ?? '',
     cc: carbonCopy,
   });
   if (ccError) {
@@ -161,7 +164,7 @@ export async function nyweClientSendContract(options: {
       emailSubject: contractDocuSignEmailSubject(contract.exhibitor_company_name, event),
       emailBlurb: contractDocuSignEmailBlurb(contract.exhibitor_company_name, event),
       signer1: { name: signerName, email: signerEmail },
-      countersigner: { name: countersignerName, email: countersignerEmail },
+      countersigner,
       carbonCopy,
       brandId: docusignBrandIdForEvent(event),
       skipExhibitorDataTabs:
@@ -198,8 +201,9 @@ export async function nyweClientSendContract(options: {
         envelope_status: 'sent',
         exhibitor_signer: signerEmail,
         signer_cc_email: carbonCopy?.email ?? null,
-        countersigner_email: countersignerEmail,
-        countersigner_name: countersignerName,
+        countersigner_email: countersigner?.email ?? event.shanken_signatory_email,
+        countersigner_name: countersigner?.name ?? event.shanken_signatory_name,
+        single_signer_envelope: countersigner == null,
         bulk_send: true,
       },
     });

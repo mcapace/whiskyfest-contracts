@@ -1,9 +1,9 @@
 import { isDocuSignRateLimitError } from '@/lib/docusign';
 import { syncContractFromDocuSign } from '@/lib/docusign-envelope-sync';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
-import { releaseNyweSignedLicensesToAccounting } from '@/lib/nywe-release-stuck-on-load';
+import { releaseSignedContractsToAccounting } from '@/lib/nywe-release-stuck-on-load';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { getActiveWineSpectatorEvent } from '@/lib/wine-spectator-event';
+import { getActiveWineSpectatorEventIds, getActiveWineSpectatorEvents } from '@/lib/wine-spectator-event';
 
 export type NyweExhibitorSyncResult = {
   scanned: number;
@@ -34,14 +34,14 @@ async function mapWithConcurrency<T>(
   await Promise.all(workers);
 }
 
-/** Reconcile NYWE licenses stuck at `sent` when the winery already signed in DocuSign. */
+/** Reconcile NYWE licenses stuck at `sent` / `error` when the winery already signed in DocuSign. */
 export async function syncNyweExhibitorSignaturesFromDocuSign(options?: {
   batchSize?: number;
   afterId?: string | null;
   notify?: boolean;
   concurrency?: number;
 }): Promise<NyweExhibitorSyncResult> {
-  const event = await getActiveWineSpectatorEvent();
+  const eventIds = await getActiveWineSpectatorEventIds();
   const empty: NyweExhibitorSyncResult = {
     scanned: 0,
     partiallySigned: 0,
@@ -53,7 +53,10 @@ export async function syncNyweExhibitorSignaturesFromDocuSign(options?: {
     hasMore: false,
     remainingSent: 0,
   };
-  if (!event) return empty;
+  if (eventIds.length === 0) return empty;
+
+  const events = await getActiveWineSpectatorEvents();
+  const eventById = new Map(events.map((e) => [e.id, e]));
 
   const batchSize = options?.batchSize ?? 20;
   const notify = options?.notify !== false;
@@ -64,15 +67,15 @@ export async function syncNyweExhibitorSignaturesFromDocuSign(options?: {
   const { count: remainingSent } = await supabase
     .from('contracts')
     .select('*', { count: 'exact', head: true })
-    .eq('event_id', event.id)
-    .eq('status', 'sent')
+    .in('event_id', eventIds)
+    .in('status', ['sent', 'error'])
     .not('docusign_envelope_id', 'is', null);
 
   let query = supabase
     .from('contracts')
     .select('id')
-    .eq('event_id', event.id)
-    .eq('status', 'sent')
+    .in('event_id', eventIds)
+    .in('status', ['sent', 'error'])
     .not('docusign_envelope_id', 'is', null)
     .order('sent_at', { ascending: false, nullsFirst: false })
     .order('id', { ascending: true })
@@ -98,9 +101,16 @@ export async function syncNyweExhibitorSignaturesFromDocuSign(options?: {
     }
 
     const contract = await fetchContractWithTotalsById(supabase, id);
-    if (!contract || contract.status !== 'sent' || !contract.docusign_envelope_id?.trim()) {
+    if (
+      !contract ||
+      !['sent', 'error'].includes(contract.status) ||
+      !contract.docusign_envelope_id?.trim()
+    ) {
       return;
     }
+
+    const event = eventById.get(contract.event_id);
+    if (!event) return;
 
     result.scanned += 1;
 
@@ -201,15 +211,18 @@ export async function syncNyweCountersignaturesFromDocuSign(options?: {
   concurrency?: number;
   limit?: number;
 }): Promise<Pick<NyweExhibitorSyncResult, 'scanned' | 'fullySigned' | 'unchanged' | 'errors' | 'errorSamples'>> {
-  const event = await getActiveWineSpectatorEvent();
+  const eventIds = await getActiveWineSpectatorEventIds();
   const empty = { scanned: 0, fullySigned: 0, unchanged: 0, errors: 0, errorSamples: [] as NyweExhibitorSyncResult['errorSamples'] };
-  if (!event) return empty;
+  if (eventIds.length === 0) return empty;
+
+  const events = await getActiveWineSpectatorEvents();
+  const eventById = new Map(events.map((e) => [e.id, e]));
 
   const supabase = getSupabaseAdmin();
   const { data: pendingIds } = await supabase
     .from('contracts')
     .select('id')
-    .eq('event_id', event.id)
+    .in('event_id', eventIds)
     .eq('status', 'partially_signed')
     .not('docusign_envelope_id', 'is', null)
     .order('updated_at', { ascending: false })
@@ -228,6 +241,9 @@ export async function syncNyweCountersignaturesFromDocuSign(options?: {
     if (!contract || contract.status !== 'partially_signed' || !contract.docusign_envelope_id?.trim()) {
       return;
     }
+
+    const event = eventById.get(contract.event_id);
+    if (!event) return;
 
     result.scanned += 1;
 
@@ -267,7 +283,7 @@ export async function syncNyweCountersignaturesFromDocuSign(options?: {
 export type NyweDocuSignReconcileResult = {
   exhibitor: NyweExhibitorSyncResult;
   countersign: Awaited<ReturnType<typeof syncNyweCountersignaturesFromDocuSign>>;
-  accounting: Awaited<ReturnType<typeof releaseNyweSignedLicensesToAccounting>>;
+  accounting: Awaited<ReturnType<typeof releaseSignedContractsToAccounting>>;
 };
 
 /**
@@ -297,7 +313,7 @@ export async function reconcileNyweDocuSignPipeline(options?: {
       });
 
   const countersign = await syncNyweCountersignaturesFromDocuSign({ notify, limit: batchSize });
-  const accounting = await releaseNyweSignedLicensesToAccounting({ limit: options?.releaseLimit ?? 50 });
+  const accounting = await releaseSignedContractsToAccounting({ limit: options?.releaseLimit ?? 100 });
 
   return { exhibitor, countersign, accounting };
 }

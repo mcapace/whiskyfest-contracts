@@ -35,6 +35,8 @@ export interface AccountingEmailPayload {
   /** Set when exhibitor DocuSign tabs populated `exhibitor_fields_captured_at`. */
   exhibitorBillingContactName?: string | null;
   exhibitorBillingContactEmail?: string | null;
+  /** Bill-to company for invoicing (legal name or display company). */
+  billingCompanyName?: string | null;
   /** Multiline billing address (HTML uses <br/>). */
   exhibitorBillingAddressDetail?: string | null;
   exhibitorEventContactName?: string | null;
@@ -143,11 +145,12 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
 
   const billingSection = [
     ``,
-    `BILLING / INVOICING`,
+    `DESIGNATED BILLING (EXHIBITOR)`,
     ...(hasDesignatedBilling
       ? [
           `Billing contact: ${p.exhibitorBillingContactName ?? '—'}`,
           `Billing email: ${p.exhibitorBillingContactEmail ?? '—'}`,
+          `Billing company: ${p.billingCompanyName?.trim() || '—'}`,
           ...(billingAddressDetail
             ? ['Billing address:', ...billingAddressDetail.split('\n').map((ln) => `  ${ln.trim()}`).filter(Boolean)]
             : [`Billing address: ${p.billingAddressLine}`]),
@@ -209,7 +212,7 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
     : escape(p.invoiceStatusLabel);
 
   const designatedBillingHtml = [
-    sectionHeader('Billing / invoicing'),
+    sectionHeader('Designated billing (exhibitor)'),
     ...(hasDesignatedBilling
       ? [
           row('Billing contact', escape(p.exhibitorBillingContactName ?? '—')),
@@ -219,6 +222,7 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
               ? `<a href="mailto:${escape(p.exhibitorBillingContactEmail)}">${escape(p.exhibitorBillingContactEmail)}</a>`
               : '—',
           ),
+          row('Billing company', escape(p.billingCompanyName?.trim() || '—')),
           row('Billing address', multilineCell(p.exhibitorBillingAddressDetail)),
         ]
       : [row('Billing summary', escape(p.billingAddressLine))]),

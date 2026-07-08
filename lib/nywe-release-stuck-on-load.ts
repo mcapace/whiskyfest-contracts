@@ -1,41 +1,47 @@
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { autoReleaseNyweAfterCountersign } from '@/lib/nywe-auto-release-accounting';
-import { getActiveWineSpectatorEvent } from '@/lib/wine-spectator-event';
-import type { ContractWithTotals } from '@/types/db';
+import { autoReleaseAfterFullySigned } from '@/lib/auto-release-accounting';
+import type { ContractWithTotals, Event } from '@/types/db';
 
-export type NyweAccountingReleaseResult = {
+export type SignedAccountingReleaseResult = {
   scanned: number;
   released: number;
   failed: number;
   errorSamples: { id: string; company: string; error: string }[];
 };
 
-/** Release NYWE licenses countersigned in DocuSign but still stuck at `signed`. */
-export async function releaseNyweSignedLicensesToAccounting(options?: {
+/** Release fully signed contracts (WhiskyFest + NYWE) that have not reached accounting yet. */
+export async function releaseSignedContractsToAccounting(options?: {
   limit?: number;
-}): Promise<NyweAccountingReleaseResult> {
-  const event = await getActiveWineSpectatorEvent();
-  const empty: NyweAccountingReleaseResult = {
+}): Promise<SignedAccountingReleaseResult> {
+  const supabase = getSupabaseAdmin();
+  const empty: SignedAccountingReleaseResult = {
     scanned: 0,
     released: 0,
     failed: 0,
     errorSamples: [],
   };
-  if (!event) return empty;
 
-  const supabase = getSupabaseAdmin();
+  const { data: activeEvents } = await supabase.from('events').select('*').eq('is_active', true);
+  const eventIds = (activeEvents ?? []).map((e) => e.id as string);
+  if (eventIds.length === 0) return empty;
+
+  const eventById = new Map<string, Event>(((activeEvents ?? []) as Event[]).map((e) => [e.id, e]));
+
   const { data: stuck } = await supabase
     .from('contracts_with_totals')
     .select('*')
-    .eq('event_id', event.id)
+    .in('event_id', eventIds)
     .eq('status', 'signed')
     .is('executed_at', null)
-    .limit(options?.limit ?? 50);
+    .limit(options?.limit ?? 100);
 
   const result = { ...empty, scanned: stuck?.length ?? 0 };
 
   for (const row of (stuck ?? []) as ContractWithTotals[]) {
-    const release = await autoReleaseNyweAfterCountersign({
+    const event = eventById.get(row.event_id);
+    if (!event) continue;
+
+    const release = await autoReleaseAfterFullySigned({
       supabase,
       contractId: row.id,
       event,
@@ -58,8 +64,14 @@ export async function releaseNyweSignedLicensesToAccounting(options?: {
   return result;
 }
 
-/** On dashboard load, release any NYWE licenses Susannah countersigned but accounting never received. */
+/** @deprecated Use releaseSignedContractsToAccounting */
+export async function releaseNyweSignedLicensesToAccounting(options?: {
+  limit?: number;
+}): Promise<SignedAccountingReleaseResult> {
+  return releaseSignedContractsToAccounting(options);
+}
+
 export async function releaseStuckNyweSignedLicenses(): Promise<number> {
-  const result = await releaseNyweSignedLicensesToAccounting({ limit: 25 });
+  const result = await releaseSignedContractsToAccounting({ limit: 40 });
   return result.released;
 }

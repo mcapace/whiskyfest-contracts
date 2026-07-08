@@ -206,8 +206,8 @@ export interface SendEnvelopeParams {
   emailSubject: string;
   emailBlurb: string;
   signer1: { email: string; name: string };
-  /** Event-level Shanken countersigner recipient (routing order 2). */
-  countersigner: { email: string; name: string };
+  /** Event-level Shanken countersigner recipient (routing order 2). Omit for single-signer NYWE envelopes. */
+  countersigner?: { email: string; name: string } | null;
   /** Optional carbon copy — receives DocuSign notifications but does not sign. */
   carbonCopy?: { email: string; name: string } | null;
   /** DocuSign brand id — controls exhibitor-facing signing email sender/branding. */
@@ -221,9 +221,38 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
 
   const signHere1 = anchorOnly(DOCUSIGN_ANCHORS.sig1);
   const date1 = anchorOnly(DOCUSIGN_ANCHORS.date1);
-  const signHere2 = anchorOnly(DOCUSIGN_ANCHORS.sig2);
-  const date2 = anchorOnly(DOCUSIGN_ANCHORS.date2);
   const exhibitorTabs = params.skipExhibitorDataTabs ? {} : buildExhibitorDataTextTabs();
+
+  const signers: Record<string, unknown>[] = [
+    {
+      email: params.signer1.email,
+      name: params.signer1.name,
+      recipientId: '1',
+      routingOrder: '1',
+      tabs: {
+        signHereTabs: [signHere1],
+        dateSignedTabs: [date1],
+        ...exhibitorTabs,
+      },
+    },
+  ];
+
+  const countersigner = params.countersigner;
+  if (countersigner?.email?.trim() && countersigner?.name?.trim()) {
+    const signHere2 = anchorOnly(DOCUSIGN_ANCHORS.sig2);
+    const date2 = anchorOnly(DOCUSIGN_ANCHORS.date2);
+    signers.push({
+      email: countersigner.email.trim(),
+      name: countersigner.name.trim(),
+      recipientId: '2',
+      routingOrder: '2',
+      roleName: 'Countersigner',
+      tabs: {
+        signHereTabs: [signHere2],
+        dateSignedTabs: [date2],
+      },
+    });
+  }
 
   const envelopeDefinition: Record<string, unknown> = {
     emailSubject: params.emailSubject,
@@ -238,30 +267,7 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
       },
     ],
     recipients: {
-      signers: [
-        {
-          email: params.signer1.email,
-          name: params.signer1.name,
-          recipientId: '1',
-          routingOrder: '1',
-          tabs: {
-            signHereTabs: [signHere1],
-            dateSignedTabs: [date1],
-            ...exhibitorTabs,
-          },
-        },
-        {
-          email: params.countersigner.email,
-          name: params.countersigner.name,
-          recipientId: '2',
-          routingOrder: '2',
-          roleName: 'Countersigner',
-          tabs: {
-            signHereTabs: [signHere2],
-            dateSignedTabs: [date2],
-          },
-        },
-      ],
+      signers,
     },
   };
 

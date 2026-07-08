@@ -15,7 +15,9 @@ import { appendContractRow, updateContractRow } from '@/lib/sheets-tracker';
 import { syncExhibitorRosterWriteback } from '@/lib/exhibitor-roster-sync-hook';
 import { insertContractAudit } from '@/lib/audit-log';
 import { isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
-import { autoReleaseNyweAfterCountersign } from '@/lib/nywe-auto-release-accounting';
+import { autoReleaseAfterFullySigned } from '@/lib/auto-release-accounting';
+import { eventCountersignerIdentity } from '@/lib/docusign-envelope-recipients';
+import { usesSingleSignerEnvelope } from '@/lib/single-signer-envelope';
 import {
   notifyContractFullySigned,
   notifyPartialSignature,
@@ -151,8 +153,8 @@ export async function applyEnvelopeFullySigned(
   }
 
   if (contract.status === 'signed') {
-    if (event && isNyweEventsManagedEvent(event)) {
-      const retry = await autoReleaseNyweAfterCountersign({
+    if (event) {
+      const retry = await autoReleaseAfterFullySigned({
         supabase,
         contractId: contract.id,
         event,
@@ -172,6 +174,11 @@ export async function applyEnvelopeFullySigned(
     console.error('DocuSign sync: fetchEnvelopeSigners failed', recErr);
   }
 
+  const now = new Date().toISOString();
+  if (!countersigner?.email && event && usesSingleSignerEnvelope(event)) {
+    countersigner = eventCountersignerIdentity(event, now);
+  }
+
   const pdfBytes = await downloadCompletedPdf(envelopeId);
   const signedFolderId = process.env.GOOGLE_SIGNED_FOLDER_ID!;
   const safeName = contract.exhibitor_company_name.replace(/[^\w\s-]/g, '');
@@ -183,7 +190,6 @@ export async function applyEnvelopeFullySigned(
   const signedStoragePath = contractSignedPdfPath(contract.id);
   await uploadContractPdfToStorage(signedStoragePath, pdfBytes);
 
-  const now = new Date().toISOString();
   const fromStatus = contract.status;
 
   await supabase
@@ -225,7 +231,7 @@ export async function applyEnvelopeFullySigned(
     metadata: {
       envelope_id: envelopeId,
       signed_pdf_url: webViewLink,
-      release_required: !(event && isNyweEventsManagedEvent(event)),
+      release_required: false,
       countersigned_by_email: countersigner?.email ?? null,
       countersigned_by_name: countersigner?.name ?? null,
       source: options?.actorEmail ? 'manual_sync' : 'webhook',
@@ -256,8 +262,8 @@ export async function applyEnvelopeFullySigned(
     }
     await syncExhibitorRosterWriteback(afterSigned);
 
-    if (event && isNyweEventsManagedEvent(event)) {
-      await autoReleaseNyweAfterCountersign({
+    if (event) {
+      await autoReleaseAfterFullySigned({
         supabase,
         contractId: afterSigned.id,
         event,
@@ -298,8 +304,8 @@ export async function syncContractFromDocuSign(
   }
 
   if (contract.status === 'signed') {
-    if (event && isNyweEventsManagedEvent(event)) {
-      const retry = await autoReleaseNyweAfterCountersign({
+    if (event) {
+      const retry = await autoReleaseAfterFullySigned({
         supabase,
         contractId: contract.id,
         event,

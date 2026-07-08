@@ -6,6 +6,7 @@ import { isEventsManagedWorkflow } from '@/lib/contract-template-profile';
 import { isNyweVendorEvent } from '@/lib/nywe-pricing';
 import { dealKindFromContract } from '@/lib/contract-deal-kind';
 import { isLegacyImportedContract } from '@/lib/legacy-import';
+import { eventAutoReleasesToAccounting } from '@/lib/auto-release-accounting';
 import { ContractDetailViewClient } from '@/lib/contract-detail-client';
 import { buildContractActivityTimeline } from '@/lib/contract-activity-timeline';
 import {
@@ -225,6 +226,7 @@ export async function ContractDetailPage({
       isEventsTeam={isEventsTeam}
       clientSendEnabled={clientSendEnabled}
       eventsManagedWorkflow={eventsManagedWorkflow}
+      autoReleaseToAccounting={eventAutoReleasesToAccounting(eventRow)}
       releaseAudit={releaseAudit}
       discountPending={discountPending}
       dealKind={dealKind}

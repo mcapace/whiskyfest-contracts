@@ -108,6 +108,8 @@ interface Props {
   portalBasePath?: string;
   /** When set, contract was imported from a legacy signed PDF (skips DocuSign send). */
   importedAt?: string | null;
+  /** When true, signed contracts auto-release to accounting (no manual button). */
+  autoReleaseToAccounting?: boolean;
 }
 
 export function ContractActions({
@@ -145,6 +147,7 @@ export function ContractActions({
   clientSendEnabled = true,
   portalBasePath = '',
   importedAt = null,
+  autoReleaseToAccounting = false,
 }: Props) {
   const contractEditHref = `${portalBasePath}/contracts/${contractId}/edit`;
   const legacyImport = Boolean(importedAt?.trim());
@@ -268,7 +271,10 @@ export function ContractActions({
   const canCancelInflightDocuSign =
     (status === 'sent' || status === 'partially_signed') && (isAdmin || isEventsTeam);
   const canCancelSigned = status === 'signed' && (isAdmin || isEventsTeam);
-  const canRelease = status === 'signed' && (isAdmin || (isEventsTeam && eventsManagedWorkflow));
+  const canRelease =
+    !autoReleaseToAccounting &&
+    status === 'signed' &&
+    (isAdmin || (isEventsTeam && eventsManagedWorkflow));
   const canEditImported =
     legacyImport && (status === 'imported' || status === 'pending_events_review') && (isAdmin || isEventsTeam);
   const canEditVoided = status === 'voided' && (isAdmin || isEventsTeam);
@@ -794,6 +800,7 @@ export function ContractActions({
           isAdmin={isAdmin}
           isEventsTeam={isEventsTeam}
           eventsManagedWorkflow={eventsManagedWorkflow}
+          autoReleaseToAccounting={autoReleaseToAccounting}
           docusignEnvelopeId={docusignEnvelopeId}
           cancelledReason={cancelledReason}
           cancelledAt={cancelledAt}
@@ -1125,6 +1132,7 @@ function StatusLine({
   isAdmin,
   isEventsTeam,
   eventsManagedWorkflow,
+  autoReleaseToAccounting,
   docusignEnvelopeId,
   cancelledReason,
   cancelledAt,
@@ -1143,6 +1151,7 @@ function StatusLine({
   isAdmin: boolean;
   isEventsTeam: boolean;
   eventsManagedWorkflow: boolean;
+  autoReleaseToAccounting: boolean;
   docusignEnvelopeId: string | null;
   cancelledReason: string | null;
   cancelledAt: string | null;
@@ -1174,6 +1183,13 @@ function StatusLine({
     );
   }
   if (status === 'partially_signed') {
+    if (autoReleaseToAccounting) {
+      return (
+        <p className="text-sm text-muted-foreground" suppressHydrationWarning>
+          Exhibitor signed {updatedAt && hydrated ? updatedRelative : 'recently'} · Finishing automatically
+        </p>
+      );
+    }
     if (!isAdmin) {
       return (
         <p className="text-sm text-muted-foreground">
@@ -1187,20 +1203,27 @@ function StatusLine({
       </p>
     );
   }
+  if (status === 'signed' && autoReleaseToAccounting) {
+    return (
+      <p className="text-sm text-muted-foreground" suppressHydrationWarning>
+        Fully signed · Sending to accounting automatically
+      </p>
+    );
+  }
   if (status === 'signed' && !isAdmin && !(isEventsTeam && eventsManagedWorkflow)) {
     return <p className="text-sm text-muted-foreground">Awaiting admin release to accounting.</p>;
   }
   if (status === 'imported' || (legacyImport && status === 'pending_events_review')) {
     return (
       <p className="text-sm text-muted-foreground">
-        Legacy signed agreement on file — awaiting events approval, then release to accounting for invoicing.
+        Legacy signed agreement on file — awaiting events approval{autoReleaseToAccounting ? ', then automatic handoff to accounting' : ', then release to accounting for invoicing'}.
       </p>
     );
   }
   if (status === 'executed') {
     return (
       <p className="text-sm text-emerald-700" suppressHydrationWarning>
-        ✓ Released {hydrated ? releasedRelative : 'recently'}
+        ✓ {autoReleaseToAccounting && !releasedBy ? 'Executed' : 'Released'} {hydrated ? releasedRelative : 'recently'}
         {releasedBy ? ` by ${releasedBy}` : ''}
       </p>
     );

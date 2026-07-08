@@ -13,6 +13,10 @@ import {
   contractPdfBaseName,
 } from '@/lib/contract-document-naming';
 import { eventUsesContractOrderTable } from '@/lib/contract-template-profile';
+import {
+  countersignerRequiredForEvent,
+  docusignCountersignerForEvent,
+} from '@/lib/docusign-envelope-recipients';
 import { nyweLicenseAddressError } from '@/lib/nywe-billing';
 import { refreshNyweBillingFromRosterForContract } from '@/lib/nywe-roster-billing-sync';
 import { resolveContractTemplateDocId } from '@/lib/contract-template';
@@ -126,16 +130,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   let newEnvelopeId: string;
   try {
-    const countersignerEmail = event.shanken_signatory_email?.trim();
-    const countersignerName = event.shanken_signatory_name?.trim();
-    if (!countersignerEmail || !countersignerName) {
+    const countersigner = docusignCountersignerForEvent(event);
+    if (countersignerRequiredForEvent(event) && !countersigner) {
       return NextResponse.json({ error: 'Event countersigner name and email are required.' }, { status: 500 });
     }
 
     const carbonCopy = parseSignerCc(mergedContract);
     const ccError = validateSignerCcDistinct({
       signerEmail: newSignerEmail,
-      countersignerEmail,
+      countersignerEmail: countersigner?.email ?? event.shanken_signatory_email?.trim() ?? '',
       cc: carbonCopy,
     });
     if (ccError) {
@@ -159,7 +162,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       emailSubject: contractDocuSignEmailSubject(contract.exhibitor_company_name, event),
       emailBlurb: contractDocuSignEmailBlurb(contract.exhibitor_company_name, event),
       signer1: { name: newSignerName, email: newSignerEmail },
-      countersigner: { name: countersignerName, email: countersignerEmail },
+      countersigner,
       carbonCopy,
       brandId: docusignBrandIdForEvent(event),
     });

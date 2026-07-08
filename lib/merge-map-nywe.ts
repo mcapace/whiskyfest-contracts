@@ -2,6 +2,7 @@ import { DOCUSIGN_ANCHORS } from '@/lib/merge-map';
 import { formatCurrency } from '@/lib/utils';
 import { getAgreementDatePartsInDisplayZone } from '@/lib/datetime';
 import { formatEventDateForDisplayOrMerge } from '@/lib/event-schedule';
+import { usesSingleSignerEnvelope } from '@/lib/single-signer-envelope';
 import { nyweBillingMergeTokens, nyweExhibitorAddressMergeTokens } from '@/lib/nywe-billing';
 import type { ContractWithTotals, Event } from '@/types/db';
 import type { MergePlaceholderMode } from '@/lib/merge-map';
@@ -21,6 +22,9 @@ export function buildNyweVendorMergeMap(
 ): Record<string, string> {
   const agreement = getAgreementDatePartsInDisplayZone();
   const licenseFeeCents = contract.grand_total_cents;
+  const singleSigner = usesSingleSignerEnvelope(event);
+  const shankenSigLine = `/s/ ${event.shanken_signatory_name}`.trim();
+  const shankenDateLine = `${agreement.monthName} ${agreement.day}, ${agreement.year}`;
 
   const anchors =
     mode === 'draft'
@@ -30,12 +34,19 @@ export function buildNyweVendorMergeMap(
           '{{date_anchor_1}}': DRAFT_DATE_LINE,
           '{{date_anchor_2}}': DRAFT_DATE_LINE,
         }
-      : {
-          '{{sig_anchor_1}}': DOCUSIGN_ANCHORS.sig1,
-          '{{sig_anchor_2}}': DOCUSIGN_ANCHORS.sig2,
-          '{{date_anchor_1}}': DOCUSIGN_ANCHORS.date1,
-          '{{date_anchor_2}}': DOCUSIGN_ANCHORS.date2,
-        };
+      : singleSigner
+        ? {
+            '{{sig_anchor_1}}': DOCUSIGN_ANCHORS.sig1,
+            '{{date_anchor_1}}': DOCUSIGN_ANCHORS.date1,
+            '{{sig_anchor_2}}': shankenSigLine,
+            '{{date_anchor_2}}': shankenDateLine,
+          }
+        : {
+            '{{sig_anchor_1}}': DOCUSIGN_ANCHORS.sig1,
+            '{{sig_anchor_2}}': DOCUSIGN_ANCHORS.sig2,
+            '{{date_anchor_1}}': DOCUSIGN_ANCHORS.date1,
+            '{{date_anchor_2}}': DOCUSIGN_ANCHORS.date2,
+          };
 
   return {
     '{{event_year}}': String(event.year),

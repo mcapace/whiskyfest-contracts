@@ -12,6 +12,7 @@ import { formatCurrency } from '@/lib/utils';
 import { formatEventDateForMerge, getAgreementDatePartsInDisplayZone } from '@/lib/datetime';
 import { eventTemplateProfile } from '@/lib/contract-template-profile';
 import { buildNyweVendorMergeMap } from '@/lib/merge-map-nywe';
+import { usesSingleSignerEnvelope } from '@/lib/single-signer-envelope';
 import { formatBoothBrandsBlock } from '@/lib/contract-booth-brands';
 import type { ContractBoothBrand, ContractWithTotals, Event } from '@/types/db';
 
@@ -123,6 +124,9 @@ export function buildContractMergeMap(
   }
 
   const boothBlock = formatBoothBrandsBlock(boothBrands ?? []);
+  const singleSigner = usesSingleSignerEnvelope(event);
+  const shankenSigLine = `/s/ ${event.shanken_signatory_name}`.trim();
+  const shankenDateLine = `${agreement.monthName} ${agreement.day}, ${agreement.year}`;
 
   const anchors =
     mode === 'draft'
@@ -132,12 +136,19 @@ export function buildContractMergeMap(
           '{{sig_anchor_2}}': DRAFT_SIG_LINE,
           '{{date_anchor_2}}': DRAFT_DATE_LINE,
         }
-      : {
-          '{{sig_anchor_1}}': DOCUSIGN_ANCHORS.sig1,
-          '{{date_anchor_1}}': DOCUSIGN_ANCHORS.date1,
-          '{{sig_anchor_2}}': DOCUSIGN_ANCHORS.sig2,
-          '{{date_anchor_2}}': DOCUSIGN_ANCHORS.date2,
-        };
+      : singleSigner
+        ? {
+            '{{sig_anchor_1}}': DOCUSIGN_ANCHORS.sig1,
+            '{{date_anchor_1}}': DOCUSIGN_ANCHORS.date1,
+            '{{sig_anchor_2}}': shankenSigLine,
+            '{{date_anchor_2}}': shankenDateLine,
+          }
+        : {
+            '{{sig_anchor_1}}': DOCUSIGN_ANCHORS.sig1,
+            '{{date_anchor_1}}': DOCUSIGN_ANCHORS.date1,
+            '{{sig_anchor_2}}': DOCUSIGN_ANCHORS.sig2,
+            '{{date_anchor_2}}': DOCUSIGN_ANCHORS.date2,
+          };
 
   return {
     '{{event_year}}': String(event.year),
