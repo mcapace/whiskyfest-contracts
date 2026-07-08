@@ -89,11 +89,6 @@ async function resolveApiContext(accessToken: string): Promise<{ accountId: stri
   const envAccountId = process.env['DOCUSIGN_ACCOUNT_ID']?.trim();
   const envBase = process.env['DOCUSIGN_BASE_URL']?.trim();
 
-  // Production env vars are authoritative — skip userinfo (saves 1 API call per session).
-  if (envAccountId && envBase) {
-    return { accountId: envAccountId, restApiBase: envBase.replace(/\/$/, '') };
-  }
-
   const authUrl = process.env['DOCUSIGN_AUTH_URL'] ?? 'https://account-d.docusign.com';
   const oAuthBasePath = authHostFromUrl(authUrl);
 
@@ -103,6 +98,7 @@ async function resolveApiContext(accessToken: string): Promise<{ accountId: stri
 
   if (!userInfoRes.ok) {
     const t = await userInfoRes.text();
+    markDocuSignRateLimitedFromResponse(userInfoRes.status, t);
     if (envAccountId && envBase) {
       console.warn(`[DocuSign] userinfo lookup failed (${userInfoRes.status}); using env account/base fallback`);
       return { accountId: envAccountId, restApiBase: envBase.replace(/\/$/, '') };
@@ -137,7 +133,7 @@ async function resolveApiContext(accessToken: string): Promise<{ accountId: stri
   }
 
   const accountId = envAccountId ?? chosen.account_id;
-  // Prefer account-scoped base_uri from userinfo; DOCUSIGN_BASE_URL can be stale/wrong cluster.
+  // Account-scoped base_uri from userinfo — DOCUSIGN_BASE_URL alone is often the wrong cluster.
   const restApiBase = normalizeRestApiBase(chosen.base_uri ?? '') || envBase?.replace(/\/$/, '');
   if (!restApiBase) throw new Error('DocuSign userinfo did not provide base_uri and DOCUSIGN_BASE_URL is not set');
 
@@ -543,6 +539,33 @@ export async function createExhibitorSigningViewUrl(options: {
   const text = await res.text();
   if (!res.ok) {
     markDocuSignRateLimitedFromResponse(res.status, text);
+    if (text.includes('USER_AUTHENTICATION_FAILED') || text.includes('AUTHORIZATION_INVALID_TOKEN')) {
+      clearDocuSignSessionCache();
+      const retrySession = await getDocuSignSession();
+      const retryUrl = `${retrySession.restApiBase}/v2.1/accounts/${encodeURIComponent(retrySession.accountId)}/envelopes/${encodeURIComponent(options.envelopeId)}/views/recipient`;
+      const retryRes = await fetch(retryUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${retrySession.accessToken}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          authenticationMethod: 'email',
+          email: options.signerEmail.trim(),
+          userName: options.signerName.trim() || options.signerEmail.trim(),
+          recipientId,
+          returnUrl: options.returnUrl,
+        }),
+      });
+      const retryText = await retryRes.text();
+      if (retryRes.ok) {
+        const data = JSON.parse(retryText) as { url?: string };
+        if (data.url?.trim()) return data.url.trim();
+      }
+      markDocuSignRateLimitedFromResponse(retryRes.status, retryText);
+      throw new Error(`DocuSign createRecipientView ${retryRes.status}: ${retryText}`);
+    }
     throw new Error(`DocuSign createRecipientView ${res.status}: ${text}`);
   }
 
