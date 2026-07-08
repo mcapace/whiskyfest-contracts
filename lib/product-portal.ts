@@ -110,5 +110,13 @@ export function dashboardHref(productKey: ProductKey): string {
 }
 
 export function productKeyFromEvent(event: Pick<Event, 'product_key'> | null | undefined): ProductKey {
-  return event?.product_key === PRODUCT_WINE_SPECTATOR ? PRODUCT_WINE_SPECTATOR : PRODUCT_WHISKYFEST;
+  if (!event) {
+    console.warn('[productKeyFromEvent] Event is null/undefined, defaulting to whiskyfest');
+    return PRODUCT_WHISKYFEST;
+  }
+  if (!event.product_key) {
+    console.error('[productKeyFromEvent] Event missing product_key field', { event });
+    return PRODUCT_WHISKYFEST;
+  }
+  return event.product_key === PRODUCT_WINE_SPECTATOR ? PRODUCT_WINE_SPECTATOR : PRODUCT_WHISKYFEST;
 }

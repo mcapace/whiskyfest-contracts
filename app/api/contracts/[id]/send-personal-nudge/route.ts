@@ -54,11 +54,39 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: 'Signer email is required before sending a nudge.' }, { status: 409 });
   }
 
-  const { data: eventRow } = await supabase.from('events').select('*').eq('id', contract.event_id).maybeSingle();
-  const event = eventRow as Event | null;
+  const { data: eventRow } = await supabase
+    .from('events')
+    .select('id, name, year, product_key')
+    .eq('id', contract.event_id)
+    .maybeSingle();
+
+  const event = eventRow as Pick<Event, 'id' | 'name' | 'year' | 'product_key'> | null;
+  
   if (!event) {
+    console.error('[send-personal-nudge] Event not found', { contract_id: params.id, event_id: contract.event_id });
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }
+
+  if (!event.product_key) {
+    console.error('[send-personal-nudge] Event missing product_key', {
+      contract_id: params.id,
+      event_id: event.id,
+      event_name: event.name,
+    });
+    return NextResponse.json(
+      { error: 'Event configuration error: missing product key. Please contact support.' },
+      { status: 500 },
+    );
+  }
+
+  // Log for debugging: track which product keys are being used for personal nudges
+  console.log('[send-personal-nudge] Sending email', {
+    contract_id: params.id,
+    event_id: event.id,
+    event_name: event.name,
+    product_key: event.product_key,
+    signer_email: signerEmail,
+  });
 
   const actorEmail = getEffectiveUserEmail(session)?.trim().toLowerCase();
   if (!actorEmail) {
