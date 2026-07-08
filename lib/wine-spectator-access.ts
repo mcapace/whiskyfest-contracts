@@ -1,6 +1,7 @@
 export type WineSpectatorAccessUser = {
   role?: string | null;
   is_events_team?: boolean;
+  is_accounting?: boolean;
   is_wine_spectator_admin?: boolean;
   email?: string | null;
 };
@@ -15,11 +16,16 @@ export function isWineSpectatorAdmin(user: WineSpectatorAccessUser | null | unde
   return Boolean(user.is_wine_spectator_admin);
 }
 
-/** Wine Spectator portal: admins, events team, portal admins, and legacy allowlist. */
+/**
+ * Wine Spectator / NYWE portal access:
+ * admins, events team, AR (`is_accounting`), portal admins, and legacy allowlist.
+ * Accounting users get AR on both WhiskyFest and NYWE dashboards.
+ */
 export function canAccessWineSpectator(user: WineSpectatorAccessUser | null | undefined): boolean {
   if (!user) return false;
   if (isWineSpectatorAdmin(user)) return true;
   if (user.is_events_team) return true;
+  if (user.is_accounting) return true;
   const email = user.email?.trim().toLowerCase();
   return Boolean(email && WINE_SPECTATOR_ALLOWED_EMAILS.has(email));
 }

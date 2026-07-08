@@ -80,6 +80,7 @@ async function computeAccessFlagsForEmail(
     wine_spectator_access: canAccessWineSpectator({
       role: appUser.role,
       is_events_team: isEventsTeam,
+      is_accounting: isAccounting,
       is_wine_spectator_admin: isWineSpectatorAdminFlag,
       email,
     }),

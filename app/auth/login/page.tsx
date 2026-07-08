@@ -32,6 +32,7 @@ export default async function LoginPage({
         wine_spectator_access: canAccessWineSpectator({
           role: session.user.role,
           is_events_team: session.user.is_events_team,
+          is_accounting: session.user.is_accounting,
           email: session.user.email,
         }),
         role: session.user.role ?? undefined,

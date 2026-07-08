@@ -145,16 +145,27 @@ export function isWhiskyfestExclusiveUser(user: PortalUserFlags): boolean {
   return Boolean(user.pipeline_access) && !Boolean(user.wine_spectator_access);
 }
 
-/** Accounting-only user who should use WhiskyFest AR on the WF domain (no NYWE portal access). */
+/**
+ * Dual-portal AR: `is_accounting` with Wine Spectator access (including AR via canAccessWineSpectator).
+ * These users may use WhiskyFest `/accounting` and NYWE `/accounting` without being bounced between hosts.
+ */
+export function isDualPortalAccountingUser(user: PortalUserFlags): boolean {
+  if (isFullPortalAdmin(user)) return false;
+  return Boolean(user.is_accounting) && Boolean(user.wine_spectator_access) && !Boolean(user.pipeline_access);
+}
+
+/** Accounting-only user locked to WhiskyFest AR (no NYWE portal access). */
 export function isWhiskyfestAccountingOnlyUser(user: PortalUserFlags): boolean {
   if (isFullPortalAdmin(user)) return false;
+  if (isDualPortalAccountingUser(user)) return false;
   const accountingOnly = Boolean(user.is_accounting) && !Boolean(user.pipeline_access);
   return accountingOnly && !Boolean(user.wine_spectator_access);
 }
 
-/** Accounting-only user who should use NYWE AR on the NYWE domain. */
+/** Accounting-only user locked to NYWE AR (exclusive; no WhiskyFest AR). */
 export function isNyweAccountingOnlyUser(user: PortalUserFlags): boolean {
   if (isFullPortalAdmin(user)) return false;
+  if (isDualPortalAccountingUser(user)) return false;
   const accountingOnly = Boolean(user.is_accounting) && !Boolean(user.pipeline_access);
   return accountingOnly && Boolean(user.wine_spectator_access);
 }

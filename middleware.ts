@@ -153,6 +153,7 @@ export default auth((req) => {
       !canAccessWineSpectator({
         role: u.role,
         is_events_team: u.is_events_team,
+        is_accounting: u.is_accounting,
         email: u.email,
       })
     ) {
@@ -160,7 +161,16 @@ export default auth((req) => {
       return applyPortalHeader(NextResponse.redirect(requestUrl(req, dest)), host);
     }
 
-    if (nyweHost && !admin && !canAccessWineSpectator({ role: u.role, is_events_team: u.is_events_team, email: u.email })) {
+    if (
+      nyweHost &&
+      !admin &&
+      !canAccessWineSpectator({
+        role: u.role,
+        is_events_team: u.is_events_team,
+        is_accounting: u.is_accounting,
+        email: u.email,
+      })
+    ) {
       if (!accountingOnly) {
         return applyPortalHeader(NextResponse.redirect(requestUrl(req, '/auth/login')), host);
       }
@@ -172,6 +182,7 @@ export default auth((req) => {
       wine_spectator_access: canAccessWineSpectator({
         role: u.role,
         is_events_team: u.is_events_team,
+        is_accounting: u.is_accounting,
         email: u.email,
       }),
       role: u.role,

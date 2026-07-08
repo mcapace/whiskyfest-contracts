@@ -4,7 +4,7 @@
 
 - `role`: `admin`, `sales`, `viewer`, `sales_rep` (project uses `sales` for most rep users)
 - `is_events_team`: can review/approve/send-back/release and perform other events functions
-- `is_accounting`: can access accounting dashboard and invoice actions
+- `is_accounting`: can access accounting dashboard and invoice actions on **both** WhiskyFest (`/accounting`) and NYWE (`/accounting` on the NYWE host / `/accounting/nywe`). Also grants Wine Spectator portal access for AR-only users so they are not redirected off the NYWE domain.
 - `can_impersonate`: enables View As menu and read-only impersonation mode
 - `is_active`: hard gate for app access
 

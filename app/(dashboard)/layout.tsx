@@ -31,6 +31,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const wineSpectatorAccess = canAccessWineSpectator({
     role: session.user.role,
     is_events_team: session.user.is_events_team,
+    is_accounting: session.user.is_accounting,
     email: session.user.email,
   });
   let pendingAccessRequests = 0;
