@@ -5,10 +5,13 @@ import { productKeyFromEvent } from '@/lib/product-portal';
 function signingLinkSecret(): string {
   const secret =
     process.env['DOCUSIGN_SIGN_LINK_SECRET']?.trim() ||
+    process.env['AUTH_SECRET']?.trim() ||
     process.env['NEXTAUTH_SECRET']?.trim() ||
     '';
   if (!secret) {
-    throw new Error('DOCUSIGN_SIGN_LINK_SECRET or NEXTAUTH_SECRET must be set for signing links.');
+    throw new Error(
+      'DOCUSIGN_SIGN_LINK_SECRET or AUTH_SECRET must be set for personal-note signing links.',
+    );
   }
   return secret;
 }
