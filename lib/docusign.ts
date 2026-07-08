@@ -438,10 +438,6 @@ export async function voidEnvelope(envelopeId: string, voidedReason: string): Pr
   }
 }
 
-/**
- * Ask DocuSign to resend notification emails to recipients who have not completed signing.
- * Same recipient emails as the live envelope — use Recall if you need to change the address.
- */
 export async function resendEnvelopeNotifications(envelopeId: string): Promise<void> {
   const { accessToken, accountId, restApiBase } = await getDocuSignSession();
   const base = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}/recipients`;
@@ -467,6 +463,51 @@ export async function resendEnvelopeNotifications(envelopeId: string): Promise<v
     const t = await putRes.text();
     throw new Error(`DocuSign resendEnvelope ${putRes.status}: ${t}`);
   }
+}
+
+/** One-time DocuSign signing URL for routing order 1 (exhibitor / winery). */
+export async function createExhibitorSigningViewUrl(options: {
+  envelopeId: string;
+  signerEmail: string;
+  signerName: string;
+  returnUrl: string;
+}): Promise<string> {
+  const { accessToken, accountId, restApiBase } = await getDocuSignSession();
+  const signers = await fetchEnvelopeSigners(options.envelopeId);
+  const exhibitor =
+    signers.find((s) => s.routingOrder === '1') ??
+    signers.find((s) => s.email?.trim().toLowerCase() === options.signerEmail.trim().toLowerCase());
+  if (!exhibitor?.recipientId) {
+    throw new Error('DocuSign exhibitor signer not found on this envelope.');
+  }
+
+  const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(options.envelopeId)}/views/recipient`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      authenticationMethod: 'email',
+      email: options.signerEmail.trim(),
+      userName: options.signerName.trim() || options.signerEmail.trim(),
+      recipientId: exhibitor.recipientId,
+      returnUrl: options.returnUrl,
+    }),
+  });
+
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`DocuSign createRecipientView ${res.status}: ${text}`);
+  }
+
+  const data = JSON.parse(text) as { url?: string };
+  if (!data.url?.trim()) {
+    throw new Error('DocuSign did not return a signing URL.');
+  }
+  return data.url.trim();
 }
 
 async function downloadEnvelopePdfFromUrl(url: string, accessToken: string): Promise<Buffer> {

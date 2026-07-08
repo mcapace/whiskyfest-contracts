@@ -141,6 +141,12 @@ export function describeAuditEntry(entry: AuditLogEntry): AuditDisplay {
       };
     case 'docusign_send_reminder':
       return { title: 'DocuSign signing reminder sent', synthetic };
+    case 'personal_nudge_sent':
+      return {
+        title: 'Personal signing reminder sent',
+        detail: meta.signer_email ? String(meta.signer_email) : undefined,
+        synthetic,
+      };
     case 'docusign_resend_notification':
       return { title: 'DocuSign notification resent', synthetic };
     case 'docusign_resent_with_changes':

@@ -28,8 +28,20 @@ export async function getStephenSenatoreRepId(): Promise<string | null> {
   return data?.id ?? null;
 }
 
+async function isWhiskyfestAdmin(actorEmail: string): Promise<boolean> {
+  const supabase = getSupabaseAdmin();
+  const { data } = await supabase
+    .from('app_users')
+    .select('role, is_active')
+    .eq('email', actorEmail.trim().toLowerCase())
+    .maybeSingle();
+  return Boolean(data?.is_active && data.role === 'admin');
+}
+
 /** True when the signed-in user may create/edit no-charge WhiskyFest booth deals. */
 export async function actorCanUseNoChargeBooth(actorEmail: string): Promise<boolean> {
+  if (await isWhiskyfestAdmin(actorEmail)) return true;
+
   const email = actorEmail.trim().toLowerCase();
   if (email === NO_CHARGE_BOOTH_OWNER_EMAIL) return true;
   if (email !== NO_CHARGE_BOOTH_ASSISTANT_EMAIL) return false;
@@ -46,6 +58,12 @@ export async function actorCanUseNoChargeBooth(actorEmail: string): Promise<bool
     .maybeSingle();
 
   return Boolean(row?.id);
+}
+
+/** Katherine must assign Stephen; admins and Stephen may pick any rep. */
+export async function noChargeMustAssignStephenRep(actorEmail: string): Promise<boolean> {
+  if (await isWhiskyfestAdmin(actorEmail)) return false;
+  return actorEmail.trim().toLowerCase() === NO_CHARGE_BOOTH_ASSISTANT_EMAIL;
 }
 
 /** Katherine must assign Stephen as sales rep; Stephen may use his own rep or admin pick. */
@@ -70,8 +88,7 @@ export async function assertNoChargeBoothAllowed(options: {
     return { ok: false, error: 'No-charge booth applies to booth deals, not sponsorship-only.' };
   }
 
-  const email = options.actorEmail.trim().toLowerCase();
-  if (email === NO_CHARGE_BOOTH_ASSISTANT_EMAIL) {
+  if (await noChargeMustAssignStephenRep(options.actorEmail)) {
     const stephenRepId = await getStephenSenatoreRepId();
     if (!stephenRepId || options.salesRepId !== stephenRepId) {
       return {

@@ -8,6 +8,9 @@ export const CONTRACT_ACTION_HELP = {
 
   sendReminder: 'Follow-up email to unsigned recipients.',
 
+  sendPersonalNudge:
+    'Send a personal note from you to the unsigned signer with a DocuSign link. Optionally CC a colleague on your team.',
+
   syncFromDocusign:
     'Pull the latest signature status from DocuSign and update this contract if a webhook was missed (exhibitor signed or fully executed).',
 

@@ -11,7 +11,7 @@ import {
   productKeyFromEvent,
   scopeEventsByProduct,
 } from '@/lib/product-portal';
-import { actorCanUseNoChargeBooth, getStephenSenatoreRepId } from '@/lib/no-charge-booth';
+import { actorCanUseNoChargeBooth, getStephenSenatoreRepId, noChargeMustAssignStephenRep } from '@/lib/no-charge-booth';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,9 +72,10 @@ export async function EditDraftContractPage({
     return { description: row.description, amount_cents: row.amount_cents };
   });
 
-  const [canUseNoChargeBooth, stephenRepId] = await Promise.all([
+  const [canUseNoChargeBooth, stephenRepId, noChargeEnforceStephenRep] = await Promise.all([
     actorCanUseNoChargeBooth(viewed.actor.email),
     getStephenSenatoreRepId(),
+    noChargeMustAssignStephenRep(viewed.actor.email),
   ]);
 
   return (
@@ -121,6 +122,7 @@ export async function EditDraftContractPage({
           }[]
         }
         canUseNoChargeBooth={canUseNoChargeBooth}
+        noChargeEnforceStephenRep={noChargeEnforceStephenRep}
         stephenRepId={stephenRepId}
         initialNoChargeBooth={Boolean(c.no_charge_booth)}
       />

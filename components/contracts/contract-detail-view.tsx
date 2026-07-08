@@ -295,6 +295,7 @@ export function ContractDetailView({
                 lineItemsSubtotalCents={contract.line_items_subtotal_cents ?? 0}
                 salesRep={contract.sales_rep_name ?? contract.sales_rep_email ?? null}
                 salesRepEmail={contract.sales_rep_email ?? null}
+                eventName={event?.name ?? null}
                 countersignerName={event?.shanken_signatory_name ?? null}
                 countersignerEmail={event?.shanken_signatory_email ?? null}
                 createdBy={contract.created_by}

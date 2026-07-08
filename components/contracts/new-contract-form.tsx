@@ -115,6 +115,8 @@ interface Props {
   portalBasePath?: string;
   /** Stephen Senatore / Katherine Brumley complimentary booth workflow. */
   canUseNoChargeBooth?: boolean;
+  /** When true (Katherine), no-charge deals must use Stephen Senatore as sales rep. */
+  noChargeEnforceStephenRep?: boolean;
   stephenRepId?: string | null;
   initialNoChargeBooth?: boolean;
 }
@@ -180,6 +182,7 @@ export function NewContractForm({
   initialDealKind,
   portalBasePath = '',
   canUseNoChargeBooth = false,
+  noChargeEnforceStephenRep = false,
   stephenRepId = null,
   initialNoChargeBooth = false,
 }: Props) {
@@ -386,7 +389,7 @@ export function NewContractForm({
       setForm((f) => ({
         ...f,
         booth_rate_cents: 0,
-        ...(stephenRepId ? { sales_rep_id: stephenRepId } : {}),
+        ...(noChargeEnforceStephenRep && stephenRepId ? { sales_rep_id: stephenRepId } : {}),
       }));
       setBoothRateInput('0.00');
     } else {
@@ -441,7 +444,7 @@ export function NewContractForm({
     if (!eventsManaged && !form.sales_rep_id) { setErr('Sales rep is required'); return; }
 
     const useNoCharge = showNoChargeOption && noChargeBooth;
-    if (useNoCharge && stephenRepId && form.sales_rep_id !== stephenRepId) {
+    if (useNoCharge && noChargeEnforceStephenRep && stephenRepId && form.sales_rep_id !== stephenRepId) {
       setErr('No-charge contracts must be assigned to Stephen Senatore as sales rep.');
       return;
     }

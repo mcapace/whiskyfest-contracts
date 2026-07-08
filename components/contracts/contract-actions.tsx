@@ -37,6 +37,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { CONTRACT_ACTION_HELP } from '@/lib/contract-action-help-text';
+import { defaultPersonalNudgeMessage } from '@/lib/contract-personal-nudge-copy';
 import {
   Dialog,
   DialogContent,
@@ -95,6 +96,8 @@ interface Props {
   lineItemsSubtotalCents: number;
   salesRep: string | null;
   salesRepEmail: string | null;
+  /** Event display name for personal nudge default copy. */
+  eventName?: string | null;
   countersignerName: string | null;
   countersignerEmail: string | null;
   createdBy: string | null;
@@ -138,6 +141,7 @@ export function ContractActions({
   lineItemsSubtotalCents,
   salesRep,
   salesRepEmail,
+  eventName = null,
   countersignerName,
   countersignerEmail,
   createdBy,
@@ -166,6 +170,10 @@ export function ContractActions({
   const [openErrorDetails, setOpenErrorDetails] = useState(false);
   const [openSendBack, setOpenSendBack] = useState(false);
   const [openReleaseAccounting, setOpenReleaseAccounting] = useState(false);
+  const [openPersonalNudge, setOpenPersonalNudge] = useState(false);
+  const [personalNudgeMessage, setPersonalNudgeMessage] = useState('');
+  const [internalCcEmail, setInternalCcEmail] = useState('');
+  const [internalCcName, setInternalCcName] = useState('');
   const [sendBackReason, setSendBackReason] = useState('');
   const [recallReason, setRecallReason] = useState('');
   const [cancelReason, setCancelReason] = useState('');
@@ -229,6 +237,46 @@ export function ContractActions({
     });
   }
 
+  function openPersonalNudgeDialog() {
+    const senderName =
+      session?.user?.name?.trim() ||
+      session?.user?.email?.split('@')[0]?.replace(/\./g, ' ') ||
+      'Events team';
+    setPersonalNudgeMessage(
+      defaultPersonalNudgeMessage({
+        signerName,
+        exhibitorCompanyName: exhibitorName,
+        eventName: eventName?.trim() || 'the event',
+        senderName,
+      }),
+    );
+    setOpenPersonalNudge(true);
+  }
+
+  function submitPersonalNudge() {
+    setAction('personal-nudge');
+    startTransition(async () => {
+      const res = await fetch(`/api/contracts/${contractId}/send-personal-nudge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: personalNudgeMessage.trim(),
+          internal_cc_email: internalCcEmail.trim() || null,
+          internal_cc_name: internalCcName.trim() || null,
+        }),
+      });
+      if (res.ok) {
+        emitContractActionSuccessFeedback(Boolean(session?.user?.sound_enabled));
+        setOpenPersonalNudge(false);
+        router.refresh();
+      } else {
+        const j = await res.json().catch(() => ({}));
+        alert(`Could not send note: ${j.error ?? res.status}`);
+      }
+      setAction(null);
+    });
+  }
+
   async function syncFromDocuSign() {
     setAction('sync-docusign');
     startTransition(async () => {
@@ -251,6 +299,15 @@ export function ContractActions({
   }
 
   const canReminder = isAdmin && (status === 'sent' || status === 'partially_signed') && Boolean(docusignEnvelopeId);
+  const actorEmail = session?.user?.email?.trim().toLowerCase() ?? '';
+  const actorIsAssignedRep =
+    Boolean(salesRepEmail?.trim()) && actorEmail === salesRepEmail!.trim().toLowerCase();
+  const actorIsCreator = Boolean(createdBy?.trim()) && actorEmail === createdBy!.trim().toLowerCase();
+  const canPersonalNudge =
+    status === 'sent' &&
+    Boolean(docusignEnvelopeId) &&
+    Boolean(signerEmail?.trim()) &&
+    (isAdmin || isEventsTeam || actorIsAssignedRep || actorIsCreator);
   const canRecall =
     (isAdmin || isEventsTeam) &&
     (status === 'sent' || status === 'partially_signed') &&
@@ -266,7 +323,7 @@ export function ContractActions({
     (status === 'sent' || status === 'partially_signed' || status === 'error');
   /** In-flight DocuSign: reminder / recall / resend-with-changes / void / sync */
   const hasDocuSignSecondary =
-    canReminder || canResendWithChanges || canRecall || canVoid || canSyncDocuSign;
+    canPersonalNudge || canReminder || canResendWithChanges || canRecall || canVoid || canSyncDocuSign;
   /** Cancel contract while envelope is out (API allows cancel except executed/cancelled). */
   const canCancelInflightDocuSign =
     (status === 'sent' || status === 'partially_signed') && (isAdmin || isEventsTeam);
@@ -701,6 +758,21 @@ export function ContractActions({
           )}
           {hasDocuSignSecondary && (
             <ContractActionsSidebarGroup label="DocuSign">
+              {canPersonalNudge && (
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.sendPersonalNudge} className="w-full">
+                  <Button
+                    className={btnPrimary}
+                    onClick={openPersonalNudgeDialog}
+                    disabled={busy}
+                  >
+                    <ContractActionButtonLabel
+                      icon={Mail}
+                      label="Send personal note"
+                      spinning={pending && action === 'personal-nudge'}
+                    />
+                  </Button>
+                </ActionWithHelp>
+              )}
               {canReminder && (
                 <ActionWithHelp helpText={CONTRACT_ACTION_HELP.sendReminder} className="w-full">
                   <Button
@@ -1096,6 +1168,64 @@ export function ContractActions({
               disabled={busy}
             >
               Yes, send to accounting
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={openPersonalNudge} onOpenChange={setOpenPersonalNudge}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Send personal note</DialogTitle>
+            <DialogDescription>
+              Email {signerName?.trim() || signerEmail || 'the signer'} with your message and a DocuSign signing link.
+              They can reply directly to you.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="space-y-2">
+              <Label htmlFor="personal-nudge-message">Your message</Label>
+              <Textarea
+                id="personal-nudge-message"
+                value={personalNudgeMessage}
+                onChange={(e) => setPersonalNudgeMessage(e.target.value)}
+                rows={8}
+                maxLength={4000}
+              />
+              <p className="text-right text-xs text-muted-foreground">{personalNudgeMessage.length}/4000</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="internal-cc-name">CC colleague (optional)</Label>
+                <Input
+                  id="internal-cc-name"
+                  value={internalCcName}
+                  onChange={(e) => setInternalCcName(e.target.value)}
+                  placeholder="Name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="internal-cc-email">CC email</Label>
+                <Input
+                  id="internal-cc-email"
+                  type="email"
+                  value={internalCcEmail}
+                  onChange={(e) => setInternalCcEmail(e.target.value)}
+                  placeholder="colleague@mshanken.com"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenPersonalNudge(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => submitPersonalNudge()}
+              disabled={busy || personalNudgeMessage.trim().length < 10}
+            >
+              {pending && action === 'personal-nudge' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Send email
             </Button>
           </DialogFooter>
         </DialogContent>
