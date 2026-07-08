@@ -773,7 +773,7 @@ export function ContractActions({
                   </Button>
                 </ActionWithHelp>
               )}
-              {canReminder && (
+              {canReminder && !canPersonalNudge && (
                 <ActionWithHelp helpText={CONTRACT_ACTION_HELP.sendReminder} className="w-full">
                   <Button
                     className={btnPrimary}
@@ -1295,7 +1295,15 @@ function StatusLine({
   const cancelledRelative = useRelativeTimeLabel(cancelledAt);
 
   if (status === 'sent') {
-    if (!isAdmin) {
+    const staffHint =
+      (isAdmin || isEventsTeam) && docusignEnvelopeId ? (
+        <>
+          {' '}
+          · Open <span className="font-medium text-foreground">Actions</span> →{' '}
+          <span className="font-medium text-foreground">Send personal note</span> for a custom follow-up
+        </>
+      ) : null;
+    if (!isAdmin && !isEventsTeam) {
       return (
         <p className="text-sm italic text-muted-foreground" suppressHydrationWarning>
           Waiting for {signerWaitLabel}
@@ -1306,8 +1314,9 @@ function StatusLine({
     return (
       <p className="text-sm italic text-muted-foreground" suppressHydrationWarning>
         {sentAt && hydrated ? `Sent ${sentRelative}` : 'Sent'} · Waiting for {signerWaitLabel} to sign
+        {staffHint}
         {(isAdmin || isEventsTeam) && docusignEnvelopeId ? (
-          <> · If they already signed in DocuSign, open <span className="font-medium text-foreground">Actions</span> and use Sync from DocuSign.</>
+          <> · If they already signed, use Sync from DocuSign in Actions.</>
         ) : null}
       </p>
     );
