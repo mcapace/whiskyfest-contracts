@@ -30,7 +30,15 @@ export function whiskyfestPortalOrigin(): string {
   const explicit = process.env['WHISKYFEST_PORTAL_ORIGIN']?.trim().replace(/\/$/, '');
   if (explicit) return explicit;
   const fromNextAuth = process.env['NEXTAUTH_URL']?.trim().replace(/\/$/, '');
-  if (fromNextAuth) return fromNextAuth;
+  if (fromNextAuth) {
+    try {
+      if (normalizeHost(new URL(fromNextAuth).host) === normalizeHost(WHISKYFEST_PORTAL_HOST)) {
+        return fromNextAuth;
+      }
+    } catch {
+      // ignore malformed NEXTAUTH_URL
+    }
+  }
   return `https://${WHISKYFEST_PORTAL_HOST}`;
 }
 
