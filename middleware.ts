@@ -191,7 +191,10 @@ export default auth((req) => {
     };
 
     const crossPortalPath =
-      !pathname.startsWith('/api/') && !pathname.startsWith('/auth') && !pathname.startsWith('/_next');
+      !pathname.startsWith('/api/') &&
+      !pathname.startsWith('/auth') &&
+      !pathname.startsWith('/_next') &&
+      !isPublicExhibitorPath(pathname);
 
     if (crossPortalPath && !isFullPortalAdmin(portalUser)) {
       if (!nyweHost && (isNyweExclusiveUser(portalUser) || isNyweAccountingOnlyUser(portalUser))) {

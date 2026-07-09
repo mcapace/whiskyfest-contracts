@@ -74,6 +74,10 @@ export function exhibitorSigningAccentClass(productKey: ProductKey): string {
   return productKey === PRODUCT_WINE_SPECTATOR ? 'bg-[#6b3822]' : 'bg-neutral-900';
 }
 
+export function exhibitorSigningAccentHex(productKey: ProductKey): string {
+  return productKey === PRODUCT_WINE_SPECTATOR ? '#6b3822' : '#171717';
+}
+
 export function exhibitorSigningPortalKind(productKey: ProductKey): 'nywe' | 'whiskyfest' {
   return productKey === PRODUCT_WINE_SPECTATOR ? 'nywe' : 'whiskyfest';
 }

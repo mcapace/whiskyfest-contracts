@@ -118,7 +118,7 @@ export async function handleExhibitorDocuSignSignRedirect(
       envelopeId,
       signerEmail: gate.signerEmail,
       signerName: gate.signerName,
-      returnUrl: personalNudgeReturnUrl(event),
+      returnUrl: personalNudgeReturnUrl(event, trimmedId),
       recipientId: gate.recipientId,
       bypassRateLimitGuard: true,
     });

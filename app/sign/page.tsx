@@ -5,6 +5,8 @@ import {
   exhibitorSigningCrossPortalRedirectUrl,
   loadExhibitorSigningPortalContext,
 } from '@/lib/exhibitor-signing-portal';
+import { portalKindFromHost, productKeyForPortalKind } from '@/lib/portal-host';
+import { workspaceLabelForProduct } from '@/lib/product-email';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,13 +30,14 @@ export default async function ExhibitorSignLandingPage({
     if (crossPortal) redirect(crossPortal);
   }
 
-  const workspaceLabel =
-    portal?.workspaceLabel ??
-    (host?.includes('nywe') || host?.includes('winespectator') ? 'NYWE Contracts' : 'WhiskyFest Contracts');
+  const fallbackKey = productKeyForPortalKind(portalKindFromHost(host));
+  const workspaceLabel = portal?.workspaceLabel ?? workspaceLabelForProduct(fallbackKey);
   const continueAction = portal
     ? `${portal.portalOrigin.replace(/\/$/, '')}/sign/continue`
     : '/sign/continue';
-  const accentClass = portal ? exhibitorSigningAccentClass(portal.productKey) : 'bg-[#6b3822]';
+  const accentClass = portal
+    ? exhibitorSigningAccentClass(portal.productKey)
+    : exhibitorSigningAccentClass(fallbackKey);
 
   if (!contractId || !token) {
     return (
