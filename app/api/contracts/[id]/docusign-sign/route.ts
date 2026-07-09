@@ -3,6 +3,8 @@ import { createExhibitorSigningViewUrl, formatDocuSignErrorForUser } from '@/lib
 import { verifyDocuSignSigningLinkToken } from '@/lib/docusign-signing-link';
 import { personalNudgeReturnUrl } from '@/lib/contract-personal-nudge-email';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { portalKindFromHost } from '@/lib/portal-host';
+import { PRODUCT_WINE_SPECTATOR } from '@/lib/product-portal';
 import type { Event } from '@/types/db';
 
 export const runtime = 'nodejs';
@@ -15,15 +17,30 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   }
 
   const supabase = getSupabaseAdmin();
-  const { data: contract } = await supabase
+  const { data: contract, error: contractError } = await supabase
     .from('contracts')
     .select('id, status, docusign_envelope_id, signer_1_email, signer_1_name, event_id')
     .eq('id', params.id)
     .maybeSingle();
 
   if (!contract) {
-    return NextResponse.json({ error: 'Contract not found.' }, { status: 404 });
+    console.error('[docusign-sign] Contract not found', {
+      contract_id: params.id,
+      error: contractError,
+      url: req.url,
+    });
+    return htmlPage(
+      'Contract not found',
+      'This signing link may be incorrect or the contract may no longer be available. Please contact the sender for a new link.',
+    );
   }
+
+  console.log('[docusign-sign] Contract found', {
+    contract_id: contract.id,
+    status: contract.status,
+    has_envelope: !!contract.docusign_envelope_id,
+    event_id: contract.event_id,
+  });
 
   const signerEmail = contract.signer_1_email?.trim().toLowerCase();
   const envelopeId = contract.docusign_envelope_id?.trim();
@@ -52,6 +69,30 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   const { data: eventRow } = await supabase.from('events').select('*').eq('id', contract.event_id).maybeSingle();
   const event = eventRow as Event | null;
 
+  // Detect product_key / host mismatch
+  const requestHost = req.headers.get('host') || '';
+  const portalKind = portalKindFromHost(requestHost);
+  const isWineSpectatorContract = event?.product_key === PRODUCT_WINE_SPECTATOR;
+  const expectedPortal = isWineSpectatorContract ? 'nywe' : 'whiskyfest';
+  
+  if (portalKind !== expectedPortal) {
+    console.warn('[docusign-sign] Portal/product mismatch detected', {
+      contract_id: contract.id,
+      event_product_key: event?.product_key,
+      request_host: requestHost,
+      portal_kind: portalKind,
+      expected_portal: expectedPortal,
+    });
+  }
+
+  console.log('[docusign-sign] Creating DocuSign signing view', {
+    contract_id: contract.id,
+    envelope_id: envelopeId,
+    signer_email: signerEmail,
+    event_product_key: event?.product_key,
+    request_portal: portalKind,
+  });
+
   try {
     const signingUrl = await createExhibitorSigningViewUrl({
       envelopeId,
@@ -62,9 +103,18 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       bypassRateLimitGuard: true,
     });
 
+    console.log('[docusign-sign] Redirecting to DocuSign', {
+      contract_id: contract.id,
+      signing_url_host: new URL(signingUrl).host,
+    });
+
     return NextResponse.redirect(signingUrl, { status: 302 });
   } catch (err) {
-    console.error('[docusign-sign]', err);
+    console.error('[docusign-sign] Failed to create signing view', {
+      contract_id: contract.id,
+      envelope_id: envelopeId,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return htmlPage('Unable to open signing', formatDocuSignErrorForUser(err));
   }
 }
