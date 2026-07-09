@@ -113,7 +113,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       internal_cc_email: internalCcEmail,
       message_preview: message.slice(0, 240),
       product_key: event.product_key,
-      signing_url_host: new URL(signingApiUrl).host,
+      signing_url_host: new URL(signingLandingUrl).host,
     },
   });
 
