@@ -8,7 +8,7 @@ import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
 import { formatDocuSignErrorForUser } from '@/lib/docusign';
 import { sendPersonalContractNudgeEmail } from '@/lib/contract-personal-nudge-email';
 import { defaultPersonalNudgeMessage } from '@/lib/contract-personal-nudge-copy';
-import { docuSignSigningRedirectUrl } from '@/lib/docusign-signing-link';
+import { docuSignSigningApiUrl, docuSignSigningRedirectUrl } from '@/lib/docusign-signing-link';
 import { insertContractAudit } from '@/lib/audit-log';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import type { Event } from '@/types/db';
@@ -82,7 +82,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       senderName,
     });
 
-  const signingUrl = docuSignSigningRedirectUrl(contract.id, event, signerEmail);
+  const signingLandingUrl = docuSignSigningRedirectUrl(contract.id, event, signerEmail);
+  const signingApiUrl = docuSignSigningApiUrl(contract.id, event, signerEmail);
 
   try {
     await sendPersonalContractNudgeEmail({
@@ -96,7 +97,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       senderEmail: actorEmail,
       internalCcEmail,
       internalCcName: body.internal_cc_name?.trim() || null,
-      signingUrl,
+      signingUrl: signingApiUrl,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -112,11 +113,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       internal_cc_email: internalCcEmail,
       message_preview: message.slice(0, 240),
       product_key: event.product_key,
-      signing_url_host: new URL(signingUrl).host,
+      signing_url_host: new URL(signingApiUrl).host,
     },
   });
 
   revalidateContractPaths(contract.id);
 
-  return NextResponse.json({ ok: true, signingUrl });
+  return NextResponse.json({ ok: true, signingUrl: signingLandingUrl, signingApiUrl });
 }

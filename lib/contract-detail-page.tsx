@@ -14,6 +14,7 @@ import {
   contractPdfPreviewVersion,
   contractPrefersSignedPdf,
 } from '@/lib/contract-pdf-preview';
+import { docuSignSigningApiUrl, docuSignSigningRedirectUrl } from '@/lib/docusign-signing-link';
 import { syncDraftPdfFromDocuSign } from '@/lib/contract-pdf-sync-docusign';
 import { syncContractFromDocuSign } from '@/lib/docusign-envelope-sync';
 import { docuSignPollEligible } from '@/lib/docusign-poll-cooldown';
@@ -213,6 +214,17 @@ export async function ContractDetailPage({
         ? 'Live preview — billing address and signatory title from current data'
         : 'Latest generated draft';
 
+  const exhibitorSigningLandingUrl =
+    contract.status === 'sent' &&
+    contract.docusign_envelope_id?.trim() &&
+    contract.signer_1_email?.trim()
+      ? docuSignSigningRedirectUrl(contract.id, eventRow, contract.signer_1_email)
+      : null;
+  const exhibitorSigningApiUrl =
+    exhibitorSigningLandingUrl && contract.signer_1_email?.trim()
+      ? docuSignSigningApiUrl(contract.id, eventRow, contract.signer_1_email)
+      : null;
+
   return (
     <ContractDetailViewClient
       portalBasePath={portalBasePath}
@@ -241,6 +253,8 @@ export async function ContractDetailPage({
       pdfPreviewUrl={pdfPreviewUrl}
       pdfPreviewCaption={pdfPreviewCaption}
       legacyPdfUrl={legacyPdfUrl}
+      exhibitorSigningLandingUrl={exhibitorSigningLandingUrl}
+      exhibitorSigningApiUrl={exhibitorSigningApiUrl}
     />
   );
 }

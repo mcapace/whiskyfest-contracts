@@ -22,6 +22,7 @@ import { ContractProgressionTimeline } from '@/components/contract/progression-t
 import { ContractActions } from '@/components/contracts/contract-actions';
 import { ActivityTimeline } from '@/components/contracts/activity-timeline';
 import { PdfPreview } from '@/components/contracts/pdf-preview';
+import { ExhibitorSigningLinkCard } from '@/components/contracts/exhibitor-signing-link-card';
 import { ContractLiveProvider } from '@/components/contracts/contract-live-context';
 import { ContractDetailRealtime } from '@/components/contracts/contract-detail-realtime';
 import { ContractTableOfContents } from '@/components/contracts/table-of-contents';
@@ -62,6 +63,8 @@ export type ContractDetailViewProps = {
   pdfPreviewUrl: string;
   pdfPreviewCaption: string;
   legacyPdfUrl: string | null;
+  exhibitorSigningLandingUrl: string | null;
+  exhibitorSigningApiUrl: string | null;
 };
 
 /** Entire contract detail UI — client-only to avoid hydration crashes on corporate PCs. */
@@ -92,6 +95,8 @@ export function ContractDetailView({
   pdfPreviewUrl,
   pdfPreviewCaption,
   legacyPdfUrl,
+  exhibitorSigningLandingUrl,
+  exhibitorSigningApiUrl,
 }: ContractDetailViewProps) {
   const nyweLicense = isNyweVendorEvent(event);
 
@@ -310,6 +315,15 @@ export function ContractDetailView({
             </div>
 
             <hr className="my-2 border-parchment-300" />
+
+            {contract.status === 'sent' && exhibitorSigningLandingUrl && exhibitorSigningApiUrl ? (
+              <ExhibitorSigningLinkCard
+                signerName={contract.signer_1_name}
+                signerEmail={contract.signer_1_email}
+                signingLandingUrl={exhibitorSigningLandingUrl}
+                signingApiUrl={exhibitorSigningApiUrl}
+              />
+            ) : null}
 
             <div className="grid gap-6 lg:grid-cols-2">
               <Card id="exhibitor-info">

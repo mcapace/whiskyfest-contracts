@@ -273,8 +273,8 @@ export function ContractActions({
           const copied = await navigator.clipboard?.writeText(j.signingUrl.trim()).then(() => true).catch(() => false);
           alert(
             copied
-              ? 'Personal note sent. Signing link copied to clipboard. Open it in incognito, click "Continue to sign" on the next page — that opens DocuSign (not the staff contract page).'
-              : 'Personal note sent. The signer should click the email button, then "Continue to sign" on the next page to open DocuSign.',
+              ? 'Personal note sent. Signing page link copied — open in incognito, click Continue to sign (DocuSign opens in a new tab). The PDF on this page is staff-only.'
+              : 'Personal note sent. The signer should use the email button to open DocuSign directly.',
           );
         }
         router.refresh();

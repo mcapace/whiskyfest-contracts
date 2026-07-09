@@ -375,8 +375,15 @@ export async function fetchRecipientSignHereTabCount(
     markDocuSignRateLimitedFromResponse(res.status, text);
     throw new Error(`DocuSign getRecipientTabs ${res.status}: ${text}`);
   }
-  const data = JSON.parse(text) as { signHereTabs?: unknown[] };
-  return (data.signHereTabs ?? []).length;
+  const data = JSON.parse(text) as { signHereTabs?: Record<string, unknown>[] };
+  const tabs = data.signHereTabs ?? [];
+  return tabs.filter((raw) => {
+    const tab = raw as Record<string, unknown>;
+    const page = tab['pageNumber'] ?? tab['PageNumber'];
+    const status = String(tab['status'] ?? tab['Status'] ?? '').toLowerCase();
+    if (status === 'voided') return false;
+    return page != null && String(page) !== '' && String(page) !== '0';
+  }).length;
 }
 
 /** Load envelope recipients (signers) for webhook / audit (actual countersigner identity after signing group completes). */
@@ -589,38 +596,36 @@ export async function createExhibitorSigningViewUrl(options: {
     returnUrl: options.returnUrl,
   };
 
-  try {
-    return await postExhibitorSigningView(restApiBase, accountId, accessToken, options.envelopeId, {
-      ...baseBody,
-      authenticationMethod: 'none',
-    });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (!msg.includes('USER_AUTHENTICATION_FAILED') && !msg.includes('AUTHORIZATION_INVALID_TOKEN')) {
-      throw err;
-    }
-    clearDocuSignSessionCache();
-    const retrySession = await getDocuSignSession();
+  const authMethods = ['email', 'none'] as const;
+  let lastErr: unknown;
+  for (const authenticationMethod of authMethods) {
     try {
-      return await postExhibitorSigningView(
-        retrySession.restApiBase,
-        retrySession.accountId,
-        retrySession.accessToken,
-        options.envelopeId,
-        { ...baseBody, authenticationMethod: 'none' },
-      );
-    } catch (retryErr) {
-      const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
-      if (!retryMsg.includes('USER_AUTHENTICATION_FAILED') && !retryMsg.includes('AUTHORIZATION_INVALID_TOKEN')) {
-        throw retryErr;
+      return await postExhibitorSigningView(restApiBase, accountId, accessToken, options.envelopeId, {
+        ...baseBody,
+        authenticationMethod,
+      });
+    } catch (err) {
+      lastErr = err;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('USER_AUTHENTICATION_FAILED') || msg.includes('AUTHORIZATION_INVALID_TOKEN')) {
+        clearDocuSignSessionCache();
+        const retrySession = await getDocuSignSession();
+        try {
+          return await postExhibitorSigningView(
+            retrySession.restApiBase,
+            retrySession.accountId,
+            retrySession.accessToken,
+            options.envelopeId,
+            { ...baseBody, authenticationMethod },
+          );
+        } catch (retryErr) {
+          lastErr = retryErr;
+        }
       }
     }
   }
 
-  return postExhibitorSigningView(restApiBase, accountId, accessToken, options.envelopeId, {
-    ...baseBody,
-    authenticationMethod: 'email',
-  });
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr ?? 'DocuSign signing view failed'));
 }
 
 function signerCompletedStatus(status: string | undefined): boolean {

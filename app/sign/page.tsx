@@ -43,7 +43,7 @@ export default function ExhibitorSignLandingPage({
       <p className="mt-3 leading-relaxed text-muted-foreground">
         When you are ready, continue below to open the secure DocuSign signing page. No Shanken login is required.
       </p>
-      <form action={signingApiUrl} method="GET" className="mt-6">
+      <form action={signingApiUrl} method="GET" target="_blank" rel="noopener noreferrer" className="mt-6">
         <button
           type="submit"
           className={`inline-flex cursor-pointer items-center justify-center rounded-md border-0 px-5 py-3 text-sm font-semibold text-white hover:opacity-90 ${

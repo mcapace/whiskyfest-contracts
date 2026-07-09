@@ -54,7 +54,7 @@ export async function sendPersonalContractNudgeEmail(p: PersonalNudgeEmailParams
   const subject = `Reminder: please sign your ${eventLabel} agreement`;
 
   const docusignNote =
-    'Click the button below, then press "Continue to sign" on the next page to open DocuSign. No Shanken login is required. This works even if your company email blocks messages from DocuSign.';
+    'Click the button below to open DocuSign and sign. No Shanken login is required. This works even if your company email blocks messages from DocuSign.';
 
   const text = [
     p.personalMessage.trim(),
