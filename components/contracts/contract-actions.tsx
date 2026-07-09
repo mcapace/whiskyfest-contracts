@@ -1187,9 +1187,9 @@ export function ContractActions({
           <DialogHeader>
             <DialogTitle>Send personal note</DialogTitle>
             <DialogDescription>
-              Email {signerName?.trim() || signerEmail || 'the signer'} with your message and a secure signing link
-              ({`/sign?...`} on this portal — not the staff contract page). Works when their company blocks DocuSign
-              emails.
+              Email {signerName?.trim() || signerEmail || 'the signer'} with your message and a secure link to sign the
+              same original DocuSign agreement ({`/sign?...`} → Continue to sign). Does not void or create a new
+              envelope — use when their company blocks DocuSign notification emails.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-sm">

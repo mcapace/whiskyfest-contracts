@@ -44,11 +44,12 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }
 
   const envelopeId = contract.docusign_envelope_id?.trim();
-  const signerEmail = contract.signer_1_email?.trim().toLowerCase();
+  const signerEmailForToken = contract.signer_1_email?.trim().toLowerCase();
+  const signerEmailForDelivery = contract.signer_1_email?.trim();
   if (!envelopeId) {
     return NextResponse.json({ error: 'No DocuSign contract is linked to this record.' }, { status: 409 });
   }
-  if (!signerEmail) {
+  if (!signerEmailForToken || !signerEmailForDelivery) {
     return NextResponse.json({ error: 'Signer email is required before sending a nudge.' }, { status: 409 });
   }
 
@@ -69,7 +70,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     'Events team';
 
   const internalCcEmail = body.internal_cc_email?.trim().toLowerCase() || null;
-  if (internalCcEmail && internalCcEmail === signerEmail) {
+  if (internalCcEmail && internalCcEmail === signerEmailForToken) {
     return NextResponse.json({ error: 'Internal CC must differ from the signer email.' }, { status: 400 });
   }
 
@@ -82,8 +83,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       senderName,
     });
 
-  const signingLandingUrl = docuSignSigningRedirectUrl(contract.id, event, signerEmail);
-  const signingApiUrl = docuSignSigningApiUrl(contract.id, event, signerEmail);
+  const signingLandingUrl = docuSignSigningRedirectUrl(contract.id, event, signerEmailForToken);
+  const signingApiUrl = docuSignSigningApiUrl(contract.id, event, signerEmailForToken);
 
   try {
     await sendPersonalContractNudgeEmail({
@@ -91,7 +92,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       event,
       exhibitorCompanyName: contract.exhibitor_company_name,
       signerName: contract.signer_1_name,
-      signerEmail,
+      signerEmail: signerEmailForDelivery,
       personalMessage: message,
       senderName,
       senderEmail: actorEmail,
@@ -109,7 +110,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     actor_email: actorEmail,
     action: 'personal_nudge_sent',
     metadata: {
-      signer_email: signerEmail,
+      signer_email: signerEmailForDelivery,
+      docusign_envelope_id: envelopeId,
       internal_cc_email: internalCcEmail,
       message_preview: message.slice(0, 240),
       product_key: event.product_key,

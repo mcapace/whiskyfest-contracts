@@ -41,6 +41,14 @@ export default function ExhibitorSignLandingPage({
       <p className="mt-3 leading-relaxed text-muted-foreground">
         When you are ready, continue below to open the secure DocuSign signing page. No Shanken login is required.
       </p>
+      <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-relaxed text-muted-foreground">
+        <li>In DocuSign, click <strong>Start</strong> or <strong>Continue</strong> if you see that prompt.</li>
+        <li>
+          Your signature line may be on <strong>page 2</strong> — use DocuSign&apos;s <strong>Next</strong> arrow if you
+          do not see a sign box right away.
+        </li>
+        <li>Open the link once in this browser tab; do not forward it (signing links expire after use).</li>
+      </ul>
       <form action="/sign/continue" method="POST" target="_blank" rel="noopener noreferrer" className="mt-6">
         <input type="hidden" name="c" value={contractId} />
         <input type="hidden" name="t" value={token} />

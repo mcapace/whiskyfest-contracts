@@ -139,6 +139,7 @@ function htmlRedirectPage(targetUrl: string): NextResponse {
 <body style="font-family:system-ui,sans-serif;max-width:480px;margin:48px auto;padding:0 16px;color:#1a1a1a;">
 <h1 style="font-size:1.25rem;">Opening DocuSign</h1>
 <p style="line-height:1.5;color:#444;">If you are not redirected automatically, <a href="${safeUrl}">click here to sign your agreement</a>.</p>
+<p style="line-height:1.5;color:#666;font-size:14px;margin-top:16px;">In DocuSign, click <strong>Start</strong> if prompted. If you do not see a signature box, go to <strong>page 2</strong> using the Next arrow.</p>
 <script>window.location.replace(${JSON.stringify(targetUrl)});</script>
 </body></html>`;
   return new NextResponse(html, {

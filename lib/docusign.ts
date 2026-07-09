@@ -581,6 +581,8 @@ export async function createExhibitorSigningViewUrl(options: {
   recipientId?: string;
   /** When true, attempt even if a recent 429 was seen in this instance (client-facing links). */
   bypassRateLimitGuard?: boolean;
+  /** DocuSign recipient-view auth — default none first (token-gated links); email as fallback. */
+  authenticationMethods?: readonly ('none' | 'email')[];
 }): Promise<string> {
   if (!options.bypassRateLimitGuard) {
     assertDocuSignApiAvailable();
@@ -596,7 +598,7 @@ export async function createExhibitorSigningViewUrl(options: {
     returnUrl: options.returnUrl,
   };
 
-  const authMethods = ['email', 'none'] as const;
+  const authMethods = options.authenticationMethods ?? (['none', 'email'] as const);
   let lastErr: unknown;
   for (const authenticationMethod of authMethods) {
     try {

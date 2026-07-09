@@ -11,7 +11,7 @@ export function defaultPersonalNudgeMessage(options: {
     '',
     `I wanted to follow up on the agreement for ${options.exhibitorCompanyName.trim() || 'your company'} (${options.eventName.trim()}).`,
     '',
-    'When you have a moment, please review and sign using the link below. If you have any questions, just reply to this email.',
+    'When you have a moment, please review and sign the same agreement we sent earlier using the link below. If you have any questions, just reply to this email.',
     '',
     `Thank you,`,
     sender,
