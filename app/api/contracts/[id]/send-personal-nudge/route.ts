@@ -97,7 +97,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       senderEmail: actorEmail,
       internalCcEmail,
       internalCcName: body.internal_cc_name?.trim() || null,
-      signingUrl: signingApiUrl,
+      signingUrl: signingLandingUrl,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

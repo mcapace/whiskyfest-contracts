@@ -26,7 +26,7 @@ export type PersonalNudgeEmailParams = {
   senderEmail: string;
   internalCcEmail?: string | null;
   internalCcName?: string | null;
-  /** Pre-built exhibitor signing landing URL (from docuSignSigningRedirectUrl). */
+  /** Pre-built exhibitor signing landing URL (/sign?c=...&t=...). */
   signingUrl: string;
 };
 
