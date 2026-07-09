@@ -6,7 +6,8 @@ export const CONTRACT_ACTION_HELP = {
 
   cancel: 'Use when the deal is off. Terminates the contract entirely.',
 
-  sendReminder: 'Follow-up email to unsigned recipients.',
+  sendReminder:
+    'Ask DocuSign to resend its standard signing email to outstanding recipients on the same envelope. Use when the client can receive @docusign.net mail; pair with Send personal note when they cannot.',
 
   sendPersonalNudge:
     'Send a personal follow-up to the unsigned signer with a secure link to sign the same original DocuSign agreement (bulk or individual send). Does not void or resend the envelope. Optionally CC a colleague.',

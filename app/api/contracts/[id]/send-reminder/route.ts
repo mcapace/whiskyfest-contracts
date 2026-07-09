@@ -1,15 +1,22 @@
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/api-auth';
+import { auth } from '@/lib/auth';
+import { resolveContractActor } from '@/lib/auth-contract';
+import { getEffectiveUserEmail } from '@/lib/effective-user';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { resendEnvelopeNotifications } from '@/lib/docusign';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 
 export const runtime = 'nodejs';
 
-/** Admin-only: ask DocuSign to resend reminder notifications to outstanding signers. */
+/** Admin or events team: ask DocuSign to resend reminder notifications on the existing envelope. */
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
-  const gate = await requireAdmin();
-  if (!gate.ok) return gate.res;
+  const session = await auth();
+  const gate = await resolveContractActor(session);
+  if (!gate.ok) return gate.response;
+
+  if (!gate.actor.isAdmin && !gate.actor.isEventsTeam) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const supabase = getSupabaseAdmin();
   const { data: contract } = await supabase
@@ -38,9 +45,10 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: msg }, { status: 502 });
   }
 
+  const actorEmail = getEffectiveUserEmail(session)?.trim().toLowerCase();
   await supabase.from('audit_log').insert({
     contract_id: params.id,
-    actor_email: gate.session.user.email,
+    actor_email: actorEmail,
     action: 'docusign_send_reminder',
     metadata: { envelope_id: envelopeId },
   });

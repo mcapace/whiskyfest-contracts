@@ -226,6 +226,9 @@ export function ContractActions({
       if (res.ok) {
         contractLive?.setOptimisticStatus(null);
         emitContractActionSuccessFeedback(Boolean(session?.user?.sound_enabled));
+        if (actionName === 'reminder') {
+          alert('DocuSign reminder sent. The signer should receive a new email from DocuSign (@docusign.net).');
+        }
         router.refresh();
         queueMicrotask(() => router.refresh());
       } else {
@@ -307,7 +310,10 @@ export function ContractActions({
     });
   }
 
-  const canReminder = isAdmin && (status === 'sent' || status === 'partially_signed') && Boolean(docusignEnvelopeId);
+  const canReminder =
+    (isAdmin || isEventsTeam) &&
+    (status === 'sent' || status === 'partially_signed') &&
+    Boolean(docusignEnvelopeId);
   const actorEmail = session?.user?.email?.trim().toLowerCase() ?? '';
   const actorIsAssignedRep =
     Boolean(salesRepEmail?.trim()) && actorEmail === salesRepEmail!.trim().toLowerCase();
@@ -782,10 +788,10 @@ export function ContractActions({
                   </Button>
                 </ActionWithHelp>
               )}
-              {canReminder && !canPersonalNudge && (
+              {canReminder && (
                 <ActionWithHelp helpText={CONTRACT_ACTION_HELP.sendReminder} className="w-full">
                   <Button
-                    className={btnPrimary}
+                    className={canPersonalNudge ? btnSecondary : btnPrimary}
                     onClick={() => runAction('send-reminder', 'reminder')}
                     disabled={busy}
                   >
