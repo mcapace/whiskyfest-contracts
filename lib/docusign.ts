@@ -185,6 +185,10 @@ export function isDocuSignRateLimitError(err: unknown): boolean {
 
 let docuSignRateLimitedUntilMs = 0;
 
+function maybeAssertDocuSignApiAvailable(bypass?: boolean): void {
+  if (!bypass) assertDocuSignApiAvailable();
+}
+
 export function isDocuSignRateLimitedNow(): boolean {
   return Date.now() < docuSignRateLimitedUntilMs;
 }
@@ -382,8 +386,11 @@ export async function fetchRecipientTextTabs(
 }
 
 /** Current envelope status from DocuSign (e.g. sent, delivered, completed, voided). */
-export async function fetchEnvelopeStatus(envelopeId: string): Promise<{ status: string }> {
-  assertDocuSignApiAvailable();
+export async function fetchEnvelopeStatus(
+  envelopeId: string,
+  options?: { bypassRateLimitGuard?: boolean },
+): Promise<{ status: string }> {
+  maybeAssertDocuSignApiAvailable(options?.bypassRateLimitGuard);
   const { accessToken, accountId, restApiBase } = await getDocuSignSession();
   const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}`;
   const res = await fetch(url, {
@@ -403,8 +410,11 @@ export async function fetchEnvelopeStatus(envelopeId: string): Promise<{ status:
   return { status };
 }
 
-export async function fetchEnvelopeSigners(envelopeId: string): Promise<DocuSignSignerRow[]> {
-  assertDocuSignApiAvailable();
+export async function fetchEnvelopeSigners(
+  envelopeId: string,
+  options?: { bypassRateLimitGuard?: boolean },
+): Promise<DocuSignSignerRow[]> {
+  maybeAssertDocuSignApiAvailable(options?.bypassRateLimitGuard);
   const { accessToken, accountId, restApiBase } = await getDocuSignSession();
   const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}/recipients`;
   const res = await fetch(url, {
@@ -520,6 +530,13 @@ export async function createExhibitorSigningViewUrl(options: {
   const recipientId = options.recipientId?.trim() || '1';
 
   const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(options.envelopeId)}/views/recipient`;
+  const body = {
+    authenticationMethod: 'none',
+    email: options.signerEmail.trim(),
+    userName: options.signerName.trim() || options.signerEmail.trim(),
+    recipientId,
+    returnUrl: options.returnUrl,
+  };
   const res = await fetch(url, {
     method: 'POST',
     headers: {
@@ -527,13 +544,7 @@ export async function createExhibitorSigningViewUrl(options: {
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    body: JSON.stringify({
-      authenticationMethod: 'email',
-      email: options.signerEmail.trim(),
-      userName: options.signerName.trim() || options.signerEmail.trim(),
-      recipientId,
-      returnUrl: options.returnUrl,
-    }),
+    body: JSON.stringify(body),
   });
 
   const text = await res.text();
@@ -550,13 +561,7 @@ export async function createExhibitorSigningViewUrl(options: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
         },
-        body: JSON.stringify({
-          authenticationMethod: 'email',
-          email: options.signerEmail.trim(),
-          userName: options.signerName.trim() || options.signerEmail.trim(),
-          recipientId,
-          returnUrl: options.returnUrl,
-        }),
+        body: JSON.stringify(body),
       });
       const retryText = await retryRes.text();
       if (retryRes.ok) {
@@ -574,6 +579,46 @@ export async function createExhibitorSigningViewUrl(options: {
     throw new Error('DocuSign did not return a signing URL.');
   }
   return data.url.trim();
+}
+
+function signerCompletedStatus(status: string | undefined): boolean {
+  const st = (status ?? '').toLowerCase();
+  return st === 'completed' || st === 'signed';
+}
+
+export type ExhibitorSigningGateResult =
+  | { action: 'open_signing'; recipientId: string }
+  | { action: 'already_signed' }
+  | { action: 'envelope_voided' }
+  | { action: 'envelope_declined' };
+
+/** Check DocuSign before opening a personal-note signing link (avoids empty signing UI). */
+export async function resolveExhibitorSigningGate(
+  envelopeId: string,
+  signerEmail: string,
+  options?: { bypassRateLimitGuard?: boolean },
+): Promise<ExhibitorSigningGateResult> {
+  const bypass = options?.bypassRateLimitGuard;
+  const normalizedEmail = signerEmail.trim().toLowerCase();
+
+  const { status: envelopeStatus } = await fetchEnvelopeStatus(envelopeId, { bypassRateLimitGuard: bypass });
+  const envLower = envelopeStatus.toLowerCase();
+  if (envLower === 'completed') return { action: 'already_signed' };
+  if (envLower === 'voided') return { action: 'envelope_voided' };
+  if (envLower === 'declined') return { action: 'envelope_declined' };
+
+  const signers = await fetchEnvelopeSigners(envelopeId, { bypassRateLimitGuard: bypass });
+  const exhibitor =
+    signers.find((s) => s.routingOrder === '1') ??
+    signers.find((s) => s.email?.trim().toLowerCase() === normalizedEmail);
+  if (!exhibitor?.recipientId) {
+    throw new Error('DocuSign exhibitor signer not found on this envelope.');
+  }
+  if (signerCompletedStatus(exhibitor.status)) {
+    return { action: 'already_signed' };
+  }
+
+  return { action: 'open_signing', recipientId: exhibitor.recipientId };
 }
 
 async function downloadEnvelopePdfFromUrl(url: string, accessToken: string): Promise<Buffer> {

@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
-import { createExhibitorSigningViewUrl, formatDocuSignErrorForUser } from '@/lib/docusign';
+import {
+  createExhibitorSigningViewUrl,
+  formatDocuSignErrorForUser,
+  resolveExhibitorSigningGate,
+} from '@/lib/docusign';
+import { syncContractFromDocuSign } from '@/lib/docusign-envelope-sync';
 import { verifyDocuSignSigningLinkToken } from '@/lib/docusign-signing-link';
 import { personalNudgeReturnUrl } from '@/lib/contract-personal-nudge-email';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import type { Event } from '@/types/db';
+import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
 
@@ -16,10 +21,10 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
   const supabase = getSupabaseAdmin();
   const { data: contract } = await supabase
-    .from('contracts')
-    .select('id, status, docusign_envelope_id, signer_1_email, signer_1_name, event_id')
+    .from('contracts_with_totals')
+    .select('*')
     .eq('id', params.id)
-    .maybeSingle();
+    .maybeSingle<ContractWithTotals>();
 
   if (!contract) {
     return NextResponse.json({ error: 'Contract not found.' }, { status: 404 });
@@ -35,6 +40,9 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     return NextResponse.json({ error: 'Invalid or expired signing link.' }, { status: 403 });
   }
 
+  const { data: eventRow } = await supabase.from('events').select('*').eq('id', contract.event_id).maybeSingle();
+  const event = (eventRow ?? null) as Event | null;
+
   if (contract.status !== 'sent' && contract.status !== 'partially_signed') {
     return htmlPage(
       'Agreement already completed',
@@ -49,16 +57,40 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     );
   }
 
-  const { data: eventRow } = await supabase.from('events').select('*').eq('id', contract.event_id).maybeSingle();
-  const event = eventRow as Event | null;
-
   try {
+    const gate = await resolveExhibitorSigningGate(envelopeId, signerEmail, { bypassRateLimitGuard: true });
+
+    if (gate.action === 'already_signed') {
+      void syncContractFromDocuSign(supabase, contract, event, null, {
+        notify: false,
+        forcePoll: true,
+      }).catch((err) => console.error('[docusign-sign] sync after already_signed', err));
+      return htmlPage(
+        'Thank you',
+        'Your signature is already on file. You can close this window — no further action is needed.',
+      );
+    }
+
+    if (gate.action === 'envelope_voided') {
+      return htmlPage(
+        'Agreement unavailable',
+        'This agreement is no longer active in DocuSign. Please contact your event coordinator for a new copy.',
+      );
+    }
+
+    if (gate.action === 'envelope_declined') {
+      return htmlPage(
+        'Agreement declined',
+        'This agreement was declined in DocuSign. Please contact your event coordinator if you need help.',
+      );
+    }
+
     const signingUrl = await createExhibitorSigningViewUrl({
       envelopeId,
       signerEmail,
       signerName: contract.signer_1_name?.trim() || signerEmail,
       returnUrl: personalNudgeReturnUrl(event),
-      recipientId: '1',
+      recipientId: gate.recipientId,
       bypassRateLimitGuard: true,
     });
 
