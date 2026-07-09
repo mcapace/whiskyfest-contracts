@@ -69,19 +69,23 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   const { data: eventRow } = await supabase.from('events').select('*').eq('id', contract.event_id).maybeSingle();
   const event = eventRow as Event | null;
 
-  // Detect product_key / host mismatch
+  // Detect product_key / host mismatch (for diagnostics only - signing still works)
+  // Note: It's valid for staff to send emails from either portal, so cross-portal
+  // access is expected and supported. This warning helps diagnose if wrong URLs
+  // are being systematically generated (e.g., Wine contracts always getting Whisky URLs).
   const requestHost = req.headers.get('host') || '';
   const portalKind = portalKindFromHost(requestHost);
   const isWineSpectatorContract = event?.product_key === PRODUCT_WINE_SPECTATOR;
   const expectedPortal = isWineSpectatorContract ? 'nywe' : 'whiskyfest';
   
   if (portalKind !== expectedPortal) {
-    console.warn('[docusign-sign] Portal/product mismatch detected', {
+    console.warn('[docusign-sign] Portal/product mismatch detected (signing will still proceed)', {
       contract_id: contract.id,
       event_product_key: event?.product_key,
       request_host: requestHost,
       portal_kind: portalKind,
       expected_portal: expectedPortal,
+      note: 'Cross-portal access is supported. This warns if URLs are being systematically generated incorrectly.',
     });
   }
 
