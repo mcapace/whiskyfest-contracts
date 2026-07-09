@@ -34,8 +34,6 @@ export default function ExhibitorSignLandingPage({
     );
   }
 
-  const signingApiUrl = `/api/contracts/${encodeURIComponent(contractId)}/docusign-sign?t=${encodeURIComponent(token)}`;
-
   return (
     <main className="mx-auto flex min-h-[60vh] max-w-lg flex-col justify-center px-4 py-16 font-sans text-foreground">
       <p className="text-sm font-medium text-muted-foreground">{workspaceLabel}</p>
@@ -43,7 +41,9 @@ export default function ExhibitorSignLandingPage({
       <p className="mt-3 leading-relaxed text-muted-foreground">
         When you are ready, continue below to open the secure DocuSign signing page. No Shanken login is required.
       </p>
-      <form action={signingApiUrl} method="GET" target="_blank" rel="noopener noreferrer" className="mt-6">
+      <form action="/sign/continue" method="POST" target="_blank" rel="noopener noreferrer" className="mt-6">
+        <input type="hidden" name="c" value={contractId} />
+        <input type="hidden" name="t" value={token} />
         <button
           type="submit"
           className={`inline-flex cursor-pointer items-center justify-center rounded-md border-0 px-5 py-3 text-sm font-semibold text-white hover:opacity-90 ${
