@@ -8,6 +8,7 @@ import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
 import { formatDocuSignErrorForUser } from '@/lib/docusign';
 import { sendPersonalContractNudgeEmail } from '@/lib/contract-personal-nudge-email';
 import { defaultPersonalNudgeMessage } from '@/lib/contract-personal-nudge-copy';
+import { docuSignSigningRedirectUrl } from '@/lib/docusign-signing-link';
 import { insertContractAudit } from '@/lib/audit-log';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import type { Event } from '@/types/db';
@@ -81,6 +82,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       senderName,
     });
 
+  const signingUrl = docuSignSigningRedirectUrl(contract.id, event, signerEmail);
+
   try {
     await sendPersonalContractNudgeEmail({
       contractId: contract.id,
@@ -93,6 +96,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       senderEmail: actorEmail,
       internalCcEmail,
       internalCcName: body.internal_cc_name?.trim() || null,
+      signingUrl,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -112,5 +116,5 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   revalidateContractPaths(contract.id);
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, signingUrl });
 }

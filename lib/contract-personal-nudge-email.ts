@@ -6,7 +6,6 @@ import {
   type EventEmailContext,
 } from '@/lib/product-email';
 import { productKeyFromEvent } from '@/lib/product-portal';
-import { docuSignSigningRedirectUrl } from '@/lib/docusign-signing-link';
 
 function eventLabelForEmail(event: { name: string; year?: number }): string {
   const name = event.name.trim();
@@ -27,6 +26,8 @@ export type PersonalNudgeEmailParams = {
   senderEmail: string;
   internalCcEmail?: string | null;
   internalCcName?: string | null;
+  /** Pre-built exhibitor signing landing URL (from docuSignSigningRedirectUrl). */
+  signingUrl: string;
 };
 
 function escapeHtml(s: string): string {
@@ -48,12 +49,12 @@ export async function sendPersonalContractNudgeEmail(p: PersonalNudgeEmailParams
 
   const from = sendGridFromForEvent(p.event);
   const workspaceLabel = workspaceLabelForEvent(p.event);
-  const signingUrl = docuSignSigningRedirectUrl(p.contractId, p.event, p.signerEmail);
+  const signingUrl = p.signingUrl.trim();
   const eventLabel = eventLabelForEmail(p.event);
   const subject = `Reminder: please sign your ${eventLabel} agreement`;
 
   const docusignNote =
-    'Use the button below to review and sign. This link works even if your company email blocks messages from DocuSign.';
+    'Use the button below to review and sign. This page opens signing in DocuSign — no staff login required. It works even if your company email blocks messages from DocuSign.';
 
   const text = [
     p.personalMessage.trim(),
@@ -96,6 +97,10 @@ export async function sendPersonalContractNudgeEmail(p: PersonalNudgeEmailParams
     subject,
     text,
     html,
+    trackingSettings: {
+      clickTracking: { enable: false, enableText: false },
+      openTracking: { enable: false },
+    },
   });
 }
 

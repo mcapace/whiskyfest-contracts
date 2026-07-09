@@ -37,7 +37,7 @@ export function verifyDocuSignSigningLinkToken(
   }
 }
 
-export function docuSignSigningRedirectUrl(
+export function docuSignSigningApiUrl(
   contractId: string,
   event: EventEmailContext | null | undefined,
   signerEmail: string,
@@ -45,4 +45,15 @@ export function docuSignSigningRedirectUrl(
   const token = createDocuSignSigningLinkToken(contractId, signerEmail);
   const base = appBaseUrlForProduct(productKeyFromEvent(event));
   return `${base}/api/contracts/${encodeURIComponent(contractId)}/docusign-sign?t=${encodeURIComponent(token)}`;
+}
+
+/** Exhibitor-facing landing page — avoids email scanners consuming one-time DocuSign URLs. */
+export function docuSignSigningRedirectUrl(
+  contractId: string,
+  event: EventEmailContext | null | undefined,
+  signerEmail: string,
+): string {
+  const token = createDocuSignSigningLinkToken(contractId, signerEmail);
+  const base = appBaseUrlForProduct(productKeyFromEvent(event));
+  return `${base}/sign?c=${encodeURIComponent(contractId)}&t=${encodeURIComponent(token)}`;
 }

@@ -266,8 +266,17 @@ export function ContractActions({
         }),
       });
       if (res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { signingUrl?: string };
         emitContractActionSuccessFeedback(Boolean(session?.user?.sound_enabled));
         setOpenPersonalNudge(false);
+        if (j.signingUrl?.trim()) {
+          const copied = await navigator.clipboard?.writeText(j.signingUrl.trim()).then(() => true).catch(() => false);
+          alert(
+            copied
+              ? 'Personal note sent. The exhibitor signing link was copied to your clipboard — open it in a private/incognito window to test (not the staff contract page).'
+              : 'Personal note sent. Ask the signer to use the button in the email — not the staff contract page in the portal.',
+          );
+        }
         router.refresh();
       } else {
         const j = await res.json().catch(() => ({}));
@@ -1178,8 +1187,9 @@ export function ContractActions({
           <DialogHeader>
             <DialogTitle>Send personal note</DialogTitle>
             <DialogDescription>
-              Email {signerName?.trim() || signerEmail || 'the signer'} with your message and a secure signing link.
-              This works when their company blocks DocuSign emails. They can reply directly to you.
+              Email {signerName?.trim() || signerEmail || 'the signer'} with your message and a secure signing link
+              ({`/sign?...`} on this portal — not the staff contract page). Works when their company blocks DocuSign
+              emails.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-sm">

@@ -5,5 +5,5 @@ export function isPublicDocuSignSigningApiPath(pathname: string): boolean {
 
 /** Paths reachable without a Shanken Google account (exhibitors / external signers). */
 export function isPublicExhibitorPath(pathname: string): boolean {
-  return pathname === '/signing/complete' || isPublicDocuSignSigningApiPath(pathname);
+  return pathname === '/sign' || pathname === '/signing/complete' || isPublicDocuSignSigningApiPath(pathname);
 }
