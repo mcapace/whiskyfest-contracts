@@ -21,6 +21,7 @@ import {
 } from '@/lib/portal-host';
 import { canAccessWineSpectator } from '@/lib/wine-spectator-access';
 import { portalFaviconPath } from '@/lib/portal-metadata';
+import { isPublicExhibitorPath } from '@/lib/public-routes';
 
 type SessionUserFlags = {
   pipeline_access?: boolean;
@@ -52,7 +53,8 @@ export default auth((req) => {
     pathname.startsWith('/auth') ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/api/webhooks') ||
-    pathname.startsWith('/api/cron');
+    pathname.startsWith('/api/cron') ||
+    isPublicExhibitorPath(pathname);
 
   if (!req.auth && !isPublic) {
     return applyPortalHeader(NextResponse.redirect(requestUrl(req, '/auth/login')), host);

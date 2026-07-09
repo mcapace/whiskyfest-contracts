@@ -8,6 +8,14 @@ import {
 import { productKeyFromEvent } from '@/lib/product-portal';
 import { docuSignSigningRedirectUrl } from '@/lib/docusign-signing-link';
 
+function eventLabelForEmail(event: { name: string; year?: number }): string {
+  const name = event.name.trim();
+  const year = event.year;
+  if (!year) return name;
+  if (new RegExp(`\\b${year}\\b`).test(name)) return name;
+  return `${name} ${year}`;
+}
+
 export type PersonalNudgeEmailParams = {
   contractId: string;
   event: EventEmailContext & { year?: number; name: string };
@@ -43,7 +51,7 @@ export async function sendPersonalContractNudgeEmail(p: PersonalNudgeEmailParams
   const from = sendGridFromForEvent(p.event);
   const workspaceLabel = workspaceLabelForEvent(p.event);
   const signingUrl = docuSignSigningRedirectUrl(p.contractId, p.event, p.signerEmail);
-  const eventLabel = p.event.year ? `${p.event.name} ${p.event.year}` : p.event.name;
+  const eventLabel = eventLabelForEmail(p.event);
   const subject = `Reminder: please sign your ${eventLabel} agreement`;
 
   const docusignNote = p.docusignResent
@@ -95,5 +103,5 @@ export async function sendPersonalContractNudgeEmail(p: PersonalNudgeEmailParams
 }
 
 export function personalNudgeReturnUrl(event: EventEmailContext | null | undefined): string {
-  return `${appBaseUrlForProduct(productKeyFromEvent(event))}/auth/login?signed=1`;
+  return `${appBaseUrlForProduct(productKeyFromEvent(event))}/signing/complete`;
 }
