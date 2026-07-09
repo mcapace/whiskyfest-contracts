@@ -27,8 +27,6 @@ export type PersonalNudgeEmailParams = {
   senderEmail: string;
   internalCcEmail?: string | null;
   internalCcName?: string | null;
-  /** True when a fresh DocuSign signing email was also sent to the signer. */
-  docusignResent?: boolean;
 };
 
 function escapeHtml(s: string): string {
@@ -54,9 +52,8 @@ export async function sendPersonalContractNudgeEmail(p: PersonalNudgeEmailParams
   const eventLabel = eventLabelForEmail(p.event);
   const subject = `Reminder: please sign your ${eventLabel} agreement`;
 
-  const docusignNote = p.docusignResent
-    ? 'We also sent a separate email from DocuSign with a direct signing link — you can use either email to sign.'
-    : 'If the button below does not work, check your inbox for an email from DocuSign about signing this agreement.';
+  const docusignNote =
+    'Use the button below to review and sign. This link works even if your company email blocks messages from DocuSign.';
 
   const text = [
     p.personalMessage.trim(),

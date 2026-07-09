@@ -1178,8 +1178,8 @@ export function ContractActions({
           <DialogHeader>
             <DialogTitle>Send personal note</DialogTitle>
             <DialogDescription>
-              Email {signerName?.trim() || signerEmail || 'the signer'} with your message and a DocuSign signing link.
-              They can reply directly to you.
+              Email {signerName?.trim() || signerEmail || 'the signer'} with your message and a secure signing link.
+              This works when their company blocks DocuSign emails. They can reply directly to you.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-sm">
