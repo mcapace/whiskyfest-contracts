@@ -273,8 +273,8 @@ export function ContractActions({
           const copied = await navigator.clipboard?.writeText(j.signingUrl.trim()).then(() => true).catch(() => false);
           alert(
             copied
-              ? 'Personal note sent. The exhibitor signing link was copied to your clipboard — open it in a private/incognito window to test (not the staff contract page).'
-              : 'Personal note sent. Ask the signer to use the button in the email — not the staff contract page in the portal.',
+              ? 'Personal note sent. Signing link copied to clipboard. Open it in incognito, click "Continue to sign" on the next page — that opens DocuSign (not the staff contract page).'
+              : 'Personal note sent. The signer should click the email button, then "Continue to sign" on the next page to open DocuSign.',
           );
         }
         router.refresh();

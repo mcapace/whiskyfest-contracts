@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { headers } from 'next/headers';
 import { portalKindFromHost } from '@/lib/portal-host';
 import { workspaceLabelForProduct } from '@/lib/product-email';
@@ -8,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 type SearchParams = { c?: string; t?: string };
 
-/** Public signing landing — button click opens DocuSign (email scanners cannot consume the session). */
+/** Public signing landing — form submit opens DocuSign (must not use Next.js Link — it blocks 302 redirects). */
 export default function ExhibitorSignLandingPage({
   searchParams,
 }: {
@@ -44,16 +43,16 @@ export default function ExhibitorSignLandingPage({
       <p className="mt-3 leading-relaxed text-muted-foreground">
         When you are ready, continue below to open the secure DocuSign signing page. No Shanken login is required.
       </p>
-      <p className="mt-6">
-        <Link
-          href={signingApiUrl}
-          className={`inline-flex items-center justify-center rounded-md px-5 py-3 text-sm font-semibold text-white no-underline hover:opacity-90 ${
+      <form action={signingApiUrl} method="GET" className="mt-6">
+        <button
+          type="submit"
+          className={`inline-flex cursor-pointer items-center justify-center rounded-md border-0 px-5 py-3 text-sm font-semibold text-white hover:opacity-90 ${
             portalKind === 'nywe' ? 'bg-[#6b3822]' : 'bg-neutral-900'
           }`}
         >
           Continue to sign
-        </Link>
-      </p>
+        </button>
+      </form>
       <p className="mt-8 text-sm text-muted-foreground">
         If you have questions, reply to the email from your event coordinator.
       </p>
