@@ -85,20 +85,51 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       );
     }
 
+    if (gate.action === 'delivery_failed') {
+      return htmlPage(
+        'Email delivery problem',
+        'DocuSign could not deliver to the signer email on this envelope (it may be blocked or invalid). Your event coordinator must correct the email in DocuSign or send a new agreement.',
+      );
+    }
+
+    if (gate.action === 'no_signature_fields') {
+      return htmlPage(
+        'Unable to open signing',
+        'This DocuSign envelope has no signature fields for the exhibitor. Your event coordinator should use Resend with changes to generate a new agreement.',
+      );
+    }
+
     const signingUrl = await createExhibitorSigningViewUrl({
       envelopeId,
-      signerEmail,
-      signerName: contract.signer_1_name?.trim() || signerEmail,
+      signerEmail: gate.signerEmail,
+      signerName: gate.signerName,
       returnUrl: personalNudgeReturnUrl(event),
       recipientId: gate.recipientId,
       bypassRateLimitGuard: true,
     });
 
-    return NextResponse.redirect(signingUrl, { status: 302 });
+    return htmlRedirectPage(signingUrl);
   } catch (err) {
     console.error('[docusign-sign]', err);
     return htmlPage('Unable to open signing', formatDocuSignErrorForUser(err));
   }
+}
+
+function htmlRedirectPage(targetUrl: string): NextResponse {
+  const safeUrl = escapeHtml(targetUrl);
+  const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta http-equiv="refresh" content="0;url=${safeUrl}"/>
+<title>Opening DocuSign</title></head>
+<body style="font-family:system-ui,sans-serif;max-width:480px;margin:48px auto;padding:0 16px;color:#1a1a1a;">
+<h1 style="font-size:1.25rem;">Opening DocuSign</h1>
+<p style="line-height:1.5;color:#444;">If you are not redirected automatically, <a href="${safeUrl}">click here to sign your agreement</a>.</p>
+<script>window.location.replace(${JSON.stringify(targetUrl)});</script>
+</body></html>`;
+  return new NextResponse(html, {
+    status: 200,
+    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+  });
 }
 
 function htmlPage(title: string, message: string): NextResponse {

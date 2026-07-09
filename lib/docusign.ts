@@ -356,6 +356,29 @@ export interface DocuSignSignerRow {
   recipientId?: string;
 }
 
+export async function fetchRecipientSignHereTabCount(
+  envelopeId: string,
+  recipientId: string,
+  options?: { bypassRateLimitGuard?: boolean },
+): Promise<number> {
+  maybeAssertDocuSignApiAvailable(options?.bypassRateLimitGuard);
+  const { accessToken, accountId, restApiBase } = await getDocuSignSession();
+  const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}/recipients/${encodeURIComponent(recipientId)}/tabs`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/json',
+    },
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    markDocuSignRateLimitedFromResponse(res.status, text);
+    throw new Error(`DocuSign getRecipientTabs ${res.status}: ${text}`);
+  }
+  const data = JSON.parse(text) as { signHereTabs?: unknown[] };
+  return (data.signHereTabs ?? []).length;
+}
+
 /** Load envelope recipients (signers) for webhook / audit (actual countersigner identity after signing group completes). */
 /** Text tab values for a recipient (e.g. exhibitor routing order 1) after signing. */
 export async function fetchRecipientTextTabs(
@@ -512,6 +535,35 @@ export async function resendEnvelopeNotifications(envelopeId: string): Promise<v
   }
 }
 
+async function postExhibitorSigningView(
+  restApiBase: string,
+  accountId: string,
+  accessToken: string,
+  envelopeId: string,
+  body: Record<string, unknown>,
+): Promise<string> {
+  const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}/views/recipient`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    markDocuSignRateLimitedFromResponse(res.status, text);
+    throw new Error(`DocuSign createRecipientView ${res.status}: ${text}`);
+  }
+  const data = JSON.parse(text) as { url?: string };
+  if (!data.url?.trim()) {
+    throw new Error('DocuSign did not return a signing URL.');
+  }
+  return data.url.trim();
+}
+
 /** One-time DocuSign signing URL for routing order 1 (exhibitor / winery). */
 export async function createExhibitorSigningViewUrl(options: {
   envelopeId: string;
@@ -528,57 +580,47 @@ export async function createExhibitorSigningViewUrl(options: {
   }
   const { accessToken, accountId, restApiBase } = await getDocuSignSession();
   const recipientId = options.recipientId?.trim() || '1';
-
-  const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(options.envelopeId)}/views/recipient`;
-  const body = {
-    authenticationMethod: 'none',
-    email: options.signerEmail.trim(),
-    userName: options.signerName.trim() || options.signerEmail.trim(),
+  const email = options.signerEmail.trim();
+  const userName = options.signerName.trim() || email;
+  const baseBody = {
+    email,
+    userName,
     recipientId,
     returnUrl: options.returnUrl,
   };
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
 
-  const text = await res.text();
-  if (!res.ok) {
-    markDocuSignRateLimitedFromResponse(res.status, text);
-    if (text.includes('USER_AUTHENTICATION_FAILED') || text.includes('AUTHORIZATION_INVALID_TOKEN')) {
-      clearDocuSignSessionCache();
-      const retrySession = await getDocuSignSession();
-      const retryUrl = `${retrySession.restApiBase}/v2.1/accounts/${encodeURIComponent(retrySession.accountId)}/envelopes/${encodeURIComponent(options.envelopeId)}/views/recipient`;
-      const retryRes = await fetch(retryUrl, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${retrySession.accessToken}`,
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
-      const retryText = await retryRes.text();
-      if (retryRes.ok) {
-        const data = JSON.parse(retryText) as { url?: string };
-        if (data.url?.trim()) return data.url.trim();
-      }
-      markDocuSignRateLimitedFromResponse(retryRes.status, retryText);
-      throw new Error(`DocuSign createRecipientView ${retryRes.status}: ${retryText}`);
+  try {
+    return await postExhibitorSigningView(restApiBase, accountId, accessToken, options.envelopeId, {
+      ...baseBody,
+      authenticationMethod: 'none',
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (!msg.includes('USER_AUTHENTICATION_FAILED') && !msg.includes('AUTHORIZATION_INVALID_TOKEN')) {
+      throw err;
     }
-    throw new Error(`DocuSign createRecipientView ${res.status}: ${text}`);
+    clearDocuSignSessionCache();
+    const retrySession = await getDocuSignSession();
+    try {
+      return await postExhibitorSigningView(
+        retrySession.restApiBase,
+        retrySession.accountId,
+        retrySession.accessToken,
+        options.envelopeId,
+        { ...baseBody, authenticationMethod: 'none' },
+      );
+    } catch (retryErr) {
+      const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
+      if (!retryMsg.includes('USER_AUTHENTICATION_FAILED') && !retryMsg.includes('AUTHORIZATION_INVALID_TOKEN')) {
+        throw retryErr;
+      }
+    }
   }
 
-  const data = JSON.parse(text) as { url?: string };
-  if (!data.url?.trim()) {
-    throw new Error('DocuSign did not return a signing URL.');
-  }
-  return data.url.trim();
+  return postExhibitorSigningView(restApiBase, accountId, accessToken, options.envelopeId, {
+    ...baseBody,
+    authenticationMethod: 'email',
+  });
 }
 
 function signerCompletedStatus(status: string | undefined): boolean {
@@ -587,10 +629,17 @@ function signerCompletedStatus(status: string | undefined): boolean {
 }
 
 export type ExhibitorSigningGateResult =
-  | { action: 'open_signing'; recipientId: string }
+  | { action: 'open_signing'; recipientId: string; signerEmail: string; signerName: string }
   | { action: 'already_signed' }
   | { action: 'envelope_voided' }
-  | { action: 'envelope_declined' };
+  | { action: 'envelope_declined' }
+  | { action: 'delivery_failed' }
+  | { action: 'no_signature_fields' };
+
+function signerNeedsDeliveryRetry(status: string | undefined): boolean {
+  const st = (status ?? '').toLowerCase();
+  return st === 'autoresponded' || st === 'faxfailed' || st === 'autorespondedgenerationfailed';
+}
 
 /** Check DocuSign before opening a personal-note signing link (avoids empty signing UI). */
 export async function resolveExhibitorSigningGate(
@@ -609,16 +658,31 @@ export async function resolveExhibitorSigningGate(
 
   const signers = await fetchEnvelopeSigners(envelopeId, { bypassRateLimitGuard: bypass });
   const exhibitor =
-    signers.find((s) => s.routingOrder === '1') ??
+    signers.find((s) => s.routingOrder === '1' && s.email?.trim()) ??
     signers.find((s) => s.email?.trim().toLowerCase() === normalizedEmail);
-  if (!exhibitor?.recipientId) {
+  if (!exhibitor?.recipientId || !exhibitor.email?.trim()) {
     throw new Error('DocuSign exhibitor signer not found on this envelope.');
   }
   if (signerCompletedStatus(exhibitor.status)) {
     return { action: 'already_signed' };
   }
+  if (signerNeedsDeliveryRetry(exhibitor.status)) {
+    return { action: 'delivery_failed' };
+  }
 
-  return { action: 'open_signing', recipientId: exhibitor.recipientId };
+  const signHereCount = await fetchRecipientSignHereTabCount(envelopeId, exhibitor.recipientId, {
+    bypassRateLimitGuard: bypass,
+  });
+  if (signHereCount === 0) {
+    return { action: 'no_signature_fields' };
+  }
+
+  return {
+    action: 'open_signing',
+    recipientId: exhibitor.recipientId,
+    signerEmail: exhibitor.email.trim(),
+    signerName: exhibitor.name?.trim() || exhibitor.email.trim(),
+  };
 }
 
 async function downloadEnvelopePdfFromUrl(url: string, accessToken: string): Promise<Buffer> {
