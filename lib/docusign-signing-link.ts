@@ -42,7 +42,25 @@ export function docuSignSigningRedirectUrl(
   event: EventEmailContext | null | undefined,
   signerEmail: string,
 ): string {
+  const productKey = productKeyFromEvent(event);
+  
+  if (!event?.product_key) {
+    console.error('[docuSignSigningRedirectUrl] Event missing product_key - defaulting to whiskyfest', {
+      contractId,
+      event: event ? { name: event.name, product_key: event.product_key } : null,
+      resolved_product_key: productKey,
+    });
+  }
+  
   const token = createDocuSignSigningLinkToken(contractId, signerEmail);
-  const base = appBaseUrlForProduct(productKeyFromEvent(event));
+  const base = appBaseUrlForProduct(productKey);
+  
+  console.log('[docuSignSigningRedirectUrl] Generated signing URL', {
+    contractId,
+    product_key: productKey,
+    event_name: event?.name,
+    base_url: base,
+  });
+  
   return `${base}/api/contracts/${encodeURIComponent(contractId)}/docusign-sign?t=${encodeURIComponent(token)}`;
 }
