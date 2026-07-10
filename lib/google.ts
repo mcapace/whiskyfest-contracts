@@ -1,4 +1,4 @@
-import { google } from 'googleapis';
+import { google, type docs_v1 } from 'googleapis';
 import {
   applyContractOrderTableDataRowFormatting,
   insertContractLineItemsIntoOrderTable,
@@ -51,6 +51,8 @@ export function getGoogleDrive() {
 export type RenderContractPdfOptions = {
   /** Sponsorship-only Google Doc has no booth row in CONTRACT ORDER table. */
   includeBoothRow?: boolean;
+  /** Inline template edits applied after merge tokens (AI revision plan). */
+  postMergeRevisionRequests?: docs_v1.Schema$Request[];
 };
 
 export async function renderContractPdfFromTemplate(
@@ -101,6 +103,14 @@ export async function renderContractPdfFromTemplate(
       await docs.documents.batchUpdate({
         documentId: tempDocId,
         requestBody: { requests },
+      });
+    }
+
+    const revisionRequests = options?.postMergeRevisionRequests ?? [];
+    if (revisionRequests.length > 0) {
+      await docs.documents.batchUpdate({
+        documentId: tempDocId,
+        requestBody: { requests: revisionRequests },
       });
     }
 

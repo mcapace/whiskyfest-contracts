@@ -32,11 +32,25 @@ import { insertContractAudit } from '@/lib/audit-log';
 import { syncExhibitorRosterWriteback } from '@/lib/exhibitor-roster-sync-hook';
 import { docusignBrandIdForEvent } from '@/lib/product-email';
 import { parseSignerCc, validateSignerCcDistinct } from '@/lib/docusign-signer-cc';
+import {
+  amendmentsTextForPlan,
+  buildContractRevisionPlan,
+  docRequestsForRevisionPlan,
+} from '@/lib/contract-revision-plan-service';
+import {
+  applyRevisionPlanFieldUpdates,
+  contractRevisionPlanSchema,
+  type ContractRevisionPlan,
+} from '@/lib/contract-revision-plan';
 import type { Contract, ContractStatus, ContractWithTotals, Event } from '@/types/db';
 
 export const reviseAndSendBodySchema = z.object({
   reason: z.string().trim().min(10).max(1000),
   use_uploaded_pdf: z.boolean().optional(),
+  /** Natural-language client change requests (parsed by AI into template edits). */
+  change_request: z.string().max(50000).optional().nullable(),
+  /** Pre-computed plan from POST /revision-plan; generated on submit if omitted. */
+  revision_plan: contractRevisionPlanSchema.optional().nullable(),
   revision_amendments: z.string().max(50000).optional().nullable(),
   exhibitor_notes: z.string().max(50000).optional().nullable(),
   signer_1_name: z.string().trim().min(1).optional(),
@@ -104,17 +118,27 @@ async function recallInFlightContract(
   });
 }
 
-function buildRevisionPatch(body: ReviseAndSendBody, contract: Contract): Record<string, unknown> {
+function buildRevisionPatch(
+  body: ReviseAndSendBody,
+  contract: Contract,
+  plan?: ContractRevisionPlan | null,
+): Record<string, unknown> {
   const patch: Record<string, unknown> = {
     revision_round: (contract.revision_round ?? 0) + 1,
     revision_use_uploaded_pdf: Boolean(body.use_uploaded_pdf),
   };
 
+  if (plan) {
+    applyRevisionPlanFieldUpdates(plan, patch);
+    const planAmendments = amendmentsTextForPlan(plan);
+    if (planAmendments) patch.revision_amendments = planAmendments;
+  }
+
   const set = (key: string, value: unknown) => {
     if (value !== undefined) patch[key] = value;
   };
 
-  set('revision_amendments', body.revision_amendments?.trim() || null);
+  set('revision_amendments', body.revision_amendments?.trim() || patch.revision_amendments || null);
   set('exhibitor_notes', body.exhibitor_notes?.trim() || null);
   set('signer_1_name', body.signer_1_name?.trim());
   set('signer_1_email', body.signer_1_email?.trim());
@@ -135,6 +159,7 @@ function buildRevisionPatch(body: ReviseAndSendBody, contract: Contract): Record
 async function resolveRevisionPdfBytes(
   contract: ContractWithTotals,
   event: Event,
+  plan?: ContractRevisionPlan | null,
 ): Promise<Buffer> {
   if (contract.revision_use_uploaded_pdf && contract.revision_upload_path?.trim()) {
     return downloadContractPdfFromStorage(contract.revision_upload_path.trim());
@@ -146,6 +171,7 @@ async function resolveRevisionPdfBytes(
   const mergeMap = buildContractMergeMap(contract, event, 'docusign', boothBrands);
   const templateDocId = resolveContractTemplateDocId(contract, event);
   const usesOrderTable = eventUsesContractOrderTable(event);
+  const postMergeRevisionRequests = plan ? docRequestsForRevisionPlan(plan) : undefined;
 
   return renderContractPdfFromTemplate(
     templateDocId,
@@ -154,6 +180,7 @@ async function resolveRevisionPdfBytes(
     usesOrderTable ? lineItems : undefined,
     {
       includeBoothRow: usesOrderTable && !isSponsorshipOnlyOrder(contract),
+      postMergeRevisionRequests,
     },
   );
 }
@@ -183,9 +210,21 @@ export async function reviseAndSendContract(options: {
   const priorStatus = contract.status;
   const priorEnvelopeId = contract.docusign_envelope_id;
 
+  let revisionPlan = body.revision_plan ?? null;
+  const changeRequest = body.change_request?.trim() ?? '';
+  if (!body.use_uploaded_pdf && !revisionPlan && changeRequest.length >= 10) {
+    const built = await buildContractRevisionPlan({
+      contract,
+      event,
+      changeRequest,
+      revisionUploadPath: contract.revision_upload_path,
+    });
+    revisionPlan = built.plan;
+  }
+
   await recallInFlightContract(contract, actorEmail, body.reason);
 
-  const patch = buildRevisionPatch(body, contract);
+  const patch = buildRevisionPatch(body, contract, revisionPlan);
   const { error: patchError } = await supabase.from('contracts').update(patch).eq('id', contractId);
   if (patchError) throw new Error(patchError.message);
 
@@ -222,7 +261,7 @@ export async function reviseAndSendContract(options: {
   });
   if (ccError) throw new Error(ccError);
 
-  const pdfBytes = await resolveRevisionPdfBytes(contract, event);
+  const pdfBytes = await resolveRevisionPdfBytes(contract, event, revisionPlan);
   const { draftStoragePath, drafted_at } = await persistContractDraftPdf(contract.id, pdfBytes);
 
   const now = new Date().toISOString();
@@ -282,6 +321,8 @@ export async function reviseAndSendContract(options: {
     to_status: 'sent',
     metadata: {
       reason: body.reason,
+      change_request: changeRequest || undefined,
+      revision_plan: revisionPlan ?? undefined,
       revision_round: contract.revision_round,
       old_envelope_id: priorEnvelopeId,
       new_envelope_id: envelopeId,

@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input, Label, Textarea } from '@/components/ui/input';
 import { emitContractActionSuccessFeedback } from '@/lib/contract-action-feedback';
+import type { ContractRevisionPlan } from '@/lib/contract-revision-plan';
 import { useContractLiveOptional } from '@/components/contracts/contract-live-context';
 
 export type ContractReviseInitialValues = {
@@ -51,6 +52,11 @@ export function ContractReviseWizard({ contractId, open, onOpenChange, initial, 
   const busy = pending || readOnly;
 
   const [reason, setReason] = useState('');
+  const [changeRequest, setChangeRequest] = useState('');
+  const [revisionPlan, setRevisionPlan] = useState<ContractRevisionPlan | null>(null);
+  const [planPreviewLines, setPlanPreviewLines] = useState<string[]>([]);
+  const [planError, setPlanError] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
   const [useUploadedPdf, setUseUploadedPdf] = useState(false);
   const [uploadPath, setUploadPath] = useState<string | null>(initial.revisionUploadPath);
   const [uploading, setUploading] = useState(false);
@@ -74,6 +80,10 @@ export function ContractReviseWizard({ contractId, open, onOpenChange, initial, 
   useEffect(() => {
     if (!open) return;
     setReason('');
+    setChangeRequest('');
+    setRevisionPlan(null);
+    setPlanPreviewLines([]);
+    setPlanError(null);
     setUseUploadedPdf(false);
     setUploadPath(initial.revisionUploadPath);
     setUploadError(null);
@@ -114,6 +124,40 @@ export function ContractReviseWizard({ contractId, open, onOpenChange, initial, 
     }
   }
 
+  async function analyzeChanges() {
+    setPlanError(null);
+    setAnalyzing(true);
+    try {
+      const res = await fetch(`/api/contracts/${contractId}/revision-plan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ change_request: changeRequest.trim() }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPlanError(typeof j.error === 'string' ? j.error : 'Analysis failed');
+        setRevisionPlan(null);
+        setPlanPreviewLines([]);
+        return;
+      }
+      setRevisionPlan(j.plan as ContractRevisionPlan);
+      setPlanPreviewLines(Array.isArray(j.preview_lines) ? j.preview_lines : []);
+      const plan = j.plan as ContractRevisionPlan | undefined;
+      if (plan?.field_updates?.exhibitor_legal_name) {
+        setExhibitorLegalName(plan.field_updates.exhibitor_legal_name);
+      }
+      if (plan?.field_updates?.exhibitor_company_name) {
+        setExhibitorCompanyName(plan.field_updates.exhibitor_company_name);
+      }
+      if (plan?.field_updates?.signer_1_name) setSignerName(plan.field_updates.signer_1_name);
+      if (plan?.field_updates?.signer_1_email) setSignerEmail(plan.field_updates.signer_1_email);
+    } catch {
+      setPlanError('Analysis failed');
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
   function submitReviseAndSend() {
     if (contractLive) contractLive.setOptimisticStatus('sent');
     startTransition(async () => {
@@ -121,6 +165,9 @@ export function ContractReviseWizard({ contractId, open, onOpenChange, initial, 
         reason: reason.trim(),
         use_uploaded_pdf: useUploadedPdf,
       };
+
+      if (changeRequest.trim().length >= 10) body.change_request = changeRequest.trim();
+      if (revisionPlan) body.revision_plan = revisionPlan;
 
       const setIfChanged = (key: string, value: string, initialValue: string) => {
         const trimmed = value.trim();
@@ -165,7 +212,11 @@ export function ContractReviseWizard({ contractId, open, onOpenChange, initial, 
     reason.trim().length >= 10 &&
     signerName.trim().length > 0 &&
     signerEmail.trim().length > 0 &&
-    (!useUploadedPdf || Boolean(uploadPath));
+    (useUploadedPdf
+      ? Boolean(uploadPath)
+      : changeRequest.trim().length >= 10 || Boolean(revisionPlan) || revisionAmendments.trim().length > 0);
+
+  const busyAll = busy || analyzing;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -173,9 +224,9 @@ export function ContractReviseWizard({ contractId, open, onOpenChange, initial, 
         <DialogHeader>
           <DialogTitle>Revise and send</DialogTitle>
           <DialogDescription>
-            Void the current DocuSign envelope, apply client revisions, and send a new customized contract. Upload a
-            redlined PDF or enter the changes below — the master template will be regenerated with your amendments unless
-            you choose to send the uploaded document.
+            Describe what the client wants changed. The system analyzes the request, updates the master contract
+            template (names, payment terms, deletions, etc.), and sends a new DocuSign envelope — or send an uploaded
+            PDF as-is.
           </DialogDescription>
         </DialogHeader>
 
@@ -186,10 +237,54 @@ export function ContractReviseWizard({ contractId, open, onOpenChange, initial, 
               id="revise-reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="e.g., Client requested billing address change and added custom payment terms"
-              rows={3}
+              placeholder="e.g., Suntory redlines — party name, Net 60, remove Med Exp"
+              rows={2}
               maxLength={1000}
             />
+          </div>
+
+          <div className="space-y-3 rounded-lg border border-blue-200/80 bg-blue-50/50 p-4">
+            <p className="font-medium">Client requested changes</p>
+            <p className="text-muted-foreground text-xs">
+              Paste the client&apos;s bullet list or redline summary. Click <strong>Analyze changes</strong> to preview
+              how the contract template will be updated.
+            </p>
+            <Textarea
+              id="revise-change-request"
+              value={changeRequest}
+              onChange={(e) => {
+                setChangeRequest(e.target.value);
+                setRevisionPlan(null);
+                setPlanPreviewLines([]);
+                setPlanError(null);
+              }}
+              placeholder={`Replace references to Suntory Global Spirits with "Jim Beam Brands Co."\nUpdate payment terms to Net 60\nDelete the medical expense insurance coverage ("Med Exp")`}
+              rows={5}
+              disabled={useUploadedPdf}
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={busyAll || useUploadedPdf || changeRequest.trim().length < 10}
+                onClick={() => void analyzeChanges()}
+              >
+                {analyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Analyze changes
+              </Button>
+              {revisionPlan ? (
+                <span className="text-xs text-emerald-800">Plan ready — review below before sending</span>
+              ) : null}
+            </div>
+            {planError ? <p className="text-xs text-destructive">{planError}</p> : null}
+            {planPreviewLines.length > 0 ? (
+              <ul className="list-disc space-y-1 pl-5 text-xs text-foreground/90">
+                {planPreviewLines.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            ) : null}
           </div>
 
           <div className="space-y-3 rounded-lg border border-parchment-200 bg-parchment-50/60 p-4">
@@ -239,14 +334,13 @@ export function ContractReviseWizard({ contractId, open, onOpenChange, initial, 
           </div>
 
           <div className="space-y-4">
-            <p className="font-medium">Contract adjustments</p>
+            <p className="font-medium">Manual overrides (optional)</p>
             <p className="text-muted-foreground text-xs">
-              Leave fields unchanged to keep current values. Amendments appear in the contract via{' '}
-              <code className="rounded bg-muted px-1">{'{{revision_amendments}}'}</code> on the master template.
+              These override analyzed values. Use only if you need to tweak something the plan missed.
             </p>
 
             <div className="space-y-2">
-              <Label htmlFor="revise-amendments">Revision amendments / custom terms</Label>
+              <Label htmlFor="revise-amendments">Extra amendment text</Label>
               <Textarea
                 id="revise-amendments"
                 value={revisionAmendments}
@@ -351,10 +445,10 @@ export function ContractReviseWizard({ contractId, open, onOpenChange, initial, 
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busyAll}>
             Cancel
           </Button>
-          <Button onClick={() => void submitReviseAndSend()} disabled={busy || !canSubmit}>
+          <Button onClick={() => void submitReviseAndSend()} disabled={busyAll || !canSubmit}>
             {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Void, revise, and send
           </Button>
