@@ -208,6 +208,8 @@ export function describeAuditEntry(entry: AuditLogEntry, context?: AuditDisplayC
       return { title: 'Admin ended impersonation session', synthetic };
     case 'voided_contract_reopened_for_edit':
       return { title: 'Voided contract reopened for editing', synthetic };
+    case 'cancelled_contract_redrafted':
+      return { title: 'Cancelled contract redrafted for resend', synthetic };
     default:
       return {
         title: entry.action.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase()),

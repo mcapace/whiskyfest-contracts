@@ -31,6 +31,8 @@ export const CONTRACT_ACTION_HELP = {
 
   editImportedContract: 'Fix typos or amounts on an imported record before it is released to accounting.',
   editVoidedContract: 'Reopen this voided deal for edits. Saving moves it back to draft so you can regenerate and re-send.',
+  redraftCancelled:
+    'Return this cancelled contract to draft, void any linked DocuSign envelope, and open the editor so you can regenerate and send again.',
 
   voidImportedRecord:
     'Permanently marks this imported record void when the deal should not continue in the system. No DocuSign envelope is involved.',

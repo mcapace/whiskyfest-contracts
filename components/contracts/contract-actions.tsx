@@ -182,6 +182,22 @@ export function ContractActions({
   const [nextSignerName, setNextSignerName] = useState(signerName ?? '');
   const [nextSignerEmail, setNextSignerEmail] = useState(signerEmail ?? '');
 
+  async function submitRedraftCancelled() {
+    setAction('redraft');
+    startTransition(async () => {
+      const res = await fetch(`/api/contracts/${contractId}/redraft`, { method: 'POST' });
+      if (res.ok) {
+        emitContractActionSuccessFeedback(Boolean(session?.user?.sound_enabled));
+        router.push(contractEditHref);
+        router.refresh();
+      } else {
+        const j = await res.json().catch(() => ({}));
+        alert(`Redraft failed: ${j.error ?? res.status}`);
+      }
+      setAction(null);
+    });
+  }
+
   async function submitRecall() {
     setAction('recall');
     if (contractLive) contractLive.setOptimisticStatus('draft');
@@ -350,6 +366,7 @@ export function ContractActions({
   const canEditImported =
     legacyImport && (status === 'imported' || status === 'pending_events_review') && (isAdmin || isEventsTeam);
   const canEditVoided = status === 'voided' && (isAdmin || isEventsTeam);
+  const canRedraftCancelled = status === 'cancelled' && (isAdmin || isEventsTeam);
   const canVoidImported =
     legacyImport && (status === 'imported' || status === 'pending_events_review') && (isAdmin || isEventsTeam);
   const signerWaitLabel = signerName?.trim() || signerEmail?.trim() || 'signer';
@@ -369,6 +386,7 @@ export function ContractActions({
     if (canCancelInflightDocuSign) return true;
     if (canRelease || canCancelSigned) return true;
     if (canEditVoided) return true;
+    if (canRedraftCancelled) return true;
     if (legacyImport && (signedPdfHref || canEditImported || canVoidImported)) return true;
     if (status === 'executed' && signedPdfHref) return true;
     if (status === 'error' && isAdmin) return true;
@@ -384,6 +402,7 @@ export function ContractActions({
     canRelease,
     canEditImported,
     canEditVoided,
+    canRedraftCancelled,
     canVoidImported,
     canCancelSigned,
     signedPdfHref,
@@ -722,6 +741,18 @@ export function ContractActions({
                 title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
               >
                 <ContractActionButtonLabel icon={XCircle} label="Cancel Contract" />
+              </Button>
+            </ActionWithHelp>
+          )}
+
+          {canRedraftCancelled && (
+            <ActionWithHelp helpText={CONTRACT_ACTION_HELP.redraftCancelled}>
+              <Button className={btnPrimary} onClick={() => submitRedraftCancelled()} disabled={busy}>
+                <ContractActionButtonLabel
+                  icon={Repeat2}
+                  label="Redraft for resend"
+                  spinning={pending && action === 'redraft'}
+                />
               </Button>
             </ActionWithHelp>
           )}
@@ -1392,6 +1423,12 @@ function StatusLine({
           {cancelledAt && hydrated ? cancelledRelative : 'recently'}
           {cancelledBy ? ` by ${cancelledBy}` : ''}
         </p>
+        {(isAdmin || isEventsTeam) ? (
+          <p className="mt-2 text-xs font-medium text-red-800">
+            Use <span className="text-foreground">Actions</span> →{' '}
+            <span className="text-foreground">Redraft for resend</span> to edit and send again.
+          </p>
+        ) : null}
       </div>
     );
   }

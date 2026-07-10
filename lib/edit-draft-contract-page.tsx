@@ -26,11 +26,13 @@ export async function EditDraftContractPage({
   if (!viewed) notFound();
   const canEditVoided =
     viewed.contract.status === 'voided' && (viewed.actor.isAdmin || viewed.actor.isEventsTeam);
+  const canEditCancelled =
+    viewed.contract.status === 'cancelled' && (viewed.actor.isAdmin || viewed.actor.isEventsTeam);
   const canEditImported =
     isLegacyImportedContract(viewed.contract) &&
     (viewed.contract.status === 'imported' || viewed.contract.status === 'pending_events_review') &&
     (viewed.actor.isAdmin || viewed.actor.isEventsTeam);
-  if (viewed.contract.status !== 'draft' && !canEditImported && !canEditVoided) notFound();
+  if (viewed.contract.status !== 'draft' && !canEditImported && !canEditVoided && !canEditCancelled) notFound();
 
   const supabase = getSupabaseAdmin();
   const { data: events } = await supabase

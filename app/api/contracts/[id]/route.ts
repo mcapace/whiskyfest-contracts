@@ -18,7 +18,7 @@ import {
   normalizeSignerCcEmail,
   normalizeSignerCcName,
 } from '@/lib/docusign-signer-cc';
-import type { Contract, ContractStatus } from '@/types/db';
+import type { Contract, ContractStatus, Event } from '@/types/db';
 import { isLegacyImportedContract } from '@/lib/legacy-import';
 import { billingFieldsFromOptionalBody } from '@/lib/nywe-billing';
 import { refreshNyweBillingFromRosterForContract } from '@/lib/nywe-roster-billing-sync';
@@ -28,7 +28,10 @@ import {
   isNoChargeBoothContract,
   noChargeBoothFieldsForInsert,
 } from '@/lib/no-charge-booth';
-import type { Event } from '@/types/db';
+import {
+  contractReopenToDraftPatch,
+  voidContractEnvelopeIfPresent,
+} from '@/lib/reopen-contract-to-draft';
 
 const signerEditableStatuses: ContractStatus[] = ['approved', 'ready_for_review', 'pending_events_review'];
 
@@ -47,6 +50,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     contract.status === 'draft' ||
     contract.status === 'imported' ||
     contract.status === 'voided' ||
+    contract.status === 'cancelled' ||
     (contract.status === 'pending_events_review' && isLegacyImportedContract(contract))
   ) {
     const parsed = newContractBodySchema.safeParse(body);
@@ -58,7 +62,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       );
     }
 
-    if (contract.status === 'imported' || contract.status === 'voided') {
+    if (contract.status === 'imported' || contract.status === 'voided' || contract.status === 'cancelled') {
       if (!actor.isAdmin && !actor.isEventsTeam) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
@@ -137,6 +141,16 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
 
     const reopeningVoided = contract.status === 'voided';
+    const reopeningCancelled = contract.status === 'cancelled';
+
+    if (reopeningVoided || reopeningCancelled) {
+      await voidContractEnvelopeIfPresent(
+        contract.docusign_envelope_id,
+        reopeningCancelled
+          ? 'Cancelled contract reopened for edit and resend'
+          : 'Voided contract reopened for edit and resend',
+      );
+    }
 
     const { error } = await supabase
       .from('contracts')
@@ -174,24 +188,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                 : {}),
             }
           : {}),
-        ...(reopeningVoided
-          ? {
-              status: 'draft',
-              docusign_envelope_id: null,
-              sent_at: null,
-              signed_at: null,
-              countersigned_at: null,
-              countersigned_by_email: null,
-              countersigned_by_name: null,
-              executed_at: null,
-              voided_at: null,
-              voided_by: null,
-              voided_reason: null,
-              events_approved_at: null,
-              events_approved_by: null,
-              events_approval_reason: null,
-            }
-          : {}),
+        ...(reopeningVoided ? contractReopenToDraftPatch('voided') : {}),
+        ...(reopeningCancelled ? contractReopenToDraftPatch('cancelled') : {}),
         ...bill,
         ...(nyweBilling ?? {}),
         ...(shouldResetDiscountApproval
@@ -249,7 +247,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     revalidateContractPaths(params.id);
 
-    if (reopeningVoided && patchEvent && nyweEvent) {
+    if ((reopeningVoided || reopeningCancelled) && patchEvent && nyweEvent) {
       const { data: withTotals } = await supabase
         .from('contracts_with_totals')
         .select('*')
@@ -267,6 +265,19 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         action: 'voided_contract_reopened_for_edit',
         from_status: 'voided',
         to_status: 'draft',
+      });
+    }
+    if (contract.status === 'cancelled') {
+      await supabase.from('audit_log').insert({
+        contract_id: params.id,
+        actor_email: actor.email,
+        action: 'cancelled_contract_redrafted',
+        from_status: 'cancelled',
+        to_status: 'draft',
+        metadata: {
+          previous_envelope_id: contract.docusign_envelope_id,
+          previous_cancelled_reason: contract.cancelled_reason,
+        },
       });
     }
     return NextResponse.json({ ok: true });
