@@ -153,6 +153,11 @@ export interface Contract {
   notes: string | null;
   /** Printed on the contract PDF via {{exhibitor_notes}}; visible to the sponsor. */
   exhibitor_notes: string | null;
+  /** Client-specific amendments merged via {{revision_amendments}}. */
+  revision_amendments: string | null;
+  revision_upload_path: string | null;
+  revision_use_uploaded_pdf: boolean;
+  revision_round: number;
   /** Legacy / off-system contract keyed in by admin or events team. */
   imported_at: string | null;
   imported_by: string | null;

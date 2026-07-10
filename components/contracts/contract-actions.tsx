@@ -16,6 +16,7 @@ import {
   Loader2,
   Mail,
   Pencil,
+  FilePenLine,
   RefreshCw,
   Repeat2,
   Send,
@@ -51,6 +52,10 @@ import { formatCurrency } from '@/lib/utils';
 import { useRelativeTimeLabel } from '@/components/ui/relative-time';
 import { useHydrated } from '@/hooks/use-hydrated';
 import { useContractLiveOptional } from '@/components/contracts/contract-live-context';
+import {
+  ContractReviseWizard,
+  type ContractReviseInitialValues,
+} from '@/components/contracts/contract-revise-wizard';
 import type { ContractStatus } from '@/types/db';
 
 const DISCOUNT_ACTION_BLOCKED = 'Discount approval required first';
@@ -113,6 +118,8 @@ interface Props {
   importedAt?: string | null;
   /** When true, signed contracts auto-release to accounting (no manual button). */
   autoReleaseToAccounting?: boolean;
+  /** Initial field values for revise-and-send wizard. */
+  reviseInitial?: ContractReviseInitialValues;
 }
 
 export function ContractActions({
@@ -152,6 +159,7 @@ export function ContractActions({
   portalBasePath = '',
   importedAt = null,
   autoReleaseToAccounting = false,
+  reviseInitial,
 }: Props) {
   const contractEditHref = `${portalBasePath}/contracts/${contractId}/edit`;
   const legacyImport = Boolean(importedAt?.trim());
@@ -163,6 +171,7 @@ export function ContractActions({
   const busy = pending || readOnly;
   const [action, setAction] = useState<string | null>(null);
   const [openRecall, setOpenRecall] = useState(false);
+  const [openRevise, setOpenRevise] = useState(false);
   const [openResendWithChanges, setOpenResendWithChanges] = useState(false);
   const [openCancel, setOpenCancel] = useState(false);
   const [openVoid, setOpenVoid] = useState(false);
@@ -343,6 +352,8 @@ export function ContractActions({
     (isAdmin || isEventsTeam) &&
     (status === 'sent' || status === 'partially_signed') &&
     Boolean(docusignEnvelopeId);
+  const canReviseAndSend =
+    canRecall && clientSendEnabled && !discountApprovalPending && Boolean(reviseInitial);
   const canResendWithChanges = canReminder && !discountApprovalPending;
   const canVoid =
     (isAdmin || isEventsTeam) &&
@@ -354,7 +365,13 @@ export function ContractActions({
     (status === 'sent' || status === 'partially_signed' || status === 'error');
   /** In-flight DocuSign: reminder / recall / resend-with-changes / void / sync */
   const hasDocuSignSecondary =
-    canPersonalNudge || canReminder || canResendWithChanges || canRecall || canVoid || canSyncDocuSign;
+    canPersonalNudge ||
+    canReminder ||
+    canReviseAndSend ||
+    canResendWithChanges ||
+    canRecall ||
+    canVoid ||
+    canSyncDocuSign;
   /** Cancel contract while envelope is out (API allows cancel except executed/cancelled). */
   const canCancelInflightDocuSign =
     (status === 'sent' || status === 'partially_signed') && (isAdmin || isEventsTeam);
@@ -850,6 +867,18 @@ export function ContractActions({
                   </Button>
                 </ActionWithHelp>
               )}
+              {canReviseAndSend && (
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.reviseAndSend} className="w-full">
+                  <Button
+                    className={btnPrimary}
+                    onClick={() => setOpenRevise(true)}
+                    disabled={readOnly}
+                    title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                  >
+                    <ContractActionButtonLabel icon={FilePenLine} label="Revise and Send" />
+                  </Button>
+                </ActionWithHelp>
+              )}
               {canResendWithChanges && (
                 <ActionWithHelp helpText={CONTRACT_ACTION_HELP.resendWithChanges} className="w-full">
                   <Button
@@ -952,6 +981,16 @@ export function ContractActions({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {reviseInitial ? (
+        <ContractReviseWizard
+          contractId={contractId}
+          open={openRevise}
+          onOpenChange={setOpenRevise}
+          initial={reviseInitial}
+          readOnly={readOnly}
+        />
+      ) : null}
 
       <Dialog open={openApproveDiscount} onOpenChange={setOpenApproveDiscount}>
         <DialogContent>

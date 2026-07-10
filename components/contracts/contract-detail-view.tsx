@@ -312,6 +312,23 @@ export function ContractDetailView({
                 clientSendEnabled={clientSendEnabled}
                 portalBasePath={portalBasePath}
                 importedAt={contract.imported_at}
+                reviseInitial={{
+                  signerName: contract.signer_1_name ?? '',
+                  signerEmail: contract.signer_1_email ?? '',
+                  signerCcName: contract.signer_cc_name,
+                  signerCcEmail: contract.signer_cc_email,
+                  exhibitorLegalName: contract.exhibitor_legal_name ?? '',
+                  exhibitorCompanyName: contract.exhibitor_company_name ?? '',
+                  brandsPoured: contract.brands_poured,
+                  exhibitorNotes: contract.exhibitor_notes,
+                  revisionAmendments: contract.revision_amendments,
+                  revisionUploadPath: contract.revision_upload_path,
+                  billingAddressLine1: contract.billing_address_line1,
+                  billingCity: contract.billing_city,
+                  billingState: contract.billing_state,
+                  billingZip: contract.billing_zip,
+                  billingCountry: contract.billing_country,
+                }}
               />
             </div>
 

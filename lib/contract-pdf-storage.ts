@@ -6,6 +6,10 @@ export function contractDraftPdfPath(contractId: string): string {
   return `${contractId}/draft.pdf`;
 }
 
+export function contractRevisionUploadPath(contractId: string): string {
+  return `${contractId}/revision-upload.pdf`;
+}
+
 export function contractSignedPdfPath(contractId: string): string {
   return `${contractId}/signed.pdf`;
 }

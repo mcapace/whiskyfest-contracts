@@ -67,6 +67,8 @@ export function buildNyweVendorMergeMap(
     '{{shanken_signatory_email}}': event.shanken_signatory_email,
     ...nyweExhibitorAddressMergeTokens(contract, mode),
     ...nyweBillingMergeTokens(contract, mode),
+    '{{exhibitor_notes}}': (contract.exhibitor_notes ?? '').trim(),
+    '{{revision_amendments}}': (contract.revision_amendments ?? '').trim(),
     ...anchors,
   };
 }

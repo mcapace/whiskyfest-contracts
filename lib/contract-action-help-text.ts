@@ -70,4 +70,7 @@ export const CONTRACT_ACTION_HELP = {
 
   resetToDraft:
     'Clears the error state and returns the contract to draft so you can fix issues and try again. Internal notes may be cleared.',
+
+  reviseAndSend:
+    'Void the in-flight DocuSign envelope, apply client redlines (upload a PDF or enter amendments), regenerate a customized master contract, and send a new envelope — all in one step.',
 } as const;

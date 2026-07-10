@@ -164,6 +164,12 @@ export function describeAuditEntry(entry: AuditLogEntry, context?: AuditDisplayC
       return { title: 'DocuSign notification resent', synthetic };
     case 'docusign_resent_with_changes':
       return { title: 'DocuSign envelope voided and resent with changes', synthetic };
+    case 'contract_revised_and_resent':
+      return {
+        title: 'Client revisions applied — new contract sent',
+        detail: meta.revision_round != null ? `Revision round ${String(meta.revision_round)}` : undefined,
+        synthetic,
+      };
     case 'contract_recalled_to_draft':
     case 'docusign_recalled':
       return { title: 'Recalled from DocuSign — returned to draft for editing', synthetic };
