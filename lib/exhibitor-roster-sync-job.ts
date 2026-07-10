@@ -9,6 +9,14 @@ import {
 } from '@/lib/exhibitor-roster';
 import { syncExhibitorRosterWriteback } from '@/lib/exhibitor-roster-sync-hook';
 import { syncLinkedContractsFromRosterRows } from '@/lib/nywe-roster-contract-sync';
+import {
+  formatRosterPullWaitMessage,
+  isGoogleSheetsQuotaError,
+  liveRosterPullAllowed,
+  markLiveRosterPullFinished,
+  msUntilNextLiveRosterPull,
+  tryBeginLiveRosterPull,
+} from '@/lib/roster-sheets-pull-policy';
 import { getActiveWineSpectatorEvent } from '@/lib/wine-spectator-event';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { ContractWithTotals, Event } from '@/types/db';
@@ -219,15 +227,57 @@ export async function loadExhibitorRoster(
   event: Event,
   options?: { forceLive?: boolean },
 ): Promise<LoadExhibitorRosterResult> {
+  const supabase = getSupabaseAdmin();
+
+  if (options?.forceLive && !liveRosterPullAllowed(event)) {
+    const cached = rosterFromEventCache(event) ?? rosterStaleFromEventCache(event);
+    const waitMsg = formatRosterPullWaitMessage(msUntilNextLiveRosterPull(event));
+    if (cached) {
+      return {
+        roster: await withLiveContractStatus(event, cached),
+        fromCache: true,
+        stale: true,
+        fetchError: `Google Sheets refresh is rate-limited to protect API quota. ${waitMsg}`,
+      };
+    }
+  }
+
   if (!options?.forceLive) {
     const cached = rosterFromEventCache(event);
     if (cached) {
       return { roster: await withLiveContractStatus(event, cached), fromCache: true };
     }
+    const stale = rosterStaleFromEventCache(event);
+    if (stale) {
+      return {
+        roster: await withLiveContractStatus(event, stale),
+        fromCache: true,
+        stale: true,
+        fetchError: 'Showing last synced roster. Use Refresh from sheets when you need the latest.',
+      };
+    }
   }
 
   if (rosterSheetsFromEvent(event).length === 0) {
     throw new Error('No exhibitor roster sheets configured for this event. Check Event settings in Supabase.');
+  }
+
+  if (options?.forceLive) {
+    const claimed = await tryBeginLiveRosterPull(event.id);
+    if (!claimed) {
+      const { data: freshEvent } = await supabase.from('events').select('*').eq('id', event.id).maybeSingle<Event>();
+      const ev = freshEvent ?? event;
+      const cached = rosterFromEventCache(ev) ?? rosterStaleFromEventCache(ev);
+      const waitMsg = formatRosterPullWaitMessage(msUntilNextLiveRosterPull(ev));
+      if (cached) {
+        return {
+          roster: await withLiveContractStatus(ev, cached),
+          fromCache: true,
+          stale: true,
+          fetchError: `Another refresh just ran. ${waitMsg}`,
+        };
+      }
+    }
   }
 
   try {
@@ -238,9 +288,26 @@ export async function loadExhibitorRoster(
       rows: roster.rows,
     };
     const sheetLoadFailed = roster.warnings.some((w) => w.includes('could not load'));
+    const quotaHit = roster.warnings.some((w) => isGoogleSheetsQuotaError(w));
     if (!sheetLoadFailed) {
       await persistRosterSnapshot(event.id, payload);
       await syncLinkedContractsFromRosterRows(event.id, payload.rows);
+    } else if (options?.forceLive) {
+      const stale = rosterStaleFromEventCache(event);
+      if (stale) {
+        const summary = roster.warnings.join(' · ');
+        console.warn('[loadExhibitorRoster] live pull partial/failed — serving stale cache', summary);
+        return {
+          roster: await withLiveContractStatus(event, stale),
+          fromCache: true,
+          stale: true,
+          fetchError: quotaHit
+            ? `Google Sheets read quota exceeded. Wait 2–3 minutes, then click Refresh from sheets. (${summary})`
+            : summary,
+          warnings: roster.warnings.length ? roster.warnings : undefined,
+        };
+      }
+      console.warn('[loadExhibitorRoster] skipped cache persist — one or more sheets failed to load');
     } else {
       console.warn('[loadExhibitorRoster] skipped cache persist — one or more sheets failed to load');
     }
@@ -250,15 +317,21 @@ export async function loadExhibitorRoster(
       warnings: roster.warnings.length ? roster.warnings : undefined,
     };
   } catch (err) {
+    if (options?.forceLive) {
+      await markLiveRosterPullFinished(event.id);
+    }
     const stale = rosterStaleFromEventCache(event);
     const message = err instanceof Error ? err.message : 'Exhibitor roster sync failed';
+    const quota = isGoogleSheetsQuotaError(message);
     if (stale) {
       console.error('[loadExhibitorRoster] live pull failed — serving stale cache', message);
       return {
         roster: await withLiveContractStatus(event, stale),
         fromCache: true,
         stale: true,
-        fetchError: message,
+        fetchError: quota
+          ? `Google Sheets read quota exceeded. Showing last synced roster. Wait 2–3 minutes, then click Refresh from sheets.`
+          : message,
       };
     }
     throw err instanceof Error ? err : new Error(message);

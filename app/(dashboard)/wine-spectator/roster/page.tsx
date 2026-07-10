@@ -1,7 +1,6 @@
 import { loadExhibitorRosterForPage } from '@/lib/exhibitor-roster-sync-job';
 import { getActiveWineSpectatorEvent } from '@/lib/wine-spectator-event';
 import { scheduleNyweBackgroundDocuSignSync } from '@/lib/nywe-background-docusign-sync';
-import { scheduleNyweBackgroundRosterSync } from '@/lib/nywe-background-roster-sync';
 import { requireContractActorForPage } from '@/lib/auth-contract';
 import { buildNyweDashboardMetrics } from '@/lib/nywe-dashboard-metrics';
 import { getNyweEventContractsForMetrics } from '@/lib/nywe-event-contracts';
@@ -25,7 +24,6 @@ export default async function WineSpectatorRosterPage() {
   }
 
   try {
-    scheduleNyweBackgroundRosterSync();
     scheduleNyweBackgroundDocuSignSync();
 
     const [{ roster, fromCache, stale, fetchError, warnings }, contracts] = await Promise.all([

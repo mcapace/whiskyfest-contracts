@@ -489,14 +489,18 @@ export function buildContractPayloadFromRosterRow(
 
 export { rosterRowHasContractAddress, ROSTER_MISSING_ADDRESS_MESSAGE } from '@/lib/exhibitor-roster-billing';
 
-async function readSheetRows(config: ExhibitorRosterSheetConfig): Promise<string[][]> {
+async function readSheetTab(config: ExhibitorRosterSheetConfig): Promise<string[][]> {
   const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: config.spreadsheet_id,
-    range: tabRange(config.tab, 'A2:AZ1000'),
+    range: tabRange(config.tab, 'A1:AZ1000'),
     valueRenderOption: 'FORMATTED_VALUE',
   });
   return (res.data.values ?? []) as string[][];
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function statusColumnStart(headers: string[]): number {
@@ -532,20 +536,16 @@ export async function fetchExhibitorRoster(event: Event): Promise<{
     );
   }
 
-  const sheets = getSheetsClient();
   const rows: ExhibitorRosterRow[] = [];
   const warnings: string[] = [];
 
-  for (const config of sheetConfigs) {
+  for (let i = 0; i < sheetConfigs.length; i++) {
+    const config = sheetConfigs[i]!;
+    if (i > 0) await sleep(400);
     try {
-      const [headerRes, dataRows] = await Promise.all([
-        sheets.spreadsheets.values.get({
-          spreadsheetId: config.spreadsheet_id,
-          range: tabRange(config.tab, 'A1:AZ1'),
-        }),
-        readSheetRows(config),
-      ]);
-      const headers = ((headerRes.data.values?.[0] ?? []) as string[]).map((h) => String(h ?? '').trim());
+      const allRows = await readSheetTab(config);
+      const headers = ((allRows[0] ?? []) as string[]).map((h) => String(h ?? '').trim());
+      const dataRows = allRows.slice(1) as string[][];
       const statusStart = statusColumnStart(headers);
       const map = buildColumnMapFromHeaders(headers, config.key);
       let included = 0;

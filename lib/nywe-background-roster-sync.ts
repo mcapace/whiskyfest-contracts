@@ -6,8 +6,8 @@ import { rosterSheetsFromEvent } from '@/lib/exhibitor-roster';
 import { getActiveWineSpectatorEvent } from '@/lib/wine-spectator-event';
 import { revalidatePath } from 'next/cache';
 
-/** Skip background pull when cron or a recent page load already synced. */
-export const NYWE_ROSTER_BACKGROUND_SYNC_MAX_AGE_MS = 10 * 60 * 1000;
+/** Skip background pull when cron runs — do not trigger from page views. */
+export const NYWE_ROSTER_BACKGROUND_SYNC_MAX_AGE_MS = 30 * 60 * 1000;
 
 /**
  * Refresh NYWE master Google Sheets into Supabase when stale.

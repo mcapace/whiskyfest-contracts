@@ -50,6 +50,8 @@ export interface Event {
   exhibitor_roster_sheets: ExhibitorRosterSheetConfig[] | null;
   /** Last automated/manual pull from Google Sheets master lists. */
   roster_last_synced_at: string | null;
+  /** Last live Google Sheets read attempt (rate-limit guard). */
+  roster_live_pull_at: string | null;
   /** Cached roster rows from the latest sync. */
   roster_cached_snapshot: unknown | null;
   created_at: string;

@@ -99,7 +99,7 @@ type RosterPayload = {
   rows: RosterRow[];
 };
 
-const AUTO_REFRESH_MS = 5 * 60 * 1000;
+const AUTO_REFRESH_MS = 15 * 60 * 1000;
 
 function chunkItems<T>(items: T[], size: number): T[][] {
   const batches: T[][] = [];
@@ -431,25 +431,8 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
     const off = subscribeToAppContractEvents(() => {
       refresh({ preserveSelection: true });
     });
-    const onVis = () => {
-      if (document.visibilityState === 'visible') refresh({ preserveSelection: true });
-    };
-    document.addEventListener('visibilitychange', onVis);
-    return () => {
-      off();
-      document.removeEventListener('visibilitychange', onVis);
-    };
+    return () => off();
   }, [refresh]);
-
-  useEffect(() => {
-    if (!initial.stale && initial.rows.length > 0) return;
-    const id = window.setTimeout(() => {
-      refresh({ live: true, preserveSelection: true });
-    }, 300);
-    return () => window.clearTimeout(id);
-    // One deferred live pull after fast SSR shell — do not re-run on client refresh.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     const tick = () => {
