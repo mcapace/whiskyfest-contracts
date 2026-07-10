@@ -171,6 +171,15 @@ function matchesSearch(row: RosterRow, query: string): boolean {
   return haystack.includes(query);
 }
 
+const ROSTER_STICKY_LEFT_HEAD =
+  'sticky left-0 z-20 w-12 min-w-[3rem] border-r border-border/50 bg-white shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)]';
+const ROSTER_STICKY_LEFT_BODY =
+  'sticky left-0 z-20 w-12 min-w-[3rem] border-r border-border/50 bg-white shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] group-hover:bg-accent/40';
+const ROSTER_STICKY_RIGHT_HEAD =
+  'sticky right-0 z-20 min-w-[6.5rem] w-[6.5rem] border-l border-border/50 bg-white pl-3 text-right shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)]';
+const ROSTER_STICKY_RIGHT_BODY =
+  'sticky right-0 z-20 min-w-[6.5rem] w-[6.5rem] border-l border-border/50 bg-white pl-3 text-right shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)] group-hover:bg-accent/40';
+
 function CellText({ value, className }: { value: string; className?: string }) {
   if (!value) return <span className="text-muted-foreground">—</span>;
   return (
@@ -886,7 +895,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
         >
           <TableHeader>
             <TableRow>
-              <TableHead className="sticky left-0 z-10 w-10 bg-background">
+              <TableHead className={ROSTER_STICKY_LEFT_HEAD}>
                 <input
                   type="checkbox"
                   aria-label="Select all visible"
@@ -909,7 +918,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
                       {col.label}
                     </TableHead>
                   ))}
-              <TableHead className="sticky right-0 z-10 min-w-[6.5rem] w-[6.5rem] bg-background pl-3 text-right shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.12)]">
+              <TableHead className={ROSTER_STICKY_RIGHT_HEAD}>
                 Actions
               </TableHead>
             </TableRow>
@@ -925,9 +934,9 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
             {filtered.map((row) => (
               <TableRow
                 key={row.rowKey}
-                className={rosterListRowClass(row.listKey, listFilter === 'all')}
+                className={cn('group', rosterListRowClass(row.listKey, listFilter === 'all'))}
               >
-                <TableCell className="sticky left-0 z-10 bg-inherit">
+                <TableCell className={ROSTER_STICKY_LEFT_BODY}>
                   <input
                     type="checkbox"
                     aria-label={`Select ${row.wineryName}`}
@@ -950,7 +959,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
                         {renderUiCell(row, col.id)}
                       </TableCell>
                     ))}
-                <TableCell className="sticky right-0 z-10 min-w-[6.5rem] w-[6.5rem] bg-inherit pl-3 text-right shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.12)]">
+                <TableCell className={ROSTER_STICKY_RIGHT_BODY}>
                   {row.contractId ? (
                     <Link href={`/wine-spectator/contracts/${row.contractId}`} className="text-sm font-medium text-accent-brand hover:underline">
                       Open
