@@ -17,6 +17,7 @@ import { NywePipelinePanel } from '@/components/wine-spectator/nywe-pipeline-pan
 import { NyweQuickNav } from '@/components/wine-spectator/nywe-quick-nav';
 import { buildNyweDashboardMetrics, getNywePipelineData } from '@/lib/nywe-dashboard-metrics';
 import { runNyweBackgroundDocuSignSync } from '@/lib/nywe-background-docusign-sync';
+import { runNyweBackgroundRosterSync } from '@/lib/nywe-background-roster-sync';
 import { DashboardLiveRefresh } from '@/components/dashboard/dashboard-live-refresh';
 import type { ContractWithTotals } from '@/types/db';
 
@@ -31,6 +32,7 @@ const RECENT_SENT_DAYS = 14;
 export default async function WineSpectatorDashboardPage() {
   const session = await auth();
   const actor = await requireContractActorForPage();
+  await runNyweBackgroundRosterSync();
   await runNyweBackgroundDocuSignSync();
   const { contracts: allScoped, events } = await getDashboardData(actor, PRODUCT_WINE_SPECTATOR);
 
