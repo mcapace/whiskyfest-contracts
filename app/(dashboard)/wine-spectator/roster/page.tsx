@@ -1,11 +1,10 @@
-import { loadExhibitorRoster } from '@/lib/exhibitor-roster-sync-job';
+import { loadExhibitorRosterForPage } from '@/lib/exhibitor-roster-sync-job';
 import { getActiveWineSpectatorEvent } from '@/lib/wine-spectator-event';
-import { runNyweBackgroundDocuSignSync } from '@/lib/nywe-background-docusign-sync';
+import { scheduleNyweBackgroundDocuSignSync } from '@/lib/nywe-background-docusign-sync';
 import { scheduleNyweBackgroundRosterSync } from '@/lib/nywe-background-roster-sync';
 import { requireContractActorForPage } from '@/lib/auth-contract';
-import { getDashboardData } from '@/app/(dashboard)/page';
-import { PRODUCT_WINE_SPECTATOR } from '@/lib/product-portal';
 import { buildNyweDashboardMetrics } from '@/lib/nywe-dashboard-metrics';
+import { getNyweEventContractsForMetrics } from '@/lib/nywe-event-contracts';
 import { ExhibitorRosterPanel } from '@/components/wine-spectator/exhibitor-roster-panel';
 import { NyweMetricsGrid } from '@/components/wine-spectator/nywe-metrics-grid';
 import { NyweRosterPageHeader } from '@/components/wine-spectator/nywe-quick-nav';
@@ -13,7 +12,7 @@ import { NyweRosterPageHeader } from '@/components/wine-spectator/nywe-quick-nav
 export const dynamic = 'force-dynamic';
 
 export default async function WineSpectatorRosterPage() {
-  const actor = await requireContractActorForPage();
+  await requireContractActorForPage();
 
   const event = await getActiveWineSpectatorEvent();
   if (!event) {
@@ -27,11 +26,11 @@ export default async function WineSpectatorRosterPage() {
 
   try {
     scheduleNyweBackgroundRosterSync();
+    scheduleNyweBackgroundDocuSignSync();
 
-    const [{ roster, fromCache, stale, fetchError, warnings }, { contracts }] = await Promise.all([
-      loadExhibitorRoster(event),
-      getDashboardData(actor, PRODUCT_WINE_SPECTATOR),
-      runNyweBackgroundDocuSignSync(),
+    const [{ roster, fromCache, stale, fetchError, warnings }, contracts] = await Promise.all([
+      loadExhibitorRosterForPage(event),
+      getNyweEventContractsForMetrics(event.id),
     ]);
 
     const active = contracts.filter((c) => c.status !== 'cancelled' && c.status !== 'voided');

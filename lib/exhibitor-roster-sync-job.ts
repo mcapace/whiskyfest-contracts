@@ -181,6 +181,39 @@ async function withLiveContractStatus(event: Event, roster: ExhibitorRosterPaylo
   };
 }
 
+/** Load roster for SSR/pages — never block on a live Google Sheets pull. */
+export async function loadExhibitorRosterForPage(event: Event): Promise<LoadExhibitorRosterResult> {
+  if (rosterSheetsFromEvent(event).length === 0) {
+    throw new Error('No exhibitor roster sheets configured for this event. Check Event settings in Supabase.');
+  }
+
+  const cached = rosterFromEventCache(event);
+  if (cached) {
+    return { roster: await withLiveContractStatus(event, cached), fromCache: true };
+  }
+
+  const stale = rosterStaleFromEventCache(event);
+  if (stale) {
+    return {
+      roster: await withLiveContractStatus(event, stale),
+      fromCache: true,
+      stale: true,
+      fetchError: 'Showing last synced roster. Use Refresh from sheets for the latest.',
+    };
+  }
+
+  return {
+    roster: {
+      syncedAt: new Date().toISOString(),
+      sheets: rosterSheetsFromEvent(event),
+      rows: [],
+    },
+    fromCache: false,
+    stale: true,
+    fetchError: 'Roster is loading from Google Sheets. Data will appear shortly — or click Refresh from sheets.',
+  };
+}
+
 /** Load roster for UI: cached snapshot when fresh, otherwise live pull (and cache). */
 export async function loadExhibitorRoster(
   event: Event,

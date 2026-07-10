@@ -99,7 +99,7 @@ type RosterPayload = {
   rows: RosterRow[];
 };
 
-const AUTO_REFRESH_MS = 60 * 1000;
+const AUTO_REFRESH_MS = 5 * 60 * 1000;
 
 function chunkItems<T>(items: T[], size: number): T[][] {
   const batches: T[][] = [];
@@ -429,10 +429,10 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
 
   useEffect(() => {
     const off = subscribeToAppContractEvents(() => {
-      refresh({ preserveSelection: true, live: true });
+      refresh({ preserveSelection: true });
     });
     const onVis = () => {
-      if (document.visibilityState === 'visible') refresh({ preserveSelection: true, live: true });
+      if (document.visibilityState === 'visible') refresh({ preserveSelection: true });
     };
     document.addEventListener('visibilitychange', onVis);
     return () => {
@@ -442,9 +442,19 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
   }, [refresh]);
 
   useEffect(() => {
+    if (!initial.stale && initial.rows.length > 0) return;
+    const id = window.setTimeout(() => {
+      refresh({ live: true, preserveSelection: true });
+    }, 300);
+    return () => window.clearTimeout(id);
+    // One deferred live pull after fast SSR shell — do not re-run on client refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     const tick = () => {
       if (document.visibilityState !== 'visible') return;
-      refresh({ preserveSelection: true, live: true });
+      refresh({ preserveSelection: true });
     };
     const id = window.setInterval(tick, AUTO_REFRESH_MS);
     return () => window.clearInterval(id);

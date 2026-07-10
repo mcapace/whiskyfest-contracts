@@ -11,3 +11,10 @@ export async function runNyweBackgroundDocuSignSync(): Promise<void> {
     console.error('[nywe-background-docusign-sync]', err);
   }
 }
+
+/** Never block page render on accounting auto-release. */
+export function scheduleNyweBackgroundDocuSignSync(): void {
+  void runNyweBackgroundDocuSignSync().catch((err) => {
+    console.error('[nywe-background-docusign-sync] scheduled run failed', err);
+  });
+}
