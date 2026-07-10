@@ -489,6 +489,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
       let totalCreated = 0;
       let totalSkipped = 0;
       let totalErrors = 0;
+      const errorReasons: string[] = [];
       const batches = chunkItems(items, ROSTER_CREATE_BATCH_MAX);
       let stoppedEarly = false;
 
@@ -521,6 +522,11 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
         totalCreated += (json.created ?? []).length;
         totalSkipped += (json.skipped ?? []).length;
         totalErrors += (json.errors ?? []).length;
+        for (const err of json.errors ?? []) {
+          if (typeof err?.reason === 'string' && errorReasons.length < 3) {
+            errorReasons.push(err.reason);
+          }
+        }
 
         setCreateProgress({
           current: Math.min((batchIndex + 1) * ROSTER_CREATE_BATCH_MAX, items.length),
@@ -531,14 +537,20 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
       setCreateProgress(null);
 
       if (!stoppedEarly) {
+        const errorHint =
+          totalErrors > 0
+            ? ` Sample issues: ${[...new Set(errorReasons)].join(' · ')}`
+            : '';
         setMessage(
           `Created ${totalCreated} draft${totalCreated === 1 ? '' : 's'} · skipped ${totalSkipped} · errors ${totalErrors}${
-            totalErrors > 0 ? ' (often missing signer email or billing address in the sheet)' : ''
-          }`,
+            totalErrors > 0
+              ? `${errorHint} — fix those rows in Google Sheets or try smaller batches.`
+              : ''
+          }${totalCreated === 0 && totalErrors === 0 && totalSkipped > 0 ? ' — selected rows already have contracts.' : ''}`,
         );
       }
 
-      await refresh({ live: true, preserveSelection: true });
+      await refresh({ preserveSelection: true });
     });
   };
 

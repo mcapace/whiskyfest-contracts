@@ -3,6 +3,7 @@ import { getSheetsClient } from '@/lib/sheets-tracker';
 import { formatRosterWineDisplay } from '@/lib/exhibitor-roster-columns';
 import {
   billingFieldsFromRosterRow,
+  resolveContractStreetFromSheetCells,
   rosterRowHasContractAddress,
   ROSTER_MISSING_ADDRESS_MESSAGE,
 } from '@/lib/exhibitor-roster-billing';
@@ -484,6 +485,43 @@ export function buildContractPayloadFromRosterRow(
     billing: billingFieldsFromRosterRow(row, map),
     event_contact_name: [primaryFirst, primaryLast].filter(Boolean).join(' ').trim() || null,
     event_contact_email: primaryEmail || null,
+  };
+}
+
+/** Build contract fields from a cached roster row — no Google Sheets API calls. */
+export function buildContractPayloadFromExhibitorRosterRow(
+  row: ExhibitorRosterRow,
+  event: Event,
+): ReturnType<typeof buildContractPayloadFromRosterRow> {
+  const winery = row.wineryName.trim();
+  const billingCompany = row.billingCompany.trim() || winery;
+  const brandLine = formatRosterWineDisplay(row.wineName, row.vintage);
+  const resolved = resolveContractStreetFromSheetCells(row.billingStreet, row.wineryAddress);
+  const billingFields: NyweBillingFields | null = resolved
+    ? {
+        billing_contact_name: row.billingContactName.trim() || null,
+        billing_contact_email: row.billingEmail.trim() || null,
+        billing_address_line1: resolved.line1,
+        billing_address_line2: null,
+        billing_city: row.billingCity.trim() || null,
+        billing_state: row.billingState.trim() || null,
+        billing_zip: row.billingZip.trim() || null,
+        billing_country: row.billingCountry.trim() || null,
+        billing_same_as_corporate: resolved.usedWineryStreet,
+      }
+    : null;
+
+  return {
+    exhibitor_legal_name: billingCompany,
+    exhibitor_company_name: winery || billingCompany,
+    signer_1_name: row.signerName.trim(),
+    signer_1_email: row.signerEmail.trim(),
+    brands_poured: brandLine || null,
+    booth_count: 1,
+    booth_rate_cents: nyweLicenseFeeCents(event),
+    billing: billingFields,
+    event_contact_name: row.primaryContactName.trim() || null,
+    event_contact_email: row.primaryContactEmail.trim() || null,
   };
 }
 

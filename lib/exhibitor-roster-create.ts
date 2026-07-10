@@ -2,10 +2,13 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { writeExhibitorRosterStatusForContract } from '@/lib/exhibitor-roster-writeback';
 import {
+  buildContractPayloadFromExhibitorRosterRow,
   buildContractPayloadFromRosterRow,
   parseRosterRowKey,
   ROSTER_MISSING_ADDRESS_MESSAGE,
+  type ExhibitorRosterRow,
 } from '@/lib/exhibitor-roster';
+import { rosterStaleFromEventCache } from '@/lib/exhibitor-roster-sync-job';
 import { contractHasNyweLicenseAddress } from '@/lib/nywe-billing';
 import { getSheetsClient } from '@/lib/sheets-tracker';
 import type { Contract, ContractWithTotals, Event } from '@/types/db';
@@ -14,6 +17,10 @@ function tabRange(tab: string, a1: string): string {
   const needsQuote = /\s|'/.test(tab);
   const safe = needsQuote ? `'${tab.replace(/'/g, "''")}'` : tab;
   return `${safe}!${a1}`;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function readRosterHeaders(
@@ -45,6 +52,36 @@ async function readRosterRow(spreadsheetId: string, tab: string, rowNumber: numb
   return ((res.data.values?.[0] ?? []) as string[]).map((v) => String(v ?? '').trim());
 }
 
+function rosterRowMapFromEvent(event: Event): Map<string, ExhibitorRosterRow> {
+  const snapshot = rosterStaleFromEventCache(event);
+  const map = new Map<string, ExhibitorRosterRow>();
+  for (const row of snapshot?.rows ?? []) {
+    map.set(row.rowKey, row);
+  }
+  return map;
+}
+
+async function resolveCreatePayload(
+  item: { rowKey: string; listKey: string },
+  event: Event,
+  cachedRows: Map<string, ExhibitorRosterRow>,
+  headerCache: Map<string, string[]>,
+) {
+  const cached = cachedRows.get(item.rowKey);
+  if (cached) {
+    return buildContractPayloadFromExhibitorRosterRow(cached, event);
+  }
+
+  const parsed = parseRosterRowKey(item.rowKey);
+  if (!parsed) throw new Error('Invalid row key');
+
+  const [headers, row] = await Promise.all([
+    readRosterHeaders(parsed.spreadsheetId, parsed.tab, headerCache),
+    readRosterRow(parsed.spreadsheetId, parsed.tab, parsed.rowNumber),
+  ]);
+  return buildContractPayloadFromRosterRow(row, item.listKey, event, headers);
+}
+
 export async function createContractsFromRosterRows(options: {
   event: Event;
   items: { rowKey: string; listKey: string }[];
@@ -56,9 +93,11 @@ export async function createContractsFromRosterRows(options: {
 }> {
   const supabase = getSupabaseAdmin();
   const headerCache = new Map<string, string[]>();
+  const cachedRows = rosterRowMapFromEvent(options.event);
   const created: { rowKey: string; contractId: string }[] = [];
   const skipped: { rowKey: string; reason: string }[] = [];
   const errors: { rowKey: string; reason: string }[] = [];
+  const pendingWritebacks: ContractWithTotals[] = [];
 
   for (const item of options.items) {
     const rowKey = item.rowKey;
@@ -82,11 +121,7 @@ export async function createContractsFromRosterRows(options: {
     }
 
     try {
-      const [headers, row] = await Promise.all([
-        readRosterHeaders(parsed.spreadsheetId, parsed.tab, headerCache),
-        readRosterRow(parsed.spreadsheetId, parsed.tab, parsed.rowNumber),
-      ]);
-      const payload = buildContractPayloadFromRosterRow(row, item.listKey, options.event, headers);
+      const payload = await resolveCreatePayload(item, options.event, cachedRows, headerCache);
       if (!payload.exhibitor_company_name.trim()) {
         errors.push({ rowKey, reason: 'Missing winery name' });
         continue;
@@ -145,13 +180,32 @@ export async function createContractsFromRosterRows(options: {
         .maybeSingle<ContractWithTotals>();
 
       if (withTotals) {
-        await writeExhibitorRosterStatusForContract(withTotals);
+        pendingWritebacks.push(withTotals);
       }
 
       revalidateContractPaths(contract.id);
       created.push({ rowKey, contractId: contract.id });
     } catch (err) {
-      errors.push({ rowKey, reason: err instanceof Error ? err.message : 'Failed to create license' });
+      const message = err instanceof Error ? err.message : 'Failed to create license';
+      errors.push({
+        rowKey,
+        reason: /quota exceeded/i.test(message)
+          ? 'Google Sheets quota exceeded — wait 2 minutes and try again, or create in smaller batches.'
+          : message,
+      });
+    }
+  }
+
+  for (let i = 0; i < pendingWritebacks.length; i++) {
+    if (i > 0) await sleep(1200);
+    try {
+      await writeExhibitorRosterStatusForContract(pendingWritebacks[i]!);
+    } catch (err) {
+      console.error(
+        '[createContractsFromRosterRows] sheet writeback failed',
+        pendingWritebacks[i]!.id,
+        err instanceof Error ? err.message : err,
+      );
     }
   }
 
