@@ -1,5 +1,7 @@
 import { formatStatus } from '@/lib/status-display';
 import { formatCurrency } from '@/lib/utils';
+import { workspaceLabelForProduct } from '@/lib/product-email';
+import { productKeyFromEvent } from '@/lib/product-portal';
 import type { AuditLogEntry } from '@/types/db';
 
 export type AuditDisplay = {
@@ -42,12 +44,15 @@ export function describeAuditEntry(entry: AuditLogEntry): AuditDisplay {
       const toLabel = entry.to_status ? formatStatus(entry.to_status) : 'Unknown';
       return { title: `Status → ${toLabel}`, detail: `Previously ${fromLabel}`, synthetic };
     }
-    case 'contract_viewed':
+    case 'contract_viewed': {
+      const productKey = meta.product_key ? productKeyFromEvent({ product_key: String(meta.product_key) }) : null;
+      const portalLabel = productKey ? workspaceLabelForProduct(productKey) : null;
       return {
-        title: 'Contract viewed in WhiskyFest Contracts',
+        title: portalLabel ? `Contract viewed in ${portalLabel}` : 'Contract viewed',
         detail: meta.view ? String(meta.view) : undefined,
         synthetic,
       };
+    }
     case 'pdf_generated':
       return { title: 'Draft PDF generated', synthetic };
     case 'events_submitted':

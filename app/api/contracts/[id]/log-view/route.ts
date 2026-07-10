@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { assertContractAccess } from '@/lib/auth-contract';
 import { insertContractAudit } from '@/lib/audit-log';
+import { eventEmailContextForContract } from '@/lib/product-email';
+import { productKeyFromEvent } from '@/lib/product-portal';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
@@ -34,7 +36,10 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     contract_id: params.id,
     actor_email: gate.actor.email,
     action: 'contract_viewed',
-    metadata: { view: 'contract_detail' },
+    metadata: {
+      view: 'contract_detail',
+      product_key: productKeyFromEvent(await eventEmailContextForContract(gate.contract)),
+    },
   });
 
   return NextResponse.json({ ok: true, logged: true });
