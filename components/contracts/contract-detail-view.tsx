@@ -330,7 +330,7 @@ export function ContractDetailView({
               <Card id="exhibitor-info">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 px-6 py-4">
                   <h2 className="font-serif text-lg font-semibold">Exhibitor</h2>
-                  {isAdmin &&
+                  {(isAdmin || isEventsTeam) &&
                     (contract.status === 'approved' ||
                       contract.status === 'ready_for_review' ||
                       contract.status === 'pending_events_review') && (

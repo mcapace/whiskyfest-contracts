@@ -10,8 +10,16 @@ export const runtime = 'nodejs';
 export const maxDuration = 120;
 
 /** NYWE roster bulk send — auto-approves and emails DocuSign (no per-license review). */
-export async function POST(_req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: { id: string } }) {
   const supabase = getSupabaseAdmin();
+  const body = await req.json().catch(() => ({}));
+  const signerCc =
+    body && typeof body === 'object'
+      ? {
+          name: typeof body.signer_cc_name === 'string' ? body.signer_cc_name : null,
+          email: typeof body.signer_cc_email === 'string' ? body.signer_cc_email : null,
+        }
+      : null;
 
   const { data: contractRow } = await supabase
     .from('contracts')
@@ -44,6 +52,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     supabase,
     contractId: params.id,
     actorEmail: access.actor.email,
+    signerCc: body && typeof body === 'object' ? signerCc : undefined,
   });
 
   if (!result.ok) {

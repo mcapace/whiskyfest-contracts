@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, CheckCircle2, Loader2, Mail, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
@@ -20,9 +22,16 @@ export type NyweBulkSendRow = {
   signerName: string;
   signerEmail: string;
   contractId: string;
+  signerCcName?: string | null;
+  signerCcEmail?: string | null;
   grandTotalCents?: number | null;
   addressPreview?: string;
   addressMissing?: boolean;
+};
+
+type CcDraft = {
+  name: string;
+  email: string;
 };
 
 type Props = {
@@ -34,9 +43,17 @@ type Props = {
 
 type DialogPhase = 'confirm' | 'sending' | 'done';
 
+function ccDraftFromRow(row: NyweBulkSendRow): CcDraft {
+  return {
+    name: row.signerCcName?.trim() ?? '',
+    email: row.signerCcEmail?.trim() ?? '',
+  };
+}
+
 export function NyweBulkSendWizard({ open, onOpenChange, sendable, onComplete }: Props) {
   const [phase, setPhase] = useState<DialogPhase>('confirm');
   const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [ccByRowKey, setCcByRowKey] = useState<Record<string, CcDraft>>({});
   const [result, setResult] = useState<{ sent: number; failed: number; failures: { name: string; error?: string }[] } | null>(
     null,
   );
@@ -46,6 +63,10 @@ export function NyweBulkSendWizard({ open, onOpenChange, sendable, onComplete }:
     [sendable],
   );
   const missingAddressCount = useMemo(() => sendable.filter((r) => r.addressMissing).length, [sendable]);
+  const ccCount = useMemo(
+    () => sendable.filter((row) => ccByRowKey[row.rowKey]?.email.trim()).length,
+    [sendable, ccByRowKey],
+  );
   const canSend = sendable.length > 0 && missingAddressCount === 0;
 
   useEffect(() => {
@@ -53,8 +74,21 @@ export function NyweBulkSendWizard({ open, onOpenChange, sendable, onComplete }:
       setPhase('confirm');
       setProgress({ current: 0, total: 0 });
       setResult(null);
+      return;
     }
-  }, [open]);
+    setCcByRowKey(Object.fromEntries(sendable.map((row) => [row.rowKey, ccDraftFromRow(row)])));
+  }, [open, sendable]);
+
+  function setCcField(rowKey: string, field: keyof CcDraft, value: string) {
+    setCcByRowKey((prev) => ({
+      ...prev,
+      [rowKey]: {
+        name: prev[rowKey]?.name ?? '',
+        email: prev[rowKey]?.email ?? '',
+        [field]: value,
+      },
+    }));
+  }
 
   async function runSend() {
     setPhase('sending');
@@ -65,8 +99,16 @@ export function NyweBulkSendWizard({ open, onOpenChange, sendable, onComplete }:
 
     for (let i = 0; i < sendable.length; i++) {
       const row = sendable[i]!;
+      const cc = ccByRowKey[row.rowKey] ?? { name: '', email: '' };
       setProgress({ current: i + 1, total: sendable.length });
-      const res = await fetch(`/api/contracts/${row.contractId}/nywe-client-send`, { method: 'POST' });
+      const res = await fetch(`/api/contracts/${row.contractId}/nywe-client-send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          signer_cc_name: cc.name.trim() || null,
+          signer_cc_email: cc.email.trim() || null,
+        }),
+      });
       if (res.ok) {
         sent += 1;
       } else {
@@ -88,12 +130,13 @@ export function NyweBulkSendWizard({ open, onOpenChange, sendable, onComplete }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto sm:max-w-xl">
+      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="font-serif text-xl">Bulk send to clients</DialogTitle>
           <DialogDescription>
             Generates each PDF, marks it approved from roster data, and emails DocuSign — no need to open contracts
-            individually.
+            individually. Optionally add a DocuSign CC per winery (assistant or colleague — they receive notifications
+            but do not sign).
           </DialogDescription>
         </DialogHeader>
 
@@ -109,6 +152,11 @@ export function NyweBulkSendWizard({ open, onOpenChange, sendable, onComplete }:
                     Each draft contract is treated as <strong>pre-approved</strong> from the roster. PDFs are generated
                     fresh, then DocuSign emails go to each winery signer immediately.
                   </p>
+                  {ccCount > 0 ? (
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {ccCount} winery{ccCount === 1 ? '' : 'ies'} will include a DocuSign CC.
+                    </p>
+                  ) : null}
                 </div>
                 <div className="rounded-lg border border-fest-200 bg-white/90 px-4 py-2 text-center">
                   <p className="text-2xl font-semibold tabular-nums text-fest-950">{sendable.length}</p>
@@ -132,6 +180,53 @@ export function NyweBulkSendWizard({ open, onOpenChange, sendable, onComplete }:
                     {missingAddressCount} approved contract{missingAddressCount === 1 ? '' : 's'} missing a street address.
                     Fix in Google Sheets, refresh the roster, and approve again before sending.
                   </p>
+                </div>
+              ) : null}
+
+              {sendable.length > 0 ? (
+                <div className="mt-4 space-y-3">
+                  <p className="text-sm font-medium text-foreground">Wineries &amp; optional DocuSign CC</p>
+                  <div className="max-h-72 space-y-3 overflow-y-auto rounded-md border border-border/70 bg-background/80 p-3">
+                    {sendable.map((row) => {
+                      const cc = ccByRowKey[row.rowKey] ?? { name: '', email: '' };
+                      return (
+                        <div key={row.rowKey} className="space-y-2 border-b border-border/50 pb-3 last:border-0 last:pb-0">
+                          <div>
+                            <p className="font-medium text-foreground">{row.wineryName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Signer: {row.signerName.trim() || row.signerEmail}
+                              {row.signerName.trim() ? ` · ${row.signerEmail}` : ''}
+                            </p>
+                          </div>
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <div className="space-y-1">
+                              <Label htmlFor={`cc-name-${row.rowKey}`} className="text-xs text-muted-foreground">
+                                CC name (optional)
+                              </Label>
+                              <Input
+                                id={`cc-name-${row.rowKey}`}
+                                value={cc.name}
+                                onChange={(e) => setCcField(row.rowKey, 'name', e.target.value)}
+                                placeholder="Assistant name"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor={`cc-email-${row.rowKey}`} className="text-xs text-muted-foreground">
+                                CC email (optional)
+                              </Label>
+                              <Input
+                                id={`cc-email-${row.rowKey}`}
+                                type="email"
+                                value={cc.email}
+                                onChange={(e) => setCcField(row.rowKey, 'email', e.target.value)}
+                                placeholder="assistant@company.com"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -180,6 +275,7 @@ export function NyweBulkSendWizard({ open, onOpenChange, sendable, onComplete }:
                 </p>
                 <ol className="mt-2 list-decimal space-y-1 pl-4 text-sky-900/90">
                   <li>Each winery receives a DocuSign email to sign their contract.</li>
+                  <li>Anyone CC&apos;d on the envelope also receives DocuSign notifications.</li>
                   <li>When they sign, you get a DocuSign email to countersign.</li>
                   <li>After you countersign, accounting is notified automatically.</li>
                 </ol>

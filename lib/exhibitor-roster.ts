@@ -67,6 +67,8 @@ export type ExhibitorRosterRow = {
   contractBillingCity: string | null;
   contractBillingState: string | null;
   contractBillingZip: string | null;
+  contractSignerCcName: string | null;
+  contractSignerCcEmail: string | null;
   /** Contract was recalled from DocuSign and returned to draft. */
   recalledToDraft: boolean;
   sheetStatus: string | null;
@@ -328,7 +330,7 @@ export async function hydrateRosterRowsWithContracts(
   const { data: linkedContracts } = await supabase
     .from('contracts_with_totals')
     .select(
-      'id, status, updated_at, grand_total_cents, billing_address_line1, billing_city, billing_state, billing_zip, source_sheet_id, source_sheet_tab, source_row_number',
+      'id, status, updated_at, grand_total_cents, billing_address_line1, billing_city, billing_state, billing_zip, signer_cc_name, signer_cc_email, source_sheet_id, source_sheet_tab, source_row_number',
     )
     .eq('event_id', eventId)
     .not('source_sheet_id', 'is', null);
@@ -359,6 +361,8 @@ export async function hydrateRosterRowsWithContracts(
         contractBillingCity: null,
         contractBillingState: null,
         contractBillingZip: null,
+        contractSignerCcName: null,
+        contractSignerCcEmail: null,
         recalledToDraft: false,
         sheetStatus: null,
         sheetContractId: null,
@@ -377,6 +381,8 @@ export async function hydrateRosterRowsWithContracts(
       contractBillingCity: contract.billing_city ?? null,
       contractBillingState: contract.billing_state ?? null,
       contractBillingZip: contract.billing_zip ?? null,
+      contractSignerCcName: contract.signer_cc_name ?? null,
+      contractSignerCcEmail: contract.signer_cc_email ?? null,
       recalledToDraft,
       sheetStatus: statusLabel,
       sheetContractId: contract.id,
@@ -589,6 +595,8 @@ export async function fetchExhibitorRoster(event: Event): Promise<{
           contractBillingCity: contract?.billing_city ?? null,
           contractBillingState: contract?.billing_state ?? null,
           contractBillingZip: contract?.billing_zip ?? null,
+          contractSignerCcName: contract?.signer_cc_name ?? null,
+          contractSignerCcEmail: contract?.signer_cc_email ?? null,
           recalledToDraft: false,
           sheetStatus: cell(row, statusStart) || null,
           sheetContractId: cell(row, statusStart + 1) || null,

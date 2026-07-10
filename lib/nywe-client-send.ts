@@ -18,7 +18,7 @@ import {
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
 import { sendEnvelope } from '@/lib/docusign';
-import { parseSignerCc, validateSignerCcDistinct } from '@/lib/docusign-signer-cc';
+import { parseSignerCc, validateSignerCcDistinct, normalizeSignerCcEmail, normalizeSignerCcName } from '@/lib/docusign-signer-cc';
 import { renderContractPdfFromTemplate } from '@/lib/google';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import {
@@ -40,13 +40,19 @@ export type NyweClientSendResult =
   | { ok: true; envelopeId: string; exhibitorSignerEmail: string }
   | { ok: false; error: string; statusCode?: number };
 
+export type NyweClientSendSignerCc = {
+  name?: string | null;
+  email?: string | null;
+};
+
 /** Auto-approve (roster pre-approved) and send one NYWE license to DocuSign. */
 export async function nyweClientSendContract(options: {
   supabase: SupabaseClient;
   contractId: string;
   actorEmail: string;
+  signerCc?: NyweClientSendSignerCc | null;
 }): Promise<NyweClientSendResult> {
-  const { supabase, contractId, actorEmail } = options;
+  const { supabase, contractId, actorEmail, signerCc } = options;
 
   let contract = await fetchContractWithTotalsById(supabase, contractId);
   if (!contract) {
@@ -75,6 +81,22 @@ export async function nyweClientSendContract(options: {
   }
 
   contract = await refreshNyweBillingFromRosterForContract(supabase, contract, event);
+
+  if (signerCc !== undefined) {
+    const ccName = normalizeSignerCcName(signerCc?.name);
+    const ccEmail = normalizeSignerCcEmail(signerCc?.email);
+    const { error: ccUpdateError } = await supabase
+      .from('contracts')
+      .update({
+        signer_cc_name: ccName,
+        signer_cc_email: ccEmail,
+      })
+      .eq('id', contract.id);
+    if (ccUpdateError) {
+      return { ok: false, error: ccUpdateError.message, statusCode: 500 };
+    }
+    contract = { ...contract, signer_cc_name: ccName, signer_cc_email: ccEmail };
+  }
 
   if (requiresDiscountApproval(contract, event)) {
     return { ok: false, error: 'Discount approval required before send.', statusCode: 403 };

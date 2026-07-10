@@ -74,6 +74,8 @@ type RosterRow = {
   contractBillingCity: string | null;
   contractBillingState: string | null;
   contractBillingZip: string | null;
+  contractSignerCcName: string | null;
+  contractSignerCcEmail: string | null;
   recalledToDraft: boolean;
   sheetStatus: string | null;
   sheetLastUpdated: string | null;
@@ -580,6 +582,8 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
         signerName: r.signerName,
         signerEmail: r.signerEmail,
         contractId: r.contractId!,
+        signerCcName: r.contractSignerCcName,
+        signerCcEmail: r.contractSignerCcEmail,
         grandTotalCents: r.contractGrandTotalCents,
         addressPreview: rosterAddressPreview(r),
         addressMissing: rosterAddressMissing(r),

@@ -282,9 +282,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     );
   }
 
-  if (!actor.isAdmin) {
+  if (!actor.isAdmin && !actor.isEventsTeam) {
     return NextResponse.json(
-      { error: 'Only admins can edit exhibitor contact details at this stage.' },
+      { error: 'Only admins or the events team can edit exhibitor contact details at this stage.' },
       { status: 403 },
     );
   }
