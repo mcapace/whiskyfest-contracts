@@ -1,19 +1,16 @@
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { Event } from '@/types/db';
 
-/** Min seconds between live Google Sheets roster pulls (per event). */
-export const ROSTER_LIVE_PULL_MIN_INTERVAL_MS = 3 * 60 * 1000;
+/** Min seconds between manual Google Sheets roster pulls (per event). */
+export const ROSTER_LIVE_PULL_MIN_INTERVAL_MS = 90 * 1000;
 
-export function msUntilNextLiveRosterPull(event: Pick<Event, 'roster_live_pull_at' | 'roster_last_synced_at'>): number {
-  const stamps = [event.roster_live_pull_at, event.roster_last_synced_at]
-    .map((v) => (v ? Date.parse(v) : 0))
-    .filter((n) => Number.isFinite(n) && n > 0);
-  if (stamps.length === 0) return 0;
-  const last = Math.max(...stamps);
+export function msUntilNextLiveRosterPull(event: Pick<Event, 'roster_live_pull_at'>): number {
+  const last = event.roster_live_pull_at ? Date.parse(event.roster_live_pull_at) : 0;
+  if (!Number.isFinite(last) || last <= 0) return 0;
   return Math.max(0, ROSTER_LIVE_PULL_MIN_INTERVAL_MS - (Date.now() - last));
 }
 
-export function liveRosterPullAllowed(event: Pick<Event, 'roster_live_pull_at' | 'roster_last_synced_at'>): boolean {
+export function liveRosterPullAllowed(event: Pick<Event, 'roster_live_pull_at'>): boolean {
   return msUntilNextLiveRosterPull(event) === 0;
 }
 

@@ -92,6 +92,7 @@ type RosterPayload = {
   syncedAt: string;
   fromCache?: boolean;
   stale?: boolean;
+  rateLimited?: boolean;
   fetchError?: string;
   warnings?: string[];
   event: { id: string; name: string; client_send_enabled: boolean };
@@ -608,7 +609,16 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
         </div>
       ) : null}
 
-      {data.stale && data.fetchError ? (
+      {data.rateLimited && data.fetchError ? (
+        <div className="rounded-md border border-sky-200 bg-sky-50/90 p-4 text-sm text-sky-950">
+          Roster is up to date from{' '}
+          <RelativeTime iso={data.syncedAt} />
+          {'. '}
+          {data.fetchError}
+        </div>
+      ) : null}
+
+      {data.stale && data.fetchError && !data.rateLimited ? (
         <div className="rounded-md border border-amber-300/80 bg-amber-50/95 p-4 text-sm text-amber-950">
           Could not refresh from Google Sheets ({data.fetchError}). Showing the last synced list from{' '}
           <RelativeTime iso={data.syncedAt} />. Use &quot;Refresh from sheets&quot; to try again.

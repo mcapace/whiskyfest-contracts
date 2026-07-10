@@ -178,6 +178,8 @@ export type LoadExhibitorRosterResult = {
   fromCache: boolean;
   /** Live pull failed; showing last cached snapshot. */
   stale?: boolean;
+  /** Manual refresh temporarily blocked to protect API quota. */
+  rateLimited?: boolean;
   fetchError?: string;
   warnings?: string[];
 };
@@ -228,29 +230,36 @@ export async function loadExhibitorRoster(
   options?: { forceLive?: boolean },
 ): Promise<LoadExhibitorRosterResult> {
   const supabase = getSupabaseAdmin();
+  let activeEvent = event;
 
-  if (options?.forceLive && !liveRosterPullAllowed(event)) {
-    const cached = rosterFromEventCache(event) ?? rosterStaleFromEventCache(event);
-    const waitMsg = formatRosterPullWaitMessage(msUntilNextLiveRosterPull(event));
-    if (cached) {
-      return {
-        roster: await withLiveContractStatus(event, cached),
-        fromCache: true,
-        stale: true,
-        fetchError: `Google Sheets refresh is rate-limited to protect API quota. ${waitMsg}`,
-      };
+  if (options?.forceLive) {
+    const { data: freshEvent } = await supabase.from('events').select('*').eq('id', event.id).maybeSingle<Event>();
+    activeEvent = freshEvent ?? event;
+
+    if (!liveRosterPullAllowed(activeEvent)) {
+      const cached = rosterFromEventCache(activeEvent) ?? rosterStaleFromEventCache(activeEvent);
+      const waitMsg = formatRosterPullWaitMessage(msUntilNextLiveRosterPull(activeEvent));
+      if (cached) {
+        return {
+          roster: await withLiveContractStatus(activeEvent, cached),
+          fromCache: true,
+          stale: false,
+          rateLimited: true,
+          fetchError: `Manual refresh available ${waitMsg.replace('Try again ', '')}`,
+        };
+      }
     }
   }
 
   if (!options?.forceLive) {
-    const cached = rosterFromEventCache(event);
+    const cached = rosterFromEventCache(activeEvent);
     if (cached) {
-      return { roster: await withLiveContractStatus(event, cached), fromCache: true };
+      return { roster: await withLiveContractStatus(activeEvent, cached), fromCache: true };
     }
-    const stale = rosterStaleFromEventCache(event);
+    const stale = rosterStaleFromEventCache(activeEvent);
     if (stale) {
       return {
-        roster: await withLiveContractStatus(event, stale),
+        roster: await withLiveContractStatus(activeEvent, stale),
         fromCache: true,
         stale: true,
         fetchError: 'Showing last synced roster. Use Refresh from sheets when you need the latest.',
@@ -258,22 +267,23 @@ export async function loadExhibitorRoster(
     }
   }
 
-  if (rosterSheetsFromEvent(event).length === 0) {
+  if (rosterSheetsFromEvent(activeEvent).length === 0) {
     throw new Error('No exhibitor roster sheets configured for this event. Check Event settings in Supabase.');
   }
 
   if (options?.forceLive) {
-    const claimed = await tryBeginLiveRosterPull(event.id);
+    const claimed = await tryBeginLiveRosterPull(activeEvent.id);
     if (!claimed) {
-      const { data: freshEvent } = await supabase.from('events').select('*').eq('id', event.id).maybeSingle<Event>();
-      const ev = freshEvent ?? event;
+      const { data: freshEvent } = await supabase.from('events').select('*').eq('id', activeEvent.id).maybeSingle<Event>();
+      const ev = freshEvent ?? activeEvent;
       const cached = rosterFromEventCache(ev) ?? rosterStaleFromEventCache(ev);
       const waitMsg = formatRosterPullWaitMessage(msUntilNextLiveRosterPull(ev));
       if (cached) {
         return {
           roster: await withLiveContractStatus(ev, cached),
           fromCache: true,
-          stale: true,
+          stale: false,
+          rateLimited: true,
           fetchError: `Another refresh just ran. ${waitMsg}`,
         };
       }
@@ -281,7 +291,7 @@ export async function loadExhibitorRoster(
   }
 
   try {
-    const roster = await fetchExhibitorRoster(event);
+    const roster = await fetchExhibitorRoster(activeEvent);
     const payload: ExhibitorRosterPayload = {
       syncedAt: roster.syncedAt,
       sheets: roster.sheets,
@@ -290,15 +300,15 @@ export async function loadExhibitorRoster(
     const sheetLoadFailed = roster.warnings.some((w) => w.includes('could not load'));
     const quotaHit = roster.warnings.some((w) => isGoogleSheetsQuotaError(w));
     if (!sheetLoadFailed) {
-      await persistRosterSnapshot(event.id, payload);
-      await syncLinkedContractsFromRosterRows(event.id, payload.rows);
+      await persistRosterSnapshot(activeEvent.id, payload);
+      await syncLinkedContractsFromRosterRows(activeEvent.id, payload.rows);
     } else if (options?.forceLive) {
-      const stale = rosterStaleFromEventCache(event);
+      const stale = rosterStaleFromEventCache(activeEvent);
       if (stale) {
         const summary = roster.warnings.join(' · ');
         console.warn('[loadExhibitorRoster] live pull partial/failed — serving stale cache', summary);
         return {
-          roster: await withLiveContractStatus(event, stale),
+          roster: await withLiveContractStatus(activeEvent, stale),
           fromCache: true,
           stale: true,
           fetchError: quotaHit
@@ -312,21 +322,21 @@ export async function loadExhibitorRoster(
       console.warn('[loadExhibitorRoster] skipped cache persist — one or more sheets failed to load');
     }
     return {
-      roster: await withLiveContractStatus(event, payload),
+      roster: await withLiveContractStatus(activeEvent, payload),
       fromCache: false,
       warnings: roster.warnings.length ? roster.warnings : undefined,
     };
   } catch (err) {
     if (options?.forceLive) {
-      await markLiveRosterPullFinished(event.id);
+      await markLiveRosterPullFinished(activeEvent.id);
     }
-    const stale = rosterStaleFromEventCache(event);
+    const stale = rosterStaleFromEventCache(activeEvent);
     const message = err instanceof Error ? err.message : 'Exhibitor roster sync failed';
     const quota = isGoogleSheetsQuotaError(message);
     if (stale) {
       console.error('[loadExhibitorRoster] live pull failed — serving stale cache', message);
       return {
-        roster: await withLiveContractStatus(event, stale),
+        roster: await withLiveContractStatus(activeEvent, stale),
         fromCache: true,
         stale: true,
         fetchError: quota

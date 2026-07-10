@@ -18,12 +18,13 @@ export async function GET(req: Request) {
   const forceLive = new URL(req.url).searchParams.get('live') === '1';
 
   try {
-    const { roster, fromCache, stale, fetchError, warnings } = await loadExhibitorRoster(event, { forceLive });
+    const { roster, fromCache, stale, rateLimited, fetchError, warnings } = await loadExhibitorRoster(event, { forceLive });
     return NextResponse.json({
       event: { id: event.id, name: event.name, client_send_enabled: event.client_send_enabled },
       syncedAt: roster.syncedAt,
       fromCache,
       stale,
+      rateLimited,
       fetchError,
       warnings,
       sheets: roster.sheets.map((sheet) => ({
