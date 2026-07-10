@@ -11,8 +11,7 @@ export const NYWE_ROSTER_BACKGROUND_SYNC_MAX_AGE_MS = 10 * 60 * 1000;
 
 /**
  * Refresh NYWE master Google Sheets into Supabase when stale.
- * Keeps the contracts dashboard and exhibitor roster aligned with sheet edits
- * without waiting for the 30-minute cron.
+ * Call without await on dashboard pages — a full sync can exceed serverless time limits.
  */
 export async function runNyweBackgroundRosterSync(options?: {
   maxAgeMs?: number;
@@ -36,4 +35,11 @@ export async function runNyweBackgroundRosterSync(options?: {
     console.error('[nywe-background-roster-sync]', err);
     return null;
   }
+}
+
+/** Fire-and-forget roster sync — never block page render on Google Sheets. */
+export function scheduleNyweBackgroundRosterSync(): void {
+  void runNyweBackgroundRosterSync().catch((err) => {
+    console.error('[nywe-background-roster-sync] scheduled run failed', err);
+  });
 }
