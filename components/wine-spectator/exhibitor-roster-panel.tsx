@@ -601,7 +601,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       {!data.event.client_send_enabled ? (
         <div className="rounded-md border border-amber-300/80 bg-amber-50/95 p-4 text-sm text-amber-950">
           Client send is disabled — create and approve contracts internally. Status still writes back to Google Sheets.
@@ -857,8 +857,11 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
         </p>
       ) : null}
 
-      <div className="overflow-x-auto rounded-2xl border border-border/60 bg-white shadow-sm">
-        <Table className={cn(columnMode === 'all' ? 'min-w-max text-xs' : 'w-full table-fixed')}>
+      <div className="min-w-0 overflow-x-auto rounded-2xl border border-border/60 bg-white shadow-sm">
+        <Table
+          wrapperClassName="overflow-visible min-w-full"
+          className={cn(columnMode === 'all' ? 'min-w-max text-xs' : 'min-w-max w-full')}
+        >
           <TableHeader>
             <TableRow>
               <TableHead className="sticky left-0 z-10 w-10 bg-background">
@@ -879,12 +882,14 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
                     <TableHead
                       key={col.id}
                       className="whitespace-nowrap"
-                      style={{ minWidth: col.minWidth, width: col.minWidth }}
+                      style={{ minWidth: col.minWidth }}
                     >
                       {col.label}
                     </TableHead>
                   ))}
-              <TableHead className="sticky right-0 z-10 bg-background text-right">Actions</TableHead>
+              <TableHead className="sticky right-0 z-10 min-w-[6.5rem] w-[6.5rem] bg-background pl-3 text-right shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.12)]">
+                Actions
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -918,12 +923,12 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
                       <TableCell
                         key={col.id}
                         className="align-top"
-                        style={{ minWidth: col.minWidth, width: col.minWidth }}
+                        style={{ minWidth: col.minWidth }}
                       >
                         {renderUiCell(row, col.id)}
                       </TableCell>
                     ))}
-                <TableCell className="sticky right-0 z-10 bg-inherit text-right">
+                <TableCell className="sticky right-0 z-10 min-w-[6.5rem] w-[6.5rem] bg-inherit pl-3 text-right shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.12)]">
                   {row.contractId ? (
                     <Link href={`/wine-spectator/contracts/${row.contractId}`} className="text-sm font-medium text-accent-brand hover:underline">
                       Open
