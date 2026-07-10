@@ -2,7 +2,13 @@ import { formatStatus } from '@/lib/status-display';
 import { formatCurrency } from '@/lib/utils';
 import { workspaceLabelForProduct } from '@/lib/product-email';
 import { productKeyFromEvent } from '@/lib/product-portal';
+import type { ProductKey } from '@/lib/product-portal';
 import type { AuditLogEntry } from '@/types/db';
+
+export type AuditDisplayContext = {
+  /** Fallback when older rows lack metadata.product_key (e.g. before backfill). */
+  productKey?: ProductKey | null;
+};
 
 export type AuditDisplay = {
   title: string;
@@ -16,7 +22,7 @@ function money(v: unknown): string {
   return Number.isFinite(n) ? formatCurrency(n) : '$0.00';
 }
 
-export function describeAuditEntry(entry: AuditLogEntry): AuditDisplay {
+export function describeAuditEntry(entry: AuditLogEntry, context?: AuditDisplayContext): AuditDisplay {
   const meta = (entry.metadata ?? {}) as Record<string, unknown>;
   const synthetic = Boolean(meta.synthetic);
 
@@ -45,7 +51,9 @@ export function describeAuditEntry(entry: AuditLogEntry): AuditDisplay {
       return { title: `Status → ${toLabel}`, detail: `Previously ${fromLabel}`, synthetic };
     }
     case 'contract_viewed': {
-      const productKey = meta.product_key ? productKeyFromEvent({ product_key: String(meta.product_key) }) : null;
+      const productKey = meta.product_key
+        ? productKeyFromEvent({ product_key: String(meta.product_key) })
+        : (context?.productKey ?? null);
       const portalLabel = productKey ? workspaceLabelForProduct(productKey) : null;
       return {
         title: portalLabel ? `Contract viewed in ${portalLabel}` : 'Contract viewed',

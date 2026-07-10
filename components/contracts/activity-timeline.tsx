@@ -1,5 +1,6 @@
 'use client';
 
+import type { ProductKey } from '@/lib/product-portal';
 import type { AuditLogEntry } from '@/types/db';
 import { auditDotClass, describeAuditEntry } from '@/lib/audit-log-display';
 import { formatStatus } from '@/lib/status-display';
@@ -7,7 +8,14 @@ import { HydratedTimestamp } from '@/components/ui/hydrated-timestamp';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
-export function ActivityTimeline({ audit }: { audit: AuditLogEntry[] }) {
+export function ActivityTimeline({
+  audit,
+  productKey,
+}: {
+  audit: AuditLogEntry[];
+  /** Contract event product — corrects legacy contract_viewed labels before DB backfill. */
+  productKey?: ProductKey | null;
+}) {
   if (audit.length === 0) {
     return <p className="font-sans text-sm text-ink-500">No activity yet.</p>;
   }
@@ -18,7 +26,7 @@ export function ActivityTimeline({ audit }: { audit: AuditLogEntry[] }) {
     <TooltipProvider delayDuration={200}>
       <ol className="relative ms-2 space-y-0 border-l border-parchment-300 py-1 ps-8">
         {ordered.map((entry) => {
-          const { title, detail, synthetic } = describeAuditEntry(entry);
+          const { title, detail, synthetic } = describeAuditEntry(entry, { productKey });
           const statusHint =
             entry.to_status && entry.action === 'status_changed'
               ? formatStatus(entry.to_status)

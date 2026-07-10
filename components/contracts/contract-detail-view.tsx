@@ -35,6 +35,7 @@ import type {
   ContractWithTotals,
   Event,
 } from '@/types/db';
+import { productKeyFromEvent } from '@/lib/product-portal';
 
 export type ContractDetailViewProps = {
   portalBasePath: string;
@@ -589,7 +590,7 @@ export function ContractDetailView({
               <p className="font-sans text-xs text-muted-foreground">
                 Creation, reviews, DocuSign signing, views, accounting steps, and other changes — newest at the bottom.
               </p>
-              <ActivityTimeline audit={activityTimeline} />
+              <ActivityTimeline audit={activityTimeline} productKey={productKeyFromEvent(event)} />
             </section>
 
             {canInlinePdf ? (
