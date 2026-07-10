@@ -328,13 +328,18 @@ export async function hydrateRosterRowsWithContracts(
   if (rows.length === 0) return rows;
 
   const supabase = getSupabaseAdmin();
-  const { data: linkedContracts } = await supabase
+  const { data: linkedContracts, error: linkedError } = await supabase
     .from('contracts_with_totals')
     .select(
-      'id, status, updated_at, grand_total_cents, billing_address_line1, billing_city, billing_state, billing_zip, signer_cc_name, signer_cc_email, source_sheet_id, source_sheet_tab, source_row_number',
+      'id, status, updated_at, grand_total_cents, billing_address_line1, billing_city, billing_state, billing_zip, source_sheet_id, source_sheet_tab, source_row_number',
     )
     .eq('event_id', eventId)
     .not('source_sheet_id', 'is', null);
+
+  if (linkedError) {
+    console.error('[hydrateRosterRowsWithContracts] contract lookup failed', linkedError.message);
+    return rows;
+  }
 
   const contractByRowKey = new Map<string, ContractWithTotals>();
   for (const contract of (linkedContracts ?? []) as ContractWithTotals[]) {
