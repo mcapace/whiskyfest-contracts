@@ -3,8 +3,38 @@ import {
   bigSmokePackageDisplayName,
   getBigSmokePackage,
 } from '@/lib/big-smoke-pricing';
+import { contractHasExhibitorAddress } from '@/lib/nywe-billing';
 import type { ContractWithTotals, Event } from '@/types/db';
 import type { MergePlaceholderMode } from '@/lib/merge-map';
+
+/**
+ * Festival Sponsor address lines: prefer exhibitor mailing fields, else billing
+ * collected on the Big Smoke new-contract form (so DocuSign does not need fill tabs).
+ */
+function bigSmokeAddressMergeOverlay(contract: ContractWithTotals): Record<string, string> {
+  const line1 =
+    contract.exhibitor_address_line1?.trim() || contract.billing_address_line1?.trim() || '';
+  const line2 =
+    contract.exhibitor_address_line2?.trim() || contract.billing_address_line2?.trim() || '';
+  const city = contract.exhibitor_city?.trim() || contract.billing_city?.trim() || '';
+  const state = contract.exhibitor_state?.trim() || contract.billing_state?.trim() || '';
+  const zip = contract.exhibitor_zip?.trim() || contract.billing_zip?.trim() || '';
+  const country =
+    contract.exhibitor_country?.trim() || contract.billing_country?.trim() || '';
+
+  if (!line1 && !city && !state && !zip && !contractHasExhibitorAddress(contract)) {
+    return {};
+  }
+
+  return {
+    '{{exhibitor_address_line1}}': line1,
+    '{{exhibitor_address_line2}}': line2,
+    '{{exhibitor_city}}': city,
+    '{{exhibitor_state}}': state,
+    '{{exhibitor_zip}}': zip,
+    '{{exhibitor_country}}': country,
+  };
+}
 
 /**
  * Big Smoke exhibitor contract merge tokens.
@@ -25,14 +55,17 @@ export function buildBigSmokeMergeMap(
 
   const phone = (contract.exhibitor_telephone ?? '').trim();
   const email =
-    (contract.event_contact_email ?? '').trim() || (contract.signer_1_email ?? '').trim();
+    (contract.event_contact_email ?? '').trim() ||
+    (contract.billing_contact_email ?? '').trim() ||
+    (contract.signer_1_email ?? '').trim();
 
-  if (phone) {
-    base['{{exhibitor_telephone}}'] = phone;
-  }
-  if (email) {
-    base['{{event_contact_email}}'] = email;
-  }
+  // Always print title / contact when we have them (NYWE map clears title).
+  base['{{signer_1_title}}'] = (contract.signer_1_title ?? '').trim();
+  base['{{exhibitor_telephone}}'] = phone;
+  base['{{event_contact_email}}'] = email;
+
+  // Prefer billing address from the form so Festival Sponsor prints real text.
+  Object.assign(base, bigSmokeAddressMergeOverlay(contract));
 
   void mode;
 

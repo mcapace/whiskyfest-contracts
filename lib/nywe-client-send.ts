@@ -8,7 +8,7 @@ import {
 } from '@/lib/contract-document-naming';
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import { insertContractAudit } from '@/lib/audit-log';
-import { eventTemplateProfile, eventUsesContractOrderTable, isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
+import { eventUsesContractOrderTable, isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
 import { persistContractDraftPdf } from '@/lib/contract-pdf-storage';
 import { resolveContractTemplateDocId } from '@/lib/contract-template';
 import {
@@ -18,14 +18,11 @@ import {
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
 import { sendEnvelope } from '@/lib/docusign';
+import { shouldSkipExhibitorDataTabs } from '@/lib/exhibitor-docusign-fields';
 import { parseSignerCc, validateSignerCcDistinct, normalizeSignerCcEmail, normalizeSignerCcName } from '@/lib/docusign-signer-cc';
 import { renderContractPdfFromTemplate } from '@/lib/google';
 import { buildContractMergeMap } from '@/lib/merge-map';
-import {
-  contractHasBillingInfo,
-  contractHasNyweLicenseAddress,
-  nyweLicenseAddressError,
-} from '@/lib/nywe-billing';
+import { nyweLicenseAddressError } from '@/lib/nywe-billing';
 import { refreshNyweBillingFromRosterForContract } from '@/lib/nywe-roster-billing-sync';
 import { docusignBrandIdForEvent } from '@/lib/product-email';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
@@ -189,10 +186,7 @@ export async function nyweClientSendContract(options: {
       countersigner,
       carbonCopy,
       brandId: docusignBrandIdForEvent(event),
-      skipExhibitorDataTabs:
-        eventTemplateProfile(event) === 'nywe_vendor' &&
-        contractHasBillingInfo(contract) &&
-        contractHasNyweLicenseAddress(contract),
+      skipExhibitorDataTabs: shouldSkipExhibitorDataTabs(event, contract),
     });
 
     await supabase

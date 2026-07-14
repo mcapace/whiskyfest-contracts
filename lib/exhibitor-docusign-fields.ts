@@ -1,3 +1,10 @@
+import { eventTemplateProfile } from '@/lib/contract-template-profile';
+import {
+  contractHasBillingInfo,
+  contractHasNyweLicenseAddress,
+} from '@/lib/nywe-billing';
+import type { Contract, Event } from '@/types/db';
+
 export type ExhibitorFieldMergeMode = 'draft' | 'docusign';
 
 /**
@@ -310,3 +317,27 @@ export function buildExhibitorDataTextTabs(): { textTabs: TextTabDef[] } {
   ];
   return { textTabs: tabs };
 }
+
+/**
+ * When true, envelopes only place Sign/Date tabs — address/billing was already merged into the PDF.
+ * Big Smoke always skips fill tabs (Festival Sponsor uses billing/exhibitor print fields).
+ */
+export function shouldSkipExhibitorDataTabs(
+  event: Pick<Event, 'contract_template_profile'>,
+  contract: Pick<
+    Contract,
+    | 'billing_contact_name'
+    | 'billing_contact_email'
+    | 'billing_address_line1'
+    | 'billing_city'
+    | 'billing_state'
+  >,
+): boolean {
+  const profile = eventTemplateProfile(event);
+  if (profile === 'big_smoke') return true;
+  if (profile === 'nywe_vendor') {
+    return contractHasBillingInfo(contract) && contractHasNyweLicenseAddress(contract);
+  }
+  return false;
+}
+

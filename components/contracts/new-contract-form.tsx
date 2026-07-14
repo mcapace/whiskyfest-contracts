@@ -773,8 +773,9 @@ export function NewContractForm({
               <div className="space-y-3 rounded-md border border-border/70 bg-muted/10 px-3 py-3">
                 <p className="text-sm font-medium text-foreground">Billing information</p>
                 <p className="text-xs text-muted-foreground">
-                  Pre-filled from the exhibitor roster when created from the list. Appears on the license PDF and NYWE
-                  accounting dashboard.
+                  {isBigSmokeEvent
+                    ? 'Printed on the Festival Sponsor section of the agreement. Fill this in before sending — Big Smoke does not collect address fields in DocuSign.'
+                    : 'Pre-filled from the exhibitor roster when created from the list. Appears on the license PDF and NYWE accounting dashboard.'}
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="Billing contact">

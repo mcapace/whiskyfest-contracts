@@ -16,12 +16,13 @@ import {
   contractDocuSignFileName,
   contractPdfBaseName,
 } from '@/lib/contract-document-naming';
-import { eventTemplateProfile, eventUsesContractOrderTable } from '@/lib/contract-template-profile';
+import { eventUsesContractOrderTable } from '@/lib/contract-template-profile';
 import {
   countersignerRequiredForEvent,
   docusignCountersignerForEvent,
 } from '@/lib/docusign-envelope-recipients';
-import { contractHasBillingInfo, contractHasNyweLicenseAddress, nyweLicenseAddressError } from '@/lib/nywe-billing';
+import { shouldSkipExhibitorDataTabs } from '@/lib/exhibitor-docusign-fields';
+import { nyweLicenseAddressError } from '@/lib/nywe-billing';
 import { refreshNyweBillingFromRosterForContract } from '@/lib/nywe-roster-billing-sync';
 import { resolveContractTemplateDocId } from '@/lib/contract-template';
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
@@ -292,10 +293,7 @@ export async function reviseAndSendContract(options: {
       countersigner,
       carbonCopy,
       brandId: docusignBrandIdForEvent(event),
-      skipExhibitorDataTabs:
-        eventTemplateProfile(event) === 'nywe_vendor' &&
-        contractHasBillingInfo(contract) &&
-        contractHasNyweLicenseAddress(contract),
+      skipExhibitorDataTabs: shouldSkipExhibitorDataTabs(event, contract),
     });
     envelopeId = sent.envelopeId;
   } catch (e) {
