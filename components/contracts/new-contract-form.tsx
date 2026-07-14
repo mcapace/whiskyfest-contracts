@@ -319,8 +319,8 @@ export function NewContractForm({
   const showNoChargeOption =
     canUseNoChargeBooth && !boothOnlyEvent && dealKind !== 'sponsorship_only';
   const listBoothRateCents = standardBoothRateCentsForEvent(selectedEvent);
-  const boothSubtotal = isBigSmokeEvent && selectedBigSmokePkg
-    ? selectedBigSmokePkg.fee_cents
+  const boothSubtotal = isBigSmokeEvent
+    ? (selectedBigSmokePkg?.fee_cents ?? 0)
     : form.booth_count * form.booth_rate_cents;
   const lineItemsSumCents = lineItems.reduce((acc, row) => {
     const desc = row.description.trim();
@@ -331,6 +331,7 @@ export function NewContractForm({
     return acc + Math.round(dollars * 100);
   }, 0);
   const grandTotal = boothSubtotal + lineItemsSumCents;
+  const bigSmokePackagePending = isBigSmokeEvent && !selectedBigSmokePkg;
 
   const effectiveBoothCount = useMemo(() => {
     if (dealKind === 'sponsorship_only') return 0;
@@ -389,7 +390,12 @@ export function NewContractForm({
     }
     if (isBigSmokeEvent) {
       const priced = pricingFromBigSmokePackage(packageKey);
-      if (!priced) return;
+      if (!priced) {
+        // Do not inherit the event default booth rate until a package is chosen.
+        setForm((f) => ({ ...f, booth_rate_cents: 0 }));
+        setBoothRateInput('0.00');
+        return;
+      }
       setForm((f) => ({
         ...f,
         booth_count: priced.booth_count,
@@ -1156,28 +1162,36 @@ export function NewContractForm({
 
             {/* Live total */}
             <div className="mt-6 rounded-lg border border-fest-600/20 bg-gradient-to-br from-fest-600/[0.07] to-whisky-50/50 p-5">
-              {dealKind !== 'sponsorship_only' ? (
-              <div className="flex items-baseline justify-between text-sm">
-                <span className="text-muted-foreground">
-                  {isBigSmokeEvent ? 'Package fee' : boothOnlyEvent ? 'License fee' : 'Booth subtotal'}
-                </span>
-                <span className="font-mono tabular-nums">{formatCurrency(boothSubtotal)}</span>
-              </div>
-              ) : null}
-              {(lineItems.length > 0 || lineItemsSumCents !== 0) && (
-                <div className="mt-2 flex items-baseline justify-between text-sm">
-                  <span className="text-muted-foreground">Line items subtotal</span>
-                  <span className="font-mono tabular-nums">{formatCurrency(lineItemsSumCents)}</span>
-                </div>
+              {bigSmokePackagePending ? (
+                <p className="text-sm text-muted-foreground">
+                  Select a rate-sheet package above to see the package fee and total.
+                </p>
+              ) : (
+                <>
+                  {dealKind !== 'sponsorship_only' ? (
+                    <div className="flex items-baseline justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {isBigSmokeEvent ? 'Package fee' : boothOnlyEvent ? 'License fee' : 'Booth subtotal'}
+                      </span>
+                      <span className="font-mono tabular-nums">{formatCurrency(boothSubtotal)}</span>
+                    </div>
+                  ) : null}
+                  {(lineItems.length > 0 || lineItemsSumCents !== 0) && (
+                    <div className="mt-2 flex items-baseline justify-between text-sm">
+                      <span className="text-muted-foreground">Line items subtotal</span>
+                      <span className="font-mono tabular-nums">{formatCurrency(lineItemsSumCents)}</span>
+                    </div>
+                  )}
+                  <div className="mt-4 flex items-baseline justify-between border-t border-fest-600/15 pt-3">
+                    <span className="font-serif text-xl font-semibold">
+                      {isBigSmokeEvent ? 'Package total' : boothOnlyEvent ? 'License total' : 'Contract total'}
+                    </span>
+                    <span className="font-serif text-2xl font-semibold tabular-nums text-fest-900">
+                      {formatCurrency(grandTotal)}
+                    </span>
+                  </div>
+                </>
               )}
-              <div className="mt-4 flex items-baseline justify-between border-t border-fest-600/15 pt-3">
-                <span className="font-serif text-xl font-semibold">
-                  {isBigSmokeEvent ? 'Package total' : boothOnlyEvent ? 'License total' : 'Contract total'}
-                </span>
-                <span className="font-serif text-2xl font-semibold tabular-nums text-fest-900">
-                  {formatCurrency(grandTotal)}
-                </span>
-              </div>
             </div>
           </CardContent>
         </Card>
