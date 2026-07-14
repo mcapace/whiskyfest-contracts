@@ -376,10 +376,11 @@ export function ContractActions({
   const canCancelInflightDocuSign =
     (status === 'sent' || status === 'partially_signed') && (isAdmin || isEventsTeam);
   const canCancelSigned = status === 'signed' && (isAdmin || isEventsTeam);
+  // Keep Release available even when the product auto-releases after DocuSign —
+  // legacy imports and failed auto-releases would otherwise stay stuck at signed
+  // and never appear in A/R.
   const canRelease =
-    !autoReleaseToAccounting &&
-    status === 'signed' &&
-    (isAdmin || (isEventsTeam && eventsManagedWorkflow));
+    status === 'signed' && (isAdmin || (isEventsTeam && eventsManagedWorkflow));
   const canEditImported =
     legacyImport && (status === 'imported' || status === 'pending_events_review') && (isAdmin || isEventsTeam);
   const canEditVoided = status === 'voided' && (isAdmin || isEventsTeam);
@@ -710,11 +711,17 @@ export function ContractActions({
 
           {canRelease && (
             <WhenDiscountBlocks active={discountApprovalPending}>
-              <ActionWithHelp helpText={CONTRACT_ACTION_HELP.releaseToAccounting}>
+              <ActionWithHelp
+                helpText={
+                  legacyImport
+                    ? CONTRACT_ACTION_HELP.releaseImported
+                    : CONTRACT_ACTION_HELP.releaseToAccounting
+                }
+              >
                 <Button
                   className={btnPrimary}
                   onClick={() =>
-                    eventsManagedWorkflow
+                    eventsManagedWorkflow || legacyImport
                       ? setOpenReleaseAccounting(true)
                       : runAction('release', 'release', undefined, 'executed')
                   }
@@ -1442,6 +1449,14 @@ function StatusLine({
       </p>
     );
   }
+  if (status === 'signed' && legacyImport) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Fully signed (imported PDF) · Use <span className="font-medium text-foreground">Release to Accounting</span> in
+        Actions to hand off to A/R
+      </p>
+    );
+  }
   if (status === 'signed' && autoReleaseToAccounting) {
     return (
       <p className="text-sm text-muted-foreground" suppressHydrationWarning>
@@ -1455,7 +1470,7 @@ function StatusLine({
   if (status === 'imported' || (legacyImport && status === 'pending_events_review')) {
     return (
       <p className="text-sm text-muted-foreground">
-        Legacy signed agreement on file — awaiting events approval{autoReleaseToAccounting ? ', then automatic handoff to accounting' : ', then release to accounting for invoicing'}.
+        Legacy signed agreement on file — awaiting events approval, then release to accounting for invoicing.
       </p>
     );
   }

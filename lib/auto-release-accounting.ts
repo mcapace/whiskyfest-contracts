@@ -16,13 +16,19 @@ export function eventAutoReleasesToAccounting(
   return isNyweEventsManagedEvent(event) || event.product_key === PRODUCT_WHISKYFEST;
 }
 
-/** Fully signed in DocuSign but not yet handed to accounting. */
+/** Fully signed (DocuSign or approved legacy import) but not yet handed to accounting. */
 export function contractNeedsAutoReleaseToAccounting(
-  contract: Pick<ContractWithTotals, 'status' | 'executed_at' | 'accounting_notified_at' | 'imported_at'>,
+  contract: Pick<
+    ContractWithTotals,
+    'status' | 'executed_at' | 'accounting_notified_at' | 'imported_at' | 'events_approved_at'
+  >,
 ): boolean {
   if (contract.status !== 'signed') return false;
   if (contract.executed_at || contract.accounting_notified_at) return false;
-  if (isLegacyImportedContract(contract as ContractWithTotals)) return false;
+  // Legacy PDFs only auto-release after events approval (not while still under review).
+  if (isLegacyImportedContract(contract as ContractWithTotals) && !contract.events_approved_at) {
+    return false;
+  }
   return true;
 }
 

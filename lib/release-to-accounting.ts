@@ -104,10 +104,29 @@ export async function releaseContractToAccounting(options: {
   }
 
   if (isLegacyImportedContract(contract) && !contract.events_approved_at) {
-    return {
-      ok: false,
-      error: 'Events approval required before legacy import can be released to accounting.',
-      status: 403,
+    // Signed imports restored/backfilled outside the events queue: stamp approval on release.
+    const stampedAt = new Date().toISOString();
+    const { error: stampErr } = await supabase
+      .from('contracts')
+      .update({
+        events_approved_at: stampedAt,
+        events_approved_by: actorEmail,
+        events_approval_reason:
+          contract.events_approval_reason?.trim() ||
+          'Stamped on release to accounting (signed import without prior events approval).',
+      })
+      .eq('id', contract.id);
+    if (stampErr) {
+      return {
+        ok: false,
+        error: `Could not record events approval before release: ${stampErr.message}`,
+        status: 500,
+      };
+    }
+    contract = {
+      ...contract,
+      events_approved_at: stampedAt,
+      events_approved_by: actorEmail,
     };
   }
 

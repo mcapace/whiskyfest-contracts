@@ -3,12 +3,16 @@ import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { resolveContractActor } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import {
+  autoReleaseAfterFullySigned,
+  eventAutoReleasesToAccounting,
+} from '@/lib/auto-release-accounting';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { isLegacyImportedContract } from '@/lib/legacy-import';
 import { notifySalesRepEventsApproved } from '@/lib/notifications';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { syncExhibitorRosterWritebackById } from '@/lib/exhibitor-roster-sync-hook';
-import type { Contract } from '@/types/db';
+import type { Contract, Event } from '@/types/db';
 
 const schema = z.object({
   reason: z.string().trim().max(1000).optional(),
@@ -42,9 +46,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const { data: event } = await supabase
     .from('events')
-    .select('contract_template_profile, booth_rate_cents')
+    .select('*')
     .eq('id', c.event_id)
-    .maybeSingle();
+    .maybeSingle<Event>();
 
   if (requiresDiscountApproval(c, event ?? undefined)) {
     return NextResponse.json({ error: 'Discount approval required before events review.' }, { status: 400 });
@@ -92,6 +96,22 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     email,
     name: gate.actor.appUser.name ?? null,
   }).catch((err) => console.error('[notifySalesRepEventsApproved]', err));
+
+  // WhiskyFest / NYWE: after events approve a legacy PDF → signed, hand off to AR
+  // (DocuSign deals already auto-release via webhook; imports never hit that path).
+  if (legacyImport && event && eventAutoReleasesToAccounting(event)) {
+    void autoReleaseAfterFullySigned({
+      supabase,
+      contractId: params.id,
+      event,
+      actorEmail: email,
+    })
+      .then((result) => {
+        if (result.released) revalidateContractPaths(params.id);
+        if (result.error) console.error('[events-approve] auto-release', params.id, result.error);
+      })
+      .catch((err) => console.error('[events-approve] auto-release', err));
+  }
 
   return NextResponse.json({ ok: true, contract: updated });
 }

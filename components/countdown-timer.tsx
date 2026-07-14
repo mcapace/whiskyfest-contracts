@@ -7,10 +7,13 @@ import { useHydrated } from '@/hooks/use-hydrated';
 export function CountdownTimer({
   targetDate,
   targetDateTimeIso,
+  untilLabel = 'until pour begins',
   className,
 }: {
   targetDate: string;
   targetDateTimeIso?: string;
+  /** Suffix after the countdown (product-specific). */
+  untilLabel?: string;
   className?: string;
 }) {
   const hydrated = useHydrated();
@@ -36,7 +39,7 @@ export function CountdownTimer({
       >
         <span className="font-semibold tabular-nums text-parchment-50">—</span> days ·{' '}
         <span className="font-semibold tabular-nums text-parchment-50">—</span> hours ·{' '}
-        <span className="font-semibold tabular-nums text-parchment-50">—</span> minutes · until pour begins
+        <span className="font-semibold tabular-nums text-parchment-50">—</span> minutes · {untilLabel}
       </p>
     );
   }
@@ -51,7 +54,7 @@ export function CountdownTimer({
     <p className={cn('font-sans text-sm text-parchment-100/95 sm:text-base', className)}>
       <span className="font-semibold tabular-nums text-parchment-50">{days}</span> days ·{' '}
       <span className="font-semibold tabular-nums text-parchment-50">{hours}</span> hours ·{' '}
-      <span className="font-semibold tabular-nums text-parchment-50">{minutes}</span> minutes · until pour begins
+      <span className="font-semibold tabular-nums text-parchment-50">{minutes}</span> minutes · {untilLabel}
     </p>
   );
 }

@@ -5,7 +5,22 @@ import { Input } from '@/components/ui/input';
 import { SponsorCard } from '@/components/sponsors/sponsor-card';
 import { SponsorProfileDrawer } from '@/components/sponsors/sponsor-profile-drawer';
 import { sponsorCategoryForRecord, type BoothBrandRowsByContract, type SponsorRecord } from '@/lib/sponsors';
+import { resolveSponsorLogoUrl } from '@/lib/sponsor-logo';
 import { canViewSponsorDetails } from '@/lib/permissions';
+
+function brandNamesForSponsor(
+  sponsor: SponsorRecord,
+  boothRowsByContract: BoothBrandRowsByContract,
+): string[] {
+  const fromBooth = (boothRowsByContract[sponsor.id] ?? [])
+    .map((r) => r.brand_name.trim())
+    .filter(Boolean);
+  if (fromBooth.length > 0) return [...new Set(fromBooth)];
+  return (sponsor.brands_poured ?? '')
+    .split(/[\n,;]+/)
+    .map((b) => b.trim())
+    .filter(Boolean);
+}
 
 export function SponsorsDirectory({
   sponsors,
@@ -37,7 +52,8 @@ export function SponsorsDirectory({
     return sponsors.filter((s) => {
       if (category !== 'all' && sponsorCategoryForRecord(s, boothRowsByContract) !== category) return false;
       if (!q) return true;
-      const blob = `${s.exhibitor_company_name} ${s.brands_poured ?? ''}`.toLowerCase();
+      const brands = brandNamesForSponsor(s, boothRowsByContract).join(' ');
+      const blob = `${s.exhibitor_company_name} ${s.brands_poured ?? ''} ${brands}`.toLowerCase();
       return blob.includes(q);
     });
   }, [sponsors, query, category, boothRowsByContract]);
@@ -60,7 +76,9 @@ export function SponsorsDirectory({
               key={cat}
               onClick={() => setCategory(cat)}
               className={`rounded-full border px-3 py-1 text-xs ${
-                category === cat ? 'border-oak-700 bg-oak-800 text-parchment-50' : 'border-parchment-300 bg-parchment-50 text-ink-700'
+                category === cat
+                  ? 'border-oak-700 bg-oak-800 text-parchment-50'
+                  : 'border-parchment-300 bg-parchment-50 text-ink-700'
               }`}
             >
               {cat === 'all' ? 'All categories' : cat}
@@ -74,24 +92,45 @@ export function SponsorsDirectory({
           {sponsors.length === 0 ? (
             <>
               <h3 className="font-display text-3xl font-medium text-oak-800">No sponsors confirmed yet</h3>
-              <p className="mt-3 text-sm text-ink-600">As exhibitors sign their contracts, they&apos;ll appear here.</p>
+              <p className="mt-3 text-sm text-ink-600">
+                As exhibitors sign their contracts, they&apos;ll appear here.
+              </p>
             </>
           ) : (
             <>
               <h3 className="font-display text-3xl font-medium text-oak-800">No sponsors match your filters</h3>
-              <p className="mt-3 text-sm text-ink-600">Try another category or clear the search to see all confirmed sponsors.</p>
+              <p className="mt-3 text-sm text-ink-600">
+                Try another category or clear the search to see all confirmed sponsors.
+              </p>
             </>
           )}
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((sponsor, index) => (
-            <SponsorCard key={sponsor.id} sponsor={sponsor} index={index} onOpen={() => setSelected(sponsor)} />
-          ))}
+        <div className="grid auto-rows-fr gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((sponsor, index) => {
+            const brands = brandNamesForSponsor(sponsor, boothRowsByContract);
+            const logoUrl = resolveSponsorLogoUrl({
+              companyName: sponsor.exhibitor_company_name,
+              signerEmail: sponsor.signer_1_email,
+              brandNames: brands,
+            });
+            return (
+              <SponsorCard
+                key={sponsor.id}
+                sponsor={sponsor}
+                index={index}
+                brandNames={brands}
+                logoUrl={logoUrl}
+                onOpen={() => setSelected(sponsor)}
+              />
+            );
+          })}
         </div>
       )}
 
-      <p className="text-sm text-ink-500">{filtered.length} sponsor{filtered.length === 1 ? '' : 's'} shown</p>
+      <p className="text-sm text-ink-500">
+        {filtered.length} sponsor{filtered.length === 1 ? '' : 's'} shown
+      </p>
 
       <SponsorProfileDrawer
         open={Boolean(selected)}

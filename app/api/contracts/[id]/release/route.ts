@@ -41,7 +41,13 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     if (!actor.isAdmin && !eventsManagedRelease) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
-    if (isLegacyImportedContract(contract) && !contract.events_approved_at) {
+    // Events team must complete events approval first. Admins may release restored/signed
+    // imports that skipped the events queue (e.g. legacy backfills).
+    if (
+      isLegacyImportedContract(contract) &&
+      !contract.events_approved_at &&
+      !actor.isAdmin
+    ) {
       return NextResponse.json(
         { error: 'Events approval required before this legacy import can be released to accounting.' },
         { status: 403 },

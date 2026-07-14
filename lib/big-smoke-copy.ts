@@ -10,6 +10,9 @@ export const BIG_SMOKE_LOGIN_TAGLINE =
   'Generate, send, and track contracts for Cigar Aficionado Big Smoke events';
 export const BIG_SMOKE_LOGIN_FOOTER = 'Cigar Aficionado · Big Smoke';
 
+/** Hero countdown suffix — Big Smoke is cigars/drinks, not a whisky pour. */
+export const BIG_SMOKE_COUNTDOWN_UNTIL = 'until doors open';
+
 export function bigSmokeContractCount(n: number): string {
   return `${n} contract${n === 1 ? '' : 's'}`;
 }

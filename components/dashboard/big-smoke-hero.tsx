@@ -8,7 +8,7 @@ import { CigarAficionadoLogo } from '@/components/brand/cigar-aficionado-logo';
 import { HeroParallaxLayer } from '@/components/dashboard/hero-parallax-layer';
 import { MagneticButton } from '@/components/motion/magnetic-button';
 import { eventCountdownTargetIso, formatEventScheduleLine } from '@/lib/event-schedule';
-import { bigSmokeContractCount } from '@/lib/big-smoke-copy';
+import { bigSmokeContractCount, BIG_SMOKE_COUNTDOWN_UNTIL } from '@/lib/big-smoke-copy';
 import { cn } from '@/lib/utils';
 import type { Event } from '@/types/db';
 
@@ -80,6 +80,7 @@ export function BigSmokeHero({
             <CountdownTimer
               targetDate={scheduleEvent.event_date}
               targetDateTimeIso={countdownIso}
+              untilLabel={BIG_SMOKE_COUNTDOWN_UNTIL}
               className="mt-6"
             />
           </div>

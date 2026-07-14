@@ -61,9 +61,9 @@ export const CIGAR_AFICIONADO_LOGO = {
     alt: 'Cigar Aficionado',
   },
   onDark: {
-    src: '/images/cigar-aficionado-logo-on-dark.png',
-    width: 428,
-    height: 116,
+    src: '/images/cigar-aficionado-logo-white.png',
+    width: 413,
+    height: 83,
     alt: 'Cigar Aficionado',
   },
 } as const;
