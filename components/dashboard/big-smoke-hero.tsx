@@ -57,7 +57,7 @@ export function BigSmokeHero({
           <div>
             <CigarAficionadoLogo
               priority
-              variant="onDark"
+              variant="white"
               className="mb-5 max-w-sm sm:max-w-md"
               imageClassName="max-h-14 w-auto origin-left sm:max-h-16"
             />

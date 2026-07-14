@@ -29,7 +29,7 @@ export function CigarAficionadoLogo({
         priority={priority}
         className={cn(
           'h-auto w-full object-contain',
-          variant === 'onDark' && 'drop-shadow-[0_2px_18px_rgba(0,0,0,0.55)]',
+          (variant === 'onDark' || variant === 'white') && 'drop-shadow-[0_2px_18px_rgba(0,0,0,0.55)]',
           imageClassName,
         )}
         sizes="(max-width: 768px) 240px, 360px"

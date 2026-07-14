@@ -8,7 +8,7 @@ const WHISKYFEST_DESCRIPTION = 'Participation contract management — M. Shanken
 
 export function portalFaviconPath(kind: PortalKind): string {
   if (kind === 'nywe') return '/images/favicon-nywe.png';
-  if (kind === 'big_smoke') return '/images/cigar-aficionado-logo-white.png';
+  if (kind === 'big_smoke') return '/images/cigar-aficionado-logo-on-dark.png';
   return '/images/favicon-whiskyfest.png';
 }
 
