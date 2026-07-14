@@ -26,6 +26,17 @@ export function InvoiceLifecycleTimeline({
     );
   }
 
+  if (status === 'invoice_voided') {
+    return (
+      <div className="rounded-lg border border-rose-300/80 bg-rose-50/60 px-4 py-3">
+        <p className="text-sm font-medium text-rose-950">{formatInvoiceStatus('invoice_voided')}</p>
+        <p className="mt-1 text-xs text-rose-900/80">
+          This sent invoice was cancelled. Restore to Pending from AR Actions if it should be billed again.
+        </p>
+      </div>
+    );
+  }
+
   const idx = STEPS.findIndex((s) => s.key === status);
   const currentIdx = idx >= 0 ? idx : 0;
 

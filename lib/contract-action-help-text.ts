@@ -42,6 +42,12 @@ export const CONTRACT_ACTION_HELP = {
   recallInvoiceSent:
     'Undo Invoice Sent and return this contract to Pending Invoice. Use if it was marked sent by mistake or the invoice needs to be corrected and re-sent. Does not notify the sales rep.',
 
+  voidInvoiceSent:
+    'Permanently void a sent invoice (accounting/admin only). Removes it from the billed export and marks Invoice Voided. Requires a reason. Use Restore to Pending if you need to invoice again later.',
+
+  restoreVoidedInvoice:
+    'Return a voided invoice to Pending so accounting can mark invoice sent again.',
+
   markPaid: 'Records payment received. Sales rep (or configured NYWE ops inbox) notified.',
 
   generateDraftPdf:

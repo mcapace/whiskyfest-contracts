@@ -250,6 +250,7 @@ export async function AccountingDashboardView({
                 { key: 'pending' as const, label: formatInvoiceStatus('pending') },
                 { key: 'invoice_sent' as const, label: formatInvoiceStatus('invoice_sent') },
                 { key: 'paid' as const, label: formatInvoiceStatus('paid') },
+                { key: 'invoice_voided' as const, label: formatInvoiceStatus('invoice_voided') },
                 { key: 'not_invoiced' as const, label: formatInvoiceStatus('not_invoiced') },
               ] as const
             ).map((tab) => (

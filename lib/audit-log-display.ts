@@ -210,6 +210,14 @@ export function describeAuditEntry(entry: AuditLogEntry, context?: AuditDisplayC
           : undefined,
         synthetic,
       };
+    case 'invoice_sent_voided':
+      return {
+        title: 'Invoice sent voided',
+        detail: meta.reason ? String(meta.reason) : undefined,
+        synthetic,
+      };
+    case 'invoice_voided_restored':
+      return { title: 'Voided invoice restored to pending', synthetic };
     case 'invoice_marked_paid':
       return { title: 'Payment marked received (accounting)', synthetic };
     case 'impersonation_started':
@@ -261,6 +269,10 @@ export function describeAuditActionShort(action: string): string {
       return 'marked invoice sent for';
     case 'invoice_sent_recalled':
       return 'recalled invoice sent for';
+    case 'invoice_sent_voided':
+      return 'voided invoice sent for';
+    case 'invoice_voided_restored':
+      return 'restored voided invoice for';
     case 'invoice_marked_paid':
       return 'marked paid for';
     case 'contract_voided':

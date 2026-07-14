@@ -52,6 +52,14 @@ export function filterContractsByAccountingPortal(
 }
 
 export function parseInvoiceFilter(raw: string | undefined): InvoiceStatus | 'all' {
-  if (raw === 'pending' || raw === 'invoice_sent' || raw === 'paid' || raw === 'not_invoiced') return raw;
+  if (
+    raw === 'pending' ||
+    raw === 'invoice_sent' ||
+    raw === 'paid' ||
+    raw === 'not_invoiced' ||
+    raw === 'invoice_voided'
+  ) {
+    return raw;
+  }
   return 'all';
 }

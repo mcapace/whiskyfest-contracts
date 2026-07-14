@@ -17,6 +17,11 @@ const bodySchema = z.object({
   mark_invoice_sent: z.boolean().optional(),
   /** Undo accidental "invoice sent" — returns status to pending so AR can re-send or correct. */
   recall_invoice_sent: z.boolean().optional(),
+  /** Permanently void a sent invoice (accounting/admin only). Requires reason. */
+  void_invoice_sent: z.boolean().optional(),
+  void_reason: z.string().trim().min(5).max(2000).optional(),
+  /** Restore a voided invoice back to pending so AR can invoice again. */
+  restore_voided_invoice: z.boolean().optional(),
   mark_paid: z.boolean().optional(),
   accounting_notes: z.string().max(20000).optional(),
 });
@@ -50,10 +55,20 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: 'Invalid body', details: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { mark_invoice_sent, recall_invoice_sent, mark_paid, accounting_notes } = parsed.data;
+  const {
+    mark_invoice_sent,
+    recall_invoice_sent,
+    void_invoice_sent,
+    void_reason,
+    restore_voided_invoice,
+    mark_paid,
+    accounting_notes,
+  } = parsed.data;
   const ops = [
     mark_invoice_sent === true,
     recall_invoice_sent === true,
+    void_invoice_sent === true,
+    restore_voided_invoice === true,
     mark_paid === true,
     accounting_notes !== undefined,
   ].filter(Boolean);
@@ -61,10 +76,14 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return NextResponse.json(
       {
         error:
-          'Send exactly one of: mark_invoice_sent, recall_invoice_sent, mark_paid, or accounting_notes.',
+          'Send exactly one of: mark_invoice_sent, recall_invoice_sent, void_invoice_sent, restore_voided_invoice, mark_paid, or accounting_notes.',
       },
       { status: 400 },
     );
+  }
+
+  if (void_invoice_sent && !void_reason?.trim()) {
+    return NextResponse.json({ error: 'A void reason is required (at least 5 characters).' }, { status: 400 });
   }
 
   const supabase = getSupabaseAdmin();
@@ -95,6 +114,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (mark_invoice_sent) {
     if (inv === 'not_invoiced') {
       return NextResponse.json({ error: 'This contract is marked Do Not Invoice and cannot be invoiced.' }, { status: 409 });
+    }
+    if (inv === 'invoice_voided') {
+      return NextResponse.json(
+        { error: 'This invoice was voided. Restore it to pending first, then mark sent again.' },
+        { status: 409 },
+      );
     }
     if (inv !== 'pending') {
       return NextResponse.json({ error: 'Invoice can only be marked sent from pending state.' }, { status: 409 });
@@ -168,6 +193,75 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     // Full billed-sheet refresh so this contract is removed from "invoice sent" export.
     void syncBilledContractToGoogleSheet(contract.id);
+
+    revalidatePath('/accounting');
+    revalidatePath(`/accounting/${contract.id}`);
+    return NextResponse.json({ ok: true });
+  }
+
+  if (void_invoice_sent) {
+    if (inv !== 'invoice_sent') {
+      return NextResponse.json(
+        { error: 'Only invoices marked as sent can be voided.' },
+        { status: 409 },
+      );
+    }
+    const reason = void_reason!.trim();
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from('contracts')
+      .update({
+        invoice_status: 'invoice_voided',
+        invoice_sent_at: null,
+        invoice_sent_by: null,
+        updated_at: now,
+      })
+      .eq('id', contract.id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    await insertContractAudit(supabase, {
+      contract_id: contract.id,
+      actor_email: actor.email,
+      action: 'invoice_sent_voided',
+      metadata: {
+        reason,
+        prior_invoice_sent_at: contract.invoice_sent_at,
+        prior_invoice_sent_by: contract.invoice_sent_by,
+      },
+    });
+    revalidateContractPaths(contract.id);
+
+    void syncBilledContractToGoogleSheet(contract.id);
+
+    revalidatePath('/accounting');
+    revalidatePath(`/accounting/${contract.id}`);
+    return NextResponse.json({ ok: true });
+  }
+
+  if (restore_voided_invoice) {
+    if (inv !== 'invoice_voided') {
+      return NextResponse.json(
+        { error: 'Only voided invoices can be restored to pending.' },
+        { status: 409 },
+      );
+    }
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from('contracts')
+      .update({
+        invoice_status: 'pending',
+        updated_at: now,
+      })
+      .eq('id', contract.id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    await insertContractAudit(supabase, {
+      contract_id: contract.id,
+      actor_email: actor.email,
+      action: 'invoice_voided_restored',
+      metadata: {},
+    });
+    revalidateContractPaths(contract.id);
 
     revalidatePath('/accounting');
     revalidatePath(`/accounting/${contract.id}`);

@@ -212,7 +212,7 @@ alter table contracts add column if not exists accounting_notes text;
 
 alter table contracts drop constraint if exists contracts_invoice_status_chk;
 alter table contracts add constraint contracts_invoice_status_chk
-  check (invoice_status in ('pending', 'invoice_sent', 'paid', 'not_invoiced'));
+  check (invoice_status in ('pending', 'invoice_sent', 'paid', 'not_invoiced', 'invoice_voided'));
 
 alter table contracts add column if not exists no_charge_booth boolean not null default false;
 

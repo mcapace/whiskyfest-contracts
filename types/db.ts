@@ -15,7 +15,7 @@ export type ContractStatus =
   | 'cancelled'
   | 'error';
 
-export type InvoiceStatus = 'pending' | 'invoice_sent' | 'paid' | 'not_invoiced';
+export type InvoiceStatus = 'pending' | 'invoice_sent' | 'paid' | 'not_invoiced' | 'invoice_voided';
 
 export type UserRole = 'admin' | 'sales' | 'sales_rep' | 'viewer';
 

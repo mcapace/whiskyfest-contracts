@@ -3,11 +3,12 @@
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { useSession } from 'next-auth/react';
-import { Banknote, Save, Send, Undo2 } from 'lucide-react';
+import { Banknote, Save, Send, Undo2, Ban, RotateCcw } from 'lucide-react';
 import { useImpersonationReadOnly } from '@/hooks/use-impersonation-read-only';
 import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
 import { ActionWithHelp } from '@/components/contract/action-with-help';
 import {
+  contractActionBtnDanger,
   contractActionBtnPrimary,
   contractActionBtnSecondary,
   ContractActionButtonLabel,
@@ -19,9 +20,17 @@ import {
   useContractActionsSidebar,
 } from '@/components/contract/contract-actions-sidebar';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { CONTRACT_ACTION_HELP } from '@/lib/contract-action-help-text';
-import { Textarea } from '@/components/ui/input';
+import { Label, Textarea } from '@/components/ui/input';
 import type { InvoiceStatus } from '@/types/db';
 
 export function AccountingDetailActions({
@@ -48,14 +57,19 @@ export function AccountingDetailActions({
   const { data: session } = useSession();
   const impersonationReadOnly = useImpersonationReadOnly();
   const isAccountingUser = Boolean(session?.user?.is_accounting);
+  const isAdmin = session?.user?.role === 'admin';
   /** Impersonation is read-only except when viewing as an accounting user (AR can work while impersonated). */
   const readOnly = impersonationReadOnly && !isAccountingUser;
+  const canVoidInvoice = isAdmin || isAccountingUser;
   const [pending, startTransition] = useTransition();
   const busy = pending || readOnly;
   const [notes, setNotes] = useState(initialNotes ?? '');
   const [err, setErr] = useState<string | null>(null);
+  const [openVoid, setOpenVoid] = useState(false);
+  const [voidReason, setVoidReason] = useState('');
 
-  const sidebarVisible = invoiceStatus === 'pending' || invoiceStatus === 'invoice_sent';
+  const sidebarVisible =
+    invoiceStatus === 'pending' || invoiceStatus === 'invoice_sent' || invoiceStatus === 'invoice_voided';
   const isDoNotInvoice = invoiceStatus === 'not_invoiced';
   const { open: sidebarOpen, setOpen: setSidebarOpen } = useContractActionsSidebar(
     false,
@@ -72,9 +86,10 @@ export function AccountingDetailActions({
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       setErr(typeof data.error === 'string' ? data.error : 'Request failed');
-      return;
+      return false;
     }
     router.refresh();
+    return true;
   }
 
   function markInvoiceSent() {
@@ -96,12 +111,35 @@ export function AccountingDetailActions({
     startTransition(() => void patch({ recall_invoice_sent: true }));
   }
 
+  function submitVoidInvoice() {
+    if (voidReason.trim().length < 5) return;
+    startTransition(async () => {
+      const ok = await patch({ void_invoice_sent: true, void_reason: voidReason.trim() });
+      if (ok) {
+        setOpenVoid(false);
+        setVoidReason('');
+      }
+    });
+  }
+
+  function restoreVoidedInvoice() {
+    if (
+      !window.confirm(
+        'Restore this voided invoice to Pending? Accounting can then mark invoice sent again.',
+      )
+    ) {
+      return;
+    }
+    startTransition(() => void patch({ restore_voided_invoice: true }));
+  }
+
   function saveNotes() {
     startTransition(() => void patch({ accounting_notes: notes }));
   }
 
   const btnPrimary = contractActionBtnPrimary;
   const btnSecondary = contractActionBtnSecondary;
+  const btnDanger = contractActionBtnDanger;
 
   return (
     <>
@@ -174,12 +212,80 @@ export function AccountingDetailActions({
                       />
                     </Button>
                   </ActionWithHelp>
+                  {canVoidInvoice && (
+                    <ActionWithHelp helpText={CONTRACT_ACTION_HELP.voidInvoiceSent}>
+                      <Button
+                        type="button"
+                        data-tour="accounting-void-invoice-sent"
+                        className={btnDanger}
+                        onClick={() => setOpenVoid(true)}
+                        disabled={busy}
+                        title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                      >
+                        <ContractActionButtonLabel icon={Ban} label="Void Invoice Sent" />
+                      </Button>
+                    </ActionWithHelp>
+                  )}
                 </>
+              )}
+              {invoiceStatus === 'invoice_voided' && canVoidInvoice && (
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.restoreVoidedInvoice}>
+                  <Button
+                    type="button"
+                    data-tour="accounting-restore-voided-invoice"
+                    className={btnSecondary}
+                    onClick={restoreVoidedInvoice}
+                    disabled={busy}
+                    title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                  >
+                    <ContractActionButtonLabel
+                      icon={RotateCcw}
+                      label={pending ? 'Saving…' : 'Restore to Pending'}
+                      spinning={pending}
+                    />
+                  </Button>
+                </ActionWithHelp>
               )}
             </ContractActionsSidebarGroup>
           </div>
         </ContractActionsSidebar>
       </TooltipProvider>
+
+      <Dialog open={openVoid} onOpenChange={setOpenVoid}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Void invoice sent</DialogTitle>
+            <DialogDescription>
+              Permanently voids this sent invoice and removes it from the billed export. The contract stays executed —
+              only the invoice status changes. Use Restore to Pending later if you need to invoice again.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="void-invoice-reason">Reason (required)</Label>
+            <Textarea
+              id="void-invoice-reason"
+              value={voidReason}
+              onChange={(e) => setVoidReason(e.target.value)}
+              rows={4}
+              placeholder="e.g., Invoice issued to wrong entity; credit memo issued"
+              maxLength={2000}
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpenVoid(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void submitVoidInvoice()}
+              disabled={busy || voidReason.trim().length < 5}
+            >
+              {pending ? 'Voiding…' : 'Void invoice'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="space-y-6">
         {isDoNotInvoice ? (
@@ -188,6 +294,15 @@ export function AccountingDetailActions({
             <p className="mt-2 text-violet-900/90 dark:text-violet-200/90">
               This is a complimentary WhiskyFest booth contract. It appears in A/R for tracking but should not be
               invoiced.
+            </p>
+          </div>
+        ) : null}
+        {invoiceStatus === 'invoice_voided' ? (
+          <div className="rounded-lg border border-rose-300/80 bg-rose-50/60 p-4 text-sm text-rose-950 md:p-6">
+            <p className="font-medium">Invoice voided</p>
+            <p className="mt-2 text-rose-900/90">
+              This sent invoice was cancelled. It will not appear on the billed export. Restore to Pending if you need to
+              invoice again.
             </p>
           </div>
         ) : null}
