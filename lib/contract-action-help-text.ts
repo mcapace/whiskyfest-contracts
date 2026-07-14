@@ -39,6 +39,9 @@ export const CONTRACT_ACTION_HELP = {
 
   markInvoiceSent: 'Records invoice sent. Sales rep (or configured NYWE ops inbox) notified.',
 
+  recallInvoiceSent:
+    'Undo Invoice Sent and return this contract to Pending Invoice. Use if it was marked sent by mistake or the invoice needs to be corrected and re-sent. Does not notify the sales rep.',
+
   markPaid: 'Records payment received. Sales rep (or configured NYWE ops inbox) notified.',
 
   generateDraftPdf:

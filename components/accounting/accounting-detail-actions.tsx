@@ -3,12 +3,13 @@
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { useSession } from 'next-auth/react';
-import { Banknote, Save, Send } from 'lucide-react';
+import { Banknote, Save, Send, Undo2 } from 'lucide-react';
 import { useImpersonationReadOnly } from '@/hooks/use-impersonation-read-only';
 import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
 import { ActionWithHelp } from '@/components/contract/action-with-help';
 import {
   contractActionBtnPrimary,
+  contractActionBtnSecondary,
   ContractActionButtonLabel,
 } from '@/components/contract/contract-action-bar';
 import {
@@ -84,11 +85,23 @@ export function AccountingDetailActions({
     startTransition(() => void patch({ mark_paid: true }));
   }
 
+  function recallInvoiceSent() {
+    if (
+      !window.confirm(
+        'Recall Invoice Sent? This returns the contract to Pending Invoice so you can correct and mark sent again. The billed export sheet will update.',
+      )
+    ) {
+      return;
+    }
+    startTransition(() => void patch({ recall_invoice_sent: true }));
+  }
+
   function saveNotes() {
     startTransition(() => void patch({ accounting_notes: notes }));
   }
 
   const btnPrimary = contractActionBtnPrimary;
+  const btnSecondary = contractActionBtnSecondary;
 
   return (
     <>
@@ -128,22 +141,40 @@ export function AccountingDetailActions({
                 </ActionWithHelp>
               )}
               {invoiceStatus === 'invoice_sent' && (
-                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.markPaid}>
-                  <Button
-                    type="button"
-                    data-tour="accounting-mark-paid"
-                    className={btnPrimary}
-                    onClick={markPaid}
-                    disabled={busy}
-                    title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
-                  >
-                    <ContractActionButtonLabel
-                      icon={Banknote}
-                      label={pending ? 'Saving…' : 'Mark Paid'}
-                      spinning={pending}
-                    />
-                  </Button>
-                </ActionWithHelp>
+                <>
+                  <ActionWithHelp helpText={CONTRACT_ACTION_HELP.markPaid}>
+                    <Button
+                      type="button"
+                      data-tour="accounting-mark-paid"
+                      className={btnPrimary}
+                      onClick={markPaid}
+                      disabled={busy}
+                      title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                    >
+                      <ContractActionButtonLabel
+                        icon={Banknote}
+                        label={pending ? 'Saving…' : 'Mark Paid'}
+                        spinning={pending}
+                      />
+                    </Button>
+                  </ActionWithHelp>
+                  <ActionWithHelp helpText={CONTRACT_ACTION_HELP.recallInvoiceSent}>
+                    <Button
+                      type="button"
+                      data-tour="accounting-recall-invoice-sent"
+                      className={btnSecondary}
+                      onClick={recallInvoiceSent}
+                      disabled={busy}
+                      title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                    >
+                      <ContractActionButtonLabel
+                        icon={Undo2}
+                        label={pending ? 'Saving…' : 'Recall Invoice Sent'}
+                        spinning={pending}
+                      />
+                    </Button>
+                  </ActionWithHelp>
+                </>
               )}
             </ContractActionsSidebarGroup>
           </div>

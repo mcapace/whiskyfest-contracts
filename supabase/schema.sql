@@ -322,7 +322,8 @@ create unique index if not exists access_requests_approval_token_key on access_r
 insert into app_users (email, name, role) values
   ('mcapace@mshanken.com',   'Michael Capace', 'admin'),
   ('lmott@mshanken.com',     'Liz Mott',       'admin'),
-  ('ssenatore@mshanken.com', 'Stephen Senatore','admin')
+  ('ssenatore@mshanken.com', 'Stephen Senatore','admin'),
+  ('nmazza@mshanken.com',    'Nicole Mazza',   'admin')
 on conflict (email) do nothing;
 
 update app_users
@@ -336,9 +337,21 @@ where email in (
   'jarcella@mshanken.com'
 );
 
+-- Ops leads: full admin + events team + NYWE admin (discount approval on both portals)
 update app_users
-set can_view_all_sales = true
-where email = 'ssenatore@mshanken.com';
+set
+  role = 'admin',
+  is_active = true,
+  is_events_team = true,
+  is_wine_spectator_admin = true,
+  can_view_all_sales = true
+where email in (
+  'nmazza@mshanken.com',
+  'ssenatore@mshanken.com',
+  'talper@mshanken.com',
+  'mcapace@mshanken.com',
+  'jarcella@mshanken.com'
+);
 
 update app_users
 set can_view_all_sales = true

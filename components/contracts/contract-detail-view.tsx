@@ -209,10 +209,14 @@ export function ContractDetailView({
                 <p className="text-sm font-semibold">⚠ Discounted rate pending admin approval</p>
                 <p className="mt-1 text-sm">
                   Booth rate: {formatCurrency(contract.booth_rate_cents)} is below the{' '}
-                  {formatCurrency(standardBoothRateCentsForEvent(event))} standard. This contract is paused until an admin approves
-                  the discount.
+                  {formatCurrency(standardBoothRateCentsForEvent(event))} standard. This contract is paused until an admin
+                  approves the discount.
                 </p>
-                {!isAdmin && (
+                {isAdmin ? (
+                  <p className="mt-2 text-xs text-amber-800">
+                    Open <strong>Actions</strong> and click <strong>Approve Discount</strong> to continue.
+                  </p>
+                ) : (
                   <p className="mt-2 text-xs text-amber-800">Contact an admin to approve this discount.</p>
                 )}
               </div>

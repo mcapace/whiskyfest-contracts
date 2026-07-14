@@ -390,8 +390,10 @@ export function ContractActions({
 
   const fabVisible = useMemo(() => {
     if (status === 'draft') return true;
+    if (discountApprovalPending && (isAdmin || status === 'ready_for_review' || status === 'pending_events_review' || status === 'approved')) {
+      return true;
+    }
     if (status === 'ready_for_review' || status === 'pending_events_review') {
-      if (discountApprovalPending) return true;
       if (status === 'ready_for_review') return true;
       if (status === 'pending_events_review') {
         if (isEventsTeam) return true;
@@ -441,6 +443,18 @@ export function ContractActions({
           >
           {status === 'draft' && (
             <>
+              {discountApprovalPending && isAdmin && (
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.approveDiscount}>
+                  <Button
+                    className={`${contractActionBtnPrimary} border-amber-600 bg-amber-600 text-white hover:bg-amber-700`}
+                    onClick={() => setOpenApproveDiscount(true)}
+                    disabled={readOnly}
+                    title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                  >
+                    <ContractActionButtonLabel icon={AlertTriangle} label="Approve Discount" />
+                  </Button>
+                </ActionWithHelp>
+              )}
               <WhenDiscountBlocks active={discountApprovalPending}>
                 <ActionWithHelp helpText={CONTRACT_ACTION_HELP.generateDraftPdf}>
                   <Button
@@ -491,7 +505,7 @@ export function ContractActions({
             </>
           )}
 
-          {(status === 'ready_for_review' || status === 'pending_events_review') &&
+          {(status === 'ready_for_review' || status === 'pending_events_review' || status === 'approved') &&
             discountApprovalPending &&
             isAdmin && (
             <>
@@ -533,7 +547,7 @@ export function ContractActions({
             </>
           )}
 
-          {(status === 'ready_for_review' || status === 'pending_events_review') &&
+          {(status === 'ready_for_review' || status === 'pending_events_review' || status === 'approved') &&
             discountApprovalPending &&
             !isAdmin && (
             <>

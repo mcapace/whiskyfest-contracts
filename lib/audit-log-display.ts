@@ -202,6 +202,14 @@ export function describeAuditEntry(entry: AuditLogEntry, context?: AuditDisplayC
       return { title: 'Exhibitor signer contact updated', synthetic };
     case 'invoice_marked_sent':
       return { title: 'Invoice marked sent (accounting)', synthetic };
+    case 'invoice_sent_recalled':
+      return {
+        title: 'Invoice sent recalled — returned to pending',
+        detail: meta.prior_invoice_sent_by
+          ? `Previously marked sent by ${String(meta.prior_invoice_sent_by)}`
+          : undefined,
+        synthetic,
+      };
     case 'invoice_marked_paid':
       return { title: 'Payment marked received (accounting)', synthetic };
     case 'impersonation_started':
@@ -251,6 +259,8 @@ export function describeAuditActionShort(action: string): string {
       return 'released to accounting';
     case 'invoice_marked_sent':
       return 'marked invoice sent for';
+    case 'invoice_sent_recalled':
+      return 'recalled invoice sent for';
     case 'invoice_marked_paid':
       return 'marked paid for';
     case 'contract_voided':

@@ -317,7 +317,11 @@ export async function exportBilledExhibitorsToGoogleSheet(
   };
 }
 
-/** Upsert one billed row after accounting marks invoice sent or paid. */
+/**
+ * Refresh the billed exhibitors sheet for this contract's portal.
+ * Call after invoice sent, paid, or recall (pending) so rows stay in sync —
+ * pending contracts are omitted from the export, removing accidental "sent" rows.
+ */
 export async function syncBilledContractToGoogleSheet(contractId: string): Promise<void> {
   const supabase = getSupabaseAdmin();
   const { data: contract } = await supabase
@@ -327,8 +331,6 @@ export async function syncBilledContractToGoogleSheet(contractId: string): Promi
     .maybeSingle<ContractWithTotals>();
 
   if (!contract || contract.status !== 'executed') return;
-  const inv = contract.invoice_status ?? 'pending';
-  if (inv !== 'invoice_sent' && inv !== 'paid') return;
 
   const { data: event } = await supabase.from('events').select('*').eq('id', contract.event_id).maybeSingle<Event>();
   if (!event) return;
