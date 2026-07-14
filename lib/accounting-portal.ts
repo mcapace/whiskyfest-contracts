@@ -1,41 +1,67 @@
 import {
+  PRODUCT_BIG_SMOKE,
   PRODUCT_WHISKYFEST,
   PRODUCT_WINE_SPECTATOR,
   type ProductKey,
 } from '@/lib/product-portal';
 import type { ContractWithTotals, Event, InvoiceStatus } from '@/types/db';
+import type { PortalKind } from '@/lib/portal-host';
 
-export type AccountingPortalKey = typeof PRODUCT_WHISKYFEST | typeof PRODUCT_WINE_SPECTATOR;
+export type AccountingPortalKey =
+  | typeof PRODUCT_WHISKYFEST
+  | typeof PRODUCT_WINE_SPECTATOR
+  | typeof PRODUCT_BIG_SMOKE;
 
-export function accountingPortalFromPathname(pathname: string, portalKind?: 'nywe' | 'whiskyfest'): AccountingPortalKey {
+export function accountingPortalFromPathname(
+  pathname: string,
+  portalKind?: PortalKind,
+): AccountingPortalKey {
   if (pathname === '/accounting/nywe' || pathname.startsWith('/accounting/nywe/')) {
     return PRODUCT_WINE_SPECTATOR;
+  }
+  if (pathname === '/accounting/big-smoke' || pathname.startsWith('/accounting/big-smoke/')) {
+    return PRODUCT_BIG_SMOKE;
   }
   if (portalKind === 'nywe' && (pathname === '/accounting' || pathname.startsWith('/accounting/'))) {
     return PRODUCT_WINE_SPECTATOR;
   }
+  if (
+    portalKind === 'big_smoke' &&
+    (pathname === '/accounting' || pathname.startsWith('/accounting/'))
+  ) {
+    return PRODUCT_BIG_SMOKE;
+  }
   return PRODUCT_WHISKYFEST;
 }
 
-export function isNyweAccountingPath(pathname: string, portalKind?: 'nywe' | 'whiskyfest'): boolean {
+export function isNyweAccountingPath(pathname: string, portalKind?: PortalKind): boolean {
   return accountingPortalFromPathname(pathname, portalKind) === PRODUCT_WINE_SPECTATOR;
 }
 
-export function accountingDashboardHref(productKey: ProductKey, portalKind?: 'nywe' | 'whiskyfest'): string {
+export function isBigSmokeAccountingPath(pathname: string, portalKind?: PortalKind): boolean {
+  return accountingPortalFromPathname(pathname, portalKind) === PRODUCT_BIG_SMOKE;
+}
+
+export function accountingDashboardHref(productKey: ProductKey, portalKind?: PortalKind): string {
   if (productKey === PRODUCT_WINE_SPECTATOR) {
     return portalKind === 'nywe' ? '/accounting' : '/accounting/nywe';
+  }
+  if (productKey === PRODUCT_BIG_SMOKE) {
+    return portalKind === 'big_smoke' ? '/accounting' : '/accounting/big-smoke';
   }
   return '/accounting';
 }
 
 export function accountingPortalLabel(productKey: AccountingPortalKey): string {
-  return productKey === PRODUCT_WINE_SPECTATOR ? 'NYWE' : 'WhiskyFest';
+  if (productKey === PRODUCT_WINE_SPECTATOR) return 'NYWE';
+  if (productKey === PRODUCT_BIG_SMOKE) return 'Big Smoke';
+  return 'WhiskyFest';
 }
 
 export function accountingPortalTitle(productKey: AccountingPortalKey): string {
-  return productKey === PRODUCT_WINE_SPECTATOR
-    ? 'NYWE Accounting'
-    : 'WhiskyFest Accounting';
+  if (productKey === PRODUCT_WINE_SPECTATOR) return 'NYWE Accounting';
+  if (productKey === PRODUCT_BIG_SMOKE) return 'Big Smoke Accounting';
+  return 'WhiskyFest Accounting';
 }
 
 export function eventIdsForProduct(events: Event[], productKey: AccountingPortalKey): Set<string> {

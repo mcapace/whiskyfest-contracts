@@ -21,10 +21,11 @@ import {
 import { cn } from '@/lib/utils';
 import {
   isAccountingPath,
+  isBigSmokePath,
   isWineSpectatorPath,
 } from '@/lib/product-portal';
-import { isNyweAccountingPath } from '@/lib/accounting-portal';
-import { nyweHref, type PortalKind } from '@/lib/portal-host';
+import { isBigSmokeAccountingPath, isNyweAccountingPath } from '@/lib/accounting-portal';
+import { bigSmokeHref, nyweHref, type PortalKind } from '@/lib/portal-host';
 import { usePortalKind } from '@/components/portal/portal-context';
 import {
   DropdownMenu,
@@ -35,6 +36,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { NyweLogo } from '@/components/brand/nywe-logo';
 import { WhiskyAdvocateLogo } from '@/components/brand/whisky-advocate-logo';
+import Image from 'next/image';
+import { BIG_SMOKE_EVENT_LOGO } from '@/lib/brand-assets';
 import { ImpersonationMenu } from '@/components/impersonation/impersonation-menu';
 import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
 
@@ -61,17 +64,20 @@ function AccountPermissionSummary({
     isAccounting?: boolean;
     isEventsTeam?: boolean;
     wineSpectatorAccess?: boolean;
+    bigSmokeAccess?: boolean;
   };
 }) {
   const pipeline = Boolean(user.pipelineAccess);
   const events = Boolean(user.isEventsTeam);
   const accounting = Boolean(user.isAccounting);
   const wine = Boolean(user.wineSpectatorAccess);
+  const bigSmoke = Boolean(user.bigSmokeAccess);
 
   const rows = [
     { label: 'Role', value: formatRoleLabel(user.role) },
     { label: 'Contract pipeline', value: pipeline ? 'Yes' : 'No' },
     { label: 'NYWE', value: wine ? 'Yes' : 'No' },
+    { label: 'Big Smoke', value: bigSmoke ? 'Yes' : 'No' },
     { label: 'Events team', value: events ? 'Yes' : 'No' },
     { label: 'Accounting', value: accounting ? 'Yes' : 'No' },
   ];
@@ -97,6 +103,7 @@ type SidebarNavItem = {
   icon: LucideIcon;
   adminOnly?: boolean;
   wineSpectatorAdminOk?: boolean;
+  bigSmokeAdminOk?: boolean;
   legacyImport?: boolean;
 };
 
@@ -120,6 +127,20 @@ const wineSpectatorNav: SidebarNavItem[] = [
   { href: '/events', label: 'Events', icon: CalendarDays, adminOnly: true, wineSpectatorAdminOk: true },
 ];
 
+const bigSmokeNav: SidebarNavItem[] = [
+  { href: '/big-smoke', label: 'Home', icon: LayoutDashboard },
+  { href: '/big-smoke/contracts', label: 'All contracts', icon: FileText },
+  { href: '/big-smoke/contracts/new', label: 'New contract', icon: Plus },
+  { href: '/settings', label: 'Settings', icon: Settings },
+  {
+    href: '/events',
+    label: 'Events',
+    icon: CalendarDays,
+    adminOnly: true,
+    bigSmokeAdminOk: true,
+  },
+];
+
 const whiskyfestAccountingNav: SidebarNavItem[] = [
   { href: '/accounting', label: 'Accounts receivable', icon: Landmark },
   { href: '/settings', label: 'Settings', icon: Settings },
@@ -130,30 +151,59 @@ const nyweAccountingNav: SidebarNavItem[] = [
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
+const bigSmokeAccountingNav: SidebarNavItem[] = [
+  { href: '/accounting/big-smoke', label: 'Accounts receivable', icon: Landmark },
+  { href: '/settings', label: 'Settings', icon: Settings },
+];
+
 function portalNavLinkActive(pathname: string, href: string): boolean {
   const equivalents = new Set([href]);
-  if (href === '/') equivalents.add('/wine-spectator');
-  if (href === '/wine-spectator') equivalents.add('/');
+  if (href === '/') {
+    equivalents.add('/wine-spectator');
+    equivalents.add('/big-smoke');
+  }
+  if (href === '/wine-spectator' || href === '/big-smoke') equivalents.add('/');
   if (href === '/roster') equivalents.add('/wine-spectator/roster');
   if (href === '/wine-spectator/roster') equivalents.add('/roster');
-  if (href === '/contracts') equivalents.add('/wine-spectator/contracts');
-  if (href === '/wine-spectator/contracts') equivalents.add('/contracts');
-  if (href === '/accounting') equivalents.add('/accounting/nywe');
-  if (href === '/accounting/nywe') equivalents.add('/accounting');
+  if (href === '/contracts') {
+    equivalents.add('/wine-spectator/contracts');
+    equivalents.add('/big-smoke/contracts');
+  }
+  if (href === '/wine-spectator/contracts' || href === '/big-smoke/contracts') {
+    equivalents.add('/contracts');
+  }
+  if (href === '/accounting') {
+    equivalents.add('/accounting/nywe');
+    equivalents.add('/accounting/big-smoke');
+  }
+  if (href === '/accounting/nywe' || href === '/accounting/big-smoke') {
+    equivalents.add('/accounting');
+  }
 
   for (const candidate of equivalents) {
-    if (candidate === '/' || candidate === '/wine-spectator') {
+    if (candidate === '/' || candidate === '/wine-spectator' || candidate === '/big-smoke') {
       if (pathname === candidate) return true;
       continue;
     }
     if (candidate === '/accounting') {
-      if (pathname === '/accounting' || (pathname.startsWith('/accounting/') && !pathname.startsWith('/accounting/nywe'))) {
+      if (
+        pathname === '/accounting' ||
+        (pathname.startsWith('/accounting/') &&
+          !pathname.startsWith('/accounting/nywe') &&
+          !pathname.startsWith('/accounting/big-smoke'))
+      ) {
         return true;
       }
       continue;
     }
     if (candidate === '/accounting/nywe') {
       if (pathname === '/accounting/nywe' || pathname.startsWith('/accounting/nywe/')) return true;
+      continue;
+    }
+    if (candidate === '/accounting/big-smoke') {
+      if (pathname === '/accounting/big-smoke' || pathname.startsWith('/accounting/big-smoke/')) {
+        return true;
+      }
       continue;
     }
     if (candidate === '/#start-deal') {
@@ -166,7 +216,11 @@ function portalNavLinkActive(pathname: string, href: string): boolean {
 }
 
 function mapNavForPortal(items: SidebarNavItem[], portalKind: PortalKind): SidebarNavItem[] {
-  return items.map((item) => ({ ...item, href: nyweHref(item.href, portalKind) }));
+  return items.map((item) => {
+    if (portalKind === 'nywe') return { ...item, href: nyweHref(item.href, portalKind) };
+    if (portalKind === 'big_smoke') return { ...item, href: bigSmokeHref(item.href, portalKind) };
+    return item;
+  });
 }
 
 function nyweNavLinkClass(active: boolean) {
@@ -180,6 +234,19 @@ function nyweNavLinkClass(active: boolean) {
 
 function nyweNavIconClass(active: boolean) {
   return cn('h-4 w-4', active ? 'text-rose-800' : 'text-muted-foreground/70 group-hover:text-foreground');
+}
+
+function bigSmokeNavLinkClass(active: boolean) {
+  return cn(
+    'group flex items-center gap-3 rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
+    active
+      ? 'border-amber-700 bg-gradient-to-r from-amber-50/90 to-transparent text-foreground'
+      : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
+  );
+}
+
+function bigSmokeNavIconClass(active: boolean) {
+  return cn('h-4 w-4', active ? 'text-amber-800' : 'text-muted-foreground/70 group-hover:text-foreground');
 }
 
 function defaultNavLinkClass(active: boolean) {
@@ -210,6 +277,8 @@ export function Sidebar({
     isEventsTeam?: boolean;
     wineSpectatorAccess?: boolean;
     wineSpectatorAdmin?: boolean;
+    bigSmokeAccess?: boolean;
+    bigSmokeAdmin?: boolean;
   };
   canImpersonate?: boolean;
   readOnlyImpersonation?: boolean;
@@ -219,38 +288,67 @@ export function Sidebar({
   const portalKind = usePortalKind();
   const isAdmin = user.role === 'admin';
   const wineSpectatorAdmin = Boolean(user.wineSpectatorAdmin);
+  const bigSmokeAdmin = Boolean(user.bigSmokeAdmin);
   const pipelineAccess = Boolean(user.pipelineAccess);
   const isAccounting = Boolean(user.isAccounting);
   const canAccounting = isAccounting || isAdmin;
   const accountingOnly = isAccounting && !pipelineAccess;
   const useAccountingOnlyNav = accountingOnly && !isAdmin;
   const nywePortal = portalKind === 'nywe';
-  const accountingPortal = isAccountingPath(pathname) || (nywePortal && pathname.startsWith('/accounting'));
+  const bigSmokePortal = portalKind === 'big_smoke';
+  const accountingPortal =
+    isAccountingPath(pathname) ||
+    (nywePortal && pathname.startsWith('/accounting')) ||
+    (bigSmokePortal && pathname.startsWith('/accounting'));
   const wineSpectatorPortal = isWineSpectatorPath(pathname) || nywePortal;
+  const bigSmokeProductPortal = isBigSmokePath(pathname) || bigSmokePortal;
   const showAccountingChrome = accountingPortal && useAccountingOnlyNav;
   const homeHref = accountingOnly
     ? isNyweAccountingPath(pathname, portalKind)
       ? nyweHref('/accounting/nywe', portalKind)
-      : '/accounting'
+      : isBigSmokeAccountingPath(pathname, portalKind)
+        ? bigSmokeHref('/accounting/big-smoke', portalKind)
+        : '/accounting'
     : wineSpectatorPortal
       ? nyweHref('/wine-spectator', portalKind)
-      : '/';
-  const accountingNavItems = nywePortal ? nyweAccountingNav : whiskyfestAccountingNav;
+      : bigSmokeProductPortal
+        ? bigSmokeHref('/big-smoke', portalKind)
+        : '/';
+  const accountingNavItems = nywePortal
+    ? nyweAccountingNav
+    : bigSmokePortal
+      ? bigSmokeAccountingNav
+      : whiskyfestAccountingNav;
   const rawNav =
     useAccountingOnlyNav && accountingPortal
       ? accountingNavItems
       : wineSpectatorPortal
         ? wineSpectatorNav
-        : whiskyfestNav;
+        : bigSmokeProductPortal
+          ? bigSmokeNav
+          : whiskyfestNav;
   const nav = mapNavForPortal(rawNav, portalKind);
   const nyweChrome = nywePortal;
+  const bigSmokeChrome = bigSmokePortal;
+
+  function navLinkClass(active: boolean) {
+    if (nyweChrome) return nyweNavLinkClass(active);
+    if (bigSmokeChrome) return bigSmokeNavLinkClass(active);
+    return defaultNavLinkClass(active);
+  }
+
+  function navIconClass(active: boolean) {
+    if (nyweChrome) return nyweNavIconClass(active);
+    if (bigSmokeChrome) return bigSmokeNavIconClass(active);
+    return defaultNavIconClass(active);
+  }
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border/60 bg-bg-surface/95 backdrop-blur-md lg:flex">
       <div
         className={cn(
           'shrink-0 border-b border-border/50 px-3 py-4',
-          wineSpectatorPortal
+          wineSpectatorPortal || bigSmokeProductPortal
             ? 'bg-gradient-to-b from-bg-surface-raised to-bg-surface'
             : showAccountingChrome
               ? 'bg-gradient-to-b from-brass-700/[0.08] via-bg-surface-raised to-bg-surface'
@@ -267,6 +365,17 @@ export function Sidebar({
               className="w-full max-w-[200px]"
               imageClassName="max-h-12"
             />
+          ) : bigSmokeProductPortal ? (
+            <Link href={homeHref} className="block w-full max-w-[200px]">
+              <Image
+                src={BIG_SMOKE_EVENT_LOGO.src}
+                alt={BIG_SMOKE_EVENT_LOGO.alt}
+                width={BIG_SMOKE_EVENT_LOGO.width}
+                height={BIG_SMOKE_EVENT_LOGO.height}
+                className="mx-auto h-auto max-h-14 w-auto"
+                priority
+              />
+            </Link>
           ) : showAccountingChrome ? (
             <Link href={homeHref} className="block rounded-lg border border-brass-700/25 bg-stone-950/60 px-4 py-3 text-center">
               <Landmark className="mx-auto h-6 w-6 text-brass-400" />
@@ -289,9 +398,9 @@ export function Sidebar({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={nyweChrome ? nyweNavLinkClass(active) : defaultNavLinkClass(active)}
+                  className={navLinkClass(active)}
                 >
-                  <Icon className={nyweChrome ? nyweNavIconClass(active) : defaultNavIconClass(active)} />
+                  <Icon className={navIconClass(active)} />
                   {item.label}
                 </Link>
               );
@@ -304,6 +413,13 @@ export function Sidebar({
                 if ('adminOnly' in item && item.adminOnly) {
                   if (isAdmin) return true;
                   if (wineSpectatorPortal && wineSpectatorAdmin && item.wineSpectatorAdminOk) return true;
+                  if (
+                    bigSmokeProductPortal &&
+                    item.bigSmokeAdminOk &&
+                    (bigSmokeAdmin || Boolean(user.isEventsTeam))
+                  ) {
+                    return true;
+                  }
                   return false;
                 }
                 if ('legacyImport' in item && item.legacyImport && accountingOnly) return false;
@@ -315,6 +431,7 @@ export function Sidebar({
                 const isNewContract =
                   item.href === '/#start-deal' ||
                   item.href === '/wine-spectator/contracts/new' ||
+                  item.href === '/big-smoke/contracts/new' ||
                   item.href === '/contracts/new';
                 const navDisabled = readOnlyImpersonation && isNewContract;
                 if (navDisabled) {
@@ -340,29 +457,25 @@ export function Sidebar({
                           ? 'sidebar-users'
                           : undefined
                     }
-                    className={nyweChrome ? nyweNavLinkClass(active) : defaultNavLinkClass(active)}
+                    className={navLinkClass(active)}
                   >
-                    <Icon className={nyweChrome ? nyweNavIconClass(active) : defaultNavIconClass(active)} />
+                    <Icon className={navIconClass(active)} />
                     {item.label}
                   </Link>
                 );
               })}
             {canAccounting && !useAccountingOnlyNav && (
               <Link
-                href={nywePortal ? nyweHref('/accounting/nywe', portalKind) : '/accounting'}
-                className={
-                  nyweChrome
-                    ? nyweNavLinkClass(portalNavLinkActive(pathname, '/accounting'))
-                    : defaultNavLinkClass(portalNavLinkActive(pathname, '/accounting'))
+                href={
+                  nywePortal
+                    ? nyweHref('/accounting/nywe', portalKind)
+                    : bigSmokePortal
+                      ? bigSmokeHref('/accounting/big-smoke', portalKind)
+                      : '/accounting'
                 }
+                className={navLinkClass(portalNavLinkActive(pathname, '/accounting'))}
               >
-                <Landmark
-                  className={
-                    nyweChrome
-                      ? nyweNavIconClass(portalNavLinkActive(pathname, '/accounting'))
-                      : defaultNavIconClass(portalNavLinkActive(pathname, '/accounting'))
-                  }
-                />
+                <Landmark className={navIconClass(portalNavLinkActive(pathname, '/accounting'))} />
                 Accounts receivable
               </Link>
             )}
@@ -371,25 +484,10 @@ export function Sidebar({
                 <p className="mb-2 px-[10px] wf-label-caps text-[10px]">Admin</p>
                 <Link
                   href="/admin/access-requests"
-                  className={
-                    nyweChrome
-                      ? cn(nyweNavLinkClass(pathname.startsWith('/admin/access-requests')), 'justify-between')
-                      : cn(
-                          'group flex items-center justify-between rounded-md border-l-2 py-2 pl-[10px] pr-3 text-sm font-medium transition-colors',
-                          pathname.startsWith('/admin/access-requests')
-                            ? 'border-accent-brand bg-gradient-to-r from-accent-brand/12 to-transparent text-foreground'
-                            : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50 hover:text-foreground',
-                        )
-                  }
+                  className={cn(navLinkClass(pathname.startsWith('/admin/access-requests')), 'justify-between')}
                 >
                   <span className="inline-flex items-center gap-3">
-                    <UserPlus
-                      className={
-                        nyweChrome
-                          ? nyweNavIconClass(pathname.startsWith('/admin/access-requests'))
-                          : 'h-4 w-4 text-muted-foreground/70'
-                      }
-                    />
+                    <UserPlus className={navIconClass(pathname.startsWith('/admin/access-requests'))} />
                     Access Requests
                   </span>
                   {pendingAccessRequests > 0 ? (

@@ -1,21 +1,34 @@
 import type { ContractWithTotals, Event } from '@/types/db';
-import { isNywePortalHost, isNywePortalPath } from '@/lib/portal-host';
+import { isBigSmokePortalHost, isBigSmokePortalPath, isNywePortalHost, isNywePortalPath } from '@/lib/portal-host';
+import { BIG_SMOKE_PORTAL_TITLE, BIG_SMOKE_SHORT_LABEL } from '@/lib/big-smoke-copy';
 import { NYWE_PORTAL_TITLE, NYWE_SHORT_LABEL } from '@/lib/nywe-copy';
 
 export const PRODUCT_WHISKYFEST = 'whiskyfest';
 export const PRODUCT_WINE_SPECTATOR = 'wine_spectator';
+export const PRODUCT_BIG_SMOKE = 'big_smoke';
 
-export type ProductKey = typeof PRODUCT_WHISKYFEST | typeof PRODUCT_WINE_SPECTATOR | string;
+export type ProductKey =
+  | typeof PRODUCT_WHISKYFEST
+  | typeof PRODUCT_WINE_SPECTATOR
+  | typeof PRODUCT_BIG_SMOKE
+  | string;
 
 export function productFromPathname(pathname: string, host?: string | null): ProductKey {
   if (isNywePortalPath(pathname, host)) {
     return PRODUCT_WINE_SPECTATOR;
+  }
+  if (isBigSmokePortalPath(pathname, host)) {
+    return PRODUCT_BIG_SMOKE;
   }
   return PRODUCT_WHISKYFEST;
 }
 
 export function isWineSpectatorPath(pathname: string, host?: string | null): boolean {
   return isNywePortalPath(pathname, host);
+}
+
+export function isBigSmokePath(pathname: string, host?: string | null): boolean {
+  return isBigSmokePortalPath(pathname, host);
 }
 
 export function isAccountingPath(pathname: string): boolean {
@@ -30,29 +43,51 @@ export function isNyweAccountingPathname(pathname: string, host?: string | null)
   return false;
 }
 
+export function isBigSmokeAccountingPathname(pathname: string, host?: string | null): boolean {
+  if (pathname === '/accounting/big-smoke' || pathname.startsWith('/accounting/big-smoke/')) return true;
+  if (
+    host &&
+    isBigSmokePortalHost(host) &&
+    (pathname === '/accounting' || pathname.startsWith('/accounting/'))
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export function accountingDashboardHref(productKey: ProductKey): string {
-  return productKey === PRODUCT_WINE_SPECTATOR ? '/accounting/nywe' : '/accounting';
+  if (productKey === PRODUCT_WINE_SPECTATOR) return '/accounting/nywe';
+  if (productKey === PRODUCT_BIG_SMOKE) return '/accounting/big-smoke';
+  return '/accounting';
 }
 
 export function productBasePath(productKey: ProductKey): string {
-  return productKey === PRODUCT_WINE_SPECTATOR ? '/wine-spectator' : '';
+  if (productKey === PRODUCT_WINE_SPECTATOR) return '/wine-spectator';
+  if (productKey === PRODUCT_BIG_SMOKE) return '/big-smoke';
+  return '';
 }
 
 export function productDisplayLabel(productKey: ProductKey): string {
-  return productKey === PRODUCT_WINE_SPECTATOR ? NYWE_SHORT_LABEL : 'WhiskyFest';
+  if (productKey === PRODUCT_WINE_SPECTATOR) return NYWE_SHORT_LABEL;
+  if (productKey === PRODUCT_BIG_SMOKE) return BIG_SMOKE_SHORT_LABEL;
+  return 'WhiskyFest';
 }
 
 /** Sticky header label when no page-specific title is set. */
 export function portalTopbarLabel(pathname: string): string {
   if (isWineSpectatorPath(pathname)) return `${NYWE_SHORT_LABEL} · Contracts`;
+  if (isBigSmokePath(pathname)) return `${BIG_SMOKE_SHORT_LABEL} · Contracts`;
   if (isNyweAccountingPathname(pathname)) return `Accounting · ${NYWE_SHORT_LABEL}`;
+  if (isBigSmokeAccountingPathname(pathname)) return `Accounting · ${BIG_SMOKE_SHORT_LABEL}`;
   if (isAccountingPath(pathname)) return 'Accounting · WhiskyFest';
   return 'WhiskyFest · Contracts';
 }
 
 export function portalDocumentTitle(pathname: string): string {
   if (isWineSpectatorPath(pathname)) return NYWE_PORTAL_TITLE;
-  if (isNyweAccountingPathname(pathname)) return `NYWE Accounting`;
+  if (isBigSmokePath(pathname)) return BIG_SMOKE_PORTAL_TITLE;
+  if (isNyweAccountingPathname(pathname)) return 'NYWE Accounting';
+  if (isBigSmokeAccountingPathname(pathname)) return 'Big Smoke Accounting';
   if (isAccountingPath(pathname)) return 'WhiskyFest Accounting';
   return 'WhiskyFest Contracts';
 }
@@ -110,5 +145,11 @@ export function dashboardHref(productKey: ProductKey): string {
 }
 
 export function productKeyFromEvent(event: Pick<Event, 'product_key'> | null | undefined): ProductKey {
-  return event?.product_key === PRODUCT_WINE_SPECTATOR ? PRODUCT_WINE_SPECTATOR : PRODUCT_WHISKYFEST;
+  if (event?.product_key === PRODUCT_WINE_SPECTATOR) return PRODUCT_WINE_SPECTATOR;
+  if (event?.product_key === PRODUCT_BIG_SMOKE) return PRODUCT_BIG_SMOKE;
+  return PRODUCT_WHISKYFEST;
+}
+
+export function isKnownProductKey(key: string | null | undefined): key is ProductKey {
+  return key === PRODUCT_WHISKYFEST || key === PRODUCT_WINE_SPECTATOR || key === PRODUCT_BIG_SMOKE;
 }

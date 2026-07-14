@@ -1,12 +1,20 @@
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
+import Image from 'next/image';
 import { auth, signIn } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { LoginHero } from '@/components/auth/login-hero';
 import { NyweLogo } from '@/components/brand/nywe-logo';
 import { WhiskyAdvocateLogo } from '@/components/brand/whisky-advocate-logo';
 import { portalKindFromHost, postLoginPath } from '@/lib/portal-host';
+import { canAccessBigSmoke } from '@/lib/big-smoke-access';
 import { canAccessWineSpectator } from '@/lib/wine-spectator-access';
+import {
+  BIG_SMOKE_LOGIN_FOOTER,
+  BIG_SMOKE_LOGIN_HEADLINE,
+  BIG_SMOKE_LOGIN_TAGLINE,
+} from '@/lib/big-smoke-copy';
+import { BIG_SMOKE_EVENT_LOGO } from '@/lib/brand-assets';
 import {
   NYWE_LOGIN_FOOTER,
   NYWE_LOGIN_HEADLINE,
@@ -22,6 +30,7 @@ export default async function LoginPage({
   const host = headers().get('host');
   const portalKind = portalKindFromHost(host);
   const nywePortal = portalKind === 'nywe';
+  const bigSmokePortal = portalKind === 'big_smoke';
 
   const session = await auth();
   if (session?.user) {
@@ -30,6 +39,12 @@ export default async function LoginPage({
         pipeline_access: session.user.pipeline_access,
         is_accounting: session.user.is_accounting,
         wine_spectator_access: canAccessWineSpectator({
+          role: session.user.role,
+          is_events_team: session.user.is_events_team,
+          is_accounting: session.user.is_accounting,
+          email: session.user.email,
+        }),
+        big_smoke_access: canAccessBigSmoke({
           role: session.user.role,
           is_events_team: session.user.is_events_team,
           is_accounting: session.user.is_accounting,
@@ -48,7 +63,11 @@ export default async function LoginPage({
   const redirectTo = postLoginPath(portalKind, {});
 
   return (
-    <div className={nywePortal ? 'min-h-screen bg-stone-950' : 'min-h-screen bg-parchment-50'}>
+    <div
+      className={
+        nywePortal || bigSmokePortal ? 'min-h-screen bg-stone-950' : 'min-h-screen bg-parchment-50'
+      }
+    >
       <div className="grid min-h-screen grid-cols-1 lg:grid-cols-5">
         <div className="relative h-[min(40vh,300px)] min-h-[200px] overflow-hidden lg:col-span-3 lg:h-screen">
           {nywePortal ? (
@@ -64,6 +83,38 @@ export default async function LoginPage({
                 </h1>
                 <p className="mt-4 font-display text-lg italic text-stone-300 sm:text-2xl">
                   {NYWE_LOGIN_TAGLINE}
+                </p>
+              </div>
+            </>
+          ) : bigSmokePortal ? (
+            <>
+              <div className="absolute inset-0 bg-black" />
+              <div
+                className="absolute inset-0 opacity-50"
+                style={{
+                  background:
+                    'radial-gradient(ellipse at 40% 20%, rgba(180,140,60,0.45), transparent 55%), radial-gradient(ellipse at 80% 90%, rgba(60,80,40,0.35), transparent 50%)',
+                }}
+              />
+              <div className="relative flex h-full animate-login-mount flex-col justify-center px-6 py-8 text-stone-50 sm:px-10 lg:px-12">
+                <div className="max-w-md">
+                  <Image
+                    src={BIG_SMOKE_EVENT_LOGO.src}
+                    alt={BIG_SMOKE_EVENT_LOGO.alt}
+                    width={BIG_SMOKE_EVENT_LOGO.width}
+                    height={BIG_SMOKE_EVENT_LOGO.height}
+                    className="h-auto w-full max-w-sm"
+                    priority
+                  />
+                </div>
+                <p className="mt-8 font-sans text-xs uppercase tracking-[0.25em] text-amber-400">
+                  Cigar Aficionado
+                </p>
+                <h1 className="mt-3 font-display text-5xl font-medium tracking-tight text-stone-50 sm:text-6xl">
+                  {BIG_SMOKE_LOGIN_HEADLINE}
+                </h1>
+                <p className="mt-4 font-display text-lg italic text-stone-300 sm:text-2xl">
+                  {BIG_SMOKE_LOGIN_TAGLINE}
                 </p>
               </div>
             </>
@@ -89,7 +140,7 @@ export default async function LoginPage({
 
         <div
           className={
-            nywePortal
+            nywePortal || bigSmokePortal
               ? 'flex items-center justify-center bg-stone-50 px-6 py-10 sm:px-10 lg:col-span-2 lg:p-12'
               : 'flex items-center justify-center bg-parchment-50 px-6 py-10 sm:px-10 lg:col-span-2 lg:p-12'
           }
@@ -101,13 +152,7 @@ export default async function LoginPage({
             </h2>
             <p className="mt-4 text-sm text-ink-700">Use your @mshanken.com Google account</p>
 
-            <div
-              className={
-                nywePortal
-                  ? 'mt-8 rounded-xl border border-stone-200/90 bg-white/90 p-7 shadow-[0_18px_40px_-24px_rgba(28,25,23,0.45)] backdrop-blur-sm'
-                  : 'mt-8 rounded-xl border border-parchment-200/90 bg-parchment-50/90 p-7 shadow-[0_18px_40px_-24px_rgba(42,31,15,0.55)] backdrop-blur-sm'
-              }
-            >
+            <div className="mt-8 rounded-xl border border-stone-200/90 bg-white/90 p-7 shadow-[0_18px_40px_-24px_rgba(28,25,23,0.45)] backdrop-blur-sm">
               {err ? <p className="mb-4 text-sm text-danger-base">{err}</p> : null}
               <form
                 action={async () => {
@@ -118,11 +163,7 @@ export default async function LoginPage({
                 <Button
                   type="submit"
                   size="lg"
-                  className={
-                    nywePortal
-                      ? 'h-12 w-full border border-oak-700/90 bg-oak-800 font-sans text-base font-medium tracking-tight text-parchment-50 shadow-sm transition hover:bg-oak-900 hover:text-parchment-50'
-                      : 'h-12 w-full border border-oak-700/90 bg-oak-800 font-sans text-base font-medium tracking-tight text-parchment-50 shadow-sm transition hover:bg-oak-900 hover:text-parchment-50'
-                  }
+                  className="h-12 w-full border border-oak-700/90 bg-oak-800 font-sans text-base font-medium tracking-tight text-parchment-50 shadow-sm transition hover:bg-oak-900 hover:text-parchment-50"
                 >
                   <GoogleIcon /> Continue with Google
                 </Button>
@@ -135,7 +176,11 @@ export default async function LoginPage({
             </div>
 
             <p className="mt-10 text-xs font-medium uppercase tracking-[0.14em] text-ink-500">
-              {nywePortal ? NYWE_LOGIN_FOOTER : 'WhiskyFest 2026 · Marriott Marquis · New York'}
+              {nywePortal
+                ? NYWE_LOGIN_FOOTER
+                : bigSmokePortal
+                  ? BIG_SMOKE_LOGIN_FOOTER
+                  : 'WhiskyFest 2026 · Marriott Marquis · New York'}
             </p>
           </div>
         </div>

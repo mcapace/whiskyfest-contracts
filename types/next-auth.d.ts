@@ -14,6 +14,10 @@ declare module 'next-auth' {
       wine_spectator_access?: boolean;
       /** Admin within Wine Spectator / NYWE (events settings + contract admin actions). */
       is_wine_spectator_admin?: boolean;
+      /** True when user may open the Big Smoke portal (admin, events team, Big Smoke admin, AR). */
+      big_smoke_access?: boolean;
+      /** Admin within Big Smoke (events settings + contract admin actions). */
+      is_big_smoke_admin?: boolean;
       /** Real login user — true only for users allowed to use "View as…". */
       can_impersonate?: boolean;
       /** Persisted UI theme; null/undefined = system. */
@@ -44,6 +48,8 @@ declare module 'next-auth/jwt' {
     pipeline_access?: boolean;
     wine_spectator_access?: boolean;
     is_wine_spectator_admin?: boolean;
+    big_smoke_access?: boolean;
+    is_big_smoke_admin?: boolean;
     real_can_impersonate?: boolean;
     impersonation_target_email?: string | null;
     impersonation_target_name?: string | null;

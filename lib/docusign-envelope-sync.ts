@@ -9,6 +9,8 @@ import {
 } from '@/lib/docusign';
 import { buildExhibitorCaptureDbPatch, textTabsToLabelMap } from '@/lib/docusign-exhibitor-capture';
 import { uploadPdfBufferToFolder } from '@/lib/google';
+import { signedFolderIdForEvent } from '@/lib/google-drive-folders';
+import { contractPdfBaseName } from '@/lib/contract-document-naming';
 import { contractSignedPdfPath, uploadContractPdfToStorage } from '@/lib/contract-pdf-storage';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { appendContractRow, updateContractRow } from '@/lib/sheets-tracker';
@@ -181,10 +183,10 @@ export async function applyEnvelopeFullySigned(
   }
 
   const pdfBytes = await downloadCompletedPdf(envelopeId);
-  const signedFolderId = process.env.GOOGLE_SIGNED_FOLDER_ID!;
-  const safeName = contract.exhibitor_company_name.replace(/[^\w\s-]/g, '');
-  const year = event?.year ?? new Date().getFullYear();
-  const fileBase = `${safeName} — WhiskyFest ${year} Contract (SIGNED)`;
+  const signedFolderId = signedFolderIdForEvent(event);
+  const fileBase = event
+    ? `${contractPdfBaseName(contract.exhibitor_company_name, event)} (SIGNED)`
+    : `${contract.exhibitor_company_name.replace(/[^\w\s-]/g, '')} — Contract (SIGNED)`;
 
   const { fileId, webViewLink } = await uploadPdfBufferToFolder(pdfBytes, fileBase, signedFolderId);
 

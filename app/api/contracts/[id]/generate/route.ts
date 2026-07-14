@@ -11,6 +11,7 @@ import { eventUsesContractOrderTable } from '@/lib/contract-template-profile';
 import { nyweLicenseAddressError } from '@/lib/nywe-billing';
 import { refreshNyweBillingFromRosterForContract } from '@/lib/nywe-roster-billing-sync';
 import { resolveContractTemplateDocId } from '@/lib/contract-template';
+import { draftsFolderIdForEvent } from '@/lib/google-drive-folders';
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
 import { buildContractMergeMap } from '@/lib/merge-map';
@@ -57,7 +58,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const mergeMap = buildContractMergeMap(contract, event, 'draft', boothBrands);
 
   const templateDocId = resolveContractTemplateDocId(contract, event);
-  const draftsFolderId = process.env.GOOGLE_DRAFTS_FOLDER_ID!;
+  const draftsFolderId = draftsFolderIdForEvent(event);
   const fileName = contractPdfBaseName(contract.exhibitor_company_name, event);
   const usesOrderTable = eventUsesContractOrderTable(event);
 

@@ -5,8 +5,9 @@ import { headers } from 'next/headers';
 import { auth } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { EventsAdmin } from '@/components/events/events-admin';
+import { isBigSmokeAdmin } from '@/lib/big-smoke-access';
 import { isWineSpectatorAdmin } from '@/lib/wine-spectator-access';
-import { PRODUCT_WHISKYFEST, PRODUCT_WINE_SPECTATOR } from '@/lib/product-portal';
+import { PRODUCT_BIG_SMOKE, PRODUCT_WHISKYFEST, PRODUCT_WINE_SPECTATOR } from '@/lib/product-portal';
 import { portalKindFromHost } from '@/lib/portal-host';
 import type { Event } from '@/types/db';
 
@@ -18,12 +19,23 @@ export default async function EventsPage() {
 
   const portalKind = portalKindFromHost(headers().get('host'));
   const nywePortal = portalKind === 'nywe';
-  const productKey = nywePortal ? PRODUCT_WINE_SPECTATOR : PRODUCT_WHISKYFEST;
+  const bigSmokePortal = portalKind === 'big_smoke';
+  const productKey = nywePortal
+    ? PRODUCT_WINE_SPECTATOR
+    : bigSmokePortal
+      ? PRODUCT_BIG_SMOKE
+      : PRODUCT_WHISKYFEST;
 
   const fullAdmin = session.user.role === 'admin';
   const wineAdmin = isWineSpectatorAdmin(session.user);
+  const bigSmokeAdmin = isBigSmokeAdmin(session.user);
+  const eventsTeam = Boolean(session.user.is_events_team);
+
   if (nywePortal) {
     if (!fullAdmin && !wineAdmin) redirect('/');
+  } else if (bigSmokePortal) {
+    // Admins, Big Smoke admins, and events team can manage / add Big Smoke events.
+    if (!fullAdmin && !bigSmokeAdmin && !eventsTeam) redirect('/');
   } else if (!fullAdmin) {
     redirect('/');
   }
@@ -32,7 +44,7 @@ export default async function EventsPage() {
   const { data: events } = await supabase.from('events').select('*').order('event_date', { ascending: true });
   const scopedEvents = ((events ?? []) as Event[]).filter((e) => e.product_key === productKey);
 
-  const backHref = nywePortal ? '/' : '/';
+  const backHref = '/';
 
   return (
     <div className="space-y-8">
@@ -44,11 +56,17 @@ export default async function EventsPage() {
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
           {nywePortal
             ? 'Manage New York Wine Experience event settings, pricing, and Shanken signatory lines.'
-            : 'Manage WhiskyFest events, booth pricing, and Shanken signatory lines used in generated contracts.'}
+            : bigSmokePortal
+              ? 'Manage Big Smoke events (Las Vegas and future city editions), package pricing, templates, and signatory lines.'
+              : 'Manage WhiskyFest events, booth pricing, and Shanken signatory lines used in generated contracts.'}
         </p>
       </div>
 
-      <EventsAdmin initialEvents={scopedEvents} wineSpectatorOnly={nywePortal} />
+      <EventsAdmin
+        initialEvents={scopedEvents}
+        wineSpectatorOnly={nywePortal}
+        bigSmokePortal={bigSmokePortal}
+      />
     </div>
   );
 }

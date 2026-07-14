@@ -176,7 +176,9 @@ export async function resolveNotificationRecipients(
   });
 
   if (kind === 'discount_request') {
-    const admins = await getAdminEmails();
+    // Exclude ops who opted out of discount mail (NOTIFICATION_EXCLUDED_EMAILS).
+    // Do not use countersignerExcluded() — that would drop Susannah from WhiskyFest discount alerts.
+    const admins = exclude(await getAdminEmails(), new Set(parseEmailList(process.env['NOTIFICATION_EXCLUDED_EMAILS'])));
     return admins.length ? { skip: false, to: admins, cc: [], bcc: [] } : empty('No admin recipients');
   }
 

@@ -20,9 +20,34 @@ interface Props {
   initialEvents: Event[];
   /** Wine Spectator admins may edit NYWE events only — no create. */
   wineSpectatorOnly?: boolean;
+  /** Big Smoke portal — create/edit Big Smoke events (defaults product + template). */
+  bigSmokePortal?: boolean;
 }
 
-function emptyForm(wineSpectatorOnly = false) {
+type TemplateProfile = 'whiskyfest' | 'nywe_vendor' | 'big_smoke';
+
+function emptyForm(opts: { wineSpectatorOnly?: boolean; bigSmokePortal?: boolean } = {}) {
+  if (opts.bigSmokePortal) {
+    return {
+      name: '',
+      tagline: '',
+      location: '',
+      event_date: '',
+      venue: '',
+      year: new Date().getFullYear(),
+      booth_rate_dollars: 0,
+      shanken_signatory_name: 'Nicole Mazza',
+      shanken_signatory_title: 'Vice President, Events',
+      shanken_signatory_email: 'nmazza@mshanken.com',
+      is_active: true,
+      product_key: 'big_smoke',
+      contract_template_profile: 'big_smoke' as TemplateProfile,
+      workflow_profile: 'events_managed' as 'sales_rep' | 'events_managed',
+      google_template_doc_id: '',
+      contract_document_label: 'Contract',
+      docusign_email_subject_template: '',
+    };
+  }
   return {
     name: '',
     tagline: '',
@@ -30,13 +55,13 @@ function emptyForm(wineSpectatorOnly = false) {
     event_date: '',
     venue: '',
     year: new Date().getFullYear(),
-    booth_rate_dollars: wineSpectatorOnly ? 14000 : 15000,
+    booth_rate_dollars: opts.wineSpectatorOnly ? 14000 : 15000,
     shanken_signatory_name: 'Nicole Mazza',
     shanken_signatory_title: 'Vice President, Events',
     shanken_signatory_email: 'nmazza@mshanken.com',
     is_active: true,
     product_key: 'whiskyfest',
-    contract_template_profile: 'whiskyfest' as 'whiskyfest' | 'nywe_vendor',
+    contract_template_profile: 'whiskyfest' as TemplateProfile,
     workflow_profile: 'sales_rep' as 'sales_rep' | 'events_managed',
     google_template_doc_id: '',
     contract_document_label: 'Contract',
@@ -44,14 +69,25 @@ function emptyForm(wineSpectatorOnly = false) {
   };
 }
 
-export function EventsAdmin({ initialEvents, wineSpectatorOnly = false }: Props) {
+function resolveTemplateProfile(ev: Event): TemplateProfile {
+  if (ev.contract_template_profile === 'nywe_vendor') return 'nywe_vendor';
+  if (ev.contract_template_profile === 'big_smoke') return 'big_smoke';
+  return 'whiskyfest';
+}
+
+export function EventsAdmin({
+  initialEvents,
+  wineSpectatorOnly = false,
+  bigSmokePortal = false,
+}: Props) {
   const router = useRouter();
   const readOnly = useImpersonationReadOnly();
   const [pending, startTransition] = useTransition();
   const busy = pending || readOnly;
   const [err, setErr] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(emptyForm(wineSpectatorOnly));
+  const [form, setForm] = useState(emptyForm({ wineSpectatorOnly, bigSmokePortal }));
+  const hideCreate = wineSpectatorOnly && !bigSmokePortal;
 
   function loadEvent(ev: Event) {
     setEditingId(ev.id);
@@ -69,7 +105,7 @@ export function EventsAdmin({ initialEvents, wineSpectatorOnly = false }: Props)
       shanken_signatory_email: ev.shanken_signatory_email,
       is_active: ev.is_active,
       product_key: ev.product_key ?? 'whiskyfest',
-      contract_template_profile: (ev.contract_template_profile === 'nywe_vendor' ? 'nywe_vendor' : 'whiskyfest'),
+      contract_template_profile: resolveTemplateProfile(ev),
       workflow_profile: (ev.workflow_profile === 'events_managed' ? 'events_managed' : 'sales_rep'),
       google_template_doc_id: ev.google_template_doc_id ?? '',
       contract_document_label: ev.contract_document_label ?? 'Contract',
@@ -80,7 +116,7 @@ export function EventsAdmin({ initialEvents, wineSpectatorOnly = false }: Props)
   function newEvent() {
     setEditingId(null);
     setErr(null);
-    setForm(emptyForm(wineSpectatorOnly));
+    setForm(emptyForm({ wineSpectatorOnly, bigSmokePortal }));
   }
 
   function set<K extends keyof ReturnType<typeof emptyForm>>(k: K, v: ReturnType<typeof emptyForm>[K]) {
@@ -149,17 +185,19 @@ export function EventsAdmin({ initialEvents, wineSpectatorOnly = false }: Props)
     <div className="grid gap-8 lg:grid-cols-5">
       <Card className="lg:col-span-2">
         <CardHeader>
-          <CardTitle>{editingId ? 'Edit event' : wineSpectatorOnly ? 'Event settings' : 'Add event'}</CardTitle>
+          <CardTitle>{editingId ? 'Edit event' : hideCreate ? 'Event settings' : 'Add event'}</CardTitle>
           <CardDescription>
             {editingId
               ? 'Update details below, then save.'
-              : wineSpectatorOnly
+              : hideCreate
                 ? 'Select a New York Wine Experience event from the list to edit.'
-                : 'Create a new WhiskyFest event for the intake form.'}
+                : bigSmokePortal
+                  ? 'Create a new Big Smoke event (city edition) for contracts and DocuSign.'
+                  : 'Create a new WhiskyFest event for the intake form.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {wineSpectatorOnly && !editingId ? (
+          {hideCreate && !editingId ? (
             <p className="text-sm text-muted-foreground">Choose an event on the right to update NYWE settings.</p>
           ) : (
           <form onSubmit={save} className="space-y-4">
@@ -187,8 +225,13 @@ export function EventsAdmin({ initialEvents, wineSpectatorOnly = false }: Props)
             <Field label="Venue">
               <Input value={form.venue} onChange={e => set('venue', e.target.value)} />
             </Field>
-            <Field label={form.contract_template_profile === 'nywe_vendor' ? 'License fee (USD)' : 'Booth rate (USD per booth)'}>
-              <Input
+            <Field
+              label={
+                form.contract_template_profile === 'nywe_vendor' || form.contract_template_profile === 'big_smoke'
+                  ? 'Package / license fee (USD)'
+                  : 'Booth rate (USD per booth)'
+              }
+            >              <Input
                 type="number"
                 min={0}
                 step={1}
@@ -213,10 +256,11 @@ export function EventsAdmin({ initialEvents, wineSpectatorOnly = false }: Props)
                 <select
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={form.contract_template_profile}
-                  onChange={e => set('contract_template_profile', e.target.value as 'whiskyfest' | 'nywe_vendor')}
+                  onChange={e => set('contract_template_profile', e.target.value as TemplateProfile)}
                 >
                   <option value="whiskyfest">WhiskyFest contract</option>
                   <option value="nywe_vendor">NYWE exhibitor contract</option>
+                  <option value="big_smoke">Big Smoke contract</option>
                 </select>
               </Field>
               <Field label="Workflow">
@@ -304,7 +348,7 @@ export function EventsAdmin({ initialEvents, wineSpectatorOnly = false }: Props)
             <CardTitle>Events</CardTitle>
             <CardDescription>{initialEvents.length} configured</CardDescription>
           </div>
-          {!wineSpectatorOnly ? (
+          {!hideCreate ? (
             <Button variant="outline" size="sm" onClick={newEvent}>
               <Plus className="h-4 w-4" /> New
             </Button>
@@ -326,8 +370,9 @@ export function EventsAdmin({ initialEvents, wineSpectatorOnly = false }: Props)
                     </div>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {formatLongDate(ev.event_date)} · {ev.location ?? '—'} ·{' '}
-                      {ev.contract_template_profile === 'nywe_vendor'
-                        ? `${formatCurrency(ev.booth_rate_cents)} license`
+                      {ev.contract_template_profile === 'nywe_vendor' ||
+                      ev.contract_template_profile === 'big_smoke'
+                        ? `${formatCurrency(ev.booth_rate_cents)} package`
                         : `${formatCurrency(ev.booth_rate_cents)} / booth`}
                       {ev.product_key ? ` · ${ev.product_key}` : ''}
                     </p>

@@ -145,9 +145,16 @@ export async function notifyAdminsOfDiscountRequest(
     .eq('role', 'admin')
     .eq('is_active', true);
 
+  const excluded = new Set(
+    (process.env['NOTIFICATION_EXCLUDED_EMAILS'] ?? '')
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+  );
+
   const recipients = (admins ?? [])
     .map((a) => (a as { email: string }).email?.trim().toLowerCase())
-    .filter(Boolean) as string[];
+    .filter((email): email is string => Boolean(email) && !excluded.has(email));
 
   if (recipients.length === 0) {
     console.warn('[notifyAdminsOfDiscountRequest] No active admin emails — skipping');

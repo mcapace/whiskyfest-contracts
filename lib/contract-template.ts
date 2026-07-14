@@ -1,3 +1,5 @@
+import { BIG_SMOKE_TEMPLATE_DOC_ID } from '@/lib/big-smoke-template';
+import { eventTemplateProfile } from '@/lib/contract-template-profile';
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import type { Event } from '@/types/db';
 
@@ -29,6 +31,11 @@ export function resolveContractTemplateDocId(
   const eventBoothId = event?.google_template_doc_id?.trim();
   if (eventBoothId) return eventBoothId;
 
+  if (event && eventTemplateProfile(event) === 'big_smoke') {
+    const fromEnv = process.env['BIG_SMOKE_TEMPLATE_DOC_ID']?.trim();
+    return fromEnv || BIG_SMOKE_TEMPLATE_DOC_ID;
+  }
+
   const boothId = process.env.GOOGLE_TEMPLATE_DOC_ID?.trim();
   if (!boothId) {
     throw new Error('GOOGLE_TEMPLATE_DOC_ID is not set');
@@ -41,6 +48,7 @@ export function configuredContractTemplateDocIds(extraDocIds: string[] = []): st
   const ids = [
     process.env.GOOGLE_TEMPLATE_DOC_ID?.trim(),
     process.env.GOOGLE_SPONSORSHIP_TEMPLATE_DOC_ID?.trim(),
+    process.env['BIG_SMOKE_TEMPLATE_DOC_ID']?.trim() || BIG_SMOKE_TEMPLATE_DOC_ID,
     ...extraDocIds,
   ].filter((id): id is string => Boolean(id));
   return [...new Set(ids)];

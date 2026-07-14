@@ -23,13 +23,28 @@ import { ExportBilledButton } from '@/components/accounting/export-billed-button
 
 function portalChrome(productKey: AccountingPortalKey) {
   const isNywe = productKey === 'wine_spectator';
+  const isBigSmoke = productKey === 'big_smoke';
   return {
-    cardBorder: isNywe ? 'border-rose-600/15' : 'border-fest-600/15',
-    cardHeaderBorder: isNywe ? 'border-rose-600/10' : 'border-fest-600/10',
+    cardBorder: isNywe
+      ? 'border-rose-600/15'
+      : isBigSmoke
+        ? 'border-amber-700/20'
+        : 'border-fest-600/15',
+    cardHeaderBorder: isNywe
+      ? 'border-rose-600/10'
+      : isBigSmoke
+        ? 'border-amber-700/15'
+        : 'border-fest-600/10',
     activePill: isNywe
       ? 'border-rose-700 bg-rose-50 text-rose-950 ring-1 ring-rose-600/30'
-      : 'border-fest-700 bg-fest-50 text-fest-950 ring-1 ring-fest-600/30',
-    activeRing: isNywe ? 'ring-2 ring-rose-600/35' : 'ring-2 ring-fest-600/35',
+      : isBigSmoke
+        ? 'border-amber-800 bg-amber-50 text-amber-950 ring-1 ring-amber-700/30'
+        : 'border-fest-700 bg-fest-50 text-fest-950 ring-1 ring-fest-600/30',
+    activeRing: isNywe
+      ? 'ring-2 ring-rose-600/35'
+      : isBigSmoke
+        ? 'ring-2 ring-amber-700/35'
+        : 'ring-2 ring-fest-600/35',
   };
 }
 

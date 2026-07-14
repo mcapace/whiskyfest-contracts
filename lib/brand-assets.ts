@@ -39,6 +39,13 @@ export const WHISKY_ADVOCATE_LOGO = {
   },
 } as const;
 
+export const BIG_SMOKE_EVENT_LOGO = {
+  src: '/images/big-smoke-logo.png',
+  width: 1200,
+  height: 675,
+  alt: "Cigar Aficionado's Big Smoke Las Vegas 30th Anniversary",
+} as const;
+
 export function brandLogoAsset(
   brand: 'wineSpectator' | 'whiskyAdvocate',
   variant: BrandLogoVariant = 'default',

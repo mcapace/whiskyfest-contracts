@@ -15,6 +15,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { PortalProvider } from '@/components/portal/portal-context';
 import { portalKindFromHost } from '@/lib/portal-host';
 import { headers } from 'next/headers';
+import { canAccessBigSmoke } from '@/lib/big-smoke-access';
 import { canAccessWineSpectator } from '@/lib/wine-spectator-access';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -29,6 +30,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const accountingOnly = isAccounting && !pipelineAccess;
   const showAccountingNav = isAccounting || session.user.role === 'admin';
   const wineSpectatorAccess = canAccessWineSpectator({
+    role: session.user.role,
+    is_events_team: session.user.is_events_team,
+    is_accounting: session.user.is_accounting,
+    email: session.user.email,
+  });
+  const bigSmokeAccess = canAccessBigSmoke({
     role: session.user.role,
     is_events_team: session.user.is_events_team,
     is_accounting: session.user.is_accounting,
@@ -64,6 +71,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
               isEventsTeam: Boolean(session.user.is_events_team),
               wineSpectatorAccess,
               wineSpectatorAdmin: Boolean(session.user.is_wine_spectator_admin),
+              bigSmokeAccess,
+              bigSmokeAdmin: Boolean(session.user.is_big_smoke_admin),
             }}
             canImpersonate={Boolean(session.user.can_impersonate)}
             readOnlyImpersonation={readOnly}

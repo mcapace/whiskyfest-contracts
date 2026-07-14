@@ -3,6 +3,14 @@ import { NextResponse } from 'next/server';
 import type { Session } from 'next-auth';
 import { IMPERSONATION_READ_ONLY_MESSAGE } from '@/lib/impersonation-read-only';
 import {
+  bigSmokeCrossDomainPath,
+  bigSmokeInternalPath,
+  bigSmokePortalOrigin,
+  bigSmokePublicPath,
+  isBigSmokeAccountingOnlyUser,
+  isBigSmokeExclusiveUser,
+  isBigSmokePortalHost,
+  isBigSmokePortalPath,
   isNyweAccountingOnlyUser,
   isNyweExclusiveUser,
   isNywePortalHost,
@@ -19,6 +27,7 @@ import {
   requestUrl,
   whiskyfestPortalOrigin,
 } from '@/lib/portal-host';
+import { canAccessBigSmoke } from '@/lib/big-smoke-access';
 import { canAccessWineSpectator } from '@/lib/wine-spectator-access';
 import { portalFaviconPath } from '@/lib/portal-metadata';
 import { isPublicExhibitorPath } from '@/lib/public-routes';
@@ -28,6 +37,7 @@ type SessionUserFlags = {
   is_accounting?: boolean;
   is_events_team?: boolean;
   wine_spectator_access?: boolean;
+  big_smoke_access?: boolean;
   role?: string;
   email?: string;
 };
@@ -48,6 +58,7 @@ export default auth((req) => {
   }
 
   const nyweHost = isNywePortalHost(host);
+  const bigSmokeHost = isBigSmokePortalHost(host);
 
   const isPublic =
     pathname.startsWith('/auth') ||
@@ -81,17 +92,51 @@ export default auth((req) => {
         response = NextResponse.rewrite(url);
       } else if (isWhiskyfestOnlyPath(pathname) && !pathname.startsWith('/api/')) {
         response = NextResponse.redirect(new URL('/', req.url));
+      } else if (isBigSmokePortalPath(pathname) && !pathname.startsWith('/api/')) {
+        response = NextResponse.redirect(new URL('/', req.url));
       }
     }
-  } else if (
-    !pathname.startsWith('/api/') &&
-    (pathname === '/wine-spectator' ||
+  } else if (bigSmokeHost) {
+    if (pathname.startsWith('/big-smoke')) {
+      const clean = bigSmokePublicPath(pathname);
+      if (clean !== pathname) {
+        response = NextResponse.redirect(new URL(clean, req.url));
+      }
+    } else if (pathname.startsWith('/accounting/big-smoke')) {
+      const clean = bigSmokePublicPath(pathname);
+      if (clean !== pathname) {
+        response = NextResponse.redirect(new URL(clean, req.url));
+      }
+    } else {
+      const internal = bigSmokeInternalPath(pathname);
+      if (internal && internal !== pathname) {
+        const url = req.nextUrl.clone();
+        url.pathname = internal;
+        response = NextResponse.rewrite(url);
+      } else if (isWhiskyfestOnlyPath(pathname) && !pathname.startsWith('/api/') && pathname !== '/events' && !pathname.startsWith('/events/')) {
+        response = NextResponse.redirect(new URL('/', req.url));
+      } else if (isNywePortalPath(pathname) && !pathname.startsWith('/api/')) {
+        response = NextResponse.redirect(new URL('/', req.url));
+      }
+    }
+  } else if (!pathname.startsWith('/api/')) {
+    if (
+      pathname === '/wine-spectator' ||
       pathname.startsWith('/wine-spectator/') ||
       pathname === '/accounting/nywe' ||
-      pathname.startsWith('/accounting/nywe/'))
-  ) {
-    const target = `${nywePortalOrigin()}${nyweCrossDomainPath(pathname)}`;
-    response = NextResponse.redirect(target);
+      pathname.startsWith('/accounting/nywe/')
+    ) {
+      const target = `${nywePortalOrigin()}${nyweCrossDomainPath(pathname)}`;
+      response = NextResponse.redirect(target);
+    } else if (
+      pathname === '/big-smoke' ||
+      pathname.startsWith('/big-smoke/') ||
+      pathname === '/accounting/big-smoke' ||
+      pathname.startsWith('/accounting/big-smoke/')
+    ) {
+      const target = `${bigSmokePortalOrigin()}${bigSmokeCrossDomainPath(pathname)}`;
+      response = NextResponse.redirect(target);
+    }
   }
 
   if (response) {
@@ -123,19 +168,22 @@ export default auth((req) => {
     const canOpenAccounting = accounting || admin;
 
     if (accountingOnly) {
-      const accountingPath = nyweHost
-        ? pathname === '/accounting' || pathname.startsWith('/accounting/')
-        : pathname.startsWith('/accounting');
+      const accountingPath =
+        nyweHost || bigSmokeHost
+          ? pathname === '/accounting' || pathname.startsWith('/accounting/')
+          : pathname.startsWith('/accounting');
       const allowed = accountingPath || pathname.startsWith('/api/accounting') || isPublic;
       if (!allowed) {
-        const dest = nyweHost ? '/accounting' : '/accounting';
-        return applyPortalHeader(NextResponse.redirect(requestUrl(req, dest)), host);
+        return applyPortalHeader(NextResponse.redirect(requestUrl(req, '/accounting')), host);
       }
     }
 
     const whiskyfestAccountingPath =
-      pathname === '/accounting' || (pathname.startsWith('/accounting/') && !pathname.startsWith('/accounting/nywe'));
-    if (whiskyfestAccountingPath && !canOpenAccounting && !nyweHost) {
+      pathname === '/accounting' ||
+      (pathname.startsWith('/accounting/') &&
+        !pathname.startsWith('/accounting/nywe') &&
+        !pathname.startsWith('/accounting/big-smoke'));
+    if (whiskyfestAccountingPath && !canOpenAccounting && !nyweHost && !bigSmokeHost) {
       return applyPortalHeader(NextResponse.redirect(requestUrl(req, '/')), host);
     }
 
@@ -144,8 +192,15 @@ export default auth((req) => {
       pathname.startsWith('/accounting/nywe/') ||
       (nyweHost && (pathname === '/accounting' || pathname.startsWith('/accounting/')));
     if (nyweAccountingPath && !canOpenAccounting) {
-      const dest = nyweHost ? '/' : '/';
-      return applyPortalHeader(NextResponse.redirect(requestUrl(req, dest)), host);
+      return applyPortalHeader(NextResponse.redirect(requestUrl(req, '/')), host);
+    }
+
+    const bigSmokeAccountingPath =
+      pathname === '/accounting/big-smoke' ||
+      pathname.startsWith('/accounting/big-smoke/') ||
+      (bigSmokeHost && (pathname === '/accounting' || pathname.startsWith('/accounting/')));
+    if (bigSmokeAccountingPath && !canOpenAccounting) {
+      return applyPortalHeader(NextResponse.redirect(requestUrl(req, '/')), host);
     }
 
     const wineSpectatorPath =
@@ -159,14 +214,41 @@ export default auth((req) => {
         email: u.email,
       })
     ) {
-      const dest = accountingOnly ? (nyweHost ? '/accounting' : '/accounting') : nyweHost ? '/' : '/';
-      return applyPortalHeader(NextResponse.redirect(requestUrl(req, dest)), host);
+      return applyPortalHeader(NextResponse.redirect(requestUrl(req, accountingOnly ? '/accounting' : '/')), host);
+    }
+
+    const bigSmokePath = isBigSmokePortalPath(pathname, host);
+    if (
+      bigSmokePath &&
+      !canAccessBigSmoke({
+        role: u.role,
+        is_events_team: u.is_events_team,
+        is_accounting: u.is_accounting,
+        email: u.email,
+      })
+    ) {
+      return applyPortalHeader(NextResponse.redirect(requestUrl(req, accountingOnly ? '/accounting' : '/')), host);
     }
 
     if (
       nyweHost &&
       !admin &&
       !canAccessWineSpectator({
+        role: u.role,
+        is_events_team: u.is_events_team,
+        is_accounting: u.is_accounting,
+        email: u.email,
+      })
+    ) {
+      if (!accountingOnly) {
+        return applyPortalHeader(NextResponse.redirect(requestUrl(req, '/auth/login')), host);
+      }
+    }
+
+    if (
+      bigSmokeHost &&
+      !admin &&
+      !canAccessBigSmoke({
         role: u.role,
         is_events_team: u.is_events_team,
         is_accounting: u.is_accounting,
@@ -187,6 +269,12 @@ export default auth((req) => {
         is_accounting: u.is_accounting,
         email: u.email,
       }),
+      big_smoke_access: canAccessBigSmoke({
+        role: u.role,
+        is_events_team: u.is_events_team,
+        is_accounting: u.is_accounting,
+        email: u.email,
+      }),
       role: u.role,
     };
 
@@ -197,7 +285,11 @@ export default auth((req) => {
       !isPublicExhibitorPath(pathname);
 
     if (crossPortalPath && !isFullPortalAdmin(portalUser)) {
-      if (!nyweHost && (isNyweExclusiveUser(portalUser) || isNyweAccountingOnlyUser(portalUser))) {
+      if (
+        !nyweHost &&
+        !bigSmokeHost &&
+        (isNyweExclusiveUser(portalUser) || isNyweAccountingOnlyUser(portalUser))
+      ) {
         let targetPath = '/';
         if (pathname.startsWith('/accounting')) {
           targetPath = '/accounting';
@@ -207,9 +299,37 @@ export default auth((req) => {
         return applyPortalHeader(NextResponse.redirect(`${nywePortalOrigin()}${targetPath}`), host);
       }
 
+      if (
+        !nyweHost &&
+        !bigSmokeHost &&
+        (isBigSmokeExclusiveUser(portalUser) || isBigSmokeAccountingOnlyUser(portalUser))
+      ) {
+        let targetPath = '/';
+        if (pathname.startsWith('/accounting')) {
+          targetPath = '/accounting';
+        } else if (!isWhiskyfestOnlyPath(pathname) && pathname !== '/') {
+          targetPath = bigSmokeCrossDomainPath(pathname);
+        }
+        return applyPortalHeader(NextResponse.redirect(`${bigSmokePortalOrigin()}${targetPath}`), host);
+      }
+
       if (nyweHost && (isWhiskyfestExclusiveUser(portalUser) || isWhiskyfestAccountingOnlyUser(portalUser))) {
-        const dest = `${whiskyfestPortalOrigin()}/`;
-        return applyPortalHeader(NextResponse.redirect(dest), host);
+        return applyPortalHeader(NextResponse.redirect(`${whiskyfestPortalOrigin()}/`), host);
+      }
+
+      if (nyweHost && (isBigSmokeExclusiveUser(portalUser) || isBigSmokeAccountingOnlyUser(portalUser))) {
+        return applyPortalHeader(NextResponse.redirect(`${bigSmokePortalOrigin()}/`), host);
+      }
+
+      if (
+        bigSmokeHost &&
+        (isWhiskyfestExclusiveUser(portalUser) || isWhiskyfestAccountingOnlyUser(portalUser))
+      ) {
+        return applyPortalHeader(NextResponse.redirect(`${whiskyfestPortalOrigin()}/`), host);
+      }
+
+      if (bigSmokeHost && (isNyweExclusiveUser(portalUser) || isNyweAccountingOnlyUser(portalUser))) {
+        return applyPortalHeader(NextResponse.redirect(`${nywePortalOrigin()}/`), host);
       }
     }
   }

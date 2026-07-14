@@ -5,7 +5,8 @@ import { getAccessibleSalesRepIds } from '@/lib/rep-access';
 import { loadImpersonationTargetDisplay } from '@/lib/effective-user';
 import { logImpersonationEnded, logImpersonationStarted } from '@/lib/impersonation-audit';
 import { ensureAccessRequestForUnknownUser } from '@/lib/access-requests';
-import { nywePortalOrigin, whiskyfestPortalOrigin } from '@/lib/portal-host';
+import { bigSmokePortalOrigin, nywePortalOrigin, whiskyfestPortalOrigin } from '@/lib/portal-host';
+import { canAccessBigSmoke, isBigSmokeAdmin } from '@/lib/big-smoke-access';
 import { canAccessWineSpectator, isWineSpectatorAdmin } from '@/lib/wine-spectator-access';
 import type { UserRole } from '@/types/db';
 
@@ -14,9 +15,9 @@ const IMPERSONATION_TTL_MS = 30 * 60 * 1000;
 const LAST_SEEN_THROTTLE_MS = 5 * 60 * 1000;
 
 /**
- * One Vercel deployment serves both hostnames. A static AUTH_URL / NEXTAUTH_URL (WhiskyFest)
- * breaks Google OAuth on nywecontracts.winespectator.com — Auth.js must use trustHost per request.
- * Email/deep links use WHISKYFEST_PORTAL_ORIGIN / NYWE_PORTAL_ORIGIN instead.
+ * One Vercel deployment serves multiple hostnames. A static AUTH_URL / NEXTAUTH_URL
+ * breaks Google OAuth on product domains — Auth.js must use trustHost per request.
+ * Email/deep links use product portal origin env vars instead.
  */
 function clearStaticAuthBaseUrlForMultiDomain(): void {
   if (process.env['VERCEL'] || process.env['VERCEL_ENV']) {
@@ -38,10 +39,14 @@ async function computeAccessFlagsForEmail(
   pipeline_access: boolean;
   wine_spectator_access: boolean;
   is_wine_spectator_admin: boolean;
+  big_smoke_access: boolean;
+  is_big_smoke_admin: boolean;
 }> {
   const { data: appUser } = await supabase
     .from('app_users')
-    .select('role, is_active, is_events_team, is_accounting, can_view_all_sales, is_wine_spectator_admin')
+    .select(
+      'role, is_active, is_events_team, is_accounting, can_view_all_sales, is_wine_spectator_admin, is_big_smoke_admin',
+    )
     .eq('email', email.toLowerCase())
     .maybeSingle();
 
@@ -54,6 +59,8 @@ async function computeAccessFlagsForEmail(
       pipeline_access: false,
       wine_spectator_access: false,
       is_wine_spectator_admin: false,
+      big_smoke_access: false,
+      is_big_smoke_admin: false,
     };
   }
 
@@ -64,6 +71,12 @@ async function computeAccessFlagsForEmail(
     role: appUser.role,
     is_events_team: isEventsTeam,
     is_wine_spectator_admin: Boolean((appUser as { is_wine_spectator_admin?: boolean }).is_wine_spectator_admin),
+    email,
+  });
+  const isBigSmokeAdminFlag = isBigSmokeAdmin({
+    role: appUser.role,
+    is_events_team: isEventsTeam,
+    is_big_smoke_admin: Boolean((appUser as { is_big_smoke_admin?: boolean }).is_big_smoke_admin),
     email,
   });
   const isAccounting = Boolean((appUser as { is_accounting?: boolean }).is_accounting);
@@ -85,6 +98,14 @@ async function computeAccessFlagsForEmail(
       email,
     }),
     is_wine_spectator_admin: isWineSpectatorAdminFlag,
+    big_smoke_access: canAccessBigSmoke({
+      role: appUser.role,
+      is_events_team: isEventsTeam,
+      is_accounting: isAccounting,
+      is_big_smoke_admin: isBigSmokeAdminFlag,
+      email,
+    }),
+    is_big_smoke_admin: isBigSmokeAdminFlag,
   };
 }
 
@@ -107,7 +128,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   callbacks: {
     async redirect({ url, baseUrl }) {
-      const allowedOrigins = new Set([nywePortalOrigin(), whiskyfestPortalOrigin()]);
+      const allowedOrigins = new Set([
+        nywePortalOrigin(),
+        whiskyfestPortalOrigin(),
+        bigSmokePortalOrigin(),
+      ]);
       if (url.startsWith('/')) {
         return `${baseUrl}${url}`;
       }
@@ -211,6 +236,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.can_view_all_sales = false;
         token.wine_spectator_access = false;
         token.is_wine_spectator_admin = false;
+        token.big_smoke_access = false;
+        token.is_big_smoke_admin = false;
         token.real_can_impersonate = false;
         token.impersonation_target_email = null;
         token.impersonation_target_name = null;
@@ -256,6 +283,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       token.pipeline_access = flags.pipeline_access;
       token.wine_spectator_access = flags.wine_spectator_access;
       token.is_wine_spectator_admin = flags.is_wine_spectator_admin;
+      token.big_smoke_access = flags.big_smoke_access;
+      token.is_big_smoke_admin = flags.is_big_smoke_admin;
       token.real_can_impersonate = realCanImpersonate;
 
       const tp = (realUser as { theme_preference?: string | null } | null)?.theme_preference;
@@ -304,6 +333,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.pipeline_access = Boolean(token.pipeline_access);
       session.user.wine_spectator_access = Boolean(token.wine_spectator_access);
       session.user.is_wine_spectator_admin = Boolean(token.is_wine_spectator_admin);
+      session.user.big_smoke_access = Boolean(token.big_smoke_access);
+      session.user.is_big_smoke_admin = Boolean(token.is_big_smoke_admin);
       session.user.can_impersonate = Boolean(token.real_can_impersonate);
       session.user.theme_preference =
         token.theme_preference === 'light' ||

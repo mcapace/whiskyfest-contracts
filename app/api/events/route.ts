@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireAuth, requireEventCreator } from '@/lib/api-auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +18,7 @@ const createSchema = z.object({
   shanken_signatory_email: z.string().optional().nullable(),
   is_active: z.boolean().optional(),
   product_key: z.string().min(1).optional(),
-  contract_template_profile: z.enum(['whiskyfest', 'nywe_vendor']).optional(),
+  contract_template_profile: z.enum(['whiskyfest', 'nywe_vendor', 'big_smoke']).optional(),
   workflow_profile: z.enum(['sales_rep', 'events_managed']).optional(),
   google_template_doc_id: z.string().optional().nullable(),
   google_sponsorship_template_doc_id: z.string().optional().nullable(),
@@ -27,7 +27,7 @@ const createSchema = z.object({
 });
 
 export async function GET() {
-  const gate = await requireAdmin();
+  const gate = await requireAuth();
   if (!gate.ok) return gate.res;
 
   const supabase = getSupabaseAdmin();
@@ -38,20 +38,22 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const gate = await requireAdmin();
-  if (!gate.ok) return gate.res;
-
   const body = await req.json().catch(() => null);
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 400 });
   }
 
+  const productKey = parsed.data.product_key?.trim() || 'whiskyfest';
+  const gate = await requireEventCreator(productKey);
+  if (!gate.ok) return gate.res;
+
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from('events')
     .insert({
       ...parsed.data,
+      product_key: productKey,
       is_active: parsed.data.is_active ?? true,
     })
     .select()

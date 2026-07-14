@@ -303,7 +303,9 @@ export function NewContractForm({
 
   const selectedEvent = events.find((e) => e.id === (resolvedEventId ?? form.event_id));
   const eventsManaged = selectedEvent ? isEventsManagedWorkflow(selectedEvent) : false;
-  const boothOnlyEvent = selectedEvent?.contract_template_profile === 'nywe_vendor';
+  const boothOnlyEvent =
+    selectedEvent?.contract_template_profile === 'nywe_vendor' ||
+    selectedEvent?.contract_template_profile === 'big_smoke';
   const showNoChargeOption =
     canUseNoChargeBooth && !boothOnlyEvent && dealKind !== 'sponsorship_only';
   const listBoothRateCents = standardBoothRateCentsForEvent(selectedEvent);

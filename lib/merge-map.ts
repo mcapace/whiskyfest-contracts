@@ -11,6 +11,7 @@ import {
 import { formatCurrency } from '@/lib/utils';
 import { formatEventDateForMerge, getAgreementDatePartsInDisplayZone } from '@/lib/datetime';
 import { eventTemplateProfile } from '@/lib/contract-template-profile';
+import { buildBigSmokeMergeMap } from '@/lib/merge-map-big-smoke';
 import { buildNyweVendorMergeMap } from '@/lib/merge-map-nywe';
 import { usesSingleSignerEnvelope } from '@/lib/single-signer-envelope';
 import { formatBoothBrandsBlock } from '@/lib/contract-booth-brands';
@@ -103,8 +104,12 @@ export function buildContractMergeMap(
   mode: MergePlaceholderMode,
   boothBrands?: ContractBoothBrand[],
 ): Record<string, string> {
-  if (eventTemplateProfile(event) === 'nywe_vendor') {
+  const profile = eventTemplateProfile(event);
+  if (profile === 'nywe_vendor') {
     return buildNyweVendorMergeMap(contract, event, mode);
+  }
+  if (profile === 'big_smoke') {
+    return buildBigSmokeMergeMap(contract, event, mode);
   }
 
   const agreement = getAgreementDatePartsInDisplayZone();
