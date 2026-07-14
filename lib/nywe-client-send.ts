@@ -24,7 +24,7 @@ import { renderContractPdfFromTemplate } from '@/lib/google';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import { nyweLicenseAddressError } from '@/lib/nywe-billing';
 import { refreshNyweBillingFromRosterForContract } from '@/lib/nywe-roster-billing-sync';
-import { docusignBrandIdForEvent } from '@/lib/product-email';
+import { docusignBrandIdForEvent, sendGridFromForEvent } from '@/lib/product-email';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { syncExhibitorRosterWritebackById } from '@/lib/exhibitor-roster-sync-hook';
 import type { ContractStatus, ContractWithTotals, Event } from '@/types/db';
@@ -186,6 +186,7 @@ export async function nyweClientSendContract(options: {
       countersigner,
       carbonCopy,
       brandId: docusignBrandIdForEvent(event),
+      replyTo: sendGridFromForEvent(event),
       skipExhibitorDataTabs: shouldSkipExhibitorDataTabs(event, contract),
     });
 

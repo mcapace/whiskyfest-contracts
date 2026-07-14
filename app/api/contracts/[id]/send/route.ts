@@ -29,7 +29,7 @@ import { requiresDiscountApproval } from '@/lib/contracts';
 import { insertContractAudit } from '@/lib/audit-log';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { syncExhibitorRosterWritebackById } from '@/lib/exhibitor-roster-sync-hook';
-import { docusignBrandIdForEvent } from '@/lib/product-email';
+import { docusignBrandIdForEvent, sendGridFromForEvent } from '@/lib/product-email';
 import { parseSignerCc, validateSignerCcDistinct } from '@/lib/docusign-signer-cc';
 import type { ContractWithTotals, Event } from '@/types/db';
 
@@ -151,6 +151,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       countersigner,
       carbonCopy,
       brandId: docusignBrandIdForEvent(event),
+      replyTo: sendGridFromForEvent(event),
       skipExhibitorDataTabs: shouldSkipExhibitorDataTabs(event, contract),
     });
 

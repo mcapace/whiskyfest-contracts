@@ -248,6 +248,11 @@ export interface SendEnvelopeParams {
   carbonCopy?: { email: string; name: string } | null;
   /** DocuSign brand id — controls exhibitor-facing signing email sender/branding. */
   brandId?: string;
+  /**
+   * Reply-To on DocuSign signing emails (From still follows the DocuSign user/brand).
+   * Use product SendGrid identity so NYWE / Big Smoke / WhiskyFest replies go to the right inbox.
+   */
+  replyTo?: { email: string; name: string } | null;
   /** NYWE licenses with roster billing merged into PDF — skip empty exhibitor fill tabs. */
   skipExhibitorDataTabs?: boolean;
 }
@@ -322,6 +327,15 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
 
   if (params.brandId?.trim()) {
     envelopeDefinition.brandId = params.brandId.trim();
+  }
+
+  const replyEmail = params.replyTo?.email?.trim();
+  const replyName = params.replyTo?.name?.trim();
+  if (replyEmail) {
+    envelopeDefinition.emailSettings = {
+      replyEmailAddressOverride: replyEmail,
+      ...(replyName ? { replyEmailNameOverride: replyName } : {}),
+    };
   }
 
   const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes`;

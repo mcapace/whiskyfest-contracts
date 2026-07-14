@@ -31,7 +31,7 @@ import { buildContractMergeMap } from '@/lib/merge-map';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { insertContractAudit } from '@/lib/audit-log';
 import { syncExhibitorRosterWriteback } from '@/lib/exhibitor-roster-sync-hook';
-import { docusignBrandIdForEvent } from '@/lib/product-email';
+import { docusignBrandIdForEvent, sendGridFromForEvent } from '@/lib/product-email';
 import { parseSignerCc, validateSignerCcDistinct } from '@/lib/docusign-signer-cc';
 import {
   amendmentsTextForPlan,
@@ -293,6 +293,7 @@ export async function reviseAndSendContract(options: {
       countersigner,
       carbonCopy,
       brandId: docusignBrandIdForEvent(event),
+      replyTo: sendGridFromForEvent(event),
       skipExhibitorDataTabs: shouldSkipExhibitorDataTabs(event, contract),
     });
     envelopeId = sent.envelopeId;

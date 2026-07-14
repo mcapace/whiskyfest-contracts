@@ -1,5 +1,5 @@
 import { eventContractDocumentLabel } from '@/lib/contract-template-profile';
-import { isWineSpectatorProduct } from '@/lib/product-email';
+import { isBigSmokeProduct, isWineSpectatorProduct } from '@/lib/product-email';
 import type { Event } from '@/types/db';
 
 /** DocuSign envelope email subject limit. */
@@ -33,9 +33,12 @@ export function defaultDocuSignEmailSubjectTemplate(
   event: Pick<Event, 'product_key' | 'contract_document_label'>,
 ): string {
   if (isWineSpectatorProduct(event.product_key)) {
-    return '{{winery_name}} — Please sign your {{event_name}} contract';
+    return 'NYWE Contracts: please sign {{event_name}} — {{winery_name}}';
   }
-  return '{{winery_name}} — Please sign your {{event_name}} {{document_label}}';
+  if (isBigSmokeProduct(event.product_key)) {
+    return 'Big Smoke Contracts: please sign {{event_name}} — {{winery_name}}';
+  }
+  return 'WhiskyFest Contracts: please sign {{event_name}} — {{winery_name}}';
 }
 
 export function mergeDocuSignEmailSubjectTemplate(
@@ -77,7 +80,10 @@ export function contractDocuSignEmailBlurb(
 ): string {
   const label = eventContractDocumentLabel(event);
   if (isWineSpectatorProduct(event.product_key)) {
-    return `Please review and sign your ${event.name} contract for ${companyName}.`;
+    return `Please review and sign your ${event.name} contract for ${companyName}. — NYWE Contracts`;
   }
-  return `Attached is the ${event.name} ${label} for ${companyName}. Please review and sign.`;
+  if (isBigSmokeProduct(event.product_key)) {
+    return `Please review and sign your ${event.name} exhibitor agreement for ${companyName}. — Big Smoke Contracts`;
+  }
+  return `Attached is the ${event.name} ${label} for ${companyName}. Please review and sign. — WhiskyFest Contracts`;
 }
