@@ -1,20 +1,15 @@
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
-import Image from 'next/image';
 import { auth, signIn } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { LoginHero } from '@/components/auth/login-hero';
 import { NyweLogo } from '@/components/brand/nywe-logo';
 import { WhiskyAdvocateLogo } from '@/components/brand/whisky-advocate-logo';
+import { CigarAficionadoLogo } from '@/components/brand/cigar-aficionado-logo';
 import { portalKindFromHost, postLoginPath } from '@/lib/portal-host';
 import { canAccessBigSmoke } from '@/lib/big-smoke-access';
 import { canAccessWineSpectator } from '@/lib/wine-spectator-access';
-import {
-  BIG_SMOKE_LOGIN_FOOTER,
-  BIG_SMOKE_LOGIN_HEADLINE,
-  BIG_SMOKE_LOGIN_TAGLINE,
-} from '@/lib/big-smoke-copy';
-import { BIG_SMOKE_EVENT_LOGO } from '@/lib/brand-assets';
+import { BIG_SMOKE_LOGIN_FOOTER, BIG_SMOKE_LOGIN_HEADLINE, BIG_SMOKE_LOGIN_TAGLINE } from '@/lib/big-smoke-copy';
 import {
   NYWE_LOGIN_FOOTER,
   NYWE_LOGIN_HEADLINE,
@@ -98,17 +93,10 @@ export default async function LoginPage({
               />
               <div className="relative flex h-full animate-login-mount flex-col justify-center px-6 py-8 text-stone-50 sm:px-10 lg:px-12">
                 <div className="max-w-md">
-                  <Image
-                    src={BIG_SMOKE_EVENT_LOGO.src}
-                    alt={BIG_SMOKE_EVENT_LOGO.alt}
-                    width={BIG_SMOKE_EVENT_LOGO.width}
-                    height={BIG_SMOKE_EVENT_LOGO.height}
-                    className="h-auto w-full max-w-sm"
-                    priority
-                  />
+                  <CigarAficionadoLogo priority variant="onDark" className="max-w-[320px]" imageClassName="max-h-16" />
                 </div>
                 <p className="mt-8 font-sans text-xs uppercase tracking-[0.25em] text-amber-400">
-                  Cigar Aficionado
+                  Big Smoke
                 </p>
                 <h1 className="mt-3 font-display text-5xl font-medium tracking-tight text-stone-50 sm:text-6xl">
                   {BIG_SMOKE_LOGIN_HEADLINE}

@@ -2,14 +2,19 @@
 
 import { usePathname } from 'next/navigation';
 import { usePortalKind } from '@/components/portal/portal-context';
-import { isWineSpectatorPath } from '@/lib/product-portal';
+import { isBigSmokePath, isWineSpectatorPath } from '@/lib/product-portal';
 
-/** Hides the WhiskyFest daily bubble on NYWE / Wine Spectator routes. */
+/** Hides the WhiskyFest daily bubble on NYWE / Big Smoke routes. */
 export function DailyBubblePathGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? '';
   const portalKind = usePortalKind();
 
-  if (portalKind === 'nywe' || isWineSpectatorPath(pathname)) {
+  if (
+    portalKind === 'nywe' ||
+    portalKind === 'big_smoke' ||
+    isWineSpectatorPath(pathname) ||
+    isBigSmokePath(pathname)
+  ) {
     return null;
   }
 

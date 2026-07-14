@@ -36,8 +36,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { NyweLogo } from '@/components/brand/nywe-logo';
 import { WhiskyAdvocateLogo } from '@/components/brand/whisky-advocate-logo';
-import Image from 'next/image';
-import { BIG_SMOKE_EVENT_LOGO } from '@/lib/brand-assets';
+import { CigarAficionadoLogo } from '@/components/brand/cigar-aficionado-logo';
 import { ImpersonationMenu } from '@/components/impersonation/impersonation-menu';
 import { IMPERSONATION_BUTTON_TOOLTIP } from '@/lib/impersonation-read-only';
 
@@ -366,16 +365,13 @@ export function Sidebar({
               imageClassName="max-h-12"
             />
           ) : bigSmokeProductPortal ? (
-            <Link href={homeHref} className="block w-full max-w-[200px]">
-              <Image
-                src={BIG_SMOKE_EVENT_LOGO.src}
-                alt={BIG_SMOKE_EVENT_LOGO.alt}
-                width={BIG_SMOKE_EVENT_LOGO.width}
-                height={BIG_SMOKE_EVENT_LOGO.height}
-                className="mx-auto h-auto max-h-14 w-auto"
-                priority
-              />
-            </Link>
+            <CigarAficionadoLogo
+              href={homeHref}
+              priority
+              variant="onDark"
+              className="mx-auto w-full max-w-[200px]"
+              imageClassName="max-h-10"
+            />
           ) : showAccountingChrome ? (
             <Link href={homeHref} className="block rounded-lg border border-brass-700/25 bg-stone-950/60 px-4 py-3 text-center">
               <Landmark className="mx-auto h-6 w-6 text-brass-400" />

@@ -46,10 +46,37 @@ export const BIG_SMOKE_EVENT_LOGO = {
   alt: "Cigar Aficionado's Big Smoke Las Vegas 30th Anniversary",
 } as const;
 
+export const BIG_SMOKE_HERO_IMAGE = {
+  src: '/images/big-smoke-hero.jpg',
+  width: 1024,
+  height: 576,
+  alt: 'Big Smoke Las Vegas floor — exhibitors and guests',
+} as const;
+
+export const CIGAR_AFICIONADO_LOGO = {
+  default: {
+    src: '/images/cigar-aficionado-logo.png',
+    width: 1024,
+    height: 203,
+    alt: 'Cigar Aficionado',
+  },
+  onDark: {
+    src: '/images/cigar-aficionado-logo-on-dark.png',
+    width: 428,
+    height: 116,
+    alt: 'Cigar Aficionado',
+  },
+} as const;
+
 export function brandLogoAsset(
-  brand: 'wineSpectator' | 'whiskyAdvocate',
+  brand: 'wineSpectator' | 'whiskyAdvocate' | 'cigarAficionado',
   variant: BrandLogoVariant = 'default',
 ) {
-  const set = brand === 'wineSpectator' ? WINE_SPECTATOR_LOGO : WHISKY_ADVOCATE_LOGO;
+  const set =
+    brand === 'wineSpectator'
+      ? WINE_SPECTATOR_LOGO
+      : brand === 'whiskyAdvocate'
+        ? WHISKY_ADVOCATE_LOGO
+        : CIGAR_AFICIONADO_LOGO;
   return set[variant];
 }
