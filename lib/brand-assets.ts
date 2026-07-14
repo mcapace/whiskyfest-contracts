@@ -1,6 +1,6 @@
 /** Official Wine Spectator & Whisky Advocate wordmarks (light + dark background variants). */
 
-export type BrandLogoVariant = 'default' | 'onDark';
+export type BrandLogoVariant = 'default' | 'onDark' | 'white';
 
 export const NYWE_EVENT_LOGO = {
   src: '/images/nywe-logo.png',
@@ -22,6 +22,12 @@ export const WINE_SPECTATOR_LOGO = {
     height: 289,
     alt: 'Wine Spectator',
   },
+  white: {
+    src: '/images/wine-spectator-logo-white.png?v=5',
+    width: 1035,
+    height: 289,
+    alt: 'Wine Spectator',
+  },
 } as const;
 
 export const WHISKY_ADVOCATE_LOGO = {
@@ -32,6 +38,12 @@ export const WHISKY_ADVOCATE_LOGO = {
     alt: 'Whisky Advocate',
   },
   onDark: {
+    src: '/images/whisky-advocate-logo-white.png',
+    width: 374,
+    height: 135,
+    alt: 'Whisky Advocate',
+  },
+  white: {
     src: '/images/whisky-advocate-logo-white.png',
     width: 374,
     height: 135,
@@ -60,7 +72,15 @@ export const CIGAR_AFICIONADO_LOGO = {
     height: 203,
     alt: 'Cigar Aficionado',
   },
+  /** Burgundy wordmark for dark UI chrome (sidebar, login). */
   onDark: {
+    src: '/images/cigar-aficionado-logo-on-dark.png',
+    width: 428,
+    height: 116,
+    alt: 'Cigar Aficionado',
+  },
+  /** White wordmark for photo hero overlays only. */
+  white: {
     src: '/images/cigar-aficionado-logo-white.png',
     width: 413,
     height: 83,
