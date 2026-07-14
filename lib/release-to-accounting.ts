@@ -131,6 +131,43 @@ export async function releaseContractToAccounting(options: {
   }
 
   if (contract.accounting_notified_at) {
+    // Email claim succeeded previously but status never flipped to executed (Remy stuck case).
+    if (contract.status === 'signed') {
+      const executedAt = contract.accounting_notified_at;
+      const { error: finishErr } = await supabase
+        .from('contracts')
+        .update({ status: 'executed', executed_at: executedAt })
+        .eq('id', contract.id)
+        .eq('status', 'signed');
+      if (finishErr) {
+        return { ok: false, error: finishErr.message, status: 500 };
+      }
+      await insertContractAudit(supabase, {
+        contract_id: contract.id,
+        actor_email: actorEmail,
+        action: auditAction,
+        from_status: 'signed',
+        to_status: 'executed',
+        metadata: {
+          note: 'Completed stuck handoff: accounting already notified; status was still signed',
+        },
+      });
+      revalidateContractPaths(contract.id);
+      const { data: finished } = await supabase
+        .from('contracts_with_totals')
+        .select('*')
+        .eq('id', contract.id)
+        .maybeSingle<ContractWithTotals>();
+      if (finished) {
+        try {
+          await updateContractRow(finished);
+        } catch (err) {
+          console.error('Failed to update Sheets tracker', err);
+        }
+        await syncExhibitorRosterWriteback(finished);
+      }
+      return { ok: true, executedAt };
+    }
     return { ok: false, error: 'Already released to accounting.', status: 409 };
   }
 
@@ -288,10 +325,19 @@ export async function releaseContractToAccounting(options: {
     return { ok: false, error: msg, status: 502 };
   }
 
-  await supabase
+  const { error: executedErr } = await supabase
     .from('contracts')
     .update({ status: 'executed', executed_at: now })
     .eq('id', contract.id);
+
+  if (executedErr) {
+    console.error('[release-to-accounting] status→executed failed', contract.id, executedErr.message);
+    return {
+      ok: false,
+      error: `Accounting was emailed, but marking executed failed: ${executedErr.message}. Retry Release to finish.`,
+      status: 500,
+    };
+  }
 
   await supabase.from('audit_log').insert({
     contract_id: contract.id,
