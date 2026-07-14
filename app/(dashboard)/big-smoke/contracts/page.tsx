@@ -25,7 +25,7 @@ export default async function BigSmokeContractsPage({
       <div>
         <h1 className="font-display text-3xl font-medium text-foreground">Big Smoke contracts</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Cigar Aficionado Big Smoke exhibitor agreements — separate from WhiskyFest and NYWE.
+          Cigar Aficionado Big Smoke exhibitor agreements.
         </p>
       </div>
       <ContractsList

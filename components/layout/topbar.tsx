@@ -3,8 +3,15 @@
 import type { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { usePortalKind } from '@/components/portal/portal-context';
-import { isAccountingPath, isNyweAccountingPathname, isWineSpectatorPath } from '@/lib/product-portal';
+import { BIG_SMOKE_SHORT_LABEL } from '@/lib/big-smoke-copy';
 import { NYWE_SHORT_LABEL } from '@/lib/nywe-copy';
+import {
+  isAccountingPath,
+  isBigSmokeAccountingPathname,
+  isBigSmokePath,
+  isNyweAccountingPathname,
+  isWineSpectatorPath,
+} from '@/lib/product-portal';
 import { cn } from '@/lib/utils';
 
 /**
@@ -21,18 +28,22 @@ export function Topbar({
 }) {
   const pathname = usePathname() ?? '';
   const portalKind = usePortalKind();
-  const nywePortal = portalKind === 'nywe';
-  const portalLabel = nywePortal
-    ? isNyweAccountingPathname(pathname, 'nywe')
-      ? `Accounting · ${NYWE_SHORT_LABEL}`
-      : `${NYWE_SHORT_LABEL} · Contracts`
-    : isWineSpectatorPath(pathname)
-      ? `${NYWE_SHORT_LABEL} · Contracts`
-      : isNyweAccountingPathname(pathname)
+
+  const portalLabel = (() => {
+    if (portalKind === 'big_smoke' || isBigSmokePath(pathname)) {
+      return isBigSmokeAccountingPathname(pathname) ||
+        (portalKind === 'big_smoke' && isAccountingPath(pathname))
+        ? `Accounting · ${BIG_SMOKE_SHORT_LABEL}`
+        : `${BIG_SMOKE_SHORT_LABEL} · Contracts`;
+    }
+    if (portalKind === 'nywe' || isWineSpectatorPath(pathname)) {
+      return isNyweAccountingPathname(pathname) || (portalKind === 'nywe' && isAccountingPath(pathname))
         ? `Accounting · ${NYWE_SHORT_LABEL}`
-        : isAccountingPath(pathname)
-          ? 'Accounting · WhiskyFest'
-          : 'WhiskyFest · Contracts';
+        : `${NYWE_SHORT_LABEL} · Contracts`;
+    }
+    if (isAccountingPath(pathname)) return 'Accounting · WhiskyFest';
+    return 'WhiskyFest · Contracts';
+  })();
 
   return (
     <header
