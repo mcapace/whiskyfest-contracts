@@ -1,3 +1,9 @@
+import {
+  fetchEnvelopeSigners,
+  fetchRecipientTextTabs,
+  type DocuSignSignerRow,
+} from '@/lib/docusign';
+
 export function textTabsToLabelMap(tabs: { tabLabel: string; value: string }[]): Record<string, string> {
   const out: Record<string, string> = {};
   for (const t of tabs) {
@@ -98,4 +104,27 @@ export function buildExhibitorCaptureDbPatch(map: Record<string, string>): Exhib
     billing_same_as_corporate: false,
     exhibitor_fields_captured_at: new Date().toISOString(),
   };
+}
+
+/**
+ * Read exhibitor (routing order 1) DocuSign text tabs and build a DB capture patch.
+ * Returns null when required tabs are incomplete or DocuSign fetch fails.
+ */
+export async function fetchExhibitorCaptureFromEnvelope(
+  envelopeId: string,
+  signers?: DocuSignSignerRow[],
+): Promise<ExhibitorCaptureDbRow | null> {
+  try {
+    const rows = signers ?? (await fetchEnvelopeSigners(envelopeId));
+    const exhibitor = rows.find((s) => s.routingOrder === '1') ?? rows[0];
+    const exhibitorRecipientId = exhibitor?.recipientId?.trim() || '1';
+    const tabs = await fetchRecipientTextTabs(envelopeId, exhibitorRecipientId);
+    return buildExhibitorCaptureDbPatch(textTabsToLabelMap(tabs));
+  } catch (e) {
+    console.error('[docusign-sync] exhibitor tabs fetch failed', {
+      envelopeId,
+      error: e instanceof Error ? e.message : String(e),
+    });
+    return null;
+  }
 }

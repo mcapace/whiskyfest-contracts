@@ -82,9 +82,7 @@ export default async function AccountingContractDetailPage({ params }: { params:
         ]
           .filter((x) => (x ?? '').toString().trim())
           .join('\n')
-      : contract.billing_same_as_corporate ?? true
-        ? formatExhibitorAddressBlock(contract)
-        : formatBillingAddressBlock(contract);
+      : 'Not captured in system — use the signed PDF (or billing Excel). Corporate mailing is not designated billing.';
   const showBillingContactRows =
     Boolean(contract.exhibitor_fields_captured_at) || contractHasBillingInfo(contract);
 

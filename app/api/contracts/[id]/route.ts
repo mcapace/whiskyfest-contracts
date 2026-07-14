@@ -23,6 +23,8 @@ import { isLegacyImportedContract } from '@/lib/legacy-import';
 import { billingFieldsFromOptionalBody } from '@/lib/nywe-billing';
 import { refreshNyweBillingFromRosterForContract } from '@/lib/nywe-roster-billing-sync';
 import { applyNyweLicensePricingIfNeeded, isNyweVendorEvent, signerTitleForContract } from '@/lib/nywe-pricing';
+import { pricingFromBigSmokePackage } from '@/lib/big-smoke-pricing';
+import { eventTemplateProfile } from '@/lib/contract-template-profile';
 import {
   assertNoChargeBoothAllowed,
   isNoChargeBoothContract,
@@ -121,12 +123,22 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const leavingNoCharge = !noChargeRequested && wasNoCharge;
 
     const bill = nyweEvent ? {} : clearedRepEnteredBilling();
+    const bigSmokePricing =
+      eventTemplateProfile(patchEvent) === 'big_smoke'
+        ? pricingFromBigSmokePackage(p.package_key)
+        : null;
     const nywePricing = applyNyweLicensePricingIfNeeded(patchEvent, {
-      booth_count: p.booth_count,
-      booth_rate_cents: noChargeRequested ? 0 : incomingBoothRate,
+      booth_count: bigSmokePricing?.booth_count ?? p.booth_count,
+      booth_rate_cents: noChargeRequested
+        ? 0
+        : (bigSmokePricing?.booth_rate_cents ?? incomingBoothRate),
     });
     const boothRateChanged = nywePricing.booth_rate_cents !== contract.booth_rate_cents;
     const nyweLineItems = nyweEvent ? [] : (p.line_items ?? []);
+    const nextPackageKey =
+      eventTemplateProfile(patchEvent) === 'big_smoke'
+        ? (bigSmokePricing?.package_key ?? null)
+        : null;
     const shouldResetDiscountApproval =
       !noChargeRequested &&
       !nyweEvent &&
@@ -164,6 +176,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
           : p.order_type === 'sponsorship_only'
             ? sponsorBrandFromBody(p)
             : null,
+        package_key: nextPackageKey,
         booth_count: nywePricing.booth_count,
         booth_rate_cents: nywePricing.booth_rate_cents,
         signer_1_name: p.signer_1_name ?? null,

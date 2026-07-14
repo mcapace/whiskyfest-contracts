@@ -97,6 +97,7 @@ export async function EditDraftContractPage({
           sponsor_brand: c.brands_poured ?? '',
           booth_count: c.booth_count,
           booth_rate_cents: c.booth_rate_cents,
+          package_key: c.package_key ?? '',
           signer_1_name: c.signer_1_name ?? '',
           signer_1_title: c.signer_1_title ?? '',
           signer_1_email: c.signer_1_email ?? '',

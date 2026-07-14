@@ -11,6 +11,7 @@ import { isNoChargeBoothContract } from '@/lib/no-charge-booth';
 import { contractHasBillingInfo } from '@/lib/nywe-billing';
 import { isNyweVendorEvent } from '@/lib/nywe-pricing';
 import { downloadCompletedPdf } from '@/lib/docusign';
+import { fetchExhibitorCaptureFromEnvelope } from '@/lib/docusign-exhibitor-capture';
 import {
   downloadContractPdfFromStorage,
   downloadImportedContractPdf,
@@ -21,7 +22,51 @@ import { productKeyFromEvent } from '@/lib/product-portal';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { updateContractRow } from '@/lib/sheets-tracker';
 import { syncExhibitorRosterWriteback } from '@/lib/exhibitor-roster-sync-hook';
+import { insertContractAudit } from '@/lib/audit-log';
 import type { ContractWithTotals, Event } from '@/types/db';
+
+/** Shown when AR email has no designated billing_* — never substitute corporate mailing. */
+export const BILLING_NOT_CAPTURED_MESSAGE =
+  'Not captured in system — invoice from the signed PDF (or billing Excel). Corporate mailing below is not designated billing.';
+
+async function ensureExhibitorCaptureBeforeRelease(
+  supabase: SupabaseClient,
+  contract: ContractWithTotals,
+  actorEmail: string,
+): Promise<ContractWithTotals> {
+  if (contract.exhibitor_fields_captured_at) return contract;
+  if (isLegacyImportedContract(contract)) return contract;
+
+  const envelopeId = contract.docusign_envelope_id?.trim();
+  if (!envelopeId) return contract;
+
+  const capture = await fetchExhibitorCaptureFromEnvelope(envelopeId);
+  if (!capture) return contract;
+
+  const { error } = await supabase.from('contracts').update(capture).eq('id', contract.id);
+  if (error) {
+    console.error('[release-to-accounting] late exhibitor capture failed', contract.id, error.message);
+    return contract;
+  }
+
+  await insertContractAudit(supabase, {
+    contract_id: contract.id,
+    actor_email: actorEmail,
+    action: 'exhibitor_fields_captured',
+    metadata: {
+      envelope_id: envelopeId,
+      source: 'late_capture_on_release',
+    },
+  });
+
+  const { data: refreshed } = await supabase
+    .from('contracts_with_totals')
+    .select('*')
+    .eq('id', contract.id)
+    .maybeSingle<ContractWithTotals>();
+
+  return refreshed ?? { ...contract, ...capture };
+}
 
 export type ReleaseToAccountingResult =
   | { ok: true; executedAt: string }
@@ -35,8 +80,9 @@ export async function releaseContractToAccounting(options: {
   auditAction?: 'released_to_accounting' | 'auto_released_to_accounting';
   supabase?: SupabaseClient;
 }): Promise<ReleaseToAccountingResult> {
-  const { contract, event, actorEmail, auditAction = 'released_to_accounting' } = options;
+  const { event, actorEmail, auditAction = 'released_to_accounting' } = options;
   const supabase = options.supabase ?? getSupabaseAdmin();
+  let contract = options.contract;
 
   if (requiresDiscountApproval(contract, event)) {
     return { ok: false, error: 'Discount approval required before contract can be released.', status: 403 };
@@ -72,6 +118,9 @@ export async function releaseContractToAccounting(options: {
   if (!process.env['SENDGRID_API_KEY']) {
     return { ok: false, error: 'SENDGRID_API_KEY is not configured.', status: 500 };
   }
+
+  // Last chance to sync DocuSign billing tabs into DB before the AR email is composed.
+  contract = await ensureExhibitorCaptureBeforeRelease(supabase, contract, actorEmail);
 
   let signedPdfBytes: Buffer;
 
@@ -111,9 +160,9 @@ export async function releaseContractToAccounting(options: {
     }
   }
 
-  const billingSame = contract.billing_same_as_corporate ?? true;
   const exhibitorCaptured = Boolean(contract.exhibitor_fields_captured_at);
-  const billingAddressLine = exhibitorCaptured
+  const hasDesignatedBilling = exhibitorCaptured || contractHasBillingInfo(contract);
+  const billingAddressLine = hasDesignatedBilling
     ? [
         contract.billing_contact_name,
         contract.billing_contact_email,
@@ -121,17 +170,7 @@ export async function releaseContractToAccounting(options: {
       ]
         .filter((x) => (x ?? '').toString().trim())
         .join(' · ')
-    : contractHasBillingInfo(contract)
-      ? [
-          contract.billing_contact_name,
-          contract.billing_contact_email,
-          (formatBillingAddressBlock(contract) || '—').replace(/\n/g, ', '),
-        ]
-          .filter((x) => (x ?? '').toString().trim())
-          .join(' · ')
-      : billingSame
-        ? (formatExhibitorAddressBlock(contract) || '—').replace(/\n/g, ', ')
-        : (formatBillingAddressBlock(contract) || '—').replace(/\n/g, ', ');
+    : BILLING_NOT_CAPTURED_MESSAGE;
 
   const billingCompanyName =
     contract.exhibitor_legal_name?.trim() || contract.exhibitor_company_name?.trim() || null;
@@ -196,13 +235,12 @@ export async function releaseContractToAccounting(options: {
       amountCents: row.amount_cents,
     })),
     isNyweVendor: nyweVendor,
-    exhibitorBillingContactName:
-      exhibitorCaptured || contractHasBillingInfo(contract) ? contract.billing_contact_name : null,
-    exhibitorBillingContactEmail:
-      exhibitorCaptured || contractHasBillingInfo(contract) ? contract.billing_contact_email : null,
+    exhibitorBillingContactName: hasDesignatedBilling ? contract.billing_contact_name : null,
+    exhibitorBillingContactEmail: hasDesignatedBilling ? contract.billing_contact_email : null,
     billingCompanyName,
-    exhibitorBillingAddressDetail:
-      exhibitorCaptured || contractHasBillingInfo(contract) ? formatBillingAddressBlock(contract) : null,
+    exhibitorBillingAddressDetail: hasDesignatedBilling
+      ? formatBillingAddressBlock(contract)
+      : null,
     exhibitorEventContactName: exhibitorCaptured ? contract.event_contact_name : null,
     exhibitorEventContactEmail: exhibitorCaptured ? contract.event_contact_email : null,
     eventName: event.name,

@@ -16,6 +16,13 @@ export function isPackageFeeEvent(
   return p === 'nywe_vendor' || p === 'big_smoke';
 }
 
+/** Flat NYWE vendor license only (not Big Smoke multi-package). */
+export function isNyweVendorOnlyEvent(
+  event?: Pick<Event, 'contract_template_profile'> | null,
+): boolean {
+  return event != null && eventTemplateProfile(event) === 'nywe_vendor';
+}
+
 /** @deprecated Prefer isPackageFeeEvent — includes Big Smoke. */
 export function isNyweVendorEvent(
   event?: Pick<Event, 'contract_template_profile'> | null,
@@ -38,7 +45,11 @@ export function applyNyweLicensePricingIfNeeded(
   event: Pick<Event, 'contract_template_profile' | 'booth_rate_cents'>,
   pricing: { booth_count: number; booth_rate_cents: number },
 ): { booth_count: number; booth_rate_cents: number } {
-  if (!isPackageFeeEvent(event)) return pricing;
+  // Big Smoke: form supplies package fee + booth count — do not flatten to NYWE single-booth.
+  if (eventTemplateProfile(event) === 'big_smoke') {
+    return pricing;
+  }
+  if (!isNyweVendorOnlyEvent(event)) return pricing;
   return normalizeNyweLicensePricing(event);
 }
 

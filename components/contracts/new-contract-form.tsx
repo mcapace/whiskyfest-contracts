@@ -14,7 +14,14 @@ import Link from 'next/link';
 import { cn, formatCurrency, formatLongDate } from '@/lib/utils';
 import { isEventsManagedWorkflow } from '@/lib/contract-template-profile';
 import { isDiscountedRate, standardBoothRateCentsForEvent } from '@/lib/contracts';
-import { isNyweVendorEvent, nyweLicenseFeeCents } from '@/lib/nywe-pricing';
+import { isNyweVendorOnlyEvent, nyweLicenseFeeCents } from '@/lib/nywe-pricing';
+import {
+  BIG_SMOKE_PACKAGES,
+  bigSmokePackageDisplayName,
+  getBigSmokePackage,
+  pricingFromBigSmokePackage,
+  type BigSmokePackageKey,
+} from '@/lib/big-smoke-pricing';
 import {
   CONTRACT_DEAL_KINDS,
   dealKindMeta,
@@ -67,6 +74,7 @@ export type ContractFormValues = {
   exhibitor_company_name: string;
   booth_count: number;
   booth_rate_cents: number;
+  package_key: string;
   sponsor_brand: string;
   signer_1_name: string;
   signer_1_title: string;
@@ -199,7 +207,7 @@ export function NewContractForm({
   const defaultBoothRateCents =
     initialValues?.booth_rate_cents ??
     (defaultEvent
-      ? isNyweVendorEvent(defaultEvent)
+      ? isNyweVendorOnlyEvent(defaultEvent)
         ? nyweLicenseFeeCents(defaultEvent)
         : defaultEvent.booth_rate_cents
       : 1500000);
@@ -208,6 +216,7 @@ export function NewContractForm({
   const orderType = orderTypeFromDealKind(dealKind);
   const [noChargeBooth, setNoChargeBooth] = useState(initialNoChargeBooth);
   const [sponsorBrand, setSponsorBrand] = useState(initialValues?.sponsor_brand ?? '');
+  const [packageKey, setPackageKey] = useState<string>(initialValues?.package_key ?? '');
 
   const [form, setForm] = useState(() => ({
     event_id:               initialValues?.event_id ?? defaultEvent?.id ?? '',
@@ -303,13 +312,16 @@ export function NewContractForm({
 
   const selectedEvent = events.find((e) => e.id === (resolvedEventId ?? form.event_id));
   const eventsManaged = selectedEvent ? isEventsManagedWorkflow(selectedEvent) : false;
-  const boothOnlyEvent =
-    selectedEvent?.contract_template_profile === 'nywe_vendor' ||
-    selectedEvent?.contract_template_profile === 'big_smoke';
+  const isNyweFlatEvent = isNyweVendorOnlyEvent(selectedEvent);
+  const isBigSmokeEvent = selectedEvent?.contract_template_profile === 'big_smoke';
+  const boothOnlyEvent = isNyweFlatEvent || isBigSmokeEvent;
+  const selectedBigSmokePkg = getBigSmokePackage(packageKey);
   const showNoChargeOption =
     canUseNoChargeBooth && !boothOnlyEvent && dealKind !== 'sponsorship_only';
   const listBoothRateCents = standardBoothRateCentsForEvent(selectedEvent);
-  const boothSubtotal = form.booth_count * form.booth_rate_cents;
+  const boothSubtotal = isBigSmokeEvent && selectedBigSmokePkg
+    ? selectedBigSmokePkg.fee_cents
+    : form.booth_count * form.booth_rate_cents;
   const lineItemsSumCents = lineItems.reduce((acc, row) => {
     const desc = row.description.trim();
     const raw = row.amountInput.trim().replace(/[$,]/g, '');
@@ -375,15 +387,40 @@ export function NewContractForm({
       setBoothRateInput('0.00');
       return;
     }
-    const cents = boothOnlyEvent ? nyweLicenseFeeCents(selectedEvent) : (selectedEvent.booth_rate_cents ?? 1500000);
+    if (isBigSmokeEvent) {
+      const priced = pricingFromBigSmokePackage(packageKey);
+      if (!priced) return;
+      setForm((f) => ({
+        ...f,
+        booth_count: priced.booth_count,
+        booth_rate_cents: priced.booth_rate_cents,
+      }));
+      setBoothCountInput(String(priced.booth_count));
+      setBoothRateInput((priced.booth_rate_cents / 100).toFixed(2));
+      return;
+    }
+    const cents = isNyweFlatEvent ? nyweLicenseFeeCents(selectedEvent) : (selectedEvent.booth_rate_cents ?? 1500000);
     setForm((f) => ({
       ...f,
-      booth_count: boothOnlyEvent ? 1 : f.booth_count,
+      booth_count: isNyweFlatEvent ? 1 : f.booth_count,
       booth_rate_cents: cents,
     }));
     setBoothRateInput((cents / 100).toFixed(2));
-    if (boothOnlyEvent) setBoothCountInput('1');
-  }, [selectedEvent?.id, dealKind, boothOnlyEvent, noChargeBooth]);
+    if (isNyweFlatEvent) setBoothCountInput('1');
+  }, [selectedEvent?.id, dealKind, isNyweFlatEvent, isBigSmokeEvent, packageKey, noChargeBooth]);
+
+  function applyBigSmokePackage(key: string) {
+    setPackageKey(key);
+    const priced = pricingFromBigSmokePackage(key);
+    if (!priced) return;
+    setForm((f) => ({
+      ...f,
+      booth_count: priced.booth_count,
+      booth_rate_cents: priced.booth_rate_cents,
+    }));
+    setBoothCountInput(String(priced.booth_count));
+    setBoothRateInput((priced.booth_rate_cents / 100).toFixed(2));
+  }
 
   function setNoChargeMode(enabled: boolean) {
     setNoChargeBooth(enabled);
@@ -444,6 +481,10 @@ export function NewContractForm({
     if (!form.exhibitor_company_name) { setErr('Company name required'); return; }
     if (!form.exhibitor_legal_name)   { setErr('Legal name required'); return; }
     if (!eventsManaged && !form.sales_rep_id) { setErr('Sales rep is required'); return; }
+    if (isBigSmokeEvent && !pricingFromBigSmokePackage(packageKey)) {
+      setErr('Select a Big Smoke exhibitor package');
+      return;
+    }
 
     const useNoCharge = showNoChargeOption && noChargeBooth;
     if (useNoCharge && noChargeEnforceStephenRep && stephenRepId && form.sales_rep_id !== stephenRepId) {
@@ -511,18 +552,26 @@ export function NewContractForm({
       const url = editContractId ? `/api/contracts/${editContractId}` : '/api/contracts';
       const method = editContractId ? 'PATCH' : 'POST';
 
+      const bigSmokePriced = isBigSmokeEvent ? pricingFromBigSmokePackage(packageKey) : null;
       const formForSave = {
         ...form,
         event_id: resolvedEventId,
         signer_1_title: boothOnlyEvent ? null : form.signer_1_title.trim() || null,
-        booth_count: boothOnlyEvent ? 1 : boothCountNorm,
+        booth_count: bigSmokePriced
+          ? bigSmokePriced.booth_count
+          : boothOnlyEvent
+            ? 1
+            : boothCountNorm,
         booth_rate_cents: sponsorshipOnly
           ? 0
           : useNoCharge
             ? 0
-            : boothOnlyEvent && selectedEvent
-              ? nyweLicenseFeeCents(selectedEvent)
-              : form.booth_rate_cents,
+            : bigSmokePriced
+              ? bigSmokePriced.booth_rate_cents
+              : isNyweFlatEvent && selectedEvent
+                ? nyweLicenseFeeCents(selectedEvent)
+                : form.booth_rate_cents,
+        package_key: isBigSmokeEvent ? packageKey : null,
       };
       const booth_brands = boothOnlyEvent
         ? []
@@ -610,9 +659,11 @@ export function NewContractForm({
           <CardHeader>
             <CardTitle>Event</CardTitle>
             <CardDescription>
-              {boothOnlyEvent
-                ? 'Which New York Wine Experience event is this license for?'
-                : 'Which WhiskyFest is this for?'}
+              {isBigSmokeEvent
+                ? 'Which Big Smoke event is this exhibitor package for?'
+                : isNyweFlatEvent
+                  ? 'Which New York Wine Experience event is this license for?'
+                  : 'Which WhiskyFest is this for?'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -764,13 +815,15 @@ export function NewContractForm({
           <CardHeader>
             <CardTitle>Pricing</CardTitle>
             <CardDescription>
-              {boothOnlyEvent
-                ? 'NYWE vendor licenses are a flat fee — not per-booth WhiskyFest pricing.'
-                : dealKind === 'sponsorship_only'
-                  ? 'Sponsorship-only — line items only, no booth on the contract.'
-                  : dealKind === 'booth_and_sponsorship'
-                    ? 'Booth package plus sponsorship or activation line items on one contract (combo deal).'
-                    : 'Booth package only — add line items if you later need a combo deal.'}
+              {isBigSmokeEvent
+                ? 'Choose the rate-sheet package for this exhibitor — fee is fixed by category and booth size.'
+                : isNyweFlatEvent
+                  ? 'NYWE vendor licenses are a flat fee — not per-booth WhiskyFest pricing.'
+                  : dealKind === 'sponsorship_only'
+                    ? 'Sponsorship-only — line items only, no booth on the contract.'
+                    : dealKind === 'booth_and_sponsorship'
+                      ? 'Booth package plus sponsorship or activation line items on one contract (combo deal).'
+                      : 'Booth package only — add line items if you later need a combo deal.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -822,7 +875,46 @@ export function NewContractForm({
             ) : null}
 
             {dealKind !== 'sponsorship_only' ? (
-            boothOnlyEvent ? (
+            isBigSmokeEvent ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Exhibitor package</Label>
+                  <Select
+                    value={packageKey || undefined}
+                    onValueChange={(v) => applyBigSmokePackage(v as BigSmokePackageKey)}
+                    disabled={busy}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select rate-sheet package…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {BIG_SMOKE_PACKAGES.map((pkg) => (
+                        <SelectItem key={pkg.key} value={pkg.key}>
+                          {bigSmokePackageDisplayName(pkg)} — {formatCurrency(pkg.fee_cents)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {selectedBigSmokePkg ? (
+                  <div className="rounded-lg border border-border/60 bg-muted/10 p-4">
+                    <p className="text-sm font-medium text-foreground">
+                      {bigSmokePackageDisplayName(selectedBigSmokePkg)}
+                    </p>
+                    <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-fest-900">
+                      {formatCurrency(selectedBigSmokePkg.fee_cents)}
+                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {selectedBigSmokePkg.boothLabel}
+                      {selectedBigSmokePkg.booth_count > 1
+                        ? ` (${selectedBigSmokePkg.booth_count} booths)`
+                        : ''}
+                      {' · '}Cigar Aficionado Big Smoke Las Vegas rate sheet
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            ) : isNyweFlatEvent ? (
               <div className="rounded-lg border border-border/60 bg-muted/10 p-4">
                 <p className="text-sm font-medium text-foreground">Vendor license fee</p>
                 <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-fest-900">
@@ -1067,7 +1159,7 @@ export function NewContractForm({
               {dealKind !== 'sponsorship_only' ? (
               <div className="flex items-baseline justify-between text-sm">
                 <span className="text-muted-foreground">
-                  {boothOnlyEvent ? 'License fee' : 'Booth subtotal'}
+                  {isBigSmokeEvent ? 'Package fee' : boothOnlyEvent ? 'License fee' : 'Booth subtotal'}
                 </span>
                 <span className="font-mono tabular-nums">{formatCurrency(boothSubtotal)}</span>
               </div>
@@ -1080,7 +1172,7 @@ export function NewContractForm({
               )}
               <div className="mt-4 flex items-baseline justify-between border-t border-fest-600/15 pt-3">
                 <span className="font-serif text-xl font-semibold">
-                  {boothOnlyEvent ? 'License total' : 'Contract total'}
+                  {isBigSmokeEvent ? 'Package total' : boothOnlyEvent ? 'License total' : 'Contract total'}
                 </span>
                 <span className="font-serif text-2xl font-semibold tabular-nums text-fest-900">
                   {formatCurrency(grandTotal)}

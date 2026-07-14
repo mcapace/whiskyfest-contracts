@@ -4,10 +4,12 @@ import {
   extractCountersignerFromSigners,
   fetchEnvelopeSigners,
   fetchEnvelopeStatus,
-  fetchRecipientTextTabs,
   type DocuSignSignerRow,
 } from '@/lib/docusign';
-import { buildExhibitorCaptureDbPatch, textTabsToLabelMap } from '@/lib/docusign-exhibitor-capture';
+import {
+  fetchExhibitorCaptureFromEnvelope,
+  type ExhibitorCaptureDbRow,
+} from '@/lib/docusign-exhibitor-capture';
 import { uploadPdfBufferToFolder } from '@/lib/google';
 import { signedFolderIdForEvent } from '@/lib/google-drive-folders';
 import { contractPdfBaseName } from '@/lib/contract-document-naming';
@@ -26,6 +28,8 @@ import {
   notifyPartialSignature,
 } from '@/lib/notifications';
 import type { ContractWithTotals, Event } from '@/types/db';
+
+export { fetchExhibitorCaptureFromEnvelope } from '@/lib/docusign-exhibitor-capture';
 
 function signerCompleted(s: DocuSignSignerRow): boolean {
   const st = (s.status ?? '').toLowerCase();
@@ -72,19 +76,7 @@ export async function applyExhibitorPartialSignature(
     return { updated: false };
   }
 
-  let exhibitorCapture: ReturnType<typeof buildExhibitorCaptureDbPatch> = null;
-  try {
-    const signers = await fetchEnvelopeSigners(envelopeId);
-    const exhibitorRecipientId = routing1Signer(signers)?.recipientId?.trim() || '1';
-    const tabs = await fetchRecipientTextTabs(envelopeId, exhibitorRecipientId);
-    exhibitorCapture = buildExhibitorCaptureDbPatch(textTabsToLabelMap(tabs));
-  } catch (e) {
-    console.error('[docusign-sync] exhibitor tabs fetch failed', {
-      contractId: contract.id,
-      envelopeId,
-      error: e instanceof Error ? e.message : String(e),
-    });
-  }
+  const exhibitorCapture = await fetchExhibitorCaptureFromEnvelope(envelopeId);
 
   const { error: partialUpdateErr } = await supabase
     .from('contracts')
@@ -169,9 +161,10 @@ export async function applyEnvelopeFullySigned(
     return { updated: false };
   }
 
+  let signers: DocuSignSignerRow[] | undefined;
   let countersigner = null as ReturnType<typeof extractCountersignerFromSigners>;
   try {
-    const signers = await fetchEnvelopeSigners(envelopeId);
+    signers = await fetchEnvelopeSigners(envelopeId);
     countersigner = extractCountersignerFromSigners(signers);
   } catch (recErr) {
     console.error('DocuSign sync: fetchEnvelopeSigners failed', recErr);
@@ -180,6 +173,13 @@ export async function applyEnvelopeFullySigned(
   const now = new Date().toISOString();
   if (!countersigner?.email && event && usesSingleSignerEnvelope(event)) {
     countersigner = eventCountersignerIdentity(event, now);
+  }
+
+  // Late capture: envelope-completed can arrive while status is still `sent`, skipping the
+  // partially_signed path that normally persists billing tabs. Capture before release/email.
+  let lateExhibitorCapture: ExhibitorCaptureDbRow | null = null;
+  if (!contract.exhibitor_fields_captured_at) {
+    lateExhibitorCapture = await fetchExhibitorCaptureFromEnvelope(envelopeId, signers);
   }
 
   const pdfBytes = await downloadCompletedPdf(envelopeId);
@@ -206,8 +206,22 @@ export async function applyEnvelopeFullySigned(
       countersigned_by_email: countersigner?.email ?? null,
       countersigned_by_name: countersigner?.name ?? null,
       countersigned_at: countersigner?.signedDateTime ?? null,
+      ...(lateExhibitorCapture ?? {}),
     })
     .eq('id', contract.id);
+
+  if (lateExhibitorCapture) {
+    await insertContractAudit(supabase, {
+      contract_id: contract.id,
+      actor_email: options?.actorEmail ?? null,
+      action: 'exhibitor_fields_captured',
+      metadata: {
+        envelope_id: envelopeId,
+        source: 'late_capture_on_fully_signed',
+        from_status: fromStatus,
+      },
+    });
+  }
 
   if (countersigner?.email) {
     await insertContractAudit(supabase, {

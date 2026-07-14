@@ -17,6 +17,7 @@ export function ContractDetailHeader({
   salesRep,
   showSalesRep = true,
   vendorLicense = false,
+  packageOverride,
 }: {
   title: string;
   subtitle: string;
@@ -28,6 +29,8 @@ export function ContractDetailHeader({
   salesRep: string | null;
   showSalesRep?: boolean;
   vendorLicense?: boolean;
+  /** When set (e.g. Big Smoke rate-sheet package), shown instead of deal-kind labeling. */
+  packageOverride?: string;
 }) {
   const dealKind = dealKindFromContract({
     order_type: orderType,
@@ -51,6 +54,11 @@ export function ContractDetailHeader({
           <p>
             <span className="text-ink-500">Package</span> ·{' '}
             <span className="font-semibold text-oak-800">Vendor license</span>
+          </p>
+        ) : packageOverride ? (
+          <p>
+            <span className="text-ink-500">Package</span> ·{' '}
+            <span className="font-semibold text-oak-800">{packageOverride}</span>
           </p>
         ) : (
           <p>

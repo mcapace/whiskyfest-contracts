@@ -81,6 +81,8 @@ export interface Contract {
   brands_poured: string | null;
   /** booth = exhibitor booth package; sponsorship_only = line items only (no booth). */
   order_type: 'booth' | 'sponsorship_only';
+  /** Big Smoke (etc.) package catalog key; null for WhiskyFest / flat NYWE. */
+  package_key: string | null;
   booth_count: number;
   booth_rate_cents: number;
   additional_brand_count: number;

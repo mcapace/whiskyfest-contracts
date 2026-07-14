@@ -14,6 +14,7 @@ import { replaceContractBoothBrandsForContract, clearContractBoothBrandsForContr
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
 import { eventTemplateProfile, isEventsManagedWorkflow } from '@/lib/contract-template-profile';
 import { isNyweVendorEvent, applyNyweLicensePricingIfNeeded, signerTitleForContract } from '@/lib/nywe-pricing';
+import { pricingFromBigSmokePackage } from '@/lib/big-smoke-pricing';
 import { billingFieldsFromOptionalBody } from '@/lib/nywe-billing';
 import { isDiscountedRate } from '@/lib/contracts';
 import {
@@ -157,11 +158,15 @@ export async function POST(req: Request) {
   const rosterBilling =
     eventTemplateProfile(eventRow) === 'nywe_vendor' ? billingFieldsFromOptionalBody(p) : null;
 
+  const profile = eventTemplateProfile(eventRow);
+  const bigSmokePricing =
+    profile === 'big_smoke' ? pricingFromBigSmokePackage(p.package_key) : null;
   const nywePricing = applyNyweLicensePricingIfNeeded(eventRow, {
-    booth_count: p.booth_count,
-    booth_rate_cents: p.booth_rate_cents,
+    booth_count: bigSmokePricing?.booth_count ?? p.booth_count,
+    booth_rate_cents: bigSmokePricing?.booth_rate_cents ?? p.booth_rate_cents,
   });
   const nyweLineItems = isNyweVendorEvent(eventRow) ? [] : (p.line_items ?? []);
+  const packageKey = bigSmokePricing?.package_key ?? null;
 
   const noChargeRequested = Boolean(p.no_charge_booth);
   const noChargeGate = await assertNoChargeBoothAllowed({
@@ -195,6 +200,7 @@ export async function POST(req: Request) {
         : p.order_type === 'sponsorship_only'
           ? sponsorBrandFromBody(p)
           : null,
+      package_key: packageKey,
       booth_count: nywePricing.booth_count,
       booth_rate_cents: nywePricing.booth_rate_cents,
       signer_1_name: p.signer_1_name ?? null,

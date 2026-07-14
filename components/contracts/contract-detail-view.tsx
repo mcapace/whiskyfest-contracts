@@ -5,7 +5,12 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { standardBoothRateCentsForEvent } from '@/lib/contracts';
-import { isNyweVendorEvent, nyweLicenseFeeCents } from '@/lib/nywe-pricing';
+import { isNyweVendorEvent, isNyweVendorOnlyEvent, nyweLicenseFeeCents } from '@/lib/nywe-pricing';
+import {
+  bigSmokePackageDisplayName,
+  getBigSmokePackage,
+} from '@/lib/big-smoke-pricing';
+import { listPackageLabel } from '@/lib/contract-deal-kind';
 import {
   INTERNAL_CONTRACT_NOTES_LABEL,
   SPONSOR_CONTRACT_NOTES_LABEL,
@@ -99,7 +104,14 @@ export function ContractDetailView({
   exhibitorSigningLandingUrl,
   exhibitorSigningApiUrl,
 }: ContractDetailViewProps) {
-  const nyweLicense = isNyweVendorEvent(event);
+  const packageFeeEvent = isNyweVendorEvent(event);
+  const nyweLicense = isNyweVendorOnlyEvent(event);
+  const bigSmokePkg = getBigSmokePackage(contract.package_key);
+  const packageOverride = bigSmokePkg
+    ? bigSmokePackageDisplayName(bigSmokePkg)
+    : packageFeeEvent && !nyweLicense
+      ? listPackageLabel(contract)
+      : undefined;
 
   return (
     <ContractLiveProvider>
@@ -126,8 +138,9 @@ export function ContractDetailView({
           lineItemsSubtotalCents={contract.line_items_subtotal_cents}
           totalCents={contract.grand_total_cents}
           salesRep={contract.sales_rep_name ?? contract.sales_rep_email ?? null}
-          showSalesRep={!nyweLicense}
+          showSalesRep={!packageFeeEvent}
           vendorLicense={nyweLicense}
+          packageOverride={packageOverride}
         />
 
         <div className="grid gap-6 xl:grid-cols-[240px_minmax(0,1fr)]">
@@ -401,7 +414,7 @@ export function ContractDetailView({
                   </div>
                   <Detail label="Legal Name" value={contract.exhibitor_legal_name} />
                   <Detail label="Display Name" value={contract.exhibitor_company_name} />
-                  {!nyweLicense && boothBrands.length > 0 ? (
+                  {!packageFeeEvent && boothBrands.length > 0 ? (
                     <section aria-labelledby="brands-expressions-heading">
                       <h3
                         id="brands-expressions-heading"
@@ -441,12 +454,12 @@ export function ContractDetailView({
                         ))}
                       </div>
                     </section>
-                  ) : !nyweLicense ? (
+                  ) : !packageFeeEvent ? (
                     <Detail label="Brands" value={contract.brands_poured} />
                   ) : contract.brands_poured ? (
-                    <Detail label="Wine" value={contract.brands_poured} />
+                    <Detail label={nyweLicense ? 'Wine' : 'Company / brand'} value={contract.brands_poured} />
                   ) : null}
-                  {!nyweLicense ? (
+                  {!packageFeeEvent ? (
                     <Detail label="Sales Rep" value={contract.sales_rep_name ?? contract.sales_rep_email ?? '—'} />
                   ) : null}
                   {(contract.status === 'signed' || contract.status === 'executed') &&
@@ -465,7 +478,7 @@ export function ContractDetailView({
                   <h2 className="font-serif text-lg font-semibold">Pricing</h2>
                 </div>
                 <CardContent className="space-y-3 p-6 text-sm">
-                  {!nyweLicense ? (
+                  {!packageFeeEvent ? (
                     <Detail label="Deal type" value={dealKindLabel(dealKind)} />
                   ) : null}
                   {isSponsorshipOnlyOrder(contract) ? (
@@ -476,17 +489,24 @@ export function ContractDetailView({
                         <Detail label="Sponsor / brand" value={contract.brands_poured} />
                       ) : null}
                     </>
-                  ) : isNyweVendorEvent(event) ? (
+                  ) : nyweLicense ? (
                     <>
                       <p className="wf-label-caps text-[0.6rem] text-muted-foreground">Vendor license</p>
                       <Detail
                         label="License fee"
-                        value={formatCurrency(nyweLicenseFeeCents(event ?? undefined))}
+                        value={formatCurrency(contract.booth_subtotal_cents || nyweLicenseFeeCents(event ?? undefined))}
                         mono
                       />
                       {contract.brands_poured ? (
                         <Detail label="Wine / brand" value={contract.brands_poured} />
                       ) : null}
+                    </>
+                  ) : bigSmokePkg ? (
+                    <>
+                      <p className="wf-label-caps text-[0.6rem] text-muted-foreground">Exhibitor package</p>
+                      <Detail label="Package" value={bigSmokePackageDisplayName(bigSmokePkg)} />
+                      <Detail label="Booths" value={String(bigSmokePkg.booth_count)} />
+                      <Detail label="Package fee" value={formatCurrency(bigSmokePkg.fee_cents)} mono />
                     </>
                   ) : (
                     <>

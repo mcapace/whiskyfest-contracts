@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { BRAND_CATEGORIES } from '@/lib/brand-category';
+import { isBigSmokePackageKey } from '@/lib/big-smoke-pricing';
 import { CONTRACT_ORDER_TYPES } from '@/lib/contract-order-type';
 import { CONTRACT_TEMPLATE_PROFILES } from '@/lib/contract-template-profile';
 import { MAX_LINE_ITEM_AMOUNT_CENTS } from '@/lib/contract-line-items';
@@ -42,6 +43,8 @@ export const newContractBodySchema = z
     ),
     /** Sent by the order form so NYWE vendor licenses skip WhiskyFest booth-brand rules. */
     contract_template_profile: z.enum(CONTRACT_TEMPLATE_PROFILES).optional(),
+    /** Big Smoke rate-sheet package key. */
+    package_key: z.string().max(80).optional().nullable(),
     notes: z.string().max(20000).optional().nullable(),
     exhibitor_notes: z.string().max(50000).optional().nullable(),
     billing_contact_name: z.string().max(200).optional().nullable(),
@@ -108,7 +111,10 @@ export const newContractBodySchema = z
     }
 
     if (data.no_charge_booth) {
-      if (data.contract_template_profile === 'nywe_vendor') {
+      if (
+        data.contract_template_profile === 'nywe_vendor' ||
+        data.contract_template_profile === 'big_smoke'
+      ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: 'No-charge booth is only available for WhiskyFest contracts.',
@@ -127,6 +133,18 @@ export const newContractBodySchema = z
     }
 
     if (data.contract_template_profile === 'nywe_vendor') {
+      return;
+    }
+
+    if (data.contract_template_profile === 'big_smoke') {
+      const key = data.package_key?.trim() ?? '';
+      if (!isBigSmokePackageKey(key)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Select a Big Smoke exhibitor package.',
+          path: ['package_key'],
+        });
+      }
       return;
     }
 
