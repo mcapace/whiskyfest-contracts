@@ -31,7 +31,8 @@ export function InvoiceLifecycleTimeline({
       <div className="rounded-lg border border-rose-300/80 bg-rose-50/60 px-4 py-3">
         <p className="text-sm font-medium text-rose-950">{formatInvoiceStatus('invoice_voided')}</p>
         <p className="mt-1 text-xs text-rose-900/80">
-          This sent invoice was cancelled. Restore to Pending from AR Actions if it should be billed again.
+          This sent invoice was cancelled. Accounting can Mark Invoice Sent again, then Mark Paid — or Restore to
+          Pending first.
         </p>
       </div>
     );

@@ -115,14 +115,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (inv === 'not_invoiced') {
       return NextResponse.json({ error: 'This contract is marked Do Not Invoice and cannot be invoiced.' }, { status: 409 });
     }
-    if (inv === 'invoice_voided') {
+    if (inv !== 'pending' && inv !== 'invoice_voided') {
       return NextResponse.json(
-        { error: 'This invoice was voided. Restore it to pending first, then mark sent again.' },
+        { error: 'Invoice can only be marked sent from pending or voided state.' },
         { status: 409 },
       );
-    }
-    if (inv !== 'pending') {
-      return NextResponse.json({ error: 'Invoice can only be marked sent from pending state.' }, { status: 409 });
     }
     const now = new Date().toISOString();
     const { error } = await supabase
@@ -140,7 +137,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       contract_id: contract.id,
       actor_email: actor.email,
       action: 'invoice_marked_sent',
-      metadata: { invoice_sent_at: now },
+      metadata: {
+        invoice_sent_at: now,
+        from_status: inv,
+        reissued_after_void: inv === 'invoice_voided',
+      },
     });
     revalidateContractPaths(contract.id);
 

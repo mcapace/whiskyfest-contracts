@@ -229,22 +229,40 @@ export function AccountingDetailActions({
                 </>
               )}
               {invoiceStatus === 'invoice_voided' && canVoidInvoice && (
-                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.restoreVoidedInvoice}>
-                  <Button
-                    type="button"
-                    data-tour="accounting-restore-voided-invoice"
-                    className={btnSecondary}
-                    onClick={restoreVoidedInvoice}
-                    disabled={busy}
-                    title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
-                  >
-                    <ContractActionButtonLabel
-                      icon={RotateCcw}
-                      label={pending ? 'Saving…' : 'Restore to Pending'}
-                      spinning={pending}
-                    />
-                  </Button>
-                </ActionWithHelp>
+                <>
+                  <ActionWithHelp helpText={CONTRACT_ACTION_HELP.markInvoiceSent}>
+                    <Button
+                      type="button"
+                      data-tour="accounting-mark-invoice-sent"
+                      className={btnPrimary}
+                      onClick={markInvoiceSent}
+                      disabled={busy}
+                      title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                    >
+                      <ContractActionButtonLabel
+                        icon={Send}
+                        label={pending ? 'Saving…' : 'Mark Invoice Sent'}
+                        spinning={pending}
+                      />
+                    </Button>
+                  </ActionWithHelp>
+                  <ActionWithHelp helpText={CONTRACT_ACTION_HELP.restoreVoidedInvoice}>
+                    <Button
+                      type="button"
+                      data-tour="accounting-restore-voided-invoice"
+                      className={btnSecondary}
+                      onClick={restoreVoidedInvoice}
+                      disabled={busy}
+                      title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                    >
+                      <ContractActionButtonLabel
+                        icon={RotateCcw}
+                        label={pending ? 'Saving…' : 'Restore to Pending'}
+                        spinning={pending}
+                      />
+                    </Button>
+                  </ActionWithHelp>
+                </>
               )}
             </ContractActionsSidebarGroup>
           </div>
@@ -301,8 +319,8 @@ export function AccountingDetailActions({
           <div className="rounded-lg border border-rose-300/80 bg-rose-50/60 p-4 text-sm text-rose-950 md:p-6">
             <p className="font-medium">Invoice voided</p>
             <p className="mt-2 text-rose-900/90">
-              This sent invoice was cancelled. It will not appear on the billed export. Restore to Pending if you need to
-              invoice again.
+              This sent invoice was cancelled and removed from the billed export. Use <strong>Mark Invoice Sent</strong>{' '}
+              to re-issue (then Mark Paid), or Restore to Pending if you are not ready to send yet.
             </p>
           </div>
         ) : null}
