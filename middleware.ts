@@ -38,6 +38,7 @@ type SessionUserFlags = {
   is_events_team?: boolean;
   wine_spectator_access?: boolean;
   big_smoke_access?: boolean;
+  is_big_smoke_admin?: boolean;
   role?: string;
   email?: string;
 };
@@ -113,7 +114,18 @@ export default auth((req) => {
         const url = req.nextUrl.clone();
         url.pathname = internal;
         response = NextResponse.rewrite(url);
-      } else if (isWhiskyfestOnlyPath(pathname) && !pathname.startsWith('/api/') && pathname !== '/events' && !pathname.startsWith('/events/')) {
+      } else if (
+        isWhiskyfestOnlyPath(pathname) &&
+        !pathname.startsWith('/api/') &&
+        pathname !== '/events' &&
+        !pathname.startsWith('/events/') &&
+        pathname !== '/users' &&
+        !pathname.startsWith('/users/') &&
+        pathname !== '/sales-reps' &&
+        !pathname.startsWith('/sales-reps/') &&
+        pathname !== '/admin' &&
+        !pathname.startsWith('/admin/')
+      ) {
         response = NextResponse.redirect(new URL('/', req.url));
       } else if (isNywePortalPath(pathname) && !pathname.startsWith('/api/')) {
         response = NextResponse.redirect(new URL('/', req.url));
@@ -224,6 +236,8 @@ export default auth((req) => {
         role: u.role,
         is_events_team: u.is_events_team,
         is_accounting: u.is_accounting,
+        is_big_smoke_admin: u.is_big_smoke_admin,
+        pipeline_access: u.pipeline_access,
         email: u.email,
       })
     ) {
@@ -252,6 +266,8 @@ export default auth((req) => {
         role: u.role,
         is_events_team: u.is_events_team,
         is_accounting: u.is_accounting,
+        is_big_smoke_admin: u.is_big_smoke_admin,
+        pipeline_access: u.pipeline_access,
         email: u.email,
       })
     ) {
@@ -273,6 +289,8 @@ export default auth((req) => {
         role: u.role,
         is_events_team: u.is_events_team,
         is_accounting: u.is_accounting,
+        is_big_smoke_admin: u.is_big_smoke_admin,
+        pipeline_access: u.pipeline_access,
         email: u.email,
       }),
       role: u.role,

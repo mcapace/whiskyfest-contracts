@@ -23,6 +23,7 @@ export function AccessRequestReviewForm({
   const [role, setRole] = useState<UserRole>('sales');
   const [eventsTeam, setEventsTeam] = useState(false);
   const [accounting, setAccounting] = useState(false);
+  const [bigSmokeAdmin, setBigSmokeAdmin] = useState(false);
   const [impersonation, setImpersonation] = useState(false);
   const [sendEmail, setSendEmail] = useState(true);
   const [reason, setReason] = useState('');
@@ -40,6 +41,7 @@ export function AccessRequestReviewForm({
               role,
               is_events_team: eventsTeam,
               is_accounting: accounting,
+              is_big_smoke_admin: bigSmokeAdmin,
               can_impersonate: impersonation,
               send_email: sendEmail,
             }
@@ -94,6 +96,7 @@ export function AccessRequestReviewForm({
           <div className="space-y-2 text-sm">
             <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4" checked={eventsTeam} onChange={(e) => setEventsTeam(e.target.checked)} /> Events team</label>
             <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4" checked={accounting} onChange={(e) => setAccounting(e.target.checked)} /> Accounting</label>
+            <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4" checked={bigSmokeAdmin} onChange={(e) => setBigSmokeAdmin(e.target.checked)} /> Big Smoke admin</label>
             <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4" checked={impersonation} onChange={(e) => setImpersonation(e.target.checked)} /> Impersonation</label>
             <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} /> Send welcome email</label>
           </div>

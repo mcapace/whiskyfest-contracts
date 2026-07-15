@@ -83,13 +83,14 @@ async function computeAccessFlagsForEmail(
   const canViewAllSales =
     isAdmin || isEventsTeam || isAccounting || Boolean((appUser as { can_view_all_sales?: boolean }).can_view_all_sales);
   const hasRep = accessibleSalesRepIds.length > 0;
+  const pipelineAccess = canViewAllSales || hasRep;
 
   return {
     role: appUser.role,
     is_events_team: isEventsTeam,
     is_accounting: isAccounting,
     can_view_all_sales: canViewAllSales,
-    pipeline_access: canViewAllSales || hasRep,
+    pipeline_access: pipelineAccess,
     wine_spectator_access: canAccessWineSpectator({
       role: appUser.role,
       is_events_team: isEventsTeam,
@@ -103,6 +104,7 @@ async function computeAccessFlagsForEmail(
       is_events_team: isEventsTeam,
       is_accounting: isAccounting,
       is_big_smoke_admin: isBigSmokeAdminFlag,
+      pipeline_access: pipelineAccess,
       email,
     }),
     is_big_smoke_admin: isBigSmokeAdminFlag,

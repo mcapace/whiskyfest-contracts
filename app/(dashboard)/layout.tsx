@@ -39,6 +39,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
     role: session.user.role,
     is_events_team: session.user.is_events_team,
     is_accounting: session.user.is_accounting,
+    is_big_smoke_admin: session.user.is_big_smoke_admin,
+    pipeline_access: session.user.pipeline_access,
     email: session.user.email,
   });
   let pendingAccessRequests = 0;

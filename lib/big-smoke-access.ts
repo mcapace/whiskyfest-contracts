@@ -3,6 +3,8 @@ export type BigSmokeAccessUser = {
   is_events_team?: boolean;
   is_accounting?: boolean;
   is_big_smoke_admin?: boolean;
+  /** Sales rep or assistant — same pipeline access model as WhiskyFest. */
+  pipeline_access?: boolean;
   email?: string | null;
 };
 
@@ -14,15 +16,15 @@ export function isBigSmokeAdmin(user: BigSmokeAccessUser | null | undefined): bo
 }
 
 /**
- * Big Smoke portal access:
- * admins, Big Smoke portal admins, events team, and AR.
- * Events team can create/manage Big Smoke events alongside ops admins.
+ * Big Smoke portal access (matches WhiskyFest pipeline model):
+ * admins, Big Smoke portal admins, events team, AR, and sales reps / assistants.
  */
 export function canAccessBigSmoke(user: BigSmokeAccessUser | null | undefined): boolean {
   if (!user) return false;
   if (isBigSmokeAdmin(user)) return true;
   if (user.is_events_team) return true;
   if (user.is_accounting) return true;
+  if (user.pipeline_access) return true;
   return false;
 }
 

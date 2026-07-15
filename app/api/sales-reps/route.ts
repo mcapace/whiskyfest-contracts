@@ -64,5 +64,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Same login path as WhiskyFest: ensure they have an active app_users row.
+  const { data: existingUser } = await supabase
+    .from('app_users')
+    .select('role')
+    .eq('email', parsed.data.email)
+    .maybeSingle();
+  if (!existingUser) {
+    await supabase.from('app_users').insert({
+      email: parsed.data.email,
+      name: parsed.data.name,
+      role: 'sales',
+      is_active: true,
+    });
+  } else {
+    await supabase
+      .from('app_users')
+      .update({
+        is_active: true,
+        name: parsed.data.name,
+        ...(existingUser.role === 'viewer' ? { role: 'sales' } : {}),
+      })
+      .eq('email', parsed.data.email);
+  }
+
   return NextResponse.json({ sales_rep: data });
 }

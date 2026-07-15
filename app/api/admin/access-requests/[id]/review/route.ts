@@ -14,6 +14,7 @@ const bodySchema = z.discriminatedUnion('action', [
     role: z.enum(['admin', 'sales', 'sales_rep', 'viewer']),
     is_events_team: z.boolean().optional(),
     is_accounting: z.boolean().optional(),
+    is_big_smoke_admin: z.boolean().optional(),
     can_impersonate: z.boolean().optional(),
     send_email: z.boolean().optional(),
   }),
@@ -54,6 +55,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const flags = {
       is_events_team: Boolean(parsed.data.is_events_team),
       is_accounting: Boolean(parsed.data.is_accounting),
+      is_big_smoke_admin: Boolean(parsed.data.is_big_smoke_admin),
       can_impersonate: Boolean(parsed.data.can_impersonate),
     };
 

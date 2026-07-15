@@ -131,6 +131,7 @@ const bigSmokeNav: SidebarNavItem[] = [
   { href: '/big-smoke/contracts', label: 'All contracts', icon: FileText },
   { href: '/big-smoke/contracts/new', label: 'New contract', icon: Plus },
   { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/sales-reps', label: 'Sales Reps', icon: UserRound, adminOnly: true },
   {
     href: '/events',
     label: 'Events',
@@ -138,6 +139,7 @@ const bigSmokeNav: SidebarNavItem[] = [
     adminOnly: true,
     bigSmokeAdminOk: true,
   },
+  { href: '/users', label: 'Users', icon: Users, adminOnly: true },
 ];
 
 const whiskyfestAccountingNav: SidebarNavItem[] = [
