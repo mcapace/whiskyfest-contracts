@@ -22,7 +22,7 @@ import type { Contract, ContractStatus, Event } from '@/types/db';
 import { isLegacyImportedContract } from '@/lib/legacy-import';
 import { billingFieldsFromOptionalBody } from '@/lib/nywe-billing';
 import { refreshNyweBillingFromRosterForContract } from '@/lib/nywe-roster-billing-sync';
-import { applyNyweLicensePricingIfNeeded, isNyweVendorEvent, signerTitleForContract } from '@/lib/nywe-pricing';
+import { applyNyweLicensePricingIfNeeded, isNyweVendorOnlyEvent, isPackageFeeEvent, signerTitleForContract } from '@/lib/nywe-pricing';
 import { pricingFromBigSmokePackage } from '@/lib/big-smoke-pricing';
 import { eventTemplateProfile } from '@/lib/contract-template-profile';
 import {
@@ -105,7 +105,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     const incomingBoothRate = p.booth_rate_cents;
     const patchEvent = patchEventFull;
-    const nyweEvent = isNyweVendorEvent(patchEvent);
+    const profile = eventTemplateProfile(patchEvent);
+    const nyweOnly = profile === 'nywe_vendor';
+    const isBigSmoke = profile === 'big_smoke';
+    const sponsorshipOnly = p.order_type === 'sponsorship_only';
     const noChargeRequested = Boolean(p.no_charge_booth);
     const noChargeGate = await assertNoChargeBoothAllowed({
       actorEmail: actor.email,
@@ -122,9 +125,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const becomingNoCharge = noChargeRequested && !wasNoCharge;
     const leavingNoCharge = !noChargeRequested && wasNoCharge;
 
-    const bill = nyweEvent ? {} : clearedRepEnteredBilling();
+    const bill = nyweOnly || isBigSmoke ? {} : clearedRepEnteredBilling();
     const bigSmokePricing =
-      eventTemplateProfile(patchEvent) === 'big_smoke'
+      isBigSmoke && !sponsorshipOnly && !noChargeRequested
         ? pricingFromBigSmokePackage(p.package_key)
         : null;
     const nywePricing = applyNyweLicensePricingIfNeeded(patchEvent, {
@@ -134,21 +137,18 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         : (bigSmokePricing?.booth_rate_cents ?? incomingBoothRate),
     });
     const boothRateChanged = nywePricing.booth_rate_cents !== contract.booth_rate_cents;
-    const nyweLineItems = nyweEvent ? [] : (p.line_items ?? []);
-    const nextPackageKey =
-      eventTemplateProfile(patchEvent) === 'big_smoke'
-        ? (bigSmokePricing?.package_key ?? null)
-        : null;
+    const savedLineItems = nyweOnly ? [] : (p.line_items ?? []);
+    const nextPackageKey = bigSmokePricing?.package_key ?? null;
     const shouldResetDiscountApproval =
       !noChargeRequested &&
-      !nyweEvent &&
+      !isPackageFeeEvent(patchEvent) &&
       boothRateChanged &&
       (nywePricing.booth_rate_cents >= STANDARD_BOOTH_RATE_CENTS ||
         nywePricing.booth_rate_cents < contract.booth_rate_cents);
 
-    const nyweBilling = nyweEvent ? billingFieldsFromOptionalBody(p) : null;
+    const nyweBilling = nyweOnly || isBigSmoke ? billingFieldsFromOptionalBody(p) : null;
 
-    if (nyweEvent) {
+    if (isPackageFeeEvent(patchEvent)) {
       effectiveSalesRepId = null;
     }
 
@@ -171,11 +171,13 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         exhibitor_legal_name: p.exhibitor_legal_name,
         exhibitor_company_name: p.exhibitor_company_name,
         order_type: p.order_type ?? 'booth',
-        brands_poured: nyweEvent
+        brands_poured: nyweOnly
           ? (p.brands_poured?.trim() || p.exhibitor_company_name.trim() || null)
-          : p.order_type === 'sponsorship_only'
+          : sponsorshipOnly
             ? sponsorBrandFromBody(p)
-            : null,
+            : isBigSmoke
+              ? p.exhibitor_company_name.trim() || null
+              : null,
         package_key: nextPackageKey,
         booth_count: nywePricing.booth_count,
         booth_rate_cents: nywePricing.booth_rate_cents,
@@ -221,8 +223,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
 
     try {
-      await replaceContractLineItemsForContract(supabase, params.id, nyweLineItems);
-      if (nyweEvent) {
+      await replaceContractLineItemsForContract(supabase, params.id, savedLineItems);
+      if (nyweOnly || isBigSmoke) {
         await clearContractBoothBrandsForContract(supabase, params.id);
       } else {
         await replaceContractBoothBrandsForContract(
@@ -260,7 +262,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     revalidateContractPaths(params.id);
 
-    if ((reopeningVoided || reopeningCancelled) && patchEvent && nyweEvent) {
+    if ((reopeningVoided || reopeningCancelled) && patchEvent && nyweOnly) {
       const { data: withTotals } = await supabase
         .from('contracts_with_totals')
         .select('*')
@@ -334,7 +336,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     : incomingBoothRate;
   const boothRateChanged = normalizedRate !== contract.booth_rate_cents;
   const shouldResetDiscountApproval =
-    !isNyweVendorEvent(signerPatchEvent) &&
+    !isNyweVendorOnlyEvent(signerPatchEvent) &&
     boothRateChanged &&
     (normalizedRate >= STANDARD_BOOTH_RATE_CENTS || normalizedRate < contract.booth_rate_cents);
 

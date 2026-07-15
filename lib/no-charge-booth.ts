@@ -1,6 +1,6 @@
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { isNyweVendorEvent } from '@/lib/nywe-pricing';
-import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
+import { eventTemplateProfile } from '@/lib/contract-template-profile';
+import { isNyweVendorOnlyEvent } from '@/lib/nywe-pricing';
 import type { Contract, Event } from '@/types/db';
 
 /** Stephen Senatore — head of Whisky Advocate; complimentary booth workflow. */
@@ -38,7 +38,21 @@ async function isWhiskyfestAdmin(actorEmail: string): Promise<boolean> {
   return Boolean(data?.is_active && data.role === 'admin');
 }
 
-/** True when the signed-in user may create/edit no-charge WhiskyFest booth deals. */
+async function actorMayCreateBigSmokeNoCharge(actorEmail: string): Promise<boolean> {
+  const supabase = getSupabaseAdmin();
+  const { data } = await supabase
+    .from('app_users')
+    .select('role, is_active, is_events_team, is_big_smoke_admin')
+    .eq('email', actorEmail.trim().toLowerCase())
+    .maybeSingle();
+  if (!data?.is_active) return false;
+  if (data.role === 'admin') return true;
+  if (data.is_big_smoke_admin) return true;
+  if (data.is_events_team) return true;
+  return false;
+}
+
+/** True when the signed-in user may create/edit WhiskyFest no-charge booth deals. */
 export async function actorCanUseNoChargeBooth(actorEmail: string): Promise<boolean> {
   if (await isWhiskyfestAdmin(actorEmail)) return true;
 
@@ -60,6 +74,11 @@ export async function actorCanUseNoChargeBooth(actorEmail: string): Promise<bool
   return Boolean(row?.id);
 }
 
+/** Events / Big Smoke admins may book complimentary Big Smoke packages. */
+export async function actorCanUseBigSmokeNoCharge(actorEmail: string): Promise<boolean> {
+  return actorMayCreateBigSmokeNoCharge(actorEmail);
+}
+
 /** Katherine must assign Stephen; admins and Stephen may pick any rep. */
 export async function noChargeMustAssignStephenRep(actorEmail: string): Promise<boolean> {
   if (await isWhiskyfestAdmin(actorEmail)) return false;
@@ -76,12 +95,26 @@ export async function assertNoChargeBoothAllowed(options: {
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!options.noChargeRequested) return { ok: true };
 
-  if (!(await actorCanUseNoChargeBooth(options.actorEmail))) {
-    return { ok: false, error: 'No-charge booth contracts are not available for this user.' };
+  if (isNyweVendorOnlyEvent(options.event)) {
+    return { ok: false, error: 'No-charge booth is not available for NYWE vendor licenses.' };
   }
 
-  if (isNyweVendorEvent(options.event)) {
-    return { ok: false, error: 'No-charge booth is only available for WhiskyFest contracts.' };
+  const profile = eventTemplateProfile(options.event);
+  if (profile === 'big_smoke') {
+    if (!(await actorMayCreateBigSmokeNoCharge(options.actorEmail))) {
+      return {
+        ok: false,
+        error: 'No-charge Big Smoke packages require events or Big Smoke admin access.',
+      };
+    }
+    if (options.orderType === 'sponsorship_only') {
+      return { ok: false, error: 'No-charge booth applies to booth packages, not sponsorship-only.' };
+    }
+    return { ok: true };
+  }
+
+  if (!(await actorCanUseNoChargeBooth(options.actorEmail))) {
+    return { ok: false, error: 'No-charge booth contracts are not available for this user.' };
   }
 
   if (options.orderType === 'sponsorship_only') {

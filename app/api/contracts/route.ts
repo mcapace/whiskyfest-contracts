@@ -13,7 +13,11 @@ import {
 import { replaceContractBoothBrandsForContract, clearContractBoothBrandsForContract } from '@/lib/contract-booth-brands';
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
 import { eventTemplateProfile, isEventsManagedWorkflow } from '@/lib/contract-template-profile';
-import { isNyweVendorEvent, applyNyweLicensePricingIfNeeded, signerTitleForContract } from '@/lib/nywe-pricing';
+import {
+  applyNyweLicensePricingIfNeeded,
+  isPackageFeeEvent,
+  signerTitleForContract,
+} from '@/lib/nywe-pricing';
 import { pricingFromBigSmokePackage } from '@/lib/big-smoke-pricing';
 import { billingFieldsFromOptionalBody } from '@/lib/nywe-billing';
 import { isDiscountedRate } from '@/lib/contracts';
@@ -155,20 +159,28 @@ export async function POST(req: Request) {
   }
 
   const bill = clearedRepEnteredBilling();
-  const rosterBilling =
-    eventTemplateProfile(eventRow) === 'nywe_vendor' ? billingFieldsFromOptionalBody(p) : null;
-
   const profile = eventTemplateProfile(eventRow);
-  const bigSmokePricing =
-    profile === 'big_smoke' ? pricingFromBigSmokePackage(p.package_key) : null;
-  const nywePricing = applyNyweLicensePricingIfNeeded(eventRow, {
-    booth_count: bigSmokePricing?.booth_count ?? p.booth_count,
-    booth_rate_cents: bigSmokePricing?.booth_rate_cents ?? p.booth_rate_cents,
-  });
-  const nyweLineItems = isNyweVendorEvent(eventRow) ? [] : (p.line_items ?? []);
-  const packageKey = bigSmokePricing?.package_key ?? null;
+  const nyweOnly = profile === 'nywe_vendor';
+  const isBigSmoke = profile === 'big_smoke';
+  const sponsorshipOnly = p.order_type === 'sponsorship_only';
+  const rosterBilling =
+    nyweOnly || isBigSmoke ? billingFieldsFromOptionalBody(p) : null;
 
   const noChargeRequested = Boolean(p.no_charge_booth);
+  const bigSmokePricing =
+    isBigSmoke && !sponsorshipOnly && !noChargeRequested
+      ? pricingFromBigSmokePackage(p.package_key)
+      : null;
+  const nywePricing = applyNyweLicensePricingIfNeeded(eventRow, {
+    booth_count: bigSmokePricing?.booth_count ?? p.booth_count,
+    booth_rate_cents: noChargeRequested
+      ? 0
+      : (bigSmokePricing?.booth_rate_cents ?? p.booth_rate_cents),
+  });
+  // NYWE licenses are flat — no line items. Big Smoke + WhiskyFest allow sponsorship line items.
+  const savedLineItems = nyweOnly ? [] : (p.line_items ?? []);
+  const packageKey = bigSmokePricing?.package_key ?? null;
+
   const noChargeGate = await assertNoChargeBoothAllowed({
     actorEmail: actor.email,
     salesRepId: effectiveSalesRepId,
@@ -195,11 +207,13 @@ export async function POST(req: Request) {
       exhibitor_legal_name: p.exhibitor_legal_name,
       exhibitor_company_name: p.exhibitor_company_name,
       order_type: p.order_type ?? 'booth',
-      brands_poured: isNyweVendorEvent(eventRow)
+      brands_poured: nyweOnly
         ? (p.brands_poured?.trim() || p.exhibitor_company_name.trim() || null)
-        : p.order_type === 'sponsorship_only'
+        : sponsorshipOnly
           ? sponsorBrandFromBody(p)
-          : null,
+          : isBigSmoke
+            ? p.exhibitor_company_name.trim() || null
+            : null,
       package_key: packageKey,
       booth_count: nywePricing.booth_count,
       booth_rate_cents: nywePricing.booth_rate_cents,
@@ -208,7 +222,7 @@ export async function POST(req: Request) {
       signer_1_email: p.signer_1_email ?? null,
       signer_cc_name: normalizeSignerCcName(p.signer_cc_name),
       signer_cc_email: normalizeSignerCcEmail(p.signer_cc_email),
-      sales_rep_id: isNyweVendorEvent(eventRow) ? null : effectiveSalesRepId,
+      sales_rep_id: isPackageFeeEvent(eventRow) ? null : effectiveSalesRepId,
       notes: p.notes ?? null,
       exhibitor_notes: p.exhibitor_notes?.trim() || null,
       created_by: actor.email,
@@ -228,8 +242,8 @@ export async function POST(req: Request) {
   const row = data as Contract;
 
   try {
-    await replaceContractLineItemsForContract(supabase, row.id, nyweLineItems);
-    if (isNyweVendorEvent(eventRow)) {
+    await replaceContractLineItemsForContract(supabase, row.id, savedLineItems);
+    if (nyweOnly || isBigSmoke) {
       await clearContractBoothBrandsForContract(supabase, row.id);
     } else {
       await replaceContractBoothBrandsForContract(supabase, row.id, nywePricing.booth_count, p.booth_brands ?? []);

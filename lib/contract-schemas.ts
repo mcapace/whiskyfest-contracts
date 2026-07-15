@@ -111,13 +111,10 @@ export const newContractBodySchema = z
     }
 
     if (data.no_charge_booth) {
-      if (
-        data.contract_template_profile === 'nywe_vendor' ||
-        data.contract_template_profile === 'big_smoke'
-      ) {
+      if (data.contract_template_profile === 'nywe_vendor') {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'No-charge booth is only available for WhiskyFest contracts.',
+          message: 'No-charge booth is not available for NYWE vendor licenses.',
           path: ['no_charge_booth'],
         });
         return;
@@ -137,6 +134,8 @@ export const newContractBodySchema = z
     }
 
     if (data.contract_template_profile === 'big_smoke') {
+      // Sponsorship-only uses line-item amounts (like WhiskyFest); booth deals need a rate-sheet package.
+      if (data.order_type === 'sponsorship_only') return;
       const key = data.package_key?.trim() ?? '';
       if (!isBigSmokePackageKey(key)) {
         ctx.addIssue({

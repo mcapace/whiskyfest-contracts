@@ -6,6 +6,7 @@ import { getVisibleContractsFilter } from '@/lib/permissions';
 import { recentCompanyNames } from '@/lib/new-contract-hints';
 import { parseDealKindParam } from '@/lib/contract-deal-kind';
 import { PRODUCT_BIG_SMOKE, scopeEventsByProduct } from '@/lib/product-portal';
+import { actorCanUseBigSmokeNoCharge } from '@/lib/no-charge-booth';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,9 +44,10 @@ export default async function BigSmokeNewContractPage({
     hintsQuery = hintsQuery.limit(0);
   }
 
-  const [{ data: events }, { data: hintRows }] = await Promise.all([
+  const [{ data: events }, { data: hintRows }, canUseNoChargeBooth] = await Promise.all([
     supabase.from('events').select('*').eq('is_active', true).order('event_date', { ascending: true }),
     hintsQuery,
+    actorCanUseBigSmokeNoCharge(actor.email),
   ]);
 
   const scopedEvents = scopeEventsByProduct((events ?? []) as Event[], PRODUCT_BIG_SMOKE);
@@ -73,6 +75,7 @@ export default async function BigSmokeNewContractPage({
         smartHints={smartHints}
         initialDealKind={initialDealKind}
         portalBasePath="/big-smoke"
+        canUseNoChargeBooth={canUseNoChargeBooth}
       />
     </div>
   );

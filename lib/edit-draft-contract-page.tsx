@@ -5,13 +5,8 @@ import { isLegacyImportedContract } from '@/lib/legacy-import';
 import { NewContractForm } from '@/components/contracts/new-contract-form';
 import { dealKindFromContract } from '@/lib/contract-deal-kind';
 import type { ContractLineItem, Event } from '@/types/db';
-import {
-  PRODUCT_WINE_SPECTATOR,
-  productBasePath,
-  productKeyFromEvent,
-  scopeEventsByProduct,
-} from '@/lib/product-portal';
-import { actorCanUseNoChargeBooth, getStephenSenatoreRepId, noChargeMustAssignStephenRep } from '@/lib/no-charge-booth';
+import { actorCanUseNoChargeBooth, actorCanUseBigSmokeNoCharge, getStephenSenatoreRepId, noChargeMustAssignStephenRep } from '@/lib/no-charge-booth';
+import { PRODUCT_BIG_SMOKE, PRODUCT_WINE_SPECTATOR, productBasePath, productKeyFromEvent, scopeEventsByProduct } from '@/lib/product-portal';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,7 +70,9 @@ export async function EditDraftContractPage({
   });
 
   const [canUseNoChargeBooth, stephenRepId, noChargeEnforceStephenRep] = await Promise.all([
-    actorCanUseNoChargeBooth(viewed.actor.email),
+    productKey === PRODUCT_BIG_SMOKE
+      ? actorCanUseBigSmokeNoCharge(viewed.actor.email)
+      : actorCanUseNoChargeBooth(viewed.actor.email),
     getStephenSenatoreRepId(),
     noChargeMustAssignStephenRep(viewed.actor.email),
   ]);
