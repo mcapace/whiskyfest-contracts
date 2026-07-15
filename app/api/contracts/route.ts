@@ -18,7 +18,7 @@ import {
   isPackageFeeEvent,
   signerTitleForContract,
 } from '@/lib/nywe-pricing';
-import { pricingFromBigSmokePackage } from '@/lib/big-smoke-pricing';
+import { pricingFromBigSmokeInput } from '@/lib/big-smoke-pricing';
 import { billingFieldsFromOptionalBody } from '@/lib/nywe-billing';
 import { isDiscountedRate } from '@/lib/contracts';
 import {
@@ -169,7 +169,10 @@ export async function POST(req: Request) {
   const noChargeRequested = Boolean(p.no_charge_booth);
   const bigSmokePricing =
     isBigSmoke && !sponsorshipOnly && !noChargeRequested
-      ? pricingFromBigSmokePackage(p.package_key)
+      ? pricingFromBigSmokeInput({
+          package_selections: p.package_selections,
+          package_key: p.package_key,
+        })
       : null;
   const nywePricing = applyNyweLicensePricingIfNeeded(eventRow, {
     booth_count: bigSmokePricing?.booth_count ?? p.booth_count,
@@ -180,6 +183,7 @@ export async function POST(req: Request) {
   // NYWE licenses are flat — no line items. Big Smoke + WhiskyFest allow sponsorship line items.
   const savedLineItems = nyweOnly ? [] : (p.line_items ?? []);
   const packageKey = bigSmokePricing?.package_key ?? null;
+  const packageSelections = bigSmokePricing?.package_selections ?? null;
 
   const noChargeGate = await assertNoChargeBoothAllowed({
     actorEmail: actor.email,
@@ -215,6 +219,7 @@ export async function POST(req: Request) {
             ? p.exhibitor_company_name.trim() || null
             : null,
       package_key: packageKey,
+      package_selections: noChargeRequested || sponsorshipOnly ? null : packageSelections,
       booth_count: nywePricing.booth_count,
       booth_rate_cents: nywePricing.booth_rate_cents,
       signer_1_name: p.signer_1_name ?? null,

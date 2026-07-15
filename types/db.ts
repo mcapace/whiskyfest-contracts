@@ -83,6 +83,11 @@ export interface Contract {
   order_type: 'booth' | 'sponsorship_only';
   /** Big Smoke (etc.) package catalog key; null for WhiskyFest / flat NYWE. */
   package_key: string | null;
+  /**
+   * Big Smoke multi-package lines: [{ key, qty }].
+   * When set, booth_count / fee are aggregated from all lines (e.g. Double + Single = 3 booths).
+   */
+  package_selections: { key: string; qty: number }[] | null;
   booth_count: number;
   booth_rate_cents: number;
   additional_brand_count: number;

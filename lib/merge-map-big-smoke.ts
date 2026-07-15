@@ -1,7 +1,7 @@
 import { buildNyweVendorMergeMap } from '@/lib/merge-map-nywe';
 import {
-  bigSmokePackageDisplayName,
-  getBigSmokePackage,
+  packageSelectionsFromContract,
+  pricingFromBigSmokeInput,
 } from '@/lib/big-smoke-pricing';
 import { contractHasExhibitorAddress } from '@/lib/nywe-billing';
 import type { ContractWithTotals, Event } from '@/types/db';
@@ -46,8 +46,11 @@ export function buildBigSmokeMergeMap(
   mode: MergePlaceholderMode,
 ): Record<string, string> {
   const base = buildNyweVendorMergeMap(contract, event, mode);
-  const pkg = getBigSmokePackage(contract.package_key);
-  const feeCents = pkg?.fee_cents ?? contract.grand_total_cents;
+  const priced = pricingFromBigSmokeInput({
+    package_selections: packageSelectionsFromContract(contract),
+    package_key: contract.package_key,
+  });
+  const feeCents = priced?.fee_cents ?? contract.booth_subtotal_cents ?? contract.grand_total_cents;
   const fee =
     feeCents != null
       ? (feeCents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -69,16 +72,24 @@ export function buildBigSmokeMergeMap(
 
   void mode;
 
+  const firstPkg = priced?.package_selections[0]
+    ? priced.package_selections[0]
+    : null;
+
   return {
     ...base,
     '{{license_fee}}': fee,
     '{{license_fee_balance}}': fee,
     '{{package_fee}}': fee,
     '{{package_fee_balance}}': fee,
-    '{{package_name}}': pkg ? bigSmokePackageDisplayName(pkg) : '',
-    '{{package_booth_label}}': pkg?.boothLabel ?? '',
-    '{{package_category}}': pkg?.categoryLabel ?? '',
-    '{{booth_count}}': String(pkg?.booth_count ?? contract.booth_count),
+    '{{package_name}}': priced?.displayName ?? '',
+    '{{package_booth_label}}': priced
+      ? `${priced.booth_count} booth${priced.booth_count === 1 ? '' : 's'}`
+      : '',
+    '{{package_category}}': firstPkg
+      ? priced!.displayName
+      : '',
+    '{{booth_count}}': String(priced?.booth_count ?? contract.booth_count),
     '{{event_name}}': event.name,
     '{{event_location}}': event.location ?? '',
     '{{event_tagline}}': event.tagline ?? '',

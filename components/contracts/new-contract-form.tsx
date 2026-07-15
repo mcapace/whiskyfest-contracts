@@ -18,9 +18,11 @@ import { isNyweVendorOnlyEvent, nyweLicenseFeeCents } from '@/lib/nywe-pricing';
 import {
   BIG_SMOKE_PACKAGES,
   bigSmokePackageDisplayName,
-  getBigSmokePackage,
-  pricingFromBigSmokePackage,
+  normalizeBigSmokePackageSelections,
+  packageSelectionsFromContract,
+  pricingFromBigSmokeSelections,
   type BigSmokePackageKey,
+  type BigSmokePackageSelection,
 } from '@/lib/big-smoke-pricing';
 import {
   CONTRACT_DEAL_KINDS,
@@ -75,6 +77,7 @@ export type ContractFormValues = {
   booth_count: number;
   booth_rate_cents: number;
   package_key: string;
+  package_selections?: BigSmokePackageSelection[];
   sponsor_brand: string;
   signer_1_name: string;
   signer_1_title: string;
@@ -97,6 +100,30 @@ export type ContractFormValues = {
 export type InitialContractLineItem = { description: string; amount_cents: number };
 
 type LineItemDraft = { key: string; description: string; amountInput: string };
+type PackageSelectionDraft = { id: string; key: string; qty: number };
+
+function draftSelectionsFromInitial(
+  initialValues?: Partial<ContractFormValues> | null,
+): PackageSelectionDraft[] {
+  const fromContract = packageSelectionsFromContract({
+    package_key: initialValues?.package_key,
+    package_selections: initialValues?.package_selections,
+  });
+  if (fromContract.length > 0) {
+    return fromContract.map((sel) => ({
+      id: crypto.randomUUID(),
+      key: sel.key,
+      qty: sel.qty,
+    }));
+  }
+  return [{ id: crypto.randomUUID(), key: '', qty: 1 }];
+}
+
+function selectionsFromDrafts(drafts: PackageSelectionDraft[]): BigSmokePackageSelection[] {
+  return normalizeBigSmokePackageSelections(
+    drafts.map((d) => ({ key: d.key, qty: d.qty })),
+  );
+}
 
 interface Props {
   events: Event[];
@@ -216,7 +243,9 @@ export function NewContractForm({
   const orderType = orderTypeFromDealKind(dealKind);
   const [noChargeBooth, setNoChargeBooth] = useState(initialNoChargeBooth);
   const [sponsorBrand, setSponsorBrand] = useState(initialValues?.sponsor_brand ?? '');
-  const [packageKey, setPackageKey] = useState<string>(initialValues?.package_key ?? '');
+  const [packageSelections, setPackageSelections] = useState<PackageSelectionDraft[]>(() =>
+    draftSelectionsFromInitial(initialValues),
+  );
 
   const [form, setForm] = useState(() => ({
     event_id:               initialValues?.event_id ?? defaultEvent?.id ?? '',
@@ -317,7 +346,9 @@ export function NewContractForm({
   /** NYWE flat license only — Big Smoke supports packages, sponsorships, and no-charge like WF. */
   const boothOnlyEvent = isNyweFlatEvent;
   const hideBoothBrands = isNyweFlatEvent || isBigSmokeEvent;
-  const selectedBigSmokePkg = getBigSmokePackage(packageKey);
+  const selectedBigSmokePricing = pricingFromBigSmokeSelections(
+    selectionsFromDrafts(packageSelections),
+  );
   const showNoChargeOption =
     canUseNoChargeBooth && !isNyweFlatEvent && dealKind !== 'sponsorship_only';
   const listBoothRateCents = standardBoothRateCentsForEvent(selectedEvent);
@@ -325,7 +356,7 @@ export function NewContractForm({
     isBigSmokeEvent && dealKind !== 'sponsorship_only'
       ? noChargeBooth
         ? 0
-        : (selectedBigSmokePkg?.fee_cents ?? 0)
+        : (selectedBigSmokePricing?.fee_cents ?? 0)
       : form.booth_count * form.booth_rate_cents;
   const lineItemsSumCents = lineItems.reduce((acc, row) => {
     const desc = row.description.trim();
@@ -340,7 +371,7 @@ export function NewContractForm({
     isBigSmokeEvent &&
     dealKind !== 'sponsorship_only' &&
     !noChargeBooth &&
-    !selectedBigSmokePkg;
+    !selectedBigSmokePricing;
 
   const effectiveBoothCount = useMemo(() => {
     if (dealKind === 'sponsorship_only') return 0;
@@ -398,7 +429,7 @@ export function NewContractForm({
       return;
     }
     if (isBigSmokeEvent) {
-      const priced = pricingFromBigSmokePackage(packageKey);
+      const priced = pricingFromBigSmokeSelections(selectionsFromDrafts(packageSelections));
       if (!priced) {
         // Do not inherit the event default booth rate until a package is chosen.
         setForm((f) => ({ ...f, booth_rate_cents: 0 }));
@@ -422,12 +453,15 @@ export function NewContractForm({
     }));
     setBoothRateInput((cents / 100).toFixed(2));
     if (isNyweFlatEvent) setBoothCountInput('1');
-  }, [selectedEvent?.id, dealKind, isNyweFlatEvent, isBigSmokeEvent, packageKey, noChargeBooth]);
+  }, [selectedEvent?.id, dealKind, isNyweFlatEvent, isBigSmokeEvent, packageSelections, noChargeBooth]);
 
-  function applyBigSmokePackage(key: string) {
-    setPackageKey(key);
-    const priced = pricingFromBigSmokePackage(key);
-    if (!priced) return;
+  function applyBigSmokePricingFromDrafts(drafts: PackageSelectionDraft[]) {
+    const priced = pricingFromBigSmokeSelections(selectionsFromDrafts(drafts));
+    if (!priced) {
+      setForm((f) => ({ ...f, booth_rate_cents: 0 }));
+      setBoothRateInput('0.00');
+      return;
+    }
     setForm((f) => ({
       ...f,
       booth_count: priced.booth_count,
@@ -437,10 +471,33 @@ export function NewContractForm({
     setBoothRateInput((priced.booth_rate_cents / 100).toFixed(2));
   }
 
+  function updatePackageSelection(id: string, patch: Partial<Pick<PackageSelectionDraft, 'key' | 'qty'>>) {
+    setPackageSelections((rows) => {
+      const next = rows.map((row) => (row.id === id ? { ...row, ...patch } : row));
+      applyBigSmokePricingFromDrafts(next);
+      return next;
+    });
+  }
+
+  function addPackageSelection() {
+    setPackageSelections((rows) => {
+      const next = [...rows, { id: crypto.randomUUID(), key: '', qty: 1 }];
+      return next;
+    });
+  }
+
+  function removePackageSelection(id: string) {
+    setPackageSelections((rows) => {
+      const next = rows.length <= 1 ? rows : rows.filter((row) => row.id !== id);
+      applyBigSmokePricingFromDrafts(next);
+      return next;
+    });
+  }
+
   function setNoChargeMode(enabled: boolean) {
     setNoChargeBooth(enabled);
     if (enabled) {
-      setPackageKey('');
+      setPackageSelections([{ id: crypto.randomUUID(), key: '', qty: 1 }]);
       setForm((f) => ({
         ...f,
         booth_count: Math.max(1, f.booth_count || 1),
@@ -449,19 +506,7 @@ export function NewContractForm({
       }));
       setBoothRateInput('0.00');
     } else if (isBigSmokeEvent) {
-      const priced = pricingFromBigSmokePackage(packageKey);
-      if (priced) {
-        setForm((f) => ({
-          ...f,
-          booth_count: priced.booth_count,
-          booth_rate_cents: priced.booth_rate_cents,
-        }));
-        setBoothCountInput(String(priced.booth_count));
-        setBoothRateInput((priced.booth_rate_cents / 100).toFixed(2));
-      } else {
-        setForm((f) => ({ ...f, booth_rate_cents: 0 }));
-        setBoothRateInput('0.00');
-      }
+      applyBigSmokePricingFromDrafts(packageSelections);
     } else {
       const rate = selectedEvent?.booth_rate_cents ?? 1500000;
       setForm((f) => ({ ...f, booth_rate_cents: rate }));
@@ -479,7 +524,7 @@ export function NewContractForm({
         return;
       }
       setNoChargeBooth(false);
-      setPackageKey('');
+      setPackageSelections([{ id: crypto.randomUUID(), key: '', qty: 1 }]);
       setDealKind('sponsorship_only');
       setBoothCountInput('0');
       setForm((f) => ({ ...f, booth_count: 0, booth_rate_cents: 0 }));
@@ -492,7 +537,7 @@ export function NewContractForm({
     const rate = selectedEvent?.booth_rate_cents ?? 1500000;
     setDealKind(next);
     if (isBigSmokeEvent) {
-      setPackageKey('');
+      setPackageSelections([{ id: crypto.randomUUID(), key: '', qty: 1 }]);
       setForm((f) => ({ ...f, booth_count: 1, booth_rate_cents: 0 }));
       setBoothCountInput('1');
       setBoothRateInput('0.00');
@@ -525,9 +570,9 @@ export function NewContractForm({
       isBigSmokeEvent &&
       dealKind !== 'sponsorship_only' &&
       !noChargeBooth &&
-      !pricingFromBigSmokePackage(packageKey)
+      !pricingFromBigSmokeSelections(selectionsFromDrafts(packageSelections))
     ) {
-      setErr('Select a Big Smoke exhibitor package');
+      setErr('Add at least one Big Smoke exhibitor package');
       return;
     }
 
@@ -597,7 +642,9 @@ export function NewContractForm({
       const url = editContractId ? `/api/contracts/${editContractId}` : '/api/contracts';
       const method = editContractId ? 'PATCH' : 'POST';
 
-      const bigSmokePriced = isBigSmokeEvent ? pricingFromBigSmokePackage(packageKey) : null;
+      const bigSmokePriced = isBigSmokeEvent
+        ? pricingFromBigSmokeSelections(selectionsFromDrafts(packageSelections))
+        : null;
       const formForSave = {
         ...form,
         event_id: resolvedEventId,
@@ -618,7 +665,14 @@ export function NewContractForm({
               : isNyweFlatEvent && selectedEvent
                 ? nyweLicenseFeeCents(selectedEvent)
                 : form.booth_rate_cents,
-        package_key: isBigSmokeEvent && !sponsorshipOnly && !useNoCharge ? packageKey : null,
+        package_key:
+          isBigSmokeEvent && !sponsorshipOnly && !useNoCharge
+            ? (bigSmokePriced?.package_key ?? null)
+            : null,
+        package_selections:
+          isBigSmokeEvent && !sponsorshipOnly && !useNoCharge
+            ? (bigSmokePriced?.package_selections ?? null)
+            : null,
       };
       const booth_brands = hideBoothBrands
         ? []
@@ -871,8 +925,8 @@ export function NewContractForm({
                 ? dealKind === 'sponsorship_only'
                   ? 'Sponsorship-only — add dollar line items (use $0 for complimentary sponsorships).'
                   : dealKind === 'booth_and_sponsorship'
-                    ? 'Choose a rate-sheet package, then add sponsorship line items with amounts.'
-                    : 'Choose a rate-sheet package, or mark the booth as no charge. Switch deal type for paid sponsorships.'
+                    ? 'Choose one or more rate-sheet packages, then add sponsorship line items with amounts.'
+                    : 'Choose one or more rate-sheet packages (e.g. Double + Single for 3 booths), or mark the booth as no charge. Switch deal type for paid sponsorships.'
                 : isNyweFlatEvent
                   ? 'NYWE vendor licenses are a flat fee — not per-booth WhiskyFest pricing.'
                   : dealKind === 'sponsorship_only'
@@ -934,37 +988,75 @@ export function NewContractForm({
             isBigSmokeEvent && !noChargeBooth ? (
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Exhibitor package</Label>
-                  <Select
-                    value={packageKey || undefined}
-                    onValueChange={(v) => applyBigSmokePackage(v as BigSmokePackageKey)}
-                    disabled={busy}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select rate-sheet package…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {BIG_SMOKE_PACKAGES.map((pkg) => (
-                        <SelectItem key={pkg.key} value={pkg.key}>
-                          {bigSmokePackageDisplayName(pkg)} — {formatCurrency(pkg.fee_cents)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Exhibitor packages</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Add one or more rate-sheet packages on this contract (e.g. a Double plus a Single for 3 booths).
+                  </p>
+                  <div className="space-y-3">
+                    {packageSelections.map((row, index) => (
+                      <div
+                        key={row.id}
+                        className="grid gap-2 rounded-md border border-border/60 bg-muted/10 p-3 sm:grid-cols-[minmax(0,1fr)_88px_auto]"
+                      >
+                        <Select
+                          value={row.key || undefined}
+                          onValueChange={(v) => updatePackageSelection(row.id, { key: v as BigSmokePackageKey })}
+                          disabled={busy}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder={index === 0 ? 'Select package…' : 'Add another package…'} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {BIG_SMOKE_PACKAGES.map((pkg) => (
+                              <SelectItem key={pkg.key} value={pkg.key}>
+                                {bigSmokePackageDisplayName(pkg)} — {formatCurrency(pkg.fee_cents)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Qty</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={50}
+                            value={row.qty}
+                            disabled={busy || !row.key}
+                            onChange={(e) => {
+                              const n = Math.max(1, Math.min(50, parseInt(e.target.value, 10) || 1));
+                              updatePackageSelection(row.id, { qty: n });
+                            }}
+                          />
+                        </div>
+                        <div className="flex items-end">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={busy || packageSelections.length <= 1}
+                            onClick={() => removePackageSelection(row.id)}
+                            title="Remove package"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <Button type="button" variant="outline" size="sm" disabled={busy} onClick={addPackageSelection}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add package
+                  </Button>
                 </div>
-                {selectedBigSmokePkg ? (
+                {selectedBigSmokePricing ? (
                   <div className="rounded-lg border border-border/60 bg-muted/10 p-4">
-                    <p className="text-sm font-medium text-foreground">
-                      {bigSmokePackageDisplayName(selectedBigSmokePkg)}
-                    </p>
+                    <p className="text-sm font-medium text-foreground">{selectedBigSmokePricing.displayName}</p>
                     <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-fest-900">
-                      {formatCurrency(selectedBigSmokePkg.fee_cents)}
+                      {formatCurrency(selectedBigSmokePricing.fee_cents)}
                     </p>
                     <p className="mt-2 text-xs text-muted-foreground">
-                      {selectedBigSmokePkg.boothLabel}
-                      {selectedBigSmokePkg.booth_count > 1
-                        ? ` (${selectedBigSmokePkg.booth_count} booths)`
-                        : ''}
+                      {selectedBigSmokePricing.booth_count} booth
+                      {selectedBigSmokePricing.booth_count === 1 ? '' : 's'}
                       {' · '}Cigar Aficionado Big Smoke Las Vegas rate sheet
                     </p>
                   </div>

@@ -6,6 +6,7 @@ import { NewContractForm } from '@/components/contracts/new-contract-form';
 import { dealKindFromContract } from '@/lib/contract-deal-kind';
 import type { ContractLineItem, Event } from '@/types/db';
 import { actorCanUseNoChargeBooth, actorCanUseBigSmokeNoCharge, getStephenSenatoreRepId, noChargeMustAssignStephenRep } from '@/lib/no-charge-booth';
+import { packageSelectionsFromContract } from '@/lib/big-smoke-pricing';
 import { PRODUCT_BIG_SMOKE, PRODUCT_WINE_SPECTATOR, productBasePath, productKeyFromEvent, scopeEventsByProduct } from '@/lib/product-portal';
 
 export const dynamic = 'force-dynamic';
@@ -95,6 +96,7 @@ export async function EditDraftContractPage({
           booth_count: c.booth_count,
           booth_rate_cents: c.booth_rate_cents,
           package_key: c.package_key ?? '',
+          package_selections: packageSelectionsFromContract(c),
           signer_1_name: c.signer_1_name ?? '',
           signer_1_title: c.signer_1_title ?? '',
           signer_1_email: c.signer_1_email ?? '',

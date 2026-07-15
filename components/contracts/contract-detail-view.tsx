@@ -7,8 +7,8 @@ import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/ex
 import { standardBoothRateCentsForEvent } from '@/lib/contracts';
 import { isNyweVendorEvent, isNyweVendorOnlyEvent, nyweLicenseFeeCents } from '@/lib/nywe-pricing';
 import {
-  bigSmokePackageDisplayName,
-  getBigSmokePackage,
+  packageSelectionsFromContract,
+  pricingFromBigSmokeInput,
 } from '@/lib/big-smoke-pricing';
 import { listPackageLabel } from '@/lib/contract-deal-kind';
 import {
@@ -106,9 +106,15 @@ export function ContractDetailView({
 }: ContractDetailViewProps) {
   const packageFeeEvent = isNyweVendorEvent(event);
   const nyweLicense = isNyweVendorOnlyEvent(event);
-  const bigSmokePkg = getBigSmokePackage(contract.package_key);
-  const packageOverride = bigSmokePkg
-    ? bigSmokePackageDisplayName(bigSmokePkg)
+  const bigSmokePriced = pricingFromBigSmokeInput({
+    package_selections: packageSelectionsFromContract(contract),
+    package_key: contract.package_key,
+  });
+  const packageOverride = bigSmokePriced
+    ? bigSmokePriced.package_selections.length > 1 ||
+      bigSmokePriced.package_selections.some((s) => s.qty > 1)
+      ? `${bigSmokePriced.displayName} · ${bigSmokePriced.booth_count} booths`
+      : bigSmokePriced.displayName
     : packageFeeEvent && !nyweLicense
       ? listPackageLabel(contract)
       : undefined;
@@ -501,12 +507,14 @@ export function ContractDetailView({
                         <Detail label="Wine / brand" value={contract.brands_poured} />
                       ) : null}
                     </>
-                  ) : bigSmokePkg ? (
+                  ) : bigSmokePriced ? (
                     <>
-                      <p className="wf-label-caps text-[0.6rem] text-muted-foreground">Exhibitor package</p>
-                      <Detail label="Package" value={bigSmokePackageDisplayName(bigSmokePkg)} />
-                      <Detail label="Booths" value={String(bigSmokePkg.booth_count)} />
-                      <Detail label="Package fee" value={formatCurrency(bigSmokePkg.fee_cents)} mono />
+                      <p className="wf-label-caps text-[0.6rem] text-muted-foreground">
+                        Exhibitor package{bigSmokePriced.package_selections.length > 1 ? 's' : ''}
+                      </p>
+                      <Detail label="Package" value={bigSmokePriced.displayName} />
+                      <Detail label="Booths" value={String(bigSmokePriced.booth_count)} />
+                      <Detail label="Package fee" value={formatCurrency(bigSmokePriced.fee_cents)} mono />
                     </>
                   ) : (
                     <>

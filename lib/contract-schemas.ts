@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { BRAND_CATEGORIES } from '@/lib/brand-category';
-import { isBigSmokePackageKey } from '@/lib/big-smoke-pricing';
+import { pricingFromBigSmokeInput } from '@/lib/big-smoke-pricing';
 import { CONTRACT_ORDER_TYPES } from '@/lib/contract-order-type';
 import { CONTRACT_TEMPLATE_PROFILES } from '@/lib/contract-template-profile';
 import { MAX_LINE_ITEM_AMOUNT_CENTS } from '@/lib/contract-line-items';
@@ -43,8 +43,19 @@ export const newContractBodySchema = z
     ),
     /** Sent by the order form so NYWE vendor licenses skip WhiskyFest booth-brand rules. */
     contract_template_profile: z.enum(CONTRACT_TEMPLATE_PROFILES).optional(),
-    /** Big Smoke rate-sheet package key. */
+    /** Big Smoke rate-sheet package key (legacy / primary). Prefer package_selections for multi-package. */
     package_key: z.string().max(80).optional().nullable(),
+    /** Big Smoke: one or more rate-sheet packages (e.g. Double + Single). */
+    package_selections: z
+      .array(
+        z.object({
+          key: z.string().min(1).max(80),
+          qty: z.number().int().min(1).max(50),
+        }),
+      )
+      .max(20)
+      .optional()
+      .nullable(),
     notes: z.string().max(20000).optional().nullable(),
     exhibitor_notes: z.string().max(50000).optional().nullable(),
     billing_contact_name: z.string().max(200).optional().nullable(),
@@ -134,14 +145,17 @@ export const newContractBodySchema = z
     }
 
     if (data.contract_template_profile === 'big_smoke') {
-      // Sponsorship-only uses line-item amounts (like WhiskyFest); booth deals need a rate-sheet package.
+      // Sponsorship-only uses line-item amounts (like WhiskyFest); booth deals need rate-sheet package(s).
       if (data.order_type === 'sponsorship_only') return;
-      const key = data.package_key?.trim() ?? '';
-      if (!isBigSmokePackageKey(key)) {
+      const priced = pricingFromBigSmokeInput({
+        package_selections: data.package_selections,
+        package_key: data.package_key,
+      });
+      if (!priced) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'Select a Big Smoke exhibitor package.',
-          path: ['package_key'],
+          message: 'Add at least one Big Smoke exhibitor package.',
+          path: ['package_selections'],
         });
       }
       return;

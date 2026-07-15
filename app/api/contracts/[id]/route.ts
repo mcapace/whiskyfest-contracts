@@ -23,7 +23,7 @@ import { isLegacyImportedContract } from '@/lib/legacy-import';
 import { billingFieldsFromOptionalBody } from '@/lib/nywe-billing';
 import { refreshNyweBillingFromRosterForContract } from '@/lib/nywe-roster-billing-sync';
 import { applyNyweLicensePricingIfNeeded, isNyweVendorOnlyEvent, isPackageFeeEvent, signerTitleForContract } from '@/lib/nywe-pricing';
-import { pricingFromBigSmokePackage } from '@/lib/big-smoke-pricing';
+import { pricingFromBigSmokeInput } from '@/lib/big-smoke-pricing';
 import { eventTemplateProfile } from '@/lib/contract-template-profile';
 import {
   assertNoChargeBoothAllowed,
@@ -128,7 +128,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const bill = nyweOnly || isBigSmoke ? {} : clearedRepEnteredBilling();
     const bigSmokePricing =
       isBigSmoke && !sponsorshipOnly && !noChargeRequested
-        ? pricingFromBigSmokePackage(p.package_key)
+        ? pricingFromBigSmokeInput({
+            package_selections: p.package_selections,
+            package_key: p.package_key,
+          })
         : null;
     const nywePricing = applyNyweLicensePricingIfNeeded(patchEvent, {
       booth_count: bigSmokePricing?.booth_count ?? p.booth_count,
@@ -139,6 +142,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const boothRateChanged = nywePricing.booth_rate_cents !== contract.booth_rate_cents;
     const savedLineItems = nyweOnly ? [] : (p.line_items ?? []);
     const nextPackageKey = bigSmokePricing?.package_key ?? null;
+    const nextPackageSelections = bigSmokePricing?.package_selections ?? null;
     const shouldResetDiscountApproval =
       !noChargeRequested &&
       !isPackageFeeEvent(patchEvent) &&
@@ -179,6 +183,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
               ? p.exhibitor_company_name.trim() || null
               : null,
         package_key: nextPackageKey,
+        package_selections: noChargeRequested || sponsorshipOnly ? null : nextPackageSelections,
         booth_count: nywePricing.booth_count,
         booth_rate_cents: nywePricing.booth_rate_cents,
         signer_1_name: p.signer_1_name ?? null,

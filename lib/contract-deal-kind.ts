@@ -1,6 +1,9 @@
 import type { ContractOrderType } from '@/lib/contract-order-type';
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
-import { bigSmokePackageDisplayName, getBigSmokePackage } from '@/lib/big-smoke-pricing';
+import {
+  packageSelectionsFromContract,
+  pricingFromBigSmokeInput,
+} from '@/lib/big-smoke-pricing';
 
 /** Rep-facing deal shape on the dashboard and order form. */
 export const CONTRACT_DEAL_KINDS = ['booth', 'sponsorship_only', 'booth_and_sponsorship'] as const;
@@ -68,9 +71,19 @@ export function listPackageLabel(contract: {
   booth_count?: number | null;
   line_items_subtotal_cents?: number | null;
   package_key?: string | null;
+  package_selections?: { key: string; qty: number }[] | null;
 }): string {
-  const pkg = getBigSmokePackage(contract.package_key);
-  if (pkg) return bigSmokePackageDisplayName(pkg);
+  const priced = pricingFromBigSmokeInput({
+    package_selections: packageSelectionsFromContract(contract),
+    package_key: contract.package_key,
+  });
+  if (priced) {
+    const booths = priced.booth_count;
+    if (priced.package_selections.length > 1 || priced.package_selections.some((s) => s.qty > 1)) {
+      return `${priced.displayName} · ${booths} booth${booths === 1 ? '' : 's'}`;
+    }
+    return priced.displayName;
+  }
 
   const kind = dealKindFromContract(contract);
   if (kind === 'sponsorship_only') return 'Sponsorship only';
