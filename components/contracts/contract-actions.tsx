@@ -737,7 +737,12 @@ export function ContractActions({
             </WhenDiscountBlocks>
           )}
 
-          {legacyImport && signedPdfHref && status !== 'pending_events_review' && status !== 'imported' && (
+          {/* Signed imports only — executed uses the single button below to avoid duplicates. */}
+          {legacyImport &&
+            signedPdfHref &&
+            status !== 'pending_events_review' &&
+            status !== 'imported' &&
+            status !== 'executed' && (
             <ActionWithHelp helpText={CONTRACT_ACTION_HELP.viewSignedPdf}>
               <Button className={btnSecondary} asChild>
                 <a href={signedPdfHref} target="_blank" rel="noreferrer">
