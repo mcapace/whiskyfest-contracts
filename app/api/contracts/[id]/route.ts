@@ -91,16 +91,16 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     let effectiveSalesRepId: string | null = p.sales_rep_id ?? null;
     if (effectiveSalesRepId) {
-      if (actor.isAdmin) {
-        const { data: repExists } = await supabase
-          .from('sales_reps')
-          .select('id')
-          .eq('id', effectiveSalesRepId)
-          .maybeSingle();
-        if (!repExists) return NextResponse.json({ error: 'Invalid sales rep' }, { status: 400 });
-      } else if (!actor.accessibleSalesRepIds.includes(effectiveSalesRepId)) {
-        return NextResponse.json({ error: 'Cannot reassign sales rep' }, { status: 400 });
-      }
+    if (actor.isAdmin || actor.canViewAllSales) {
+      const { data: repExists } = await supabase
+        .from('sales_reps')
+        .select('id')
+        .eq('id', effectiveSalesRepId)
+        .maybeSingle();
+      if (!repExists) return NextResponse.json({ error: 'Invalid sales rep' }, { status: 400 });
+    } else if (!actor.accessibleSalesRepIds.includes(effectiveSalesRepId)) {
+      return NextResponse.json({ error: 'Cannot reassign sales rep' }, { status: 400 });
+    }
     }
 
     const incomingBoothRate = p.booth_rate_cents;
@@ -152,7 +152,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     const nyweBilling = nyweOnly || isBigSmoke ? billingFieldsFromOptionalBody(p) : null;
 
-    if (isPackageFeeEvent(patchEvent)) {
+    if (isNyweVendorOnlyEvent(patchEvent)) {
       effectiveSalesRepId = null;
     }
 

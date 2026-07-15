@@ -12,10 +12,10 @@ import {
 } from '@/lib/docusign-signer-cc';
 import { replaceContractBoothBrandsForContract, clearContractBoothBrandsForContract } from '@/lib/contract-booth-brands';
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
-import { eventTemplateProfile, isEventsManagedWorkflow } from '@/lib/contract-template-profile';
+import { eventTemplateProfile, isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
 import {
   applyNyweLicensePricingIfNeeded,
-  isPackageFeeEvent,
+  isNyweVendorOnlyEvent,
   signerTitleForContract,
 } from '@/lib/nywe-pricing';
 import { pricingFromBigSmokeInput } from '@/lib/big-smoke-pricing';
@@ -137,18 +137,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Event not found' }, { status: 400 });
   }
 
-  const eventsManaged = isEventsManagedWorkflow(eventRow);
-  if (!eventsManaged && !p.sales_rep_id) {
+  const profile = eventTemplateProfile(eventRow);
+  const isBigSmoke = profile === 'big_smoke';
+  const requiresSalesRep = isBigSmoke || !isNyweEventsManagedEvent(eventRow);
+
+  if (requiresSalesRep && !p.sales_rep_id) {
     return NextResponse.json({ error: 'Sales rep is required for this event.' }, { status: 400 });
   }
-  if (eventsManaged && !actor.isEventsTeam && !actor.isAdmin) {
+  // NYWE events-managed: events team / admin only. Big Smoke uses sales pipeline like WhiskyFest.
+  if (isNyweEventsManagedEvent(eventRow) && !actor.isEventsTeam && !actor.isAdmin) {
     return NextResponse.json({ error: 'Only events team can create contracts for this event.' }, { status: 403 });
   }
 
   let effectiveSalesRepId: string | null = p.sales_rep_id ?? null;
 
   if (effectiveSalesRepId) {
-    if (actor.isAdmin) {
+    if (actor.isAdmin || actor.canViewAllSales) {
       const { data: repExists } = await supabase.from('sales_reps').select('id').eq('id', effectiveSalesRepId).maybeSingle();
       if (!repExists) {
         return NextResponse.json({ error: 'Invalid sales rep' }, { status: 400 });
@@ -159,9 +163,7 @@ export async function POST(req: Request) {
   }
 
   const bill = clearedRepEnteredBilling();
-  const profile = eventTemplateProfile(eventRow);
   const nyweOnly = profile === 'nywe_vendor';
-  const isBigSmoke = profile === 'big_smoke';
   const sponsorshipOnly = p.order_type === 'sponsorship_only';
   const rosterBilling =
     nyweOnly || isBigSmoke ? billingFieldsFromOptionalBody(p) : null;
@@ -227,7 +229,7 @@ export async function POST(req: Request) {
       signer_1_email: p.signer_1_email ?? null,
       signer_cc_name: normalizeSignerCcName(p.signer_cc_name),
       signer_cc_email: normalizeSignerCcEmail(p.signer_cc_email),
-      sales_rep_id: isPackageFeeEvent(eventRow) ? null : effectiveSalesRepId,
+      sales_rep_id: isNyweVendorOnlyEvent(eventRow) ? null : effectiveSalesRepId,
       notes: p.notes ?? null,
       exhibitor_notes: p.exhibitor_notes?.trim() || null,
       created_by: actor.email,

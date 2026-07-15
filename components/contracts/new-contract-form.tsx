@@ -343,6 +343,8 @@ export function NewContractForm({
   const eventsManaged = selectedEvent ? isEventsManagedWorkflow(selectedEvent) : false;
   const isNyweFlatEvent = isNyweVendorOnlyEvent(selectedEvent);
   const isBigSmokeEvent = selectedEvent?.contract_template_profile === 'big_smoke';
+  /** Big Smoke assigns AEs like WhiskyFest; NYWE events-managed stays sales-rep-free. */
+  const requiresSalesRep = isBigSmokeEvent || !eventsManaged;
   /** NYWE flat license only — Big Smoke supports packages, sponsorships, and no-charge like WF. */
   const boothOnlyEvent = isNyweFlatEvent;
   const hideBoothBrands = isNyweFlatEvent || isBigSmokeEvent;
@@ -565,7 +567,7 @@ export function NewContractForm({
     if (!resolvedEventId) { setErr('Please select an event'); return; }
     if (!form.exhibitor_company_name) { setErr('Company name required'); return; }
     if (!form.exhibitor_legal_name)   { setErr('Legal name required'); return; }
-    if (!eventsManaged && !form.sales_rep_id) { setErr('Sales rep is required'); return; }
+    if (requiresSalesRep && !form.sales_rep_id) { setErr('Sales rep is required'); return; }
     if (
       isBigSmokeEvent &&
       dealKind !== 'sponsorship_only' &&
@@ -684,7 +686,7 @@ export function NewContractForm({
           }));
       const payload = {
         ...formForSave,
-        sales_rep_id: eventsManaged ? null : form.sales_rep_id,
+        sales_rep_id: requiresSalesRep ? form.sales_rep_id : null,
         order_type: orderType,
         contract_template_profile: selectedEvent?.contract_template_profile ?? 'whiskyfest',
         brands_poured: sponsorshipOnly
@@ -1370,13 +1372,14 @@ export function NewContractForm({
                 </Field>
               </div>
             </div>
-            {!eventsManaged ? (
+            {requiresSalesRep ? (
               <SalesRepSelect
                 currentUserEmail={currentUserEmail}
                 value={form.sales_rep_id}
                 onChange={(v) => set('sales_rep_id', v)}
                 required
                 isAdmin={isAdmin}
+                label={isBigSmokeEvent ? 'Account executive' : 'Sales Rep'}
               />
             ) : (
               <p className="text-sm text-muted-foreground">

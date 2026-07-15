@@ -17,6 +17,8 @@ interface Props {
   /** When true, dropdown locked to single accessible rep (non-admin). */
   disabled?: boolean;
   isAdmin?: boolean;
+  /** Field label — Big Smoke uses “Account executive”. */
+  label?: string;
 }
 
 /** Loads assignable reps from `/api/sales-reps/accessible` (admins: all active; others: own + assisted). */
@@ -27,6 +29,7 @@ export function SalesRepSelect({
   required = true,
   disabled: disabledProp,
   isAdmin = false,
+  label = 'Sales Rep',
 }: Props) {
   const [reps, setReps] = useState<SalesRepOption[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -69,7 +72,7 @@ export function SalesRepSelect({
   return (
     <div className="space-y-1.5">
       <Label htmlFor="sales_rep_id">
-        Sales Rep {required && <span className="text-destructive">*</span>}
+        {label} {required && <span className="text-destructive">*</span>}
       </Label>
       <select
         id="sales_rep_id"
@@ -79,7 +82,7 @@ export function SalesRepSelect({
         className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
       >
         <option value="">
-          {reps.length > 1 && !isAdmin ? 'Select deal owner' : 'Select a sales rep'}
+          {reps.length > 1 && !isAdmin ? 'Select deal owner' : `Select ${label.toLowerCase()}`}
         </option>
         {reps.map((rep) => (
           <option key={rep.id} value={rep.id}>

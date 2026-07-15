@@ -18,12 +18,22 @@ export async function GET() {
   const email = getEffectiveUserEmail(session)!;
   const supabase = getSupabaseAdmin();
 
-  const { data: appUser } = await supabase.from('app_users').select('role, is_active').eq('email', email).single();
+  const { data: appUser } = await supabase
+    .from('app_users')
+    .select('role, is_active, is_events_team, can_view_all_sales, is_big_smoke_admin')
+    .eq('email', email)
+    .single();
   if (!appUser?.is_active) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  if (appUser.role === 'admin') {
+  const canPickAny =
+    appUser.role === 'admin' ||
+    Boolean(appUser.is_events_team) ||
+    Boolean(appUser.can_view_all_sales) ||
+    Boolean(appUser.is_big_smoke_admin);
+
+  if (canPickAny) {
     const { data, error } = await supabase
       .from('sales_reps')
       .select('id, name, email')

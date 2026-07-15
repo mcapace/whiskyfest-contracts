@@ -50,7 +50,9 @@ export async function resolveContractActor(session: Session | null): Promise<
   const supabase = getSupabaseAdmin();
   const { data: appUser, error } = await supabase
     .from('app_users')
-    .select('email, role, is_active, name, is_events_team, is_accounting, can_view_all_sales, is_wine_spectator_admin')
+    .select(
+      'email, role, is_active, name, is_events_team, is_accounting, can_view_all_sales, is_wine_spectator_admin, is_big_smoke_admin',
+    )
     .eq('email', email)
     .single();
 
@@ -61,8 +63,13 @@ export async function resolveContractActor(session: Session | null): Promise<
   const isEventsTeam = Boolean((appUser as { is_events_team?: boolean }).is_events_team);
   const isAccounting = Boolean((appUser as { is_accounting?: boolean }).is_accounting);
   const isWineSpectatorAdmin = Boolean((appUser as { is_wine_spectator_admin?: boolean }).is_wine_spectator_admin) || isAdmin;
+  const isBigSmokeAdmin = Boolean((appUser as { is_big_smoke_admin?: boolean }).is_big_smoke_admin) || isAdmin;
   const canViewAllSales =
-    isAdmin || isEventsTeam || isAccounting || Boolean((appUser as { can_view_all_sales?: boolean }).can_view_all_sales);
+    isAdmin ||
+    isEventsTeam ||
+    isAccounting ||
+    isBigSmokeAdmin ||
+    Boolean((appUser as { can_view_all_sales?: boolean }).can_view_all_sales);
 
   let salesRepId: string | null = null;
   const { data: sr } = await supabase

@@ -84,7 +84,7 @@ export async function EditDraftContractPage({
         events={scopedEvents}
         portalBasePath={portalBasePath}
         currentUserEmail={viewed.actor.email}
-        isAdmin={viewed.actor.isAdmin}
+        isAdmin={viewed.actor.isAdmin || viewed.actor.canViewAllSales}
         editContractId={c.id}
         editImportMode={isLegacyImportedContract(c)}
         initialLineItems={initialLineItems}

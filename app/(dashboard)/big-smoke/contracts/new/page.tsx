@@ -76,7 +76,7 @@ export default async function BigSmokeNewContractPage({
       <NewContractForm
         events={scopedEvents}
         currentUserEmail={actor.email}
-        isAdmin={actor.isAdmin}
+        isAdmin={actor.isAdmin || actor.canViewAllSales}
         smartHints={smartHints}
         initialDealKind={initialDealKind}
         portalBasePath="/big-smoke"
