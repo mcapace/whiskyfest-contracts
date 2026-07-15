@@ -46,23 +46,30 @@ export function contractPatchFromExhibitorRosterRow(
   row: ExhibitorRosterRow,
   contract: Pick<ContractWithTotals, 'status'>,
 ): Record<string, string | null | boolean> | null {
-  const resolved = resolveContractStreetFromSheetCells(row.billingStreet, row.wineryAddress);
-  if (!resolved) return null;
+  const winery = row.wineryName.trim();
+  const billingCompany = row.billingCompany.trim() || winery;
+  if (!winery && !billingCompany) return null;
 
+  // Identity / wine always sync from the sheet — including typo fixes — even when street
+  // is temporarily blank (previously a missing address skipped the entire patch).
   const patch: Record<string, string | null | boolean> = {
-    exhibitor_legal_name: row.billingCompany.trim() || row.wineryName.trim(),
-    exhibitor_company_name: row.wineryName.trim() || row.billingCompany.trim(),
+    exhibitor_legal_name: billingCompany,
+    exhibitor_company_name: winery || billingCompany,
     brands_poured: formatRosterWineDisplay(row.wineName, row.vintage) || null,
     billing_contact_name: row.billingContactName.trim() || null,
     billing_contact_email: row.billingEmail.trim() || null,
-    billing_address_line1: resolved.line1,
-    billing_address_line2: null,
-    billing_city: row.billingCity.trim() || null,
-    billing_state: row.billingState.trim() || null,
-    billing_zip: row.billingZip.trim() || null,
-    billing_country: row.billingCountry.trim() || null,
-    billing_same_as_corporate: resolved.usedWineryStreet,
   };
+
+  const resolved = resolveContractStreetFromSheetCells(row.billingStreet, row.wineryAddress);
+  if (resolved) {
+    patch.billing_address_line1 = resolved.line1;
+    patch.billing_address_line2 = null;
+    patch.billing_city = row.billingCity.trim() || null;
+    patch.billing_state = row.billingState.trim() || null;
+    patch.billing_zip = row.billingZip.trim() || null;
+    patch.billing_country = row.billingCountry.trim() || null;
+    patch.billing_same_as_corporate = resolved.usedWineryStreet;
+  }
 
   if (!SIGNER_LOCKED_STATUSES.includes(contract.status)) {
     patch.signer_1_name = row.signerName.trim() || null;
@@ -106,14 +113,21 @@ function patchFromPayload(
   contract: ContractWithTotals,
   payload: NonNullable<Awaited<ReturnType<typeof loadRosterPayloadForContract>>>,
 ): Record<string, string | null | boolean> | null {
-  if (!payload.billing) return null;
+  const company = normalize(payload.exhibitor_company_name);
+  const legal = normalize(payload.exhibitor_legal_name);
+  if (!company && !legal) return null;
 
+  // Always carry winery / legal name + wine from the sheet so typo fixes propagate even
+  // when billing street is missing. Billing block is optional on refresh.
   const patch: Record<string, string | null | boolean> = {
     exhibitor_legal_name: payload.exhibitor_legal_name,
     exhibitor_company_name: payload.exhibitor_company_name,
     brands_poured: payload.brands_poured,
-    ...payload.billing,
   };
+
+  if (payload.billing) {
+    Object.assign(patch, payload.billing);
+  }
 
   if (!SIGNER_LOCKED_STATUSES.includes(contract.status)) {
     patch.signer_1_name = payload.signer_1_name;
