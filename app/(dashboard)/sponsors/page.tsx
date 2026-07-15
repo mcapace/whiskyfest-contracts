@@ -1,4 +1,5 @@
 import { requireContractActorForPage } from '@/lib/auth-contract';
+import { PRODUCT_WHISKYFEST } from '@/lib/product-portal';
 import { boothBrandRowsRecordFromMap, getConfirmedSponsors } from '@/lib/sponsors';
 import { SponsorsDirectory } from '@/components/sponsors/sponsors-directory';
 
@@ -7,7 +8,7 @@ export const revalidate = 60;
 
 export default async function SponsorsPage() {
   const actor = await requireContractActorForPage();
-  const { sponsors, boothRowsByContract } = await getConfirmedSponsors();
+  const { sponsors, boothRowsByContract } = await getConfirmedSponsors(PRODUCT_WHISKYFEST);
 
   return (
     <div className="space-y-8">

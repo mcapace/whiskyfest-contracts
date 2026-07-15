@@ -44,16 +44,21 @@ export default async function BigSmokeNewContractPage({
     hintsQuery = hintsQuery.limit(0);
   }
 
-  const [{ data: events }, { data: hintRows }, canUseNoChargeBooth] = await Promise.all([
+  const [{ data: events }, canUseNoChargeBooth] = await Promise.all([
     supabase.from('events').select('*').eq('is_active', true).order('event_date', { ascending: true }),
-    hintsQuery,
     actorCanUseBigSmokeNoCharge(actor.email),
   ]);
 
   const scopedEvents = scopeEventsByProduct((events ?? []) as Event[], PRODUCT_BIG_SMOKE);
-  const hintContracts = (hintRows ?? []) as ContractWithTotals[];
-  const eventIds = new Set(scopedEvents.map((e) => e.id));
-  const bsHints = hintContracts.filter((c) => eventIds.has(c.event_id));
+  const bsEventIds = scopedEvents.map((e) => e.id);
+  if (bsEventIds.length === 0) {
+    hintsQuery = hintsQuery.limit(0);
+  } else {
+    hintsQuery = hintsQuery.in('event_id', bsEventIds);
+  }
+
+  const { data: hintRows } = await hintsQuery;
+  const bsHints = (hintRows ?? []) as ContractWithTotals[];
   const signedOrExecuted = bsHints.filter((c) => c.status === 'signed' || c.status === 'executed');
   const smartHints = {
     recentCompanies: recentCompanyNames(bsHints),

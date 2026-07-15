@@ -44,21 +44,30 @@ export default async function NewContractPage({
     hintsQuery = hintsQuery.limit(0);
   }
 
-  const [{ data: events }, { data: hintRows }] = await Promise.all([
-    supabase.from('events').select('*').eq('is_active', true).order('event_date', { ascending: true }),
-    hintsQuery,
-  ]);
+  const { data: events } = await supabase
+    .from('events')
+    .select('*')
+    .eq('is_active', true)
+    .order('event_date', { ascending: true });
 
-  const hintContracts = (hintRows ?? []) as ContractWithTotals[];
-  const signedOrExecuted = hintContracts.filter((c) => c.status === 'signed' || c.status === 'executed');
+  const scopedEvents = scopeEventsByProduct((events ?? []) as Event[], PRODUCT_WHISKYFEST);
+  const wfEventIds = scopedEvents.map((e) => e.id);
+  if (wfEventIds.length === 0) {
+    hintsQuery = hintsQuery.limit(0);
+  } else {
+    hintsQuery = hintsQuery.in('event_id', wfEventIds);
+  }
+
+  const { data: hintRows } = await hintsQuery;
+
+  const wfHints = (hintRows ?? []) as ContractWithTotals[];
+  const signedOrExecuted = wfHints.filter((c) => c.status === 'signed' || c.status === 'executed');
   const smartHints = {
-    recentCompanies: recentCompanyNames(hintContracts),
+    recentCompanies: recentCompanyNames(wfHints),
     priorContracts: signedOrExecuted,
   };
 
   const initialDealKind = parseDealKindParam(searchParams.deal) ?? undefined;
-
-  const scopedEvents = scopeEventsByProduct((events ?? []) as Event[], PRODUCT_WHISKYFEST);
 
   const [canUseNoChargeBooth, stephenRepId, noChargeEnforceStephenRep] = await Promise.all([
     actorCanUseNoChargeBooth(actor.email),

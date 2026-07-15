@@ -336,7 +336,11 @@ export async function syncBilledContractToGoogleSheet(contractId: string): Promi
   if (!event) return;
 
   const productKey: AccountingPortalKey =
-    event.product_key === 'wine_spectator' ? 'wine_spectator' : 'whiskyfest';
+    event.product_key === 'wine_spectator'
+      ? 'wine_spectator'
+      : event.product_key === 'big_smoke'
+        ? 'big_smoke'
+        : 'whiskyfest';
 
   try {
     await exportBilledExhibitorsToGoogleSheet(productKey);

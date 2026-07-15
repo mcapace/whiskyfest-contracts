@@ -43,15 +43,22 @@ export default async function WineSpectatorNewContractPage({
     hintsQuery = hintsQuery.limit(0);
   }
 
-  const [{ data: events }, { data: hintRows }] = await Promise.all([
-    supabase.from('events').select('*').eq('is_active', true).order('event_date', { ascending: true }),
-    hintsQuery,
-  ]);
+  const { data: events } = await supabase
+    .from('events')
+    .select('*')
+    .eq('is_active', true)
+    .order('event_date', { ascending: true });
 
   const scopedEvents = scopeEventsByProduct((events ?? []) as Event[], PRODUCT_WINE_SPECTATOR);
-  const hintContracts = (hintRows ?? []) as ContractWithTotals[];
-  const wineEventIds = new Set(scopedEvents.map((e) => e.id));
-  const wineHints = hintContracts.filter((c) => wineEventIds.has(c.event_id));
+  const wineEventIds = scopedEvents.map((e) => e.id);
+  if (wineEventIds.length === 0) {
+    hintsQuery = hintsQuery.limit(0);
+  } else {
+    hintsQuery = hintsQuery.in('event_id', wineEventIds);
+  }
+
+  const { data: hintRows } = await hintsQuery;
+  const wineHints = (hintRows ?? []) as ContractWithTotals[];
   const signedOrExecuted = wineHints.filter((c) => c.status === 'signed' || c.status === 'executed');
   const smartHints = {
     recentCompanies: recentCompanyNames(wineHints),

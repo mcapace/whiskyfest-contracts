@@ -1,7 +1,8 @@
 import { fetchBoothBrandsByContractIds } from '@/lib/contract-booth-brand-queries';
 import { categorizeContractBrands } from '@/lib/brand-category';
+import { PRODUCT_WHISKYFEST, eventIdsForProduct, type ProductKey } from '@/lib/product-portal';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import type { ContractWithTotals } from '@/types/db';
+import type { ContractWithTotals, Event } from '@/types/db';
 
 export type SponsorRecord = Pick<
   ContractWithTotals,
@@ -29,7 +30,10 @@ export type SponsorRecord = Pick<
   }[];
 };
 
-export async function getConfirmedSponsors(): Promise<{
+/** Confirmed sponsors for one product only — never mixes portals. */
+export async function getConfirmedSponsors(
+  productKey: ProductKey = PRODUCT_WHISKYFEST,
+): Promise<{
   sponsors: SponsorRecord[];
   boothRowsByContract: Map<
     string,
@@ -37,12 +41,20 @@ export async function getConfirmedSponsors(): Promise<{
   >;
 }> {
   const supabase = getSupabaseAdmin();
+  const { data: eventsData } = await supabase.from('events').select('id, product_key');
+  const productEventIds = eventIdsForProduct((eventsData ?? []) as Event[], productKey);
+
+  if (productEventIds.length === 0) {
+    return { sponsors: [], boothRowsByContract: new Map() };
+  }
+
   const { data } = await supabase
     .from('contracts_with_totals')
     .select(
       'id, exhibitor_company_name, brands_poured, booth_count, grand_total_cents, status, sales_rep_id, sales_rep_name, sales_rep_email, signer_1_name, signer_1_email, billing_contact_name, billing_contact_email, event_contact_name, event_contact_email'
     )
     .in('status', ['signed', 'executed'])
+    .in('event_id', productEventIds)
     .order('exhibitor_company_name');
   const rows = (data ?? []) as Omit<SponsorRecord, 'activity'>[];
   const ids = rows.map((r) => r.id);

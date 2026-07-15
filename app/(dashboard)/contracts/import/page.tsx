@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { canImportLegacyContracts, requireContractActorForPage } from '@/lib/auth-contract';
 import { ImportContractForm } from '@/components/contracts/import-contract-form';
+import { PRODUCT_WHISKYFEST, scopeEventsByProduct } from '@/lib/product-portal';
 import type { Event } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
@@ -21,7 +22,7 @@ export default async function ImportContractPage() {
 
   return (
     <ImportContractForm
-      events={(events ?? []) as Event[]}
+      events={scopeEventsByProduct((events ?? []) as Event[], PRODUCT_WHISKYFEST)}
       currentUserEmail={actor.email}
       isAdmin={actor.isAdmin}
       isEventsTeam={actor.isEventsTeam}

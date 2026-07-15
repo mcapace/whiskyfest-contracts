@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { resolveContractActor } from '@/lib/auth-contract';
+import { portalKindFromHost, productKeyForPortalKind } from '@/lib/portal-host';
+import {
+  PRODUCT_BIG_SMOKE,
+  PRODUCT_WINE_SPECTATOR,
+  eventIdsForProduct,
+  scopeContractsByProduct,
+} from '@/lib/product-portal';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { formatStatus } from '@/lib/status-display';
 import type { ContractWithTotals, Event } from '@/types/db';
@@ -13,27 +20,40 @@ function csvEscape(value: string | number | null | undefined): string {
   return s;
 }
 
-export async function GET() {
+function exportFilename(productKey: string): string {
+  if (productKey === PRODUCT_WINE_SPECTATOR) return 'nywe-contracts.csv';
+  if (productKey === PRODUCT_BIG_SMOKE) return 'big-smoke-contracts.csv';
+  return 'whiskyfest-contracts.csv';
+}
+
+export async function GET(req: Request) {
   const session = await auth();
   const gate = await resolveContractActor(session);
   if (!gate.ok) return gate.response;
 
+  const productKey = productKeyForPortalKind(portalKindFromHost(req.headers.get('host')));
   const supabase = getSupabaseAdmin();
 
+  const { data: events } = await supabase.from('events').select('*');
+  const allEvents = (events ?? []) as Event[];
+  const productEventIds = eventIdsForProduct(allEvents, productKey);
+
   let rowQuery = supabase.from('contracts_with_totals').select('*').order('updated_at', { ascending: false }).limit(500);
+
+  if (productEventIds.length === 0) {
+    rowQuery = rowQuery.limit(0);
+  } else {
+    rowQuery = rowQuery.in('event_id', productEventIds);
+  }
 
   const scopeAll = gate.actor.isAdmin || gate.actor.isEventsTeam;
   if (!scopeAll && gate.actor.accessibleSalesRepIds.length > 0) {
     rowQuery = rowQuery.in('sales_rep_id', gate.actor.accessibleSalesRepIds);
   }
 
-  const [{ data: rows }, { data: events }] = await Promise.all([
-    rowQuery,
-    supabase.from('events').select('*'),
-  ]);
-
-  const contracts = (rows ?? []) as ContractWithTotals[];
-  const eventMap = new Map((events ?? []).map((e: Event) => [e.id, e]));
+  const { data: rows } = await rowQuery;
+  const contracts = scopeContractsByProduct((rows ?? []) as ContractWithTotals[], allEvents, productKey);
+  const eventMap = new Map(allEvents.map((e) => [e.id, e]));
 
   const header = [
     'id',
@@ -71,7 +91,7 @@ export async function GET() {
     status: 200,
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': 'attachment; filename="whiskyfest-contracts.csv"',
+      'Content-Disposition': `attachment; filename="${exportFilename(productKey)}"`,
     },
   });
 }
