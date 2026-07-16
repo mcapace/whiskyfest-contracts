@@ -156,7 +156,9 @@ export async function AccountingDashboardView({
         subtitle={
           productKey === 'wine_spectator'
             ? 'Executed exhibitor contracts ready for invoicing and payment tracking'
-            : 'Executed sponsor contracts ready for invoicing and payment tracking'
+            : productKey === 'big_smoke'
+              ? 'Executed Big Smoke exhibitor contracts ready for invoicing and payment tracking'
+              : 'Executed sponsor contracts ready for invoicing and payment tracking'
         }
         arTotalCents={sumFor('all')}
         pendingCount={countFor('pending')}

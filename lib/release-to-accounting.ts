@@ -9,7 +9,8 @@ import { formatInvoiceStatus } from '@/lib/invoice-status';
 import { isLegacyImportedContract } from '@/lib/legacy-import';
 import { isNoChargeBoothContract } from '@/lib/no-charge-booth';
 import { contractHasBillingInfo } from '@/lib/nywe-billing';
-import { isNyweVendorEvent } from '@/lib/nywe-pricing';
+import { isNyweVendorEvent, isNyweVendorOnlyEvent } from '@/lib/nywe-pricing';
+import { isBigSmokeEventsManagedEvent } from '@/lib/contract-template-profile';
 import { downloadCompletedPdf } from '@/lib/docusign';
 import { fetchExhibitorCaptureFromEnvelope } from '@/lib/docusign-exhibitor-capture';
 import {
@@ -245,13 +246,15 @@ export async function releaseContractToAccounting(options: {
     ? formatInvoiceStatus('not_invoiced')
     : formatInvoiceStatus(contract.invoice_status ?? 'pending');
 
-  const orderTypeLabel = nyweVendor
+  const orderTypeLabel = isNyweVendorOnlyEvent(event)
     ? 'NYWE vendor license'
-    : isSponsorshipOnlyOrder(contract)
-      ? 'Sponsorship only'
-      : lineItemRows.length > 0
-        ? 'Booth + sponsorship / line items'
-        : 'Booth package';
+    : isBigSmokeEventsManagedEvent(event)
+      ? 'Big Smoke festival package'
+      : isSponsorshipOnlyOrder(contract)
+        ? 'Sponsorship only'
+        : lineItemRows.length > 0
+          ? 'Booth + sponsorship / line items'
+          : 'Booth package';
 
   const now = new Date().toISOString();
 

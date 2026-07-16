@@ -91,6 +91,19 @@ export function workspaceLabelForEvent(event: EventEmailContext | null | undefin
   return workspaceLabelForProduct(productKeyFromEvent(event));
 }
 
+/** Event title for emails — avoids "Big Smoke Las Vegas 2026 2026" when name already includes the year. */
+export function formatEventDisplayName(
+  name: string | null | undefined,
+  year?: number | null,
+): string {
+  const trimmed = (name ?? '').trim();
+  if (!trimmed) return year != null ? String(year) : '';
+  if (year == null) return trimmed;
+  const yearStr = String(year);
+  if (new RegExp(`\\b${yearStr}\\b`).test(trimmed)) return trimmed;
+  return `${trimmed} ${yearStr}`.trim();
+}
+
 export function appContractUrl(contractId: string, event: EventEmailContext | null | undefined): string {
   const productKey = productKeyFromEvent(event);
   const href = contractDetailHref(productKey, contractId);

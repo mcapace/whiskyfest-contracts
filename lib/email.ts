@@ -1,6 +1,10 @@
 import sgMail from '@sendgrid/mail';
-import { sendGridFromForProduct, workspaceLabelForProduct } from '@/lib/product-email';
-import { PRODUCT_WINE_SPECTATOR } from '@/lib/product-portal';
+import {
+  formatEventDisplayName,
+  sendGridFromForProduct,
+  workspaceLabelForProduct,
+} from '@/lib/product-email';
+import { PRODUCT_BIG_SMOKE, PRODUCT_WINE_SPECTATOR } from '@/lib/product-portal';
 import { formatInvoiceStatus } from '@/lib/invoice-status';
 
 /**
@@ -88,12 +92,15 @@ function accountingHandoffRecipients(): string[] {
 export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<void> {
   const apiKey = process.env['SENDGRID_API_KEY'];
   const isWine = p.productKey === PRODUCT_WINE_SPECTATOR;
+  const isBigSmoke = p.productKey === PRODUCT_BIG_SMOKE;
   const productFrom = sendGridFromForProduct(p.productKey);
-  const fromAddress = isWine
-    ? productFrom.email
-    : process.env['ACCOUNTING_FROM_EMAIL']?.trim() || productFrom.email;
+  const fromAddress =
+    isWine || isBigSmoke
+      ? productFrom.email
+      : process.env['ACCOUNTING_FROM_EMAIL']?.trim() || productFrom.email;
   const fromName = productFrom.name;
   const workspaceLabel = workspaceLabelForProduct(p.productKey);
+  const eventDisplay = formatEventDisplayName(p.eventName, p.eventYear);
 
   if (!apiKey) {
     throw new Error('SENDGRID_API_KEY not set — cannot send accounting email');
@@ -108,16 +115,18 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
     : `Contract Executed: ${p.sponsorCompanyName} — Ready for Invoicing`;
 
   const signerLine = [p.signerName, p.signerTitle].filter(Boolean).join(', ') || '—';
-  const productLabel = isWine ? 'NY Wine Experience' : 'WhiskyFest';
   const intro = isWine
-    ? `An ${productLabel} vendor license has been executed and is ready for accounting.`
-    : `A ${productLabel} sponsor contract has been executed and is ready for accounting.`;
+    ? 'An NY Wine Experience vendor license has been executed and is ready for accounting.'
+    : isBigSmoke
+      ? 'A Big Smoke exhibitor contract has been executed and is ready for accounting.'
+      : 'A WhiskyFest sponsor contract has been executed and is ready for accounting.';
+  const flatFeeLabel = isWine ? 'License fee' : isBigSmoke ? 'Package fee' : 'License fee';
 
   const li = p.lineItemsSubtotalCents ?? 0;
   const lineItemRows = (p.lineItems ?? []).filter((row) => row.description.trim());
   const amountLines =
     p.isNyweVendor
-      ? [`License fee: ${formatCents(p.grandTotalCents)}`]
+      ? [`${flatFeeLabel}: ${formatCents(p.grandTotalCents)}`]
       : li > 0
         ? [
             `Booth package: ${formatCents(p.boothSubtotalCents)}`,
@@ -173,7 +182,7 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
     `Signer: ${signerLine}`,
     `Signer email: ${p.signerEmail ?? '—'}`,
     `Phone: ${p.exhibitorTelephone ?? '—'}`,
-    `Event: ${p.eventName} ${p.eventYear}`,
+    `Event: ${eventDisplay}`,
     ...(p.isNyweVendor
       ? []
       : [
@@ -267,10 +276,10 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
           ${row('Signer', escape(signerLine))}
           ${row('Email', p.signerEmail ? `<a href="mailto:${escape(p.signerEmail)}">${escape(p.signerEmail)}</a>` : '—')}
           ${row('Phone', escape(p.exhibitorTelephone ?? '—'))}
-          ${row('Event', escape(`${p.eventName} ${p.eventYear}`))}
+          ${row('Event', escape(eventDisplay))}
           ${
             p.isNyweVendor
-              ? row('License fee', escape(formatCents(p.grandTotalCents)))
+              ? row(flatFeeLabel, escape(formatCents(p.grandTotalCents)))
               : row('Booth count', escape(String(p.boothCount))) +
                 row('Booth rate', escape(formatCents(p.boothRateCents))) +
                 row('Discount', escape(p.discountLine)) +
@@ -301,7 +310,9 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
     html,
     attachments: [
       {
-        filename: `${p.sponsorCompanyName} — ${isWine ? p.eventName : `WhiskyFest ${p.eventYear}`} Contract (SIGNED).pdf`,
+        filename: `${p.sponsorCompanyName} — ${
+          isWine ? eventDisplay : isBigSmoke ? eventDisplay : `WhiskyFest ${p.eventYear}`
+        } Contract (SIGNED).pdf`,
         content: p.signedPdfBytes.toString('base64'),
         type: 'application/pdf',
         disposition: 'attachment',
