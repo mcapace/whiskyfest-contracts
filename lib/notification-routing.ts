@@ -186,8 +186,15 @@ export async function resolveNotificationRecipients(
     if (wf.nywe) {
       return empty('NYWE exhibitor signed — countersigner action is via DocuSign only');
     }
+    // WhiskyFest / Big Smoke: email the Shanken countersigner so they know to open DocuSign.
+    const countersigner = wf.countersignerEmail;
     const team = await getActiveEventsTeamEmails();
     const rep = await getSalesRepEmail(ctx.salesRepId);
+    if (countersigner) {
+      const to = [countersigner];
+      const bcc = exclude(uniq([...(rep ? [rep] : []), ...team]), new Set(to));
+      return { skip: false, to, cc: [], bcc };
+    }
     const to = rep ? [rep] : team.slice(0, 1);
     const bcc = uniq([...(rep ? team : team.slice(1)), ...(rep ? [] : [])]);
     return { skip: to.length === 0 && bcc.length === 0, to, cc: [], bcc: exclude(bcc, new Set(to)) };

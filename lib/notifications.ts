@@ -314,16 +314,17 @@ export async function notifyPartialSignature(
   const exhibitorPerson = (contract.signer_1_name ?? '').trim() || (nywe ? 'Winery contact' : 'Exhibitor');
   const company = contract.exhibitor_company_name.trim();
   const signatoryName = (event?.shanken_signatory_name ?? '').trim() || 'the Shanken signatory';
+  const dualSignerCountersign = !nywe && Boolean(event?.shanken_signatory_email?.trim());
 
-  const subject = nywe
-    ? `${company} signed — countersign in DocuSign`
+  const subject = nywe || dualSignerCountersign
+    ? `${company} signed — action required: countersign in DocuSign`
     : `${exhibitorPerson} from ${company} signed — awaiting countersignature`;
 
   const para1 = nywe
     ? `${company} has signed the ${eventTitle} contract.`
     : `${exhibitorPerson} at ${company} has signed the ${eventTitle} contract.`;
-  const para2 = nywe
-    ? `Open the DocuSign email in your inbox to countersign as ${signatoryName}. Accounting is notified automatically after you sign.`
+  const para2 = nywe || dualSignerCountersign
+    ? `Action needed: open DocuSign (Action Required, or the DocuSign email in your inbox) and countersign as ${signatoryName}. That completes execution — accounting is notified automatically after you sign.`
     : `The contract is now awaiting countersignature from ${signatoryName}. They will receive a separate DocuSign email shortly.`;
   const boothSub = contract.booth_subtotal_cents ?? contract.booth_count * contract.booth_rate_cents;
   const grand =
@@ -338,10 +339,15 @@ export async function notifyPartialSignature(
 
   const text = [para1, ``, para2, ``, pricingText, ``, `Open contract: ${detailUrl}`].join('\n');
 
+  const actionHtml =
+    nywe || dualSignerCountersign
+      ? `<p><strong>Action needed:</strong> open DocuSign (Action Required, or the DocuSign email in your inbox) and countersign as ${escapeHtml(signatoryName)}. That completes execution — accounting is notified automatically after you sign.</p>`
+      : `<p>${escapeHtml(para2)}</p>`;
+
   const html = `
     <div style="font-family: system-ui, sans-serif; max-width: 560px;">
       <p>${escapeHtml(para1)}</p>
-      <p>${escapeHtml(para2)}</p>
+      ${actionHtml}
       ${contractPricingHtmlFragment({
         booth_subtotal_cents: boothSub,
         line_items_subtotal_cents: contract.line_items_subtotal_cents,
