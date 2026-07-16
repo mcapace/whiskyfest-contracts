@@ -1,5 +1,6 @@
 import { isEventsManagedWorkflow, isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
 import { NYWE_COUNTERSIGNER_EMAILS } from '@/lib/nywe-countersigner';
+import { WHISKYFEST_BIG_SMOKE_COUNTERSIGNER_EMAILS } from '@/lib/wf-bslv-countersigner';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { Event } from '@/types/db';
 
@@ -186,18 +187,12 @@ export async function resolveNotificationRecipients(
     if (wf.nywe) {
       return empty('NYWE exhibitor signed — countersigner action is via DocuSign only');
     }
-    // WhiskyFest / Big Smoke: email the Shanken countersigner so they know to open DocuSign.
-    const countersigner = wf.countersignerEmail;
-    const team = await getActiveEventsTeamEmails();
+    // WhiskyFest / Big Smoke: Liz, Nicole, Tobi (+ admins on BCC). Susannah is NYWE-only.
+    const to = [...WHISKYFEST_BIG_SMOKE_COUNTERSIGNER_EMAILS];
+    const team = exclude(await getActiveEventsTeamEmails(), countersignerExcluded());
     const rep = await getSalesRepEmail(ctx.salesRepId);
-    if (countersigner) {
-      const to = [countersigner];
-      const bcc = exclude(uniq([...(rep ? [rep] : []), ...team]), new Set(to));
-      return { skip: false, to, cc: [], bcc };
-    }
-    const to = rep ? [rep] : team.slice(0, 1);
-    const bcc = uniq([...(rep ? team : team.slice(1)), ...(rep ? [] : [])]);
-    return { skip: to.length === 0 && bcc.length === 0, to, cc: [], bcc: exclude(bcc, new Set(to)) };
+    const bcc = exclude(uniq([...(rep ? [rep] : []), ...team]), new Set(to));
+    return { skip: false, to, cc: [], bcc };
   }
 
   if (kind === 'fully_signed') {
