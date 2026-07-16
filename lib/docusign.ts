@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { buildExhibitorDataTextTabs } from '@/lib/exhibitor-docusign-fields';
 import { DOCUSIGN_ANCHORS } from '@/lib/merge-map';
+import { isWhiskyfestBigSmokeCountersignerEmail, WF_BS_COUNTERSIGN_GROUP_LABEL } from '@/lib/wf-bslv-countersigner';
 
 function requireEnv(name: string): string {
   const v = process.env[name]?.trim();
@@ -244,6 +245,8 @@ export interface SendEnvelopeParams {
   signer1: { email: string; name: string };
   /** Event-level Shanken countersigner recipient (routing order 2). Omit for single-signer NYWE envelopes. */
   countersigner?: { email: string; name: string } | null;
+  /** Shared signing group — any member may countersign (WhiskyFest / Big Smoke). */
+  countersignerSigningGroupId?: string | null;
   /** Optional carbon copy — receives DocuSign notifications but does not sign. */
   carbonCopy?: { email: string; name: string } | null;
   /** DocuSign brand id — controls exhibitor-facing signing email sender/branding. */
@@ -279,7 +282,22 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
   ];
 
   const countersigner = params.countersigner;
-  if (countersigner?.email?.trim() && countersigner?.name?.trim()) {
+  const signingGroupId = params.countersignerSigningGroupId?.trim();
+  if (signingGroupId) {
+    const signHere2 = anchorOnly(DOCUSIGN_ANCHORS.sig2);
+    const date2 = anchorOnly(DOCUSIGN_ANCHORS.date2);
+    signers.push({
+      signingGroupId,
+      name: WF_BS_COUNTERSIGN_GROUP_LABEL,
+      recipientId: '2',
+      routingOrder: '2',
+      roleName: 'Countersigner',
+      tabs: {
+        signHereTabs: [signHere2],
+        dateSignedTabs: [date2],
+      },
+    });
+  } else if (countersigner?.email?.trim() && countersigner?.name?.trim()) {
     const signHere2 = anchorOnly(DOCUSIGN_ANCHORS.sig2);
     const date2 = anchorOnly(DOCUSIGN_ANCHORS.date2);
     signers.push({
@@ -497,7 +515,18 @@ export function extractCountersignerFromSigners(signers: DocuSignSignerRow[]): {
     const st = (s.status ?? '').toLowerCase();
     return (st === 'completed' || st === 'signed') && s.email && s.signedDateTime;
   });
-  const pick = completed ?? second.find((s) => s.email && s.signedDateTime);
+  const pick =
+    completed ??
+    second.find((s) => s.email && s.signedDateTime) ??
+    signers.find((s) => {
+      const st = (s.status ?? '').toLowerCase();
+      return (
+        (st === 'completed' || st === 'signed') &&
+        s.email &&
+        s.signedDateTime &&
+        isWhiskyfestBigSmokeCountersignerEmail(s.email)
+      );
+    });
   if (!pick?.email || !pick.signedDateTime) return null;
   return {
     email: pick.email.trim(),

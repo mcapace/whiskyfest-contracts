@@ -19,7 +19,9 @@ import {
 import { eventUsesContractOrderTable } from '@/lib/contract-template-profile';
 import {
   countersignerRequiredForEvent,
-  docusignCountersignerForEvent,
+  countersignCcValidation,
+  resolveDocuSignCountersignDelivery,
+  toSendEnvelopeCountersignParams,
 } from '@/lib/docusign-envelope-recipients';
 import { shouldSkipExhibitorDataTabs } from '@/lib/exhibitor-docusign-fields';
 import { nyweLicenseAddressError } from '@/lib/nywe-billing';
@@ -32,7 +34,7 @@ import { requiresDiscountApproval } from '@/lib/contracts';
 import { insertContractAudit } from '@/lib/audit-log';
 import { syncExhibitorRosterWriteback } from '@/lib/exhibitor-roster-sync-hook';
 import { docusignBrandIdForEvent, sendGridFromForEvent } from '@/lib/product-email';
-import { parseSignerCc, validateSignerCcDistinct } from '@/lib/docusign-signer-cc';
+import { parseSignerCc } from '@/lib/docusign-signer-cc';
 import {
   amendmentsTextForPlan,
   buildContractRevisionPlan,
@@ -247,17 +249,17 @@ export async function reviseAndSendContract(options: {
     throw new Error('Upload a redlined PDF first, or uncheck “Send uploaded document”.');
   }
 
-  const countersigner = docusignCountersignerForEvent(event);
-  if (countersignerRequiredForEvent(event) && !countersigner) {
+  const countersignDelivery = await resolveDocuSignCountersignDelivery(event);
+  if (countersignerRequiredForEvent(event) && !countersignDelivery) {
     throw new Error('Event countersigner name and email are required.');
   }
 
   const signerEmail = contract.signer_1_email.trim();
   const signerName = contract.signer_1_name.trim();
   const carbonCopy = parseSignerCc(contract);
-  const ccError = validateSignerCcDistinct({
+  const ccError = countersignCcValidation({
     signerEmail,
-    countersignerEmail: countersigner?.email ?? event.shanken_signatory_email?.trim() ?? '',
+    delivery: countersignDelivery,
     cc: carbonCopy,
   });
   if (ccError) throw new Error(ccError);
@@ -290,7 +292,7 @@ export async function reviseAndSendContract(options: {
       emailSubject: contractDocuSignEmailSubject(contract.exhibitor_company_name, event),
       emailBlurb: contractDocuSignEmailBlurb(contract.exhibitor_company_name, event),
       signer1: { name: signerName, email: signerEmail },
-      countersigner,
+      ...toSendEnvelopeCountersignParams(countersignDelivery),
       carbonCopy,
       brandId: docusignBrandIdForEvent(event),
       replyTo: sendGridFromForEvent(event),

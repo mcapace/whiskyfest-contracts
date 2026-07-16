@@ -16,7 +16,9 @@ import {
 import { eventUsesContractOrderTable } from '@/lib/contract-template-profile';
 import {
   countersignerRequiredForEvent,
-  docusignCountersignerForEvent,
+  countersignCcValidation,
+  resolveDocuSignCountersignDelivery,
+  toSendEnvelopeCountersignParams,
 } from '@/lib/docusign-envelope-recipients';
 import { shouldSkipExhibitorDataTabs } from '@/lib/exhibitor-docusign-fields';
 import { nyweLicenseAddressError } from '@/lib/nywe-billing';
@@ -30,7 +32,7 @@ import { insertContractAudit } from '@/lib/audit-log';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { syncExhibitorRosterWritebackById } from '@/lib/exhibitor-roster-sync-hook';
 import { docusignBrandIdForEvent, sendGridFromForEvent } from '@/lib/product-email';
-import { parseSignerCc, validateSignerCcDistinct } from '@/lib/docusign-signer-cc';
+import { parseSignerCc } from '@/lib/docusign-signer-cc';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
@@ -100,8 +102,8 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: addressError }, { status: 400 });
   }
 
-  const countersigner = docusignCountersignerForEvent(event);
-  if (countersignerRequiredForEvent(event) && !countersigner) {
+  const countersignDelivery = await resolveDocuSignCountersignDelivery(event);
+  if (countersignerRequiredForEvent(event) && !countersignDelivery) {
     return NextResponse.json(
       { error: 'Event countersigner name and email are required.' },
       { status: 500 },
@@ -111,9 +113,9 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   const signerEmail = contract.signer_1_email.trim();
   const signerName = contract.signer_1_name.trim();
   const carbonCopy = parseSignerCc(contract);
-  const ccError = validateSignerCcDistinct({
+  const ccError = countersignCcValidation({
     signerEmail,
-    countersignerEmail: countersigner?.email ?? event.shanken_signatory_email?.trim() ?? '',
+    delivery: countersignDelivery,
     cc: carbonCopy,
   });
   if (ccError) {
@@ -148,7 +150,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       emailSubject: contractDocuSignEmailSubject(contract.exhibitor_company_name, event),
       emailBlurb: contractDocuSignEmailBlurb(contract.exhibitor_company_name, event),
       signer1: { name: signerName, email: signerEmail },
-      countersigner,
+      ...toSendEnvelopeCountersignParams(countersignDelivery),
       carbonCopy,
       brandId: docusignBrandIdForEvent(event),
       replyTo: sendGridFromForEvent(event),
@@ -183,9 +185,21 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
         envelope_status: 'sent',
         exhibitor_signer: contract.signer_1_email,
         signer_cc_email: carbonCopy?.email ?? null,
-        countersigner_email: countersigner?.email ?? event.shanken_signatory_email,
-        countersigner_name: countersigner?.name ?? event.shanken_signatory_name,
-        single_signer_envelope: countersigner == null,
+        countersigner_email:
+          countersignDelivery?.mode === 'user'
+            ? countersignDelivery.email
+            : countersignDelivery?.mode === 'signing_group'
+              ? countersignDelivery.displayName
+              : event.shanken_signatory_email,
+        countersigner_name:
+          countersignDelivery?.mode === 'user'
+            ? countersignDelivery.name
+            : countersignDelivery?.mode === 'signing_group'
+              ? countersignDelivery.displayName
+              : event.shanken_signatory_name,
+        countersigner_signing_group:
+          countersignDelivery?.mode === 'signing_group' ? countersignDelivery.signingGroupId : null,
+        single_signer_envelope: countersignDelivery == null,
       },
     });
 

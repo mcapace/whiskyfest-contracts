@@ -15,7 +15,9 @@ import {
 import { eventUsesContractOrderTable } from '@/lib/contract-template-profile';
 import {
   countersignerRequiredForEvent,
-  docusignCountersignerForEvent,
+  countersignCcValidation,
+  resolveDocuSignCountersignDelivery,
+  toSendEnvelopeCountersignParams,
 } from '@/lib/docusign-envelope-recipients';
 import { nyweLicenseAddressError } from '@/lib/nywe-billing';
 import { refreshNyweBillingFromRosterForContract } from '@/lib/nywe-roster-billing-sync';
@@ -28,7 +30,7 @@ import { sendEnvelope, voidEnvelope } from '@/lib/docusign';
 import { syncExhibitorRosterWritebackById } from '@/lib/exhibitor-roster-sync-hook';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { docusignBrandIdForEvent } from '@/lib/product-email';
-import { parseSignerCc, validateSignerCcDistinct } from '@/lib/docusign-signer-cc';
+import { parseSignerCc } from '@/lib/docusign-signer-cc';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
@@ -130,15 +132,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   let newEnvelopeId: string;
   try {
-    const countersigner = docusignCountersignerForEvent(event);
-    if (countersignerRequiredForEvent(event) && !countersigner) {
+    const countersignDelivery = await resolveDocuSignCountersignDelivery(event);
+    if (countersignerRequiredForEvent(event) && !countersignDelivery) {
       return NextResponse.json({ error: 'Event countersigner name and email are required.' }, { status: 500 });
     }
 
     const carbonCopy = parseSignerCc(mergedContract);
-    const ccError = validateSignerCcDistinct({
+    const ccError = countersignCcValidation({
       signerEmail: newSignerEmail,
-      countersignerEmail: countersigner?.email ?? event.shanken_signatory_email?.trim() ?? '',
+      delivery: countersignDelivery,
       cc: carbonCopy,
     });
     if (ccError) {
@@ -162,7 +164,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       emailSubject: contractDocuSignEmailSubject(contract.exhibitor_company_name, event),
       emailBlurb: contractDocuSignEmailBlurb(contract.exhibitor_company_name, event),
       signer1: { name: newSignerName, email: newSignerEmail },
-      countersigner,
+      ...toSendEnvelopeCountersignParams(countersignDelivery),
       carbonCopy,
       brandId: docusignBrandIdForEvent(event),
     });

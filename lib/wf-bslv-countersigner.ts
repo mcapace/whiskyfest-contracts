@@ -8,6 +8,8 @@ export const WHISKYFEST_BIG_SMOKE_COUNTERSIGNER_EMAILS = [
   'talper@mshanken.com', // Tobi Alper
 ] as const;
 
+export const WF_BS_COUNTERSIGN_GROUP_LABEL = 'Liz Mott, Nicole Mazza, or Tobi Alper';
+
 const WF_BS_COUNTERSIGNERS = new Set<string>(WHISKYFEST_BIG_SMOKE_COUNTERSIGNER_EMAILS);
 
 export function isWhiskyfestBigSmokeCountersignerEmail(email: string | null | undefined): boolean {

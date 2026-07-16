@@ -16,6 +16,8 @@ import {
   SPONSOR_CONTRACT_NOTES_LABEL,
 } from '@/lib/contract-notes-copy';
 import { dealKindLabel, type ContractDealKind } from '@/lib/contract-deal-kind';
+import { usesSingleSignerEnvelope } from '@/lib/single-signer-envelope';
+import { WF_BS_COUNTERSIGN_GROUP_LABEL } from '@/lib/wf-bslv-countersigner';
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import { contractHasBillingInfo } from '@/lib/nywe-billing';
 import { cn, formatCurrency, formatLongDate, formatTimestamp } from '@/lib/utils';
@@ -325,8 +327,16 @@ export function ContractDetailView({
                 salesRep={contract.sales_rep_name ?? contract.sales_rep_email ?? null}
                 salesRepEmail={contract.sales_rep_email ?? null}
                 eventName={event?.name ?? null}
-                countersignerName={event?.shanken_signatory_name ?? null}
-                countersignerEmail={event?.shanken_signatory_email ?? null}
+                countersignerName={
+                  event && !usesSingleSignerEnvelope(event)
+                    ? WF_BS_COUNTERSIGN_GROUP_LABEL
+                    : (event?.shanken_signatory_name ?? null)
+                }
+                countersignerEmail={
+                  event && !usesSingleSignerEnvelope(event)
+                    ? null
+                    : (event?.shanken_signatory_email ?? null)
+                }
                 createdBy={contract.created_by}
                 discountApprovalPending={discountPending}
                 isEventsTeam={isEventsTeam}
