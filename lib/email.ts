@@ -94,10 +94,12 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
   const isWine = p.productKey === PRODUCT_WINE_SPECTATOR;
   const isBigSmoke = p.productKey === PRODUCT_BIG_SMOKE;
   const productFrom = sendGridFromForProduct(p.productKey);
-  const fromAddress =
-    isWine || isBigSmoke
-      ? productFrom.email
-      : process.env['ACCOUNTING_FROM_EMAIL']?.trim() || productFrom.email;
+  // Wine Spectator uses its verified NYWE sender. WhiskyFest + Big Smoke accounting
+  // handoffs use ACCOUNTING_FROM_EMAIL (verified on SendGrid); Big Smoke still shows
+  // as "Big Smoke Contracts" via from-name.
+  const fromAddress = isWine
+    ? productFrom.email
+    : process.env['ACCOUNTING_FROM_EMAIL']?.trim() || productFrom.email;
   const fromName = productFrom.name;
   const workspaceLabel = workspaceLabelForProduct(p.productKey);
   const eventDisplay = formatEventDisplayName(p.eventName, p.eventYear);

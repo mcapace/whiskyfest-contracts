@@ -3,17 +3,21 @@ import { insertContractAudit } from '@/lib/audit-log';
 import { isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
 import { autoReleaseNyweAfterCountersign } from '@/lib/nywe-auto-release-accounting';
 import { isLegacyImportedContract } from '@/lib/legacy-import';
-import { PRODUCT_WHISKYFEST } from '@/lib/product-portal';
+import { PRODUCT_BIG_SMOKE, PRODUCT_WHISKYFEST } from '@/lib/product-portal';
 import { releaseContractToAccounting } from '@/lib/release-to-accounting';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
 import type { ContractWithTotals, Event } from '@/types/db';
 
-/** WhiskyFest + NYWE events-managed: signed contracts auto-release to accounting (no admin click). */
+/** WhiskyFest + Big Smoke + NYWE events-managed: signed contracts auto-release to accounting. */
 export function eventAutoReleasesToAccounting(
   event: Pick<Event, 'product_key' | 'workflow_profile'> | null | undefined,
 ): boolean {
   if (!event) return false;
-  return isNyweEventsManagedEvent(event) || event.product_key === PRODUCT_WHISKYFEST;
+  return (
+    isNyweEventsManagedEvent(event) ||
+    event.product_key === PRODUCT_WHISKYFEST ||
+    event.product_key === PRODUCT_BIG_SMOKE
+  );
 }
 
 /** Fully signed (DocuSign or approved legacy import) but not yet handed to accounting. */
