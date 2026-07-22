@@ -6,11 +6,11 @@ import {
   ArrowDownAZ,
   ArrowUpAZ,
   Check,
+  ChevronDown,
   Download,
   ExternalLink,
   FileUp,
   Loader2,
-  MoreHorizontal,
   Plus,
   Search,
   Sheet,
@@ -180,24 +180,33 @@ function RowMenu({
   if (!targetId) {
     if (!row.contract_id) return null;
     return (
-      <Button asChild type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs">
+      <Button asChild type="button" size="sm" variant="outline" className="h-7 px-2.5 text-xs">
         <Link href={`/contracts/${row.contract_id}`}>Open</Link>
       </Button>
     );
   }
 
   return (
-    <div className="relative flex justify-end">
+    <div className="relative flex flex-wrap items-center justify-end gap-1.5">
+      {row.contract_id ? (
+        <Button asChild type="button" size="sm" variant="outline" className="h-7 px-2.5 text-xs">
+          <Link href={`/contracts/${row.contract_id}`}>Open</Link>
+        </Button>
+      ) : (
+        <Button asChild type="button" size="sm" className="h-7 px-2.5 text-xs">
+          <Link href={`/contracts/new?fromPipeline=${targetId}`}>Convert</Link>
+        </Button>
+      )}
       <Button
         type="button"
         size="sm"
-        variant="ghost"
-        className="h-7 w-7 p-0"
-        aria-label="Manage row"
+        variant="outline"
+        className="h-7 gap-1 px-2.5 text-xs"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        <MoreHorizontal className="h-4 w-4" />
+        Manage
+        <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-180')} />
       </Button>
 
       {open ? (
@@ -208,9 +217,9 @@ function RowMenu({
             aria-label="Close menu"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute right-0 top-8 z-30 w-72 rounded-lg border border-border bg-bg-surface p-3 shadow-lg">
+          <div className="absolute right-0 top-9 z-30 w-72 rounded-lg border border-border bg-bg-surface p-3 text-left shadow-lg">
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Manage</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">More actions</p>
               <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => setOpen(false)}>
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -219,12 +228,9 @@ function RowMenu({
             <div className="grid gap-1.5">
               {row.contract_id ? (
                 <Button asChild type="button" size="sm" variant="outline" className="h-8 justify-start">
-                  <Link href={`/contracts/${row.contract_id}`}>Open contract</Link>
+                  <Link href={`/contracts/new?fromPipeline=${targetId}`}>Convert (new draft)</Link>
                 </Button>
               ) : null}
-              <Button asChild type="button" size="sm" variant={row.contract_id ? 'outline' : 'default'} className="h-8 justify-start">
-                <Link href={`/contracts/new?fromPipeline=${targetId}`}>Convert (DocuSign)</Link>
-              </Button>
               <Button asChild type="button" size="sm" variant="outline" className="h-8 justify-start">
                 <Link href={`/contracts/import?fromPipeline=${targetId}`}>
                   <FileUp className="h-3.5 w-3.5" />
@@ -652,7 +658,7 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
       ) : null}
 
       {/* Compact table */}
-      <div className="overflow-hidden rounded-lg border border-border/70 bg-bg-surface">
+      <div className="rounded-lg border border-border/70 bg-bg-surface">
         <div className="flex items-center justify-between gap-3 border-b border-border/60 bg-bg-surface-raised/80 px-3 py-2">
           <p className="text-xs text-muted-foreground">
             <span className="font-medium text-foreground">{activeMeta.label}</span>
@@ -664,7 +670,7 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
           </p>
           {tab === 'pending' ? (
             <p className="hidden text-[11px] text-muted-foreground sm:block">
-              ⋯ to Convert / Import / link an in-progress contract · click +N to expand brands
+              ⋯ to Convert / Import / link · click +N on brands to expand
             </p>
           ) : null}
         </div>
@@ -694,8 +700,8 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
                   </th>
                 ) : null}
                 {showManage ? (
-                  <th className="w-12 px-2 py-2 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    {' '}
+                  <th className="min-w-[160px] px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    Actions
                   </th>
                 ) : (
                   <th className="w-16 px-2 py-2" />
