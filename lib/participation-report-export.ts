@@ -1,10 +1,12 @@
-import { google } from 'googleapis';
+import { google, sheets_v4 } from 'googleapis';
 import {
   buildParticipationReport,
   type ParticipationReport,
   type ParticipationReportRow,
 } from '@/lib/participation-report';
 import { formatBoothAmount, getSheetsClient } from '@/lib/sheets-tracker';
+
+type SheetsRequest = sheets_v4.Schema$Request;
 
 function getDriveAuth() {
   const keyB64 = process.env['GOOGLE_SERVICE_ACCOUNT_KEY']?.trim();
@@ -67,95 +69,399 @@ function rateLabel(cents: number): string {
   return money(cents);
 }
 
-function dataRow(row: ParticipationReportRow, includeNotes: boolean): string[] {
-  const base = [
+function notesCell(row: ParticipationReportRow): string {
+  return [
+    row.pipeline_status !== 'No contract' ? row.pipeline_status : '',
+    row.sheet_notes ? `Sheet: ${row.sheet_notes}` : '',
+    row.notes ? `Portal: ${row.notes}` : '',
+  ]
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
+function dataRow(row: ParticipationReportRow, includeNotes: boolean): (string | number)[] {
+  const base: (string | number)[] = [
     row.sales_rep_initials,
     row.company_name,
     row.brands_text,
-    row.booth_count ? String(row.booth_count) : '',
+    row.booth_count || '',
     rateLabel(row.rate_per_booth_cents),
     row.sponsorship_label,
     money(row.total_spend_cents),
   ];
-  if (includeNotes) {
-    const noteParts = [
-      row.pipeline_status !== 'No contract' ? row.pipeline_status : '',
-      row.sheet_notes ? `Sheet: ${row.sheet_notes}` : '',
-      row.notes ? `Portal: ${row.notes}` : '',
-    ]
-      .map((s) => s.trim())
-      .filter(Boolean);
-    base.push(noteParts.join(' — '));
-  }
+  if (includeNotes) base.push(notesCell(row));
   return base;
 }
 
-/** Marvin-style sheet values for Confirmed / Pending / New Business. */
-export function buildParticipationSheetValues(report: ParticipationReport): string[][] {
+type RowKind = 'title' | 'subtitle' | 'blank' | 'section' | 'header' | 'data' | 'total' | 'grand';
+
+type BuiltSheet = {
+  values: (string | number)[][];
+  kinds: RowKind[];
+  colCount: number;
+};
+
+const COL_COUNT = 8;
+
+const COLORS = {
+  titleBg: { red: 0.12, green: 0.16, blue: 0.22 },
+  titleFg: { red: 1, green: 1, blue: 1 },
+  confirmedBg: { red: 0.18, green: 0.49, blue: 0.33 },
+  pendingBg: { red: 0.72, green: 0.45, blue: 0.14 },
+  newBizBg: { red: 0.22, green: 0.37, blue: 0.55 },
+  headerBg: { red: 0.93, green: 0.94, blue: 0.95 },
+  totalBg: { red: 0.95, green: 0.95, blue: 0.93 },
+  grandBg: { red: 0.12, green: 0.16, blue: 0.22 },
+  altRow: { red: 0.97, green: 0.98, blue: 0.98 },
+  white: { red: 1, green: 1, blue: 1 },
+};
+
+/** Marvin-style sheet values + row kind map for formatting. */
+export function buildParticipationSheetValues(report: ParticipationReport): BuiltSheet {
   const title = `${report.event.name} ${report.event.year} | Company Participation Status`;
-  const values: string[][] = [[title], []];
+  const asOf = report.sheetsFetchedAt
+    ? `As of ${new Date(report.sheetsFetchedAt).toLocaleString()} · Confirmed from executed contracts · Pending/New Business live from Google Sheets`
+    : `Generated ${new Date().toLocaleString()}`;
 
-  values.push(['CONFIRMED']);
-  values.push([
-    'Sales Rep',
-    'Company',
-    'Participating Brand(s)',
-    '# of Booths',
-    'Rate per Booth',
-    'Sponsorship (Y/N)',
-    'Total Spend',
-  ]);
-  for (const row of report.confirmed) values.push(dataRow(row, false));
-  values.push([
-    'TOTAL',
-    String(report.totals.confirmedBooths),
-    money(report.totals.confirmedSpendCents),
-  ]);
-  values.push([]);
+  const values: (string | number)[][] = [];
+  const kinds: RowKind[] = [];
 
-  values.push(['PENDING RENEWALS']);
-  values.push([
-    'Sales Rep',
-    'Company',
-    'Brand(s)',
-    '# of Booths',
-    'Rate per Booth',
-    'Sponsorship (Y/N)',
-    'Total Spend',
-    'Notes',
-  ]);
-  for (const row of report.pending) values.push(dataRow(row, true));
-  values.push([
-    'TOTAL',
-    String(report.totals.pendingBooths),
-    money(report.totals.pendingSpendCents),
-  ]);
-  values.push([]);
-  values.push([]);
+  const push = (row: (string | number)[], kind: RowKind) => {
+    const padded = [...row];
+    while (padded.length < COL_COUNT) padded.push('');
+    values.push(padded.slice(0, COL_COUNT));
+    kinds.push(kind);
+  };
 
-  values.push(['NEW BUSINESS - Inquiry Tracking']);
-  values.push([
-    'Sales Rep',
-    'Company',
-    'Brands',
-    '# of Booths',
-    'Rate per Booth',
-    'Sponsorship',
-    'Total Spend',
-    'Notes',
-  ]);
-  for (const row of report.newBusiness) values.push(dataRow(row, true));
-  values.push(['TOTAL', '—', '—']);
-  values.push([]);
-  values.push([]);
+  push([title], 'title');
+  push([asOf], 'subtitle');
+  push([], 'blank');
 
-  values.push([
-    'TOTAL CONFIRMED + PENDING',
-    String(report.totals.confirmedPlusPendingBooths),
-    money(report.totals.confirmedPlusPendingSpendCents),
-  ]);
+  push(['CONFIRMED'], 'section');
+  push(
+    ['Sales Rep', 'Company', 'Participating Brand(s)', '# of Booths', 'Rate per Booth', 'Sponsorship (Y/N)', 'Total Spend', ''],
+    'header',
+  );
+  for (const row of report.confirmed) push(dataRow(row, false), 'data');
+  push(['TOTAL', '', '', report.totals.confirmedBooths, '', '', money(report.totals.confirmedSpendCents), ''], 'total');
+  push([], 'blank');
 
-  return values;
+  push(['PENDING RENEWALS'], 'section');
+  push(
+    ['Sales Rep', 'Company', 'Brand(s)', '# of Booths', 'Rate per Booth', 'Sponsorship (Y/N)', 'Total Spend', 'Notes'],
+    'header',
+  );
+  for (const row of report.pending) push(dataRow(row, true), 'data');
+  push(['TOTAL', '', '', report.totals.pendingBooths, '', '', money(report.totals.pendingSpendCents), ''], 'total');
+  push([], 'blank');
+  push([], 'blank');
+
+  push(['NEW BUSINESS — Inquiry Tracking'], 'section');
+  push(
+    ['Sales Rep', 'Company', 'Brands / Notes', '# of Booths', 'Rate per Booth', 'Sponsorship', 'Total Spend', 'Notes'],
+    'header',
+  );
+  for (const row of report.newBusiness) push(dataRow(row, true), 'data');
+  push(['TOTAL', '', '', report.newBusiness.length ? '—' : '—', '', '', '—', ''], 'total');
+  push([], 'blank');
+  push([], 'blank');
+
+  push(
+    [
+      'TOTAL CONFIRMED + PENDING',
+      '',
+      '',
+      report.totals.confirmedPlusPendingBooths,
+      '',
+      '',
+      money(report.totals.confirmedPlusPendingSpendCents),
+      '',
+    ],
+    'grand',
+  );
+
+  return { values, kinds, colCount: COL_COUNT };
+}
+
+function formatRequests(sheetId: number, built: BuiltSheet): SheetsRequest[] {
+  const { kinds, colCount } = built;
+  const requests: SheetsRequest[] = [];
+
+  // Column widths
+  const widths = [90, 200, 320, 90, 110, 120, 110, 280];
+  widths.forEach((pixelSize, i) => {
+    requests.push({
+      updateDimensionProperties: {
+        range: { sheetId, dimension: 'COLUMNS', startIndex: i, endIndex: i + 1 },
+        properties: { pixelSize },
+        fields: 'pixelSize',
+      },
+    });
+  });
+
+  // Default font + wrap for whole used range
+  requests.push({
+    repeatCell: {
+      range: { sheetId, startRowIndex: 0, endRowIndex: kinds.length, startColumnIndex: 0, endColumnIndex: colCount },
+      cell: {
+        userEnteredFormat: {
+          textFormat: { fontFamily: 'Arial', fontSize: 10 },
+          verticalAlignment: 'TOP',
+          wrapStrategy: 'WRAP',
+        },
+      },
+      fields: 'userEnteredFormat(textFormat,verticalAlignment,wrapStrategy)',
+    },
+  });
+
+  // Merge title + subtitle across columns
+  requests.push({
+    mergeCells: {
+      range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: colCount },
+      mergeType: 'MERGE_ALL',
+    },
+  });
+  requests.push({
+    mergeCells: {
+      range: { sheetId, startRowIndex: 1, endRowIndex: 2, startColumnIndex: 0, endColumnIndex: colCount },
+      mergeType: 'MERGE_ALL',
+    },
+  });
+
+  let sectionTone: 'confirmed' | 'pending' | 'new' | null = null;
+
+  kinds.forEach((kind, rowIndex) => {
+    const range = {
+      sheetId,
+      startRowIndex: rowIndex,
+      endRowIndex: rowIndex + 1,
+      startColumnIndex: 0,
+      endColumnIndex: colCount,
+    };
+
+    if (kind === 'title') {
+      requests.push({
+        repeatCell: {
+          range,
+          cell: {
+            userEnteredFormat: {
+              backgroundColor: COLORS.titleBg,
+              textFormat: { fontFamily: 'Arial', fontSize: 16, bold: true, foregroundColor: COLORS.titleFg },
+              verticalAlignment: 'MIDDLE',
+              horizontalAlignment: 'LEFT',
+              padding: { top: 8, bottom: 8, left: 10, right: 10 },
+            },
+          },
+          fields:
+            'userEnteredFormat(backgroundColor,textFormat,verticalAlignment,horizontalAlignment,padding)',
+        },
+      });
+      requests.push({
+        updateDimensionProperties: {
+          range: { sheetId, dimension: 'ROWS', startIndex: rowIndex, endIndex: rowIndex + 1 },
+          properties: { pixelSize: 40 },
+          fields: 'pixelSize',
+        },
+      });
+      return;
+    }
+
+    if (kind === 'subtitle') {
+      requests.push({
+        repeatCell: {
+          range,
+          cell: {
+            userEnteredFormat: {
+              backgroundColor: { red: 0.94, green: 0.95, blue: 0.96 },
+              textFormat: { fontFamily: 'Arial', fontSize: 9, italic: true, foregroundColor: { red: 0.35, green: 0.38, blue: 0.42 } },
+              verticalAlignment: 'MIDDLE',
+            },
+          },
+          fields: 'userEnteredFormat(backgroundColor,textFormat,verticalAlignment)',
+        },
+      });
+      return;
+    }
+
+    if (kind === 'section') {
+      const label = String(built.values[rowIndex]?.[0] ?? '').toUpperCase();
+      if (label.includes('CONFIRMED') && !label.includes('PENDING')) sectionTone = 'confirmed';
+      else if (label.includes('PENDING')) sectionTone = 'pending';
+      else if (label.includes('NEW BUSINESS')) sectionTone = 'new';
+
+      const bg =
+        sectionTone === 'confirmed'
+          ? COLORS.confirmedBg
+          : sectionTone === 'pending'
+            ? COLORS.pendingBg
+            : COLORS.newBizBg;
+
+      requests.push({
+        mergeCells: {
+          range,
+          mergeType: 'MERGE_ALL',
+        },
+      });
+      requests.push({
+        repeatCell: {
+          range,
+          cell: {
+            userEnteredFormat: {
+              backgroundColor: bg,
+              textFormat: { fontFamily: 'Arial', fontSize: 11, bold: true, foregroundColor: COLORS.white },
+              verticalAlignment: 'MIDDLE',
+              padding: { top: 4, bottom: 4, left: 8, right: 8 },
+            },
+          },
+          fields: 'userEnteredFormat(backgroundColor,textFormat,verticalAlignment,padding)',
+        },
+      });
+      return;
+    }
+
+    if (kind === 'header') {
+      requests.push({
+        repeatCell: {
+          range,
+          cell: {
+            userEnteredFormat: {
+              backgroundColor: COLORS.headerBg,
+              textFormat: { fontFamily: 'Arial', fontSize: 9, bold: true },
+              horizontalAlignment: 'LEFT',
+              verticalAlignment: 'MIDDLE',
+              borders: {
+                bottom: { style: 'SOLID', width: 1, color: { red: 0.75, green: 0.78, blue: 0.8 } },
+              },
+            },
+          },
+          fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment,borders)',
+        },
+      });
+      // Right-align numeric header labels
+      for (const col of [3, 4, 5, 6]) {
+        requests.push({
+          repeatCell: {
+            range: { ...range, startColumnIndex: col, endColumnIndex: col + 1 },
+            cell: { userEnteredFormat: { horizontalAlignment: 'RIGHT' } },
+            fields: 'userEnteredFormat.horizontalAlignment',
+          },
+        });
+      }
+      return;
+    }
+
+    if (kind === 'data') {
+      const alt = rowIndex % 2 === 0;
+      requests.push({
+        repeatCell: {
+          range,
+          cell: {
+            userEnteredFormat: {
+              backgroundColor: alt ? COLORS.altRow : COLORS.white,
+              textFormat: { fontFamily: 'Arial', fontSize: 10 },
+            },
+          },
+          fields: 'userEnteredFormat(backgroundColor,textFormat)',
+        },
+      });
+      for (const col of [3, 4, 5, 6]) {
+        requests.push({
+          repeatCell: {
+            range: { ...range, startColumnIndex: col, endColumnIndex: col + 1 },
+            cell: { userEnteredFormat: { horizontalAlignment: 'RIGHT' } },
+            fields: 'userEnteredFormat.horizontalAlignment',
+          },
+        });
+      }
+      // Bold company name
+      requests.push({
+        repeatCell: {
+          range: { ...range, startColumnIndex: 1, endColumnIndex: 2 },
+          cell: { userEnteredFormat: { textFormat: { bold: true } } },
+          fields: 'userEnteredFormat.textFormat.bold',
+        },
+      });
+      return;
+    }
+
+    if (kind === 'total') {
+      requests.push({
+        repeatCell: {
+          range,
+          cell: {
+            userEnteredFormat: {
+              backgroundColor: COLORS.totalBg,
+              textFormat: { fontFamily: 'Arial', fontSize: 10, bold: true },
+              borders: {
+                top: { style: 'SOLID', width: 1, color: { red: 0.8, green: 0.82, blue: 0.84 } },
+              },
+            },
+          },
+          fields: 'userEnteredFormat(backgroundColor,textFormat,borders)',
+        },
+      });
+      for (const col of [3, 6]) {
+        requests.push({
+          repeatCell: {
+            range: { ...range, startColumnIndex: col, endColumnIndex: col + 1 },
+            cell: { userEnteredFormat: { horizontalAlignment: 'RIGHT' } },
+            fields: 'userEnteredFormat.horizontalAlignment',
+          },
+        });
+      }
+      return;
+    }
+
+    if (kind === 'grand') {
+      requests.push({
+        mergeCells: {
+          range: { ...range, endColumnIndex: 3 },
+          mergeType: 'MERGE_ALL',
+        },
+      });
+      requests.push({
+        repeatCell: {
+          range,
+          cell: {
+            userEnteredFormat: {
+              backgroundColor: COLORS.grandBg,
+              textFormat: { fontFamily: 'Arial', fontSize: 11, bold: true, foregroundColor: COLORS.white },
+              verticalAlignment: 'MIDDLE',
+            },
+          },
+          fields: 'userEnteredFormat(backgroundColor,textFormat,verticalAlignment)',
+        },
+      });
+      for (const col of [3, 6]) {
+        requests.push({
+          repeatCell: {
+            range: { ...range, startColumnIndex: col, endColumnIndex: col + 1 },
+            cell: {
+              userEnteredFormat: {
+                horizontalAlignment: 'RIGHT',
+                textFormat: { bold: true, foregroundColor: COLORS.white },
+              },
+            },
+            fields: 'userEnteredFormat(horizontalAlignment,textFormat)',
+          },
+        });
+      }
+    }
+  });
+
+  // Freeze title + subtitle; hide gridlines for a cleaner report look
+  requests.push({
+    updateSheetProperties: {
+      properties: {
+        sheetId,
+        gridProperties: { frozenRowCount: 2, hideGridlines: true },
+      },
+      fields: 'gridProperties.frozenRowCount,gridProperties.hideGridlines',
+    },
+  });
+
+  return requests;
 }
 
 export function buildParticipationCsv(report: ParticipationReport): string {
@@ -191,9 +497,7 @@ export function buildParticipationCsv(report: ParticipationReport): string {
       rateLabel(row.rate_per_booth_cents),
       row.sponsorship_label,
       money(row.total_spend_cents),
-      [row.pipeline_status, row.sheet_notes && `Sheet: ${row.sheet_notes}`, row.notes && `Portal: ${row.notes}`]
-        .filter(Boolean)
-        .join(' — '),
+      notesCell(row).replace(/\n/g, ' | '),
     ]);
   }
   for (const row of report.newBusiness) {
@@ -206,9 +510,7 @@ export function buildParticipationCsv(report: ParticipationReport): string {
       rateLabel(row.rate_per_booth_cents),
       row.sponsorship_label,
       money(row.total_spend_cents),
-      [row.pipeline_status, row.sheet_notes && `Sheet: ${row.sheet_notes}`, row.notes && `Portal: ${row.notes}`]
-        .filter(Boolean)
-        .join(' — '),
+      notesCell(row).replace(/\n/g, ' | '),
     ]);
   }
   push([]);
@@ -230,14 +532,14 @@ export type ParticipationExportResult = {
   title: string;
 };
 
-/** Create a dated Google Spreadsheet in Marvin layout and return its link. */
+/** Create a dated, formatted Google Spreadsheet in Marvin layout and return its link. */
 export async function exportParticipationReportToGoogleSheet(options?: {
   eventId?: string | null;
 }): Promise<ParticipationExportResult> {
   const report = await buildParticipationReport({ eventId: options?.eventId });
   if (!report) throw new Error('No active WhiskyFest event found');
 
-  const values = buildParticipationSheetValues(report);
+  const built = buildParticipationSheetValues(report);
   const folderId = await resolveExportFolderId();
   const stamp = new Date().toISOString().slice(0, 10);
   const title = `WF NY ${report.event.year} Participation Status — ${stamp}`;
@@ -258,32 +560,31 @@ export async function exportParticipationReportToGoogleSheet(options?: {
 
   const sheets = getSheetsClient();
   const meta = await sheets.spreadsheets.get({ spreadsheetId });
+  const sheetId = meta.data.sheets?.[0]?.properties?.sheetId;
   const tab = meta.data.sheets?.[0]?.properties?.title || 'Sheet1';
+  if (sheetId == null) throw new Error('Spreadsheet has no sheet tab');
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
     range: tabRange(tab, 'A1'),
     valueInputOption: 'USER_ENTERED',
-    requestBody: { values },
+    requestBody: { values: built.values },
   });
 
-  // Rename first tab for clarity
-  const sheetId = meta.data.sheets?.[0]?.properties?.sheetId;
-  if (sheetId != null) {
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId,
-      requestBody: {
-        requests: [
-          {
-            updateSheetProperties: {
-              properties: { sheetId, title: 'Participation Status' },
-              fields: 'title',
-            },
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          updateSheetProperties: {
+            properties: { sheetId, title: 'Participation Status' },
+            fields: 'title',
           },
-        ],
-      },
-    });
-  }
+        },
+        ...formatRequests(sheetId, built),
+      ],
+    },
+  });
 
   const webViewLink =
     created.data.webViewLink ||
