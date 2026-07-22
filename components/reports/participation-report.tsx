@@ -5,15 +5,22 @@ import Link from 'next/link';
 import {
   ArrowDownAZ,
   ArrowUpAZ,
+  BadgeCheck,
   Check,
   ChevronDown,
+  CircleDot,
+  Clock3,
   Download,
   ExternalLink,
+  FileSpreadsheet,
   FileUp,
+  Link2,
   Loader2,
   Plus,
   Search,
+  Send,
   Sheet,
+  Sparkles,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -29,8 +36,81 @@ import { companiesMatch } from '@/lib/participation-report-shared';
 type SortKey = 'company_name' | 'booth_count' | 'total_spend_cents' | 'sales_rep_initials';
 type TabId = 'confirmed' | 'pending' | 'new_business';
 
+const TAB_THEME: Record<
+  TabId,
+  {
+    label: string;
+    icon: typeof BadgeCheck;
+    accent: string;
+    accentSoft: string;
+    accentBorder: string;
+    accentText: string;
+    tabActive: string;
+    rowHover: string;
+    bar: string;
+  }
+> = {
+  confirmed: {
+    label: 'Confirmed',
+    icon: BadgeCheck,
+    accent: 'bg-emerald-800',
+    accentSoft: 'bg-emerald-800/10',
+    accentBorder: 'border-emerald-800/25',
+    accentText: 'text-emerald-900',
+    tabActive: 'bg-emerald-800 text-white shadow-sm',
+    rowHover: 'hover:bg-emerald-950/[0.03]',
+    bar: 'bg-emerald-800',
+  },
+  pending: {
+    label: 'Pending',
+    icon: Clock3,
+    accent: 'bg-[hsl(var(--accent-brand))]',
+    accentSoft: 'bg-[hsl(var(--accent-brand)/0.12)]',
+    accentBorder: 'border-[hsl(var(--accent-brand)/0.3)]',
+    accentText: 'text-amber-950',
+    tabActive: 'bg-[hsl(var(--accent-brand))] text-white shadow-sm',
+    rowHover: 'hover:bg-amber-950/[0.04]',
+    bar: 'bg-[hsl(var(--accent-brand))]',
+  },
+  new_business: {
+    label: 'New business',
+    icon: Sparkles,
+    accent: 'bg-[#182d6d]',
+    accentSoft: 'bg-[#182d6d]/[0.08]',
+    accentBorder: 'border-[#182d6d]/25',
+    accentText: 'text-[#182d6d]',
+    tabActive: 'bg-[#182d6d] text-white shadow-sm',
+    rowHover: 'hover:bg-[#182d6d]/[0.03]',
+    bar: 'bg-[#182d6d]',
+  },
+};
+
 function money(cents: number): string {
   return formatCurrency(cents, { showCents: false });
+}
+
+function statusVisual(status: string): {
+  label: string;
+  className: string;
+  Icon: typeof CircleDot;
+} {
+  const s = status.toLowerCase();
+  if (s.includes('executed') || s.includes('manual upload')) {
+    return { label: status, className: 'bg-emerald-800/10 text-emerald-900', Icon: BadgeCheck };
+  }
+  if (s.includes('signed') && !s.includes('partial')) {
+    return { label: status, className: 'bg-emerald-800/10 text-emerald-900', Icon: Check };
+  }
+  if (s.includes('sent') || s.includes('awaiting') || s.includes('partial')) {
+    return { label: status, className: 'bg-sky-900/10 text-sky-950', Icon: Send };
+  }
+  if (s.includes('progress') || s.includes('review') || s.includes('draft') || s.includes('approved')) {
+    return { label: status, className: 'bg-amber-900/10 text-amber-950', Icon: Clock3 };
+  }
+  if (s.includes('no contract')) {
+    return { label: status, className: 'bg-stone-900/5 text-stone-600', Icon: CircleDot };
+  }
+  return { label: status, className: 'bg-stone-900/5 text-stone-700', Icon: CircleDot };
 }
 
 function sortRows(rows: ParticipationReportRow[], key: SortKey, dir: 'asc' | 'desc') {
@@ -189,12 +269,18 @@ function RowMenu({
   return (
     <div className="relative flex flex-wrap items-center justify-end gap-1.5">
       {row.contract_id ? (
-        <Button asChild type="button" size="sm" variant="outline" className="h-7 px-2.5 text-xs">
-          <Link href={`/contracts/${row.contract_id}`}>Open</Link>
+        <Button asChild type="button" size="sm" variant="outline" className="h-7 gap-1 px-2.5 text-xs">
+          <Link href={`/contracts/${row.contract_id}`}>
+            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-800" />
+            Open
+          </Link>
         </Button>
       ) : (
-        <Button asChild type="button" size="sm" className="h-7 px-2.5 text-xs">
-          <Link href={`/contracts/new?fromPipeline=${targetId}`}>Convert</Link>
+        <Button asChild type="button" size="sm" className="h-7 gap-1 px-2.5 text-xs">
+          <Link href={`/contracts/new?fromPipeline=${targetId}`}>
+            <Send className="h-3.5 w-3.5" />
+            Convert
+          </Link>
         </Button>
       )}
       <Button
@@ -241,7 +327,10 @@ function RowMenu({
 
             <div className="mt-3 space-y-1">
               <label className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                Link in-progress contract
+                <span className="inline-flex items-center gap-1">
+                  <Link2 className="h-3 w-3" />
+                  Link in-progress contract
+                </span>
               </label>
               <select
                 className="w-full rounded-md border border-border/70 bg-bg-page px-2 py-1.5 text-xs"
@@ -416,6 +505,8 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
 
   const showManage = tab !== 'confirmed';
   const activeMeta = tabs.find((t) => t.id === tab)!;
+  const theme = TAB_THEME[tab];
+  const ThemeIcon = theme.icon;
 
   function onSort(key: SortKey) {
     if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -543,10 +634,16 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
 
   return (
     <div className="relative -mx-6 w-[calc(100%+3rem)] space-y-5 px-6 lg:-mx-10 lg:w-[calc(100%+5rem)] lg:px-10">
+      <div
+        className="pointer-events-none absolute inset-x-0 -top-4 h-40 bg-[radial-gradient(ellipse_at_top,_rgba(182,125,45,0.1),_transparent_60%)]"
+        aria-hidden
+      />
+
       {/* Header */}
-      <div className="flex flex-col gap-4 border-b border-border/60 pb-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="relative flex flex-col gap-4 border-b border-border/60 pb-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[hsl(var(--accent-brand))]">
+          <p className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[hsl(var(--accent-brand))]">
+            <Sparkles className="h-3 w-3" />
             WhiskyFest {report.event.year}
           </p>
           <h1 className="font-display text-3xl font-medium tracking-tight text-foreground sm:text-4xl">
@@ -586,27 +683,70 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
         </p>
       ) : null}
 
-      {/* Tabs + search */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap gap-1 rounded-lg border border-border/70 bg-bg-surface p-1">
-          {tabs.map((t) => (
+      {/* Snapshot strip */}
+      <div className="relative grid gap-2 sm:grid-cols-3">
+        {tabs.map((t) => {
+          const tone = TAB_THEME[t.id];
+          const Icon = tone.icon;
+          const active = tab === t.id;
+          return (
             <button
-              key={t.id}
+              key={`snap-${t.id}`}
               type="button"
               onClick={() => setTab(t.id)}
               className={cn(
-                'rounded-md px-3 py-1.5 text-sm transition-colors',
-                tab === t.id
-                  ? 'bg-foreground text-background shadow-sm'
-                  : 'text-muted-foreground hover:bg-stone-900/5 hover:text-foreground',
+                'flex items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition-all',
+                active
+                  ? cn(tone.accentSoft, tone.accentBorder, 'shadow-sm')
+                  : 'border-border/60 bg-bg-surface hover:border-border',
               )}
             >
-              <span className="font-medium">{t.label}</span>
-              <span className={cn('ml-1.5 tabular-nums text-xs', tab === t.id ? 'text-background/70' : 'text-muted-foreground')}>
-                {t.count}
+              <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white', tone.accent)}>
+                <Icon className="h-4 w-4" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  {t.label}
+                </span>
+                <span className="mt-0.5 flex items-baseline gap-1.5">
+                  <span className="font-display text-xl font-medium tabular-nums text-foreground">{t.booths}</span>
+                  <span className="text-xs text-muted-foreground">booths · {money(t.spend)}</span>
+                </span>
               </span>
             </button>
-          ))}
+          );
+        })}
+      </div>
+
+      {/* Tabs + search */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap gap-1 rounded-lg border border-border/70 bg-bg-surface p-1">
+          {tabs.map((t) => {
+            const tone = TAB_THEME[t.id];
+            const Icon = tone.icon;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors',
+                  tab === t.id ? tone.tabActive : 'text-muted-foreground hover:bg-stone-900/5 hover:text-foreground',
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span className="font-medium">{t.label}</span>
+                <span
+                  className={cn(
+                    'rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums',
+                    tab === t.id ? 'bg-white/20 text-white' : 'bg-stone-900/5 text-muted-foreground',
+                  )}
+                >
+                  {t.count}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -629,7 +769,7 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
       </div>
 
       {showAdd ? (
-        <form onSubmit={addInquiry} className="grid gap-2 rounded-lg border border-border/70 bg-bg-surface p-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
+        <form onSubmit={addInquiry} className="grid gap-2 rounded-lg border border-[#182d6d]/20 bg-[#182d6d]/[0.04] p-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
           <Input value={addCompany} onChange={(e) => setAddCompany(e.target.value)} required placeholder="Company" className="h-8" />
           <select
             value={addRepId}
@@ -658,19 +798,26 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
       ) : null}
 
       {/* Compact table */}
-      <div className="rounded-lg border border-border/70 bg-bg-surface">
-        <div className="flex items-center justify-between gap-3 border-b border-border/60 bg-bg-surface-raised/80 px-3 py-2">
-          <p className="text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">{activeMeta.label}</span>
-            {' · '}
-            {activeRows.length}
-            {query ? ` match${activeRows.length === 1 ? '' : 'es'}` : ' companies'}
-            {' · '}
-            {activeMeta.booths} booths · {money(activeMeta.spend)}
+      <div className={cn('overflow-hidden rounded-xl border bg-bg-surface', theme.accentBorder)}>
+        <div className={cn('flex items-center justify-between gap-3 border-b px-3 py-2.5', theme.accentSoft, theme.accentBorder)}>
+          <p className={cn('flex items-center gap-2 text-xs', theme.accentText)}>
+            <span className={cn('flex h-6 w-6 items-center justify-center rounded-md text-white', theme.accent)}>
+              <ThemeIcon className="h-3.5 w-3.5" />
+            </span>
+            <span>
+              <span className="font-semibold">{activeMeta.label}</span>
+              <span className="text-muted-foreground">
+                {' · '}
+                {activeRows.length}
+                {query ? ` match${activeRows.length === 1 ? '' : 'es'}` : ' companies'}
+                {' · '}
+                {activeMeta.booths} booths · {money(activeMeta.spend)}
+              </span>
+            </span>
           </p>
           {tab === 'pending' ? (
             <p className="hidden text-[11px] text-muted-foreground sm:block">
-              Convert starts a DocuSign draft · Manage for Import PDF / link · click +N on brands
+              Convert = DocuSign · Manage = Import / link · +N expands brands
             </p>
           ) : null}
         </div>
@@ -678,7 +825,7 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
         <div className="overflow-x-auto">
           <table className="w-full min-w-[700px] border-collapse text-sm">
             <thead>
-              <tr className="border-b border-border/60 text-left">
+              <tr className="border-b border-border/60 bg-bg-surface-raised/80 text-left">
                 <th className="w-14 px-3 py-2">
                   <SortHeader label="Rep" sortKey="sales_rep_initials" activeKey={sortKey} dir={sortDir} onSort={onSort} />
                 </th>
@@ -700,7 +847,7 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
                   </th>
                 ) : null}
                 {showManage ? (
-                  <th className="min-w-[160px] px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  <th className="min-w-[170px] px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                     Actions
                   </th>
                 ) : (
@@ -716,68 +863,101 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
                   </td>
                 </tr>
               ) : (
-                activeRows.map((row) => (
-                  <tr key={row.id} className="border-b border-border/40 last:border-0 hover:bg-amber-950/[0.025]">
-                    <td className="px-3 py-1.5 align-middle">
-                      <span className="text-xs font-semibold tracking-wide text-foreground">{row.sales_rep_initials}</span>
-                    </td>
-                    <td className="px-3 py-1.5 align-middle">
-                      <div className="flex items-center gap-1.5">
-                        {row.contract_id ? (
-                          <Link
-                            href={`/contracts/${row.contract_id}`}
-                            className="font-medium text-foreground hover:text-[hsl(var(--accent-brand))] hover:underline"
-                          >
-                            {row.company_name}
-                          </Link>
-                        ) : (
-                          <span className="font-medium text-foreground">{row.company_name}</span>
-                        )}
-                        {row.manual_upload_received ? (
-                          <Check className="h-3.5 w-3.5 shrink-0 text-emerald-700" aria-label="Manual upload received" />
-                        ) : null}
-                      </div>
-                    </td>
-                    <td className="max-w-[260px] px-3 py-1.5 align-top">
-                      <BrandsCell text={row.brands_text} />
-                    </td>
-                    <td className="px-3 py-1.5 align-middle text-right tabular-nums">{row.booth_count || '—'}</td>
-                    <td className="px-3 py-1.5 align-middle text-right tabular-nums font-medium">{money(row.total_spend_cents)}</td>
-                    {showManage ? (
-                      <td className="max-w-[180px] px-3 py-1.5 align-middle">
-                        <p className="truncate text-[11px] text-muted-foreground">{row.pipeline_status}</p>
-                        {(row.sheet_notes || row.notes) && (
-                          <p
-                            className="truncate text-[11px] text-muted-foreground/80"
-                            title={[row.sheet_notes, row.notes].filter(Boolean).join(' · ')}
-                          >
-                            {truncate(row.sheet_notes || row.notes, 40)}
-                          </p>
-                        )}
+                activeRows.map((row) => {
+                  const status = statusVisual(row.pipeline_status);
+                  const StatusIcon = status.Icon;
+                  return (
+                    <tr
+                      key={row.id}
+                      className={cn('border-b border-border/40 last:border-0', theme.rowHover)}
+                    >
+                      <td className="px-3 py-1.5 align-middle">
+                        <span
+                          className={cn(
+                            'inline-flex min-w-[2rem] justify-center rounded-md px-1.5 py-0.5 text-[11px] font-semibold tracking-wide',
+                            theme.accentSoft,
+                            theme.accentText,
+                          )}
+                        >
+                          {row.sales_rep_initials}
+                        </span>
                       </td>
-                    ) : null}
-                    <td className="px-2 py-1.5 align-middle text-right">
+                      <td className="px-3 py-1.5 align-middle">
+                        <div className="flex items-center gap-1.5">
+                          {row.contract_id ? (
+                            <Link
+                              href={`/contracts/${row.contract_id}`}
+                              className="font-medium text-foreground hover:text-[hsl(var(--accent-brand))] hover:underline"
+                            >
+                              {row.company_name}
+                            </Link>
+                          ) : (
+                            <span className="font-medium text-foreground">{row.company_name}</span>
+                          )}
+                          {row.manual_upload_received ? (
+                            <span
+                              className="inline-flex items-center gap-0.5 rounded bg-emerald-800/10 px-1 py-0.5 text-[10px] font-semibold text-emerald-900"
+                              title="Manual upload received"
+                            >
+                              <Check className="h-3 w-3" />
+                              PDF
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="max-w-[260px] px-3 py-1.5 align-top">
+                        <BrandsCell text={row.brands_text} />
+                      </td>
+                      <td className="px-3 py-1.5 align-middle text-right tabular-nums">{row.booth_count || '—'}</td>
+                      <td className="px-3 py-1.5 align-middle text-right tabular-nums font-medium">{money(row.total_spend_cents)}</td>
                       {showManage ? (
-                        <RowMenu
-                          row={row}
-                          linkableContracts={report.linkableContracts ?? []}
-                          onLinkContract={linkContract}
-                          onManualUploadToggle={setManualUpload}
-                          onNotesSave={saveNotes}
-                        />
-                      ) : row.contract_id ? (
-                        <Button asChild type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs">
-                          <Link href={`/contracts/${row.contract_id}`}>Open</Link>
-                        </Button>
+                        <td className="max-w-[200px] px-3 py-1.5 align-middle">
+                          <span
+                            className={cn(
+                              'inline-flex max-w-full items-center gap-1 truncate rounded-md px-1.5 py-0.5 text-[10px] font-medium',
+                              status.className,
+                            )}
+                            title={row.pipeline_status}
+                          >
+                            <StatusIcon className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{row.pipeline_status}</span>
+                          </span>
+                          {(row.sheet_notes || row.notes) && (
+                            <p
+                              className="mt-0.5 truncate text-[11px] text-muted-foreground/80"
+                              title={[row.sheet_notes, row.notes].filter(Boolean).join(' · ')}
+                            >
+                              {truncate(row.sheet_notes || row.notes, 40)}
+                            </p>
+                          )}
+                        </td>
                       ) : null}
-                    </td>
-                  </tr>
-                ))
+                      <td className="px-2 py-1.5 align-middle text-right">
+                        {showManage ? (
+                          <RowMenu
+                            row={row}
+                            linkableContracts={report.linkableContracts ?? []}
+                            onLinkContract={linkContract}
+                            onManualUploadToggle={setManualUpload}
+                            onNotesSave={saveNotes}
+                          />
+                        ) : row.contract_id ? (
+                          <Button asChild type="button" size="sm" variant="outline" className="h-7 gap-1 px-2 text-xs">
+                            <Link href={`/contracts/${row.contract_id}`}>
+                              <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-800" />
+                              Open
+                            </Link>
+                          </Button>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
             {!query && activeRows.length > 0 ? (
               <tfoot>
-                <tr className="border-t border-border/60 bg-bg-surface-raised/70">
+                <tr className={cn('border-t', theme.accentSoft, theme.accentBorder)}>
                   <td className="px-3 py-1.5 align-middle font-medium text-foreground" colSpan={3}>
                     Total
                   </td>
@@ -797,8 +977,9 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
       </div>
 
       {tab === 'confirmed' ? (
-        <p className="text-[11px] text-muted-foreground">
-          Confirmed = executed contracts only. Pending renewals and new business stay on their tabs until signed/executed.
+        <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <BadgeCheck className="h-3.5 w-3.5 text-emerald-800" />
+          Confirmed = executed contracts only. Pending and new business stay on their tabs until signed/executed.
         </p>
       ) : null}
     </div>
