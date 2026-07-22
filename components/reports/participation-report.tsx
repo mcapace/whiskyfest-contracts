@@ -49,67 +49,69 @@ function truncate(text: string, max = 48): string {
   return `${t.slice(0, max - 1)}…`;
 }
 
-/** Parse "1) Foo 2) Bar" / comma lists into clean brand names. */
+/** Parse "1) Foo 2) Bar" / comma / slash lists into clean brand names. */
 function parseBrandList(raw: string): string[] {
   const t = raw.trim();
   if (!t) return [];
-  if (/\d+\)\s/.test(t)) {
+
+  if (/\d+\)\s*/.test(t)) {
+    const parts = t
+      .split(/\s*\d+\)\s*/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (parts.length > 1) return parts;
+    // Leading "1) OnlyBrand"
+    const single = t.replace(/^\d+\)\s*/, '').trim();
+    return single ? [single] : [];
+  }
+
+  if (/[/|,;\n]/.test(t)) {
     return t
-      .split(/\s*(?=\d+\))\s*/)
-      .map((p) => p.replace(/^\d+\)\s*/, '').trim())
+      .split(/\s*[/|,;]\s*|\n+/)
+      .map((s) => s.trim())
       .filter(Boolean);
   }
-  return t
-    .split(/[\n,;]+/)
-    .map((s) => s.replace(/^\d+\)\s*/, '').trim())
-    .filter(Boolean);
+
+  return [t];
 }
 
 function BrandsCell({ text }: { text: string }) {
   const brands = parseBrandList(text);
-  const [expanded, setExpanded] = useState(false);
   if (!brands.length) return <span className="text-muted-foreground">—</span>;
 
-  const full = brands.join(' · ');
   const first = brands[0]!;
   const rest = brands.length - 1;
-
-  if (expanded) {
+  if (rest <= 0) {
     return (
-      <div className="space-y-1">
-        <ul className="space-y-0.5 text-xs text-muted-foreground">
-          {brands.map((b, i) => (
-            <li key={`${i}-${b}`} className="leading-snug">
-              <span className="mr-1 tabular-nums text-muted-foreground/60">{i + 1}.</span>
-              {b}
-            </li>
-          ))}
-        </ul>
-        <button
-          type="button"
-          className="text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--accent-brand))] hover:underline"
-          onClick={() => setExpanded(false)}
-        >
-          Show less
-        </button>
-      </div>
+      <span className="block truncate text-xs text-muted-foreground" title={first}>
+        {first}
+      </span>
     );
   }
 
   return (
-    <div className="flex min-w-0 items-center gap-1.5" title={rest > 0 ? full : undefined}>
-      <span className="min-w-0 truncate text-xs text-muted-foreground">{first}</span>
-      {rest > 0 ? (
-        <button
-          type="button"
-          className="shrink-0 rounded bg-stone-900/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground transition-colors hover:bg-stone-900/15 hover:text-foreground"
-          aria-label={`Show ${rest} more brand${rest === 1 ? '' : 's'}`}
-          onClick={() => setExpanded(true)}
-        >
+    <details
+      className="group/brands relative"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <summary
+        className="flex cursor-pointer list-none items-center gap-1.5 [&::-webkit-details-marker]:hidden"
+        title="Click to show all brands"
+      >
+        <span className="min-w-0 truncate text-xs text-muted-foreground">{first}</span>
+        <span className="shrink-0 rounded bg-stone-900/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground group-open/brands:bg-[hsl(var(--accent-brand)/0.15)] group-open/brands:text-foreground">
           +{rest}
-        </button>
-      ) : null}
-    </div>
+        </span>
+      </summary>
+      <ul className="mt-1.5 space-y-0.5 rounded-md border border-border/60 bg-bg-page px-2 py-1.5 text-xs text-muted-foreground shadow-sm">
+        {brands.map((b, i) => (
+          <li key={`${i}-${b}`} className="leading-snug text-foreground/85">
+            <span className="mr-1 tabular-nums text-muted-foreground/60">{i + 1}.</span>
+            {b}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 
@@ -730,7 +732,7 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
                         ) : null}
                       </div>
                     </td>
-                    <td className="max-w-[220px] px-3 py-1.5 align-middle">
+                    <td className="max-w-[260px] px-3 py-1.5 align-top">
                       <BrandsCell text={row.brands_text} />
                     </td>
                     <td className="px-3 py-1.5 align-middle text-right tabular-nums">{row.booth_count || '—'}</td>
