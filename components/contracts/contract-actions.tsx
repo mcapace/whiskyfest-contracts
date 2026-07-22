@@ -1524,10 +1524,20 @@ function StatusLine({
   }
   if (status === 'executed') {
     return (
-      <p className="text-sm text-emerald-700" suppressHydrationWarning>
-        ✓ {autoReleaseToAccounting && !releasedBy ? 'Executed' : 'Released'} {hydrated ? releasedRelative : 'recently'}
-        {releasedBy ? ` by ${releasedBy}` : ''}
-      </p>
+      <div className="space-y-2">
+        <p className="text-sm text-emerald-700" suppressHydrationWarning>
+          ✓ {autoReleaseToAccounting && !releasedBy ? 'Executed' : 'Released'} {hydrated ? releasedRelative : 'recently'}
+          {releasedBy ? ` by ${releasedBy}` : ''}
+        </p>
+        {(isAdmin || isEventsTeam) ? (
+          <p className="text-xs text-muted-foreground">
+            To change the dollar amount and re-send: open{' '}
+            <span className="font-medium text-foreground">Actions</span> (right edge) →{' '}
+            <span className="font-medium text-foreground">Void to correct</span>, then{' '}
+            <span className="font-medium text-foreground">Edit and re-send</span>.
+          </p>
+        ) : null}
+      </div>
     );
   }
   if (status === 'cancelled') {
