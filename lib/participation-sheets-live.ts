@@ -1,6 +1,5 @@
 import { getSheetsClient } from '@/lib/sheets-tracker';
 import {
-  companiesMatch,
   normalizeCompanyKey,
   parseBoothCount,
   parseMoneyToCents,
@@ -8,15 +7,17 @@ import {
   type PipelineSection,
 } from '@/lib/participation-report-shared';
 
-/** Live operational sheet (2025 FINAL + 2026 Master tabs). */
-export const PARTICIPATION_PENDING_SHEET_ID =
-  process.env['SHEETS_PARTICIPATION_PENDING_ID']?.trim() ||
-  '1ARk-1UtWazPk9qwUUEU1JY-85oeyPhumi67CQ9YFNNo';
-
-/** Marvin-style report sheet (New Business block). */
+/**
+ * WhiskyFest & Tequila 2026 participation sheet (Marvin layout):
+ * CONFIRMED / PENDING RENEWALS / NEW BUSINESS.
+ */
 export const PARTICIPATION_MARVIN_SHEET_ID =
   process.env['SHEETS_PARTICIPATION_MARVIN_ID']?.trim() ||
   '10Wmm1V2B0z8olqutieFCM8iJeFCudEWHars6YPrv7GY';
+
+/** @deprecated Kept for env compatibility — pending now uses Marvin sheet. */
+export const PARTICIPATION_PENDING_SHEET_ID =
+  process.env['SHEETS_PARTICIPATION_PENDING_ID']?.trim() || PARTICIPATION_MARVIN_SHEET_ID;
 
 export type LiveSheetPipelineRow = {
   section: PipelineSection;
@@ -44,45 +45,20 @@ function isHeaderOrTotal(company: string, firstCol: string): boolean {
   return false;
 }
 
-type MasterOverlay = {
-  rsvp: string;
-  initials: string;
-  brands: string;
-  booths: number;
-  spend: number;
-  notes: string;
-};
+type MarvinSection = 'pending' | 'new_business' | null;
 
-function parseMasterRows(rows: string[][]): Map<string, MasterOverlay> {
-  const map = new Map<string, MasterOverlay>();
-  for (const row of rows) {
-    const company = cell(row, 3);
-    if (!company || company.toLowerCase().includes('total')) continue;
-    const overlay: MasterOverlay = {
-      rsvp: cell(row, 0),
-      initials: cell(row, 2),
-      brands: cell(row, 5),
-      booths: parseBoothCount(cell(row, 4)),
-      spend: parseMoneyToCents(cell(row, 6)),
-      // Status/Notes only — do not use Contract Recv'd (often just "Yes")
-      notes: cell(row, 11),
-    };
-    map.set(normalizeCompanyKey(company), overlay);
-    // Also index under raw lower for soft match later
-  }
-  return map;
-}
-
-function findMasterOverlay(company: string, master: Map<string, MasterOverlay>): MasterOverlay | null {
-  const key = normalizeCompanyKey(company);
-  if (master.has(key)) return master.get(key)!;
-  for (const [k, v] of master) {
-    if (companiesMatch(company, k) || companiesMatch(k, company)) return v;
-  }
+function detectSection(firstCol: string): MarvinSection | 'skip' {
+  const a = firstCol.toUpperCase();
+  if (a.includes('PENDING RENEWAL')) return 'pending';
+  if (a.includes('NEW BUSINESS')) return 'new_business';
+  if (a.includes('CONFIRMED') || a.includes('TOTAL CONFIRMED')) return 'skip';
   return null;
 }
 
-/** Pull pending renewals (2025 Yes + 2026 Master overlay) and Marvin new business — live every call. */
+/**
+ * Pull pending renewals + new business live from WhiskyFest & Tequila 2026 sheet.
+ * Pending accounts and Notes come from the PENDING RENEWALS block.
+ */
 export async function fetchLiveParticipationSheetRows(): Promise<{
   pending: LiveSheetPipelineRow[];
   newBusiness: LiveSheetPipelineRow[];
@@ -90,121 +66,85 @@ export async function fetchLiveParticipationSheetRows(): Promise<{
   sources: { pendingSheetId: string; marvinSheetId: string };
 }> {
   const sheets = getSheetsClient();
-  const pendingSheetId = PARTICIPATION_PENDING_SHEET_ID;
   const marvinSheetId = PARTICIPATION_MARVIN_SHEET_ID;
 
-  const [finalRes, masterRes, marvinRes] = await Promise.all([
-    sheets.spreadsheets.values.get({
-      spreadsheetId: pendingSheetId,
-      range: "'2025 FINAL List'!A3:N120",
-    }),
-    sheets.spreadsheets.values.get({
-      spreadsheetId: pendingSheetId,
-      range: "'2026 Master List'!A3:N120",
-    }),
-    sheets.spreadsheets.values.get({
-      spreadsheetId: marvinSheetId,
-      range: 'A1:H120',
-    }),
-  ]);
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: marvinSheetId });
+  const tab = meta.data.sheets?.[0]?.properties?.title || 'Sheet1';
+  const marvinRes = await sheets.spreadsheets.values.get({
+    spreadsheetId: marvinSheetId,
+    range: `'${tab.replace(/'/g, "''")}'!A1:I120`,
+  });
 
-  const master = parseMasterRows((masterRes.data.values ?? []) as string[][]);
   const pending: LiveSheetPipelineRow[] = [];
-  const seenPending = new Set<string>();
-
-  for (const row of (finalRes.data.values ?? []) as string[][]) {
-    const rsvp = cell(row, 0).toLowerCase();
-    if (!rsvp.startsWith('yes')) continue;
-    const company = cell(row, 3);
-    if (!company || isHeaderOrTotal(company, cell(row, 0))) continue;
-    const key = normalizeCompanyKey(company);
-    if (seenPending.has(key)) continue;
-    seenPending.add(key);
-
-    const overlay = findMasterOverlay(company, master);
-    const booths = overlay?.booths || parseBoothCount(cell(row, 4));
-    const spend = overlay?.spend || parseMoneyToCents(cell(row, 6));
-    const rate = booths > 0 ? Math.round(spend / booths) : spend > 0 ? spend : 1_500_000;
-    const brands = overlay?.brands || cell(row, 5);
-    const initials = overlay?.initials || cell(row, 2) || 'SS';
-    const sheetNotes = overlay?.notes || cell(row, 11) || '';
-
-    pending.push({
-      section: 'pending_renewal',
-      company_name: company,
-      rep_initials: initials,
-      brands_text: brands,
-      booth_count: booths,
-      rate_per_booth_cents: rate,
-      total_spend_cents: spend || (booths > 0 ? booths * rate : 0),
-      sheet_notes: sheetNotes,
-      rsvp: overlay?.rsvp || cell(row, 0),
-    });
-  }
-
-  // Also include 2026 Master "pending" RSVP companies not already in 2025 Yes list
-  for (const [key, overlay] of master) {
-    if (seenPending.has(key)) continue;
-    const rsvp = overlay.rsvp.toLowerCase();
-    if (!(rsvp === 'pending' || rsvp.startsWith('pending'))) continue;
-    // recover company name from master raw rows
-  }
-
-  for (const row of (masterRes.data.values ?? []) as string[][]) {
-    const rsvp = cell(row, 0).toLowerCase();
-    if (!(rsvp === 'pending' || rsvp.startsWith('pending'))) continue;
-    const company = cell(row, 3);
-    if (!company || isHeaderOrTotal(company, cell(row, 0))) continue;
-    const key = normalizeCompanyKey(company);
-    if (seenPending.has(key)) continue;
-    seenPending.add(key);
-    const booths = parseBoothCount(cell(row, 4));
-    const spend = parseMoneyToCents(cell(row, 6));
-    const rate = booths > 0 ? Math.round(spend / booths) : 1_500_000;
-    pending.push({
-      section: 'pending_renewal',
-      company_name: company,
-      rep_initials: cell(row, 2) || 'SS',
-      brands_text: cell(row, 5),
-      booth_count: booths,
-      rate_per_booth_cents: rate,
-      total_spend_cents: spend || (booths > 0 ? booths * rate : 0),
-      sheet_notes: cell(row, 11),
-      rsvp: cell(row, 0),
-    });
-  }
-
   const newBusiness: LiveSheetPipelineRow[] = [];
+  const seenPending = new Set<string>();
   const seenNew = new Set<string>();
-  let inNewBiz = false;
+
+  let section: 'pending' | 'new_business' | null = null;
+
   for (const row of (marvinRes.data.values ?? []) as string[][]) {
     const a = cell(row, 0);
-    const aUp = a.toUpperCase();
-    if (aUp.includes('NEW BUSINESS')) {
-      inNewBiz = true;
+    const detected = detectSection(a);
+    if (detected === 'pending' || detected === 'new_business') {
+      section = detected;
       continue;
     }
-    if (!inNewBiz) continue;
-    if (aUp === 'TOTAL' || aUp.startsWith('TOTAL ') || aUp.includes('CONFIRMED + PENDING')) break;
+    if (detected === 'skip') {
+      // Leaving CONFIRMED / grand total headers — only clear section on CONFIRMED start
+      if (a.toUpperCase().includes('CONFIRMED') && !a.toUpperCase().includes('PENDING')) {
+        section = null;
+      }
+      continue;
+    }
+    if (!section) continue;
+
+    const aUp = a.toUpperCase();
+    if (aUp === 'TOTAL' || aUp.startsWith('TOTAL ') || aUp.includes('CONFIRMED + PENDING')) {
+      section = null;
+      continue;
+    }
     if (aUp === 'SALES REP') continue;
+
     const company = cell(row, 1);
     if (!company || isHeaderOrTotal(company, a)) continue;
     const key = normalizeCompanyKey(company);
-    if (seenNew.has(key)) continue;
-    seenNew.add(key);
-    const brandsOrNotes = cell(row, 2);
+
+    const brands = cell(row, 2);
     const booths = parseBoothCount(cell(row, 3));
     const rate = parseMoneyToCents(cell(row, 4));
     const spend = parseMoneyToCents(cell(row, 6));
+    // Notes column (H) on PENDING RENEWALS / sometimes NEW BUSINESS
+    const notes = cell(row, 7);
+
+    if (section === 'pending') {
+      if (seenPending.has(key)) continue;
+      seenPending.add(key);
+      const rateCents = rate || (booths > 0 && spend > 0 ? Math.round(spend / booths) : 1_500_000);
+      pending.push({
+        section: 'pending_renewal',
+        company_name: company,
+        rep_initials: a || '—',
+        brands_text: brands,
+        booth_count: booths,
+        rate_per_booth_cents: rateCents,
+        total_spend_cents: spend || (booths > 0 ? booths * rateCents : 0),
+        sheet_notes: notes,
+        rsvp: '',
+      });
+      continue;
+    }
+
+    if (seenNew.has(key)) continue;
+    seenNew.add(key);
     newBusiness.push({
       section: 'new_business',
       company_name: company,
       rep_initials: a || '—',
-      brands_text: brandsOrNotes,
+      brands_text: brands,
       booth_count: booths,
       rate_per_booth_cents: rate,
       total_spend_cents: spend,
-      sheet_notes: brandsOrNotes,
+      sheet_notes: notes || brands,
       rsvp: '',
     });
   }
@@ -213,7 +153,7 @@ export async function fetchLiveParticipationSheetRows(): Promise<{
     pending,
     newBusiness,
     fetchedAt: new Date().toISOString(),
-    sources: { pendingSheetId, marvinSheetId },
+    sources: { pendingSheetId: marvinSheetId, marvinSheetId },
   };
 }
 

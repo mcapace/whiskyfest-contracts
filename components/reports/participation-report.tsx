@@ -396,8 +396,8 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
           </h1>
           <p className="max-w-2xl text-sm text-muted-foreground">
             {report.event.name} {report.event.year} — Confirmed from executed contracts. Pending renewals and new
-            business are pulled live from Google Sheets on every load (so sheet edits stay in sync). Add your own
-            portal notes per company; sort any column and export when Stephen needs the sheet.
+            business (including Notes) pull live from the WhiskyFest &amp; Tequila 2026 sheet on every load. Add your
+            own portal notes per company; sort any column and export when Stephen needs the sheet.
           </p>
           {report.sheetsFetchedAt ? (
             <p className="text-xs text-muted-foreground">
