@@ -169,7 +169,7 @@ export async function fetchLiveParticipationSheetRows(): Promise<{
       booth_count: booths,
       rate_per_booth_cents: rate,
       total_spend_cents: spend || (booths > 0 ? booths * rate : 0),
-      sheet_notes: [cell(row, 11), cell(row, 8)].filter(Boolean).join(' — '),
+      sheet_notes: cell(row, 11),
       rsvp: cell(row, 0),
     });
   }
