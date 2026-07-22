@@ -49,6 +49,42 @@ function truncate(text: string, max = 48): string {
   return `${t.slice(0, max - 1)}…`;
 }
 
+/** Parse "1) Foo 2) Bar" / comma lists into clean brand names. */
+function parseBrandList(raw: string): string[] {
+  const t = raw.trim();
+  if (!t) return [];
+  if (/\d+\)\s/.test(t)) {
+    return t
+      .split(/\s*(?=\d+\))\s*/)
+      .map((p) => p.replace(/^\d+\)\s*/, '').trim())
+      .filter(Boolean);
+  }
+  return t
+    .split(/[\n,;]+/)
+    .map((s) => s.replace(/^\d+\)\s*/, '').trim())
+    .filter(Boolean);
+}
+
+function BrandsCell({ text }: { text: string }) {
+  const brands = parseBrandList(text);
+  if (!brands.length) return <span className="text-muted-foreground">—</span>;
+
+  const full = brands.join(' · ');
+  const first = brands[0]!;
+  const rest = brands.length - 1;
+
+  return (
+    <div className="flex min-w-0 items-center gap-1.5" title={full}>
+      <span className="min-w-0 truncate text-xs text-muted-foreground">{first}</span>
+      {rest > 0 ? (
+        <span className="shrink-0 rounded bg-stone-900/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">
+          +{rest}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function SortHeader({
   label,
   sortKey,
@@ -661,8 +697,8 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
                         ) : null}
                       </div>
                     </td>
-                    <td className="max-w-[220px] px-3 py-1.5 align-middle text-xs text-muted-foreground" title={row.brands_text || undefined}>
-                      {row.brands_text ? truncate(row.brands_text, 56) : '—'}
+                    <td className="max-w-[220px] px-3 py-1.5 align-middle">
+                      <BrandsCell text={row.brands_text} />
                     </td>
                     <td className="px-3 py-1.5 align-middle text-right tabular-nums">{row.booth_count || '—'}</td>
                     <td className="px-3 py-1.5 align-middle text-right tabular-nums font-medium">{money(row.total_spend_cents)}</td>
