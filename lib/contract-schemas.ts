@@ -70,6 +70,8 @@ export const newContractBodySchema = z
     booth_brands: z.array(boothBrandInputSchema).optional().default([]),
     /** Complimentary WhiskyFest booth — Stephen Senatore / Katherine Brumley only. */
     no_charge_booth: z.boolean().optional().default(false),
+    /** Participation report pending/new-business row to hard-link after create. */
+    pipeline_target_id: z.string().uuid().optional().nullable(),
   })
   .superRefine((data, ctx) => {
     const ccEmail = data.signer_cc_email?.trim();

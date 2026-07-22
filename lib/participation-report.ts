@@ -289,14 +289,15 @@ export async function buildParticipationReport(options?: {
   const coveredNew = new Set<string>();
 
   for (const sheet of livePending) {
-    if (isGraduatedOrConfirmed(sheet.company_name, null, confirmedContracts)) {
-      const match = findMatchingContract(sheet.company_name, null, byId, contracts);
-      if (isGraduatedOrConfirmed(sheet.company_name, match, confirmedContracts)) continue;
-    }
-    const match = findMatchingContract(sheet.company_name, null, byId, contracts);
+    const portal = findPortalTarget(sheet.company_name, 'pending_renewal', targets);
+    const match = findMatchingContract(
+      sheet.company_name,
+      portal?.linked_contract_id ?? null,
+      byId,
+      contracts,
+    );
     if (isGraduatedOrConfirmed(sheet.company_name, match, confirmedContracts)) continue;
 
-    const portal = findPortalTarget(sheet.company_name, 'pending_renewal', targets);
     const repId = resolveRepIdFromInitials(sheet.rep_initials, repByEmail);
     const targetId = await ensurePortalTargetFromSheet({
       supabase,
@@ -306,7 +307,12 @@ export async function buildParticipationReport(options?: {
       repId,
     });
     const portalFresh = targetId
-      ? ({ ...(portal ?? {}), id: targetId, notes: portal?.notes ?? null } as WfPipelineTarget)
+      ? ({
+          ...(portal ?? {}),
+          id: targetId,
+          notes: portal?.notes ?? null,
+          linked_contract_id: portal?.linked_contract_id ?? match?.id ?? null,
+        } as WfPipelineTarget)
       : portal;
 
     const row = sheetDrivenRow({
@@ -322,10 +328,15 @@ export async function buildParticipationReport(options?: {
   }
 
   for (const sheet of liveNewBiz) {
-    const match = findMatchingContract(sheet.company_name, null, byId, contracts);
+    const portal = findPortalTarget(sheet.company_name, 'new_business', targets);
+    const match = findMatchingContract(
+      sheet.company_name,
+      portal?.linked_contract_id ?? null,
+      byId,
+      contracts,
+    );
     if (isGraduatedOrConfirmed(sheet.company_name, match, confirmedContracts)) continue;
 
-    const portal = findPortalTarget(sheet.company_name, 'new_business', targets);
     const repId = resolveRepIdFromInitials(sheet.rep_initials, repByEmail);
     const targetId = await ensurePortalTargetFromSheet({
       supabase,
@@ -335,7 +346,12 @@ export async function buildParticipationReport(options?: {
       repId,
     });
     const portalFresh = targetId
-      ? ({ ...(portal ?? {}), id: targetId, notes: portal?.notes ?? null } as WfPipelineTarget)
+      ? ({
+          ...(portal ?? {}),
+          id: targetId,
+          notes: portal?.notes ?? null,
+          linked_contract_id: portal?.linked_contract_id ?? match?.id ?? null,
+        } as WfPipelineTarget)
       : portal;
 
     const row = sheetDrivenRow({

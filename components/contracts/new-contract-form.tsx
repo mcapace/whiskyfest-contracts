@@ -154,6 +154,9 @@ interface Props {
   noChargeEnforceStephenRep?: boolean;
   stephenRepId?: string | null;
   initialNoChargeBooth?: boolean;
+  /** Participation report row to hard-link after create. */
+  pipelineTargetId?: string | null;
+  pipelineBanner?: string | null;
 }
 
 function resolveInitialDealKind(
@@ -220,6 +223,8 @@ export function NewContractForm({
   noChargeEnforceStephenRep = false,
   stephenRepId = null,
   initialNoChargeBooth = false,
+  pipelineTargetId = null,
+  pipelineBanner = null,
 }: Props) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -698,6 +703,7 @@ export function NewContractForm({
         line_items: boothOnlyEvent ? [] : parsedLines.rows,
         booth_brands,
         no_charge_booth: useNoCharge,
+        ...(pipelineTargetId ? { pipeline_target_id: pipelineTargetId } : {}),
       };
 
       const res = await fetch(url, {
@@ -738,6 +744,12 @@ export function NewContractForm({
         <h1 className="font-serif text-3xl font-semibold tracking-tight">
           {editContractId ? (editImportMode ? 'Edit imported contract' : 'Edit Contract') : 'New Contract'}
         </h1>
+        {pipelineBanner ? (
+          <p className="mt-2 rounded-md border border-accent-brand/30 bg-accent-brand/5 px-3 py-2 text-sm text-foreground">
+            {pipelineBanner}. Saving this draft will hard-link it to the Participation report row (no name matching
+            needed).
+          </p>
+        ) : null}
         <p className="mt-1 text-sm text-muted-foreground">
           {editContractId
             ? editImportMode

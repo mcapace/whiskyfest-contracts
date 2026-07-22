@@ -269,6 +269,7 @@ export async function POST(req: Request) {
       created_by: actor.email,
       sales_rep_name: assignedRepLookup?.name ?? null,
       sales_rep_email: assignedRepLookup?.email ?? null,
+      ...(p.pipeline_target_id ? { pipeline_target_id: p.pipeline_target_id } : {}),
       ...(onBehalfMetadata
         ? {
             on_behalf_of: true,
@@ -278,6 +279,28 @@ export async function POST(req: Request) {
         : {}),
     },
   });
+
+  if (p.pipeline_target_id) {
+    const { error: linkErr } = await supabase
+      .from('wf_pipeline_targets')
+      .update({
+        linked_contract_id: row.id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', p.pipeline_target_id)
+      .eq('event_id', p.event_id)
+      .eq('is_active', true);
+    if (linkErr) {
+      console.error('[contracts] pipeline link failed', p.pipeline_target_id, linkErr.message);
+    } else {
+      await supabase.from('audit_log').insert({
+        contract_id: row.id,
+        actor_email: actor.email,
+        action: 'pipeline_target_linked',
+        metadata: { pipeline_target_id: p.pipeline_target_id },
+      });
+    }
+  }
 
   revalidateContractPaths(row.id);
 

@@ -237,3 +237,28 @@ export function companiesMatch(a: string, b: string): boolean {
   }
   return false;
 }
+
+/** Parse sheet-style brand lists into booth brand drafts for Convert → new contract. */
+export function brandsTextToBoothBrandDrafts(
+  brandsText: string | null | undefined,
+  boothCount: number,
+): { booth_index: number; brand_name: string; brand_category: string; expressions: string[] }[] {
+  const count = Math.max(1, boothCount || 1);
+  const raw = (brandsText ?? '').trim();
+  const parts = raw
+    ? raw
+        .split(/\n+|(?=\d+\))\s*|,|;/)
+        .map((s) => s.replace(/^\d+[).]\s*/, '').trim())
+        .filter(Boolean)
+    : [];
+  const rows = [];
+  for (let i = 0; i < count; i++) {
+    rows.push({
+      booth_index: i + 1,
+      brand_name: parts[i] ?? '',
+      brand_category: 'Other',
+      expressions: [] as string[],
+    });
+  }
+  return rows;
+}

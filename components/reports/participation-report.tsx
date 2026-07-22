@@ -59,6 +59,7 @@ function SectionTable({
   title,
   rows,
   showNotes,
+  showConvert,
   onNotesSave,
   sortKey,
   sortDir,
@@ -67,6 +68,7 @@ function SectionTable({
   title: string;
   rows: ParticipationReportRow[];
   showNotes: boolean;
+  showConvert?: boolean;
   onNotesSave?: (targetId: string, notes: string) => Promise<void>;
   sortKey: SortKey;
   sortDir: 'asc' | 'desc';
@@ -130,12 +132,20 @@ function SectionTable({
                   Notes / Status
                 </th>
               ) : null}
+              {showConvert ? (
+                <th className="px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Action
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody>
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={showNotes ? 8 : 7} className="px-3 py-8 text-center text-muted-foreground">
+                <td
+                  colSpan={(showNotes ? 8 : 7) + (showConvert ? 1 : 0)}
+                  className="px-3 py-8 text-center text-muted-foreground"
+                >
                   No rows yet.
                 </td>
               </tr>
@@ -175,6 +185,19 @@ function SectionTable({
                       )}
                     </td>
                   ) : null}
+                  {showConvert ? (
+                    <td className="px-3 py-2.5 text-right">
+                      {row.contract_id ? (
+                        <Button asChild type="button" size="sm" variant="outline">
+                          <Link href={`/contracts/${row.contract_id}`}>Open contract</Link>
+                        </Button>
+                      ) : row.target_id ? (
+                        <Button asChild type="button" size="sm">
+                          <Link href={`/contracts/new?fromPipeline=${row.target_id}`}>Convert</Link>
+                        </Button>
+                      ) : null}
+                    </td>
+                  ) : null}
                 </tr>
               ))
             )}
@@ -188,6 +211,7 @@ function SectionTable({
               <td colSpan={2} />
               <td className="px-3 py-2.5 text-right tabular-nums">{money(spend)}</td>
               {showNotes ? <td /> : null}
+              {showConvert ? <td /> : null}
             </tr>
           </tfoot>
         </table>
@@ -455,6 +479,7 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
         title="Pending renewals"
         rows={report.pending}
         showNotes
+        showConvert
         onNotesSave={saveNotes}
         sortKey={sortKey}
         sortDir={sortDir}
@@ -522,6 +547,7 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
           title="New business — inquiry tracking"
           rows={report.newBusiness}
           showNotes
+          showConvert
           onNotesSave={saveNotes}
           sortKey={sortKey}
           sortDir={sortDir}
