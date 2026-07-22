@@ -488,6 +488,263 @@ function RowMenu({
   );
 }
 
+function dollarsFromCents(cents: number): string {
+  if (!cents) return '';
+  return String(Math.round(cents) / 100);
+}
+
+function parseDollarsInput(raw: string): number {
+  const n = Number(String(raw).replace(/[$,\s]/g, '').trim());
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return n;
+}
+
+/** Kate: adjust Confirmed booths (sheet/contract) and separately billed amounts. */
+function ConfirmedAdjust({
+  row,
+  onSave,
+}: {
+  row: ParticipationReportRow;
+  onSave: (payload: {
+    contractId: string;
+    boothCountOverride: number | null;
+    additionalSpendDollars: number;
+    totalSpendOverrideDollars: number | null;
+    notes: string | null;
+    clearOverrides?: boolean;
+  }) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const preferredAutoBooth = row.sheet_booth_count ?? row.contract_booth_count ?? 0;
+  const [booths, setBooths] = useState(String(row.booth_count || ''));
+  const [additional, setAdditional] = useState(dollarsFromCents(row.additional_spend_cents));
+  const hasTotalOverride = row.total_spend_override_cents != null;
+  const [totalOverride, setTotalOverride] = useState(
+    hasTotalOverride ? dollarsFromCents(row.total_spend_override_cents ?? 0) : '',
+  );
+  const [notes, setNotes] = useState(row.notes);
+  const [useTotalOverride, setUseTotalOverride] = useState(hasTotalOverride);
+
+  if (!row.contract_id) return null;
+
+  const contractSpend = row.contract_spend_cents ?? 0;
+  const sheetBooths = row.sheet_booth_count;
+  const contractBooths = row.contract_booth_count;
+
+  return (
+    <div className="relative flex flex-wrap items-center justify-end gap-1.5">
+      <Button asChild type="button" size="sm" variant="outline" className="h-7 gap-1 px-2 text-xs">
+        <Link href={`/contracts/${row.contract_id}`}>
+          <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-800" />
+          Open
+        </Link>
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="h-7 gap-1 px-2.5 text-xs"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        Adjust
+        <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-180')} />
+      </Button>
+
+      {open ? (
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-20 cursor-default"
+            aria-label="Close adjust panel"
+            onClick={() => setOpen(false)}
+          />
+          <div className="absolute right-0 top-9 z-30 w-80 rounded-lg border border-border bg-bg-surface p-3 text-left shadow-lg">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Participation adjust
+              </p>
+              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => setOpen(false)}>
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <p className="mb-3 text-[11px] leading-snug text-muted-foreground">
+              Contract stays as-is. Use this when booths live on the sheet (sponsorship contracts) or dollars are
+              billed separately.
+            </p>
+
+            <div className="space-y-2.5">
+              <div className="space-y-1">
+                <label className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Booths on report
+                </label>
+                <Input
+                  type="number"
+                  min={0}
+                  className="h-8"
+                  value={booths}
+                  onChange={(e) => setBooths(e.target.value)}
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Sheet: {sheetBooths ?? '—'} · Contract: {contractBooths ?? '—'}
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Additional billed (outside contract)
+                </label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                    $
+                  </span>
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    className="h-8 pl-6"
+                    placeholder="e.g. 30000"
+                    value={additional}
+                    disabled={useTotalOverride}
+                    onChange={(e) => setAdditional(e.target.value)}
+                  />
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Contract {money(contractSpend)}
+                  {additional ? ` + $${parseDollarsInput(additional).toLocaleString('en-US')}` : ''}
+                </p>
+              </div>
+
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  className="h-3.5 w-3.5 accent-emerald-800"
+                  checked={useTotalOverride}
+                  onChange={(e) => {
+                    setUseTotalOverride(e.target.checked);
+                    if (e.target.checked && !totalOverride) {
+                      setTotalOverride(dollarsFromCents(row.total_spend_cents));
+                    }
+                  }}
+                />
+                Set full report total instead
+              </label>
+
+              {useTotalOverride ? (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                    Report total
+                  </label>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                      $
+                    </span>
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      className="h-8 pl-6"
+                      value={totalOverride}
+                      onChange={(e) => setTotalOverride(e.target.value)}
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Notes
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={2}
+                  className="w-full resize-y rounded-md border border-border/70 bg-bg-page px-2 py-1.5 text-xs"
+                  placeholder="e.g. $30k billed separately…"
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8"
+                  disabled={pending}
+                  onClick={() => {
+                    setError(null);
+                    const boothNum = booths.trim() === '' ? null : Math.max(0, Math.round(Number(booths)));
+                    if (booths.trim() !== '' && !Number.isFinite(boothNum)) {
+                      setError('Booths must be a number');
+                      return;
+                    }
+                    startTransition(async () => {
+                      try {
+                        const preferred = preferredAutoBooth;
+                        const boothOverride =
+                          boothNum == null || boothNum === preferred ? null : boothNum;
+                        await onSave({
+                          contractId: row.contract_id!,
+                          boothCountOverride: boothOverride,
+                          additionalSpendDollars: useTotalOverride ? 0 : parseDollarsInput(additional),
+                          totalSpendOverrideDollars: useTotalOverride
+                            ? parseDollarsInput(totalOverride)
+                            : null,
+                          notes: notes.trim() || null,
+                        });
+                        setOpen(false);
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : 'Save failed');
+                      }
+                    });
+                  }}
+                >
+                  {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  Save
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-8"
+                  disabled={pending}
+                  onClick={() => {
+                    setError(null);
+                    startTransition(async () => {
+                      try {
+                        await onSave({
+                          contractId: row.contract_id!,
+                          boothCountOverride: null,
+                          additionalSpendDollars: 0,
+                          totalSpendOverrideDollars: null,
+                          notes: null,
+                          clearOverrides: true,
+                        });
+                        setBooths(String(sheetBooths ?? contractBooths ?? ''));
+                        setAdditional('');
+                        setTotalOverride('');
+                        setUseTotalOverride(false);
+                        setNotes('');
+                        setOpen(false);
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : 'Clear failed');
+                      }
+                    });
+                  }}
+                >
+                  Reset
+                </Button>
+              </div>
+              {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
+            </div>
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 export function ParticipationReportClient({ initial }: { initial: ParticipationReport }) {
   const [report, setReport] = useState(initial);
   const [view, setView] = useState<ViewId>('pending');
@@ -607,6 +864,34 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
       throw new Error(typeof j.error === 'string' ? j.error : 'Failed to update flag');
+    }
+    await refresh();
+  }
+
+  async function saveConfirmedAdjust(payload: {
+    contractId: string;
+    boothCountOverride: number | null;
+    additionalSpendDollars: number;
+    totalSpendOverrideDollars: number | null;
+    notes: string | null;
+    clearOverrides?: boolean;
+  }) {
+    const res = await fetch('/api/reports/participation/confirmed-overrides', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventId: report.event.id,
+        contractId: payload.contractId,
+        boothCountOverride: payload.boothCountOverride,
+        additionalSpendDollars: payload.additionalSpendDollars,
+        totalSpendOverrideDollars: payload.totalSpendOverrideDollars,
+        notes: payload.notes,
+        clearOverrides: payload.clearOverrides,
+      }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      throw new Error(typeof j.error === 'string' ? j.error : 'Failed to save adjustment');
     }
     await refresh();
   }
@@ -907,6 +1192,7 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
           const sectionMeta = metaFor(sectionId);
           const rows = filteredRows(sectionId);
           const showManage = sectionId !== 'confirmed';
+          const isConfirmed = sectionId === 'confirmed';
 
           return (
             <div
@@ -938,6 +1224,11 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
                 {sectionId === 'pending' ? (
                   <p className="hidden text-[11px] text-muted-foreground sm:block">
                     Convert = DocuSign · Manage = Import / link · +N expands brands
+                  </p>
+                ) : null}
+                {isConfirmed ? (
+                  <p className="hidden text-[11px] text-muted-foreground sm:block">
+                    Booths from Marvin sheet · Adjust = separate billing / booth override
                   </p>
                 ) : null}
               </div>
@@ -1058,10 +1349,33 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
                               <BrandsCell text={row.brands_text} />
                             </td>
                             <td className="px-3 py-1.5 align-middle text-right tabular-nums">
-                              {row.booth_count || '—'}
+                              <span
+                                title={
+                                  isConfirmed && row.booths_from_sheet_or_override
+                                    ? `Sheet ${row.sheet_booth_count ?? '—'} · Contract ${row.contract_booth_count ?? '—'}`
+                                    : undefined
+                                }
+                              >
+                                {row.booth_count || '—'}
+                              </span>
                             </td>
                             <td className="px-3 py-1.5 align-middle text-right tabular-nums font-medium">
-                              {money(row.total_spend_cents)}
+                              <span
+                                className={cn(row.spend_is_adjusted && 'text-emerald-900')}
+                                title={
+                                  isConfirmed && row.contract_spend_cents != null
+                                    ? row.spend_is_adjusted
+                                      ? `Contract ${money(row.contract_spend_cents)}${
+                                          row.additional_spend_cents
+                                            ? ` + ${money(row.additional_spend_cents)} billed separately`
+                                            : ' · manual total'
+                                        }`
+                                      : `Contract ${money(row.contract_spend_cents)}`
+                                    : undefined
+                                }
+                              >
+                                {money(row.total_spend_cents)}
+                              </span>
                             </td>
                             {showManage ? (
                               <td className="max-w-[200px] px-3 py-1.5 align-middle">
@@ -1094,20 +1408,9 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
                                   onManualUploadToggle={setManualUpload}
                                   onNotesSave={saveNotes}
                                 />
-                              ) : row.contract_id ? (
-                                <Button
-                                  asChild
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 gap-1 px-2 text-xs"
-                                >
-                                  <Link href={`/contracts/${row.contract_id}`}>
-                                    <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-800" />
-                                    Open
-                                  </Link>
-                                </Button>
-                              ) : null}
+                              ) : (
+                                <ConfirmedAdjust row={row} onSave={saveConfirmedAdjust} />
+                              )}
                             </td>
                           </tr>
                         );
@@ -1141,7 +1444,7 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
       {viewAll || view === 'confirmed' ? (
         <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
           <BadgeCheck className="h-3.5 w-3.5 text-emerald-800" />
-          Confirmed = executed contracts only. Pending and new business stay listed until signed/executed.
+          Confirmed = executed contracts · booths prefer Marvin sheet · Adjust for separately billed amounts.
         </p>
       ) : null}
     </div>

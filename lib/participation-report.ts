@@ -20,6 +20,7 @@ import {
   type ParticipationReport,
   type ParticipationReportRow,
   type PipelineSection,
+  type WfParticipationConfirmedOverride,
   type WfPipelineTarget,
 } from '@/lib/participation-report-shared';
 import type { ContractWithTotals, Event, SalesRep } from '@/types/db';
@@ -70,11 +71,54 @@ function findPortalTarget(
   return null;
 }
 
-function confirmedRow(
-  contract: ContractWithTotals,
-  brandNames: string[],
-): ParticipationReportRow {
+/** Prefer CONFIRMED sheet block, then pending/new (before Marvin moves the row). */
+function findSheetRefForCompany(
+  companyName: string,
+  pools: LiveSheetPipelineRow[][],
+): LiveSheetPipelineRow | null {
+  for (const pool of pools) {
+    for (const row of pool) {
+      if (companiesMatch(companyName, row.company_name)) return row;
+    }
+  }
+  return null;
+}
+
+function confirmedRow(options: {
+  contract: ContractWithTotals;
+  brandNames: string[];
+  sheet: LiveSheetPipelineRow | null;
+  override: WfParticipationConfirmedOverride | null;
+}): ParticipationReportRow {
+  const { contract, brandNames, sheet, override } = options;
   const sponsorship = sponsorshipFromContract(contract);
+  const contractBooths = contract.booth_count ?? 0;
+  const contractSpend = contract.grand_total_cents ?? contract.total_amount_cents ?? 0;
+  const sheetBooths = sheet?.booth_count && sheet.booth_count > 0 ? sheet.booth_count : null;
+
+  let boothCount = contractBooths;
+  let boothsFromSheetOrOverride = false;
+  if (override?.booth_count_override != null) {
+    boothCount = override.booth_count_override;
+    boothsFromSheetOrOverride = true;
+  } else if (sheetBooths != null) {
+    boothCount = sheetBooths;
+    boothsFromSheetOrOverride = true;
+  }
+
+  const additional = override?.additional_spend_cents ?? 0;
+  let totalSpend = contractSpend + additional;
+  let spendIsAdjusted = additional > 0;
+  if (override?.total_spend_override_cents != null) {
+    totalSpend = override.total_spend_override_cents;
+    spendIsAdjusted = true;
+  }
+
+  const rate =
+    boothCount > 0 && totalSpend > 0 && !sponsorship.cents
+      ? Math.round(totalSpend / boothCount)
+      : contract.booth_rate_cents ?? sheet?.rate_per_booth_cents ?? 0;
+
   return {
     id: contract.id,
     section: 'confirmed',
@@ -82,19 +126,48 @@ function confirmedRow(
     sales_rep_id: contract.sales_rep_id,
     sales_rep_name: contract.sales_rep_name,
     sales_rep_initials: salesRepInitials(contract.sales_rep_name, contract.sales_rep_email),
-    brands_text: brandsFromContract(contract, brandNames),
-    booth_count: contract.booth_count ?? 0,
-    rate_per_booth_cents: contract.booth_rate_cents ?? 0,
+    brands_text:
+      brandsFromContract(contract, brandNames) || sheet?.brands_text || '',
+    booth_count: boothCount,
+    rate_per_booth_cents: rate,
     sponsorship_label: sponsorship.label,
     sponsorship_cents: sponsorship.cents,
-    total_spend_cents: contract.grand_total_cents ?? contract.total_amount_cents ?? 0,
-    notes: '',
-    sheet_notes: '',
-    pipeline_status: 'Executed',
+    total_spend_cents: totalSpend,
+    notes: override?.notes?.trim() || '',
+    sheet_notes: sheet?.sheet_notes?.trim() || '',
+    pipeline_status: spendIsAdjusted ? 'Executed · adjusted' : 'Executed',
     contract_id: contract.id,
     contract_status: contract.status,
     target_id: null,
     manual_upload_received: false,
+    sheet_booth_count: sheetBooths,
+    contract_booth_count: contractBooths,
+    contract_spend_cents: contractSpend,
+    additional_spend_cents: additional,
+    total_spend_override_cents: override?.total_spend_override_cents ?? null,
+    spend_is_adjusted: spendIsAdjusted,
+    booths_from_sheet_or_override: boothsFromSheetOrOverride,
+  };
+}
+
+function emptyConfirmedExtras(): Pick<
+  ParticipationReportRow,
+  | 'sheet_booth_count'
+  | 'contract_booth_count'
+  | 'contract_spend_cents'
+  | 'additional_spend_cents'
+  | 'total_spend_override_cents'
+  | 'spend_is_adjusted'
+  | 'booths_from_sheet_or_override'
+> {
+  return {
+    sheet_booth_count: null,
+    contract_booth_count: null,
+    contract_spend_cents: null,
+    additional_spend_cents: 0,
+    total_spend_override_cents: null,
+    spend_is_adjusted: false,
+    booths_from_sheet_or_override: false,
   };
 }
 
@@ -131,10 +204,11 @@ function sheetDrivenRow(options: {
   const portalNotes = portal?.notes?.trim() || '';
   const sheetNotes = sheet.sheet_notes?.trim() || '';
   const manualUpload = Boolean(portal?.manual_upload_received);
+  const section = sheet.section === 'confirmed' ? 'pending_renewal' : sheet.section;
 
   return {
-    id: portal?.id ?? `sheet:${sheet.section}:${normalizeCompanyKey(sheet.company_name)}`,
-    section: sheet.section,
+    id: portal?.id ?? `sheet:${section}:${normalizeCompanyKey(sheet.company_name)}`,
+    section,
     company_name: sheet.company_name,
     sales_rep_id: portal?.sales_rep_id ?? rep?.id ?? null,
     sales_rep_name: portal?.sales_rep_name ?? rep?.name ?? null,
@@ -158,6 +232,7 @@ function sheetDrivenRow(options: {
     contract_status: contract?.status ?? null,
     target_id: portal?.id ?? null,
     manual_upload_received: manualUpload,
+    ...emptyConfirmedExtras(),
   };
 }
 
@@ -223,24 +298,37 @@ export async function buildParticipationReport(options?: {
   const event = await resolveWhiskyfestEvent(supabase, options?.eventId);
   if (!event) return null;
 
-  const [{ data: contractsData }, { data: targetsData }, { data: repsData }] = await Promise.all([
-    supabase
-      .from('contracts_with_totals')
-      .select('*')
-      .eq('event_id', event.id)
-      .not('status', 'in', '("cancelled","voided")')
-      .order('exhibitor_company_name'),
-    supabase
-      .from('wf_pipeline_targets')
-      .select('*, sales_reps(name, email)')
-      .eq('event_id', event.id)
-      .eq('is_active', true)
-      .order('company_name'),
-    supabase.from('sales_reps').select('id, name, email').eq('is_active', true).order('name'),
-  ]);
+  const [{ data: contractsData }, { data: targetsData }, { data: repsData }, overridesRes] =
+    await Promise.all([
+      supabase
+        .from('contracts_with_totals')
+        .select('*')
+        .eq('event_id', event.id)
+        .not('status', 'in', '("cancelled","voided")')
+        .order('exhibitor_company_name'),
+      supabase
+        .from('wf_pipeline_targets')
+        .select('*, sales_reps(name, email)')
+        .eq('event_id', event.id)
+        .eq('is_active', true)
+        .order('company_name'),
+      supabase.from('sales_reps').select('id, name, email').eq('is_active', true).order('name'),
+      supabase.from('wf_participation_confirmed_overrides').select('*').eq('event_id', event.id),
+    ]);
+
+  if (overridesRes.error) {
+    console.warn(
+      '[participation] confirmed overrides unavailable (run migration 081):',
+      overridesRes.error.message,
+    );
+  }
+  const overridesData = overridesRes.error ? [] : (overridesRes.data ?? []);
 
   const contracts = (contractsData ?? []) as ContractWithTotals[];
   const byId = new Map(contracts.map((c) => [c.id, c]));
+  const overrideByContract = new Map(
+    ((overridesData ?? []) as WfParticipationConfirmedOverride[]).map((o) => [o.contract_id, o]),
+  );
   const contractIds = contracts.map((c) => c.id);
   const boothBrandRows = contractIds.length
     ? await fetchBoothBrandsByContractIds(supabase, contractIds)
@@ -256,7 +344,6 @@ export async function buildParticipationReport(options?: {
   }
 
   const confirmedContracts = contracts.filter((c) => contractIsConfirmed(c.status));
-  const confirmed = confirmedContracts.map((c) => confirmedRow(c, brandsByContract.get(c.id) ?? []));
 
   const salesReps = (repsData ?? []) as Pick<SalesRep, 'id' | 'name' | 'email'>[];
   const repByEmail = new Map(salesReps.map((r) => [r.email.toLowerCase(), r.id]));
@@ -277,11 +364,13 @@ export async function buildParticipationReport(options?: {
   let sheetsFromCache = false;
   let livePending: LiveSheetPipelineRow[] = [];
   let liveNewBiz: LiveSheetPipelineRow[] = [];
+  let liveConfirmed: LiveSheetPipelineRow[] = [];
 
   try {
     const live = await fetchLiveParticipationSheetRows();
     livePending = live.pending;
     liveNewBiz = live.newBusiness;
+    liveConfirmed = live.confirmed ?? [];
     sheetsFetchedAt = live.fetchedAt;
     sheetsFromCache = live.fromCache;
     if (live.stale) {
@@ -292,6 +381,17 @@ export async function buildParticipationReport(options?: {
     sheetsError = err instanceof Error ? err.message : 'Failed to load Google Sheets';
     console.error('[participation] live sheets pull failed', err);
   }
+
+  const sheetPoolsForConfirmed = [liveConfirmed, livePending, liveNewBiz];
+
+  const confirmed = confirmedContracts.map((c) =>
+    confirmedRow({
+      contract: c,
+      brandNames: brandsByContract.get(c.id) ?? [],
+      sheet: findSheetRefForCompany(c.exhibitor_company_name, sheetPoolsForConfirmed),
+      override: overrideByContract.get(c.id) ?? null,
+    }),
+  );
 
   const pending: ParticipationReportRow[] = [];
   const newBusiness: ParticipationReportRow[] = [];
@@ -409,6 +509,7 @@ export async function buildParticipationReport(options?: {
       contract_status: match?.status ?? null,
       target_id: target.id,
       manual_upload_received: Boolean(target.manual_upload_received),
+      ...emptyConfirmedExtras(),
     };
     if (target.section === 'pending_renewal') pending.push(row);
     else newBusiness.push(row);
@@ -537,4 +638,107 @@ export async function updatePipelineTarget(
     .single();
   if (error) return { ok: false, error: error.message };
   return { ok: true, row: data as WfPipelineTarget };
+}
+
+/** Upsert Kate’s Confirmed booth / separately billed amount overrides. */
+export async function upsertConfirmedOverride(
+  input: {
+    eventId: string;
+    contractId: string;
+    boothCountOverride?: number | null;
+    additionalSpendCents?: number;
+    totalSpendOverrideCents?: number | null;
+    notes?: string | null;
+    clearOverrides?: boolean;
+  },
+  supabase: SupabaseClient = getSupabaseAdmin(),
+): Promise<{ ok: true; row: WfParticipationConfirmedOverride | null } | { ok: false; error: string }> {
+  const { eventId, contractId } = input;
+
+  if (input.clearOverrides) {
+    const { error } = await supabase
+      .from('wf_participation_confirmed_overrides')
+      .delete()
+      .eq('contract_id', contractId);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, row: null };
+  }
+
+  const { data: contract } = await supabase
+    .from('contracts')
+    .select('id, event_id, status')
+    .eq('id', contractId)
+    .maybeSingle();
+  if (!contract) return { ok: false, error: 'Contract not found' };
+  if (contract.event_id !== eventId) return { ok: false, error: 'Contract is not on this event' };
+  if (!contractIsConfirmed(contract.status as ContractWithTotals['status'])) {
+    return { ok: false, error: 'Overrides only apply to executed (Confirmed) contracts' };
+  }
+
+  const payload = {
+    event_id: eventId,
+    contract_id: contractId,
+    booth_count_override:
+      input.boothCountOverride === undefined ? undefined : input.boothCountOverride,
+    additional_spend_cents:
+      input.additionalSpendCents === undefined ? undefined : Math.max(0, Math.round(input.additionalSpendCents)),
+    total_spend_override_cents:
+      input.totalSpendOverrideCents === undefined ? undefined : input.totalSpendOverrideCents,
+    notes: input.notes === undefined ? undefined : input.notes?.trim() || null,
+    updated_at: new Date().toISOString(),
+  };
+
+  // Load existing so partial patches don’t wipe unset fields.
+  const { data: existing } = await supabase
+    .from('wf_participation_confirmed_overrides')
+    .select('*')
+    .eq('contract_id', contractId)
+    .maybeSingle();
+
+  const merged = {
+    event_id: eventId,
+    contract_id: contractId,
+    booth_count_override:
+      payload.booth_count_override !== undefined
+        ? payload.booth_count_override
+        : ((existing as WfParticipationConfirmedOverride | null)?.booth_count_override ?? null),
+    additional_spend_cents:
+      payload.additional_spend_cents !== undefined
+        ? payload.additional_spend_cents
+        : ((existing as WfParticipationConfirmedOverride | null)?.additional_spend_cents ?? 0),
+    total_spend_override_cents:
+      payload.total_spend_override_cents !== undefined
+        ? payload.total_spend_override_cents
+        : ((existing as WfParticipationConfirmedOverride | null)?.total_spend_override_cents ?? null),
+    notes:
+      payload.notes !== undefined
+        ? payload.notes
+        : ((existing as WfParticipationConfirmedOverride | null)?.notes ?? null),
+    updated_at: new Date().toISOString(),
+  };
+
+  const hasMeaningful =
+    merged.booth_count_override != null ||
+    merged.additional_spend_cents > 0 ||
+    merged.total_spend_override_cents != null ||
+    Boolean(merged.notes?.trim());
+
+  if (!hasMeaningful) {
+    if (existing) {
+      const { error } = await supabase
+        .from('wf_participation_confirmed_overrides')
+        .delete()
+        .eq('contract_id', contractId);
+      if (error) return { ok: false, error: error.message };
+    }
+    return { ok: true, row: null };
+  }
+
+  const { data, error } = await supabase
+    .from('wf_participation_confirmed_overrides')
+    .upsert(merged, { onConflict: 'contract_id' })
+    .select('*')
+    .single();
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, row: data as WfParticipationConfirmedOverride };
 }

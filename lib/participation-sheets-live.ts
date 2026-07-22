@@ -19,7 +19,8 @@ export const PARTICIPATION_MARVIN_SHEET_ID = '10Wmm1V2B0z8olqutieFCM8iJeFCudEWHa
 const LIVE_SHEETS_CACHE_TTL_MS = 5 * 60 * 1000;
 
 export type LiveSheetPipelineRow = {
-  section: PipelineSection;
+  /** Sheet block this row was parsed from. Confirmed block uses `'confirmed'`. */
+  section: PipelineSection | 'confirmed';
   company_name: string;
   rep_initials: string;
   brands_text: string;
@@ -33,6 +34,8 @@ export type LiveSheetPipelineRow = {
 export type LiveParticipationSheetPayload = {
   pending: LiveSheetPipelineRow[];
   newBusiness: LiveSheetPipelineRow[];
+  /** CONFIRMED block on Marvin — booth/spend reference for executed contracts. */
+  confirmed: LiveSheetPipelineRow[];
   fetchedAt: string;
   sources: { marvinSheetId: string };
   fromCache: boolean;
@@ -62,36 +65,62 @@ function isHeaderOrTotal(company: string, firstCol: string): boolean {
   return false;
 }
 
-function detectSection(firstCol: string): 'pending' | 'new_business' | 'skip' | null {
+function detectSection(firstCol: string): 'pending' | 'new_business' | 'confirmed' | 'skip' | null {
   const a = firstCol.toUpperCase();
   if (a.includes('PENDING RENEWAL')) return 'pending';
   if (a.includes('NEW BUSINESS')) return 'new_business';
-  if (a.includes('CONFIRMED') || a.includes('TOTAL CONFIRMED')) return 'skip';
+  // TOTAL CONFIRMED is a footer, not the company list header.
+  if (a.includes('TOTAL CONFIRMED')) return 'skip';
+  if (a.includes('CONFIRMED') && !a.includes('PENDING')) return 'confirmed';
   return null;
+}
+
+function parseDataRow(row: string[], a: string): Omit<LiveSheetPipelineRow, 'section'> | null {
+  const company = cell(row, 1);
+  if (!company || isHeaderOrTotal(company, a)) return null;
+
+  const brands = cell(row, 2);
+  const booths = parseBoothCount(cell(row, 3));
+  const rate = parseMoneyToCents(cell(row, 4));
+  const spend = parseMoneyToCents(cell(row, 6));
+  const notes = cell(row, 7);
+  const rateCents = rate || (booths > 0 && spend > 0 ? Math.round(spend / booths) : 0);
+
+  return {
+    company_name: company,
+    rep_initials: a || '—',
+    brands_text: brands,
+    booth_count: booths,
+    rate_per_booth_cents: rateCents,
+    total_spend_cents: spend || (booths > 0 && rateCents > 0 ? booths * rateCents : 0),
+    sheet_notes: notes,
+    rsvp: '',
+  };
 }
 
 function parseMarvinRows(values: string[][]): {
   pending: LiveSheetPipelineRow[];
   newBusiness: LiveSheetPipelineRow[];
+  confirmed: LiveSheetPipelineRow[];
 } {
   const pending: LiveSheetPipelineRow[] = [];
   const newBusiness: LiveSheetPipelineRow[] = [];
+  const confirmed: LiveSheetPipelineRow[] = [];
   const seenPending = new Set<string>();
   const seenNew = new Set<string>();
+  const seenConfirmed = new Set<string>();
 
-  let section: 'pending' | 'new_business' | null = null;
+  let section: 'pending' | 'new_business' | 'confirmed' | null = null;
 
   for (const row of values) {
     const a = cell(row, 0);
     const detected = detectSection(a);
-    if (detected === 'pending' || detected === 'new_business') {
+    if (detected === 'pending' || detected === 'new_business' || detected === 'confirmed') {
       section = detected;
       continue;
     }
     if (detected === 'skip') {
-      if (a.toUpperCase().includes('CONFIRMED') && !a.toUpperCase().includes('PENDING')) {
-        section = null;
-      }
+      section = null;
       continue;
     }
     if (!section) continue;
@@ -103,30 +132,34 @@ function parseMarvinRows(values: string[][]): {
     }
     if (aUp === 'SALES REP') continue;
 
-    const company = cell(row, 1);
-    if (!company || isHeaderOrTotal(company, a)) continue;
-    const key = normalizeCompanyKey(company);
-
-    const brands = cell(row, 2);
-    const booths = parseBoothCount(cell(row, 3));
-    const rate = parseMoneyToCents(cell(row, 4));
-    const spend = parseMoneyToCents(cell(row, 6));
-    const notes = cell(row, 7);
+    const parsed = parseDataRow(row, a);
+    if (!parsed) continue;
+    const key = normalizeCompanyKey(parsed.company_name);
 
     if (section === 'pending') {
       if (seenPending.has(key)) continue;
       seenPending.add(key);
-      const rateCents = rate || (booths > 0 && spend > 0 ? Math.round(spend / booths) : 1_500_000);
+      const rateCents =
+        parsed.rate_per_booth_cents ||
+        (parsed.booth_count > 0 && parsed.total_spend_cents > 0
+          ? Math.round(parsed.total_spend_cents / parsed.booth_count)
+          : 1_500_000);
       pending.push({
+        ...parsed,
         section: 'pending_renewal',
-        company_name: company,
-        rep_initials: a || '—',
-        brands_text: brands,
-        booth_count: booths,
         rate_per_booth_cents: rateCents,
-        total_spend_cents: spend || (booths > 0 ? booths * rateCents : 0),
-        sheet_notes: notes,
-        rsvp: '',
+        total_spend_cents:
+          parsed.total_spend_cents || (parsed.booth_count > 0 ? parsed.booth_count * rateCents : 0),
+      });
+      continue;
+    }
+
+    if (section === 'confirmed') {
+      if (seenConfirmed.has(key)) continue;
+      seenConfirmed.add(key);
+      confirmed.push({
+        ...parsed,
+        section: 'confirmed',
       });
       continue;
     }
@@ -134,19 +167,13 @@ function parseMarvinRows(values: string[][]): {
     if (seenNew.has(key)) continue;
     seenNew.add(key);
     newBusiness.push({
+      ...parsed,
       section: 'new_business',
-      company_name: company,
-      rep_initials: a || '—',
-      brands_text: brands,
-      booth_count: booths,
-      rate_per_booth_cents: rate,
-      total_spend_cents: spend,
-      sheet_notes: notes || brands,
-      rsvp: '',
+      sheet_notes: parsed.sheet_notes || parsed.brands_text,
     });
   }
 
-  return { pending, newBusiness };
+  return { pending, newBusiness, confirmed };
 }
 
 async function resolveMarvinTabTitle(
@@ -187,10 +214,13 @@ async function pullMarvinValuesLive(): Promise<Omit<LiveParticipationSheetPayloa
     marvinRes = await loadValues(tab);
   }
 
-  const { pending, newBusiness } = parseMarvinRows((marvinRes.data.values ?? []) as string[][]);
+  const { pending, newBusiness, confirmed } = parseMarvinRows(
+    (marvinRes.data.values ?? []) as string[][],
+  );
   return {
     pending,
     newBusiness,
+    confirmed,
     fetchedAt: new Date().toISOString(),
     sources: { marvinSheetId },
   };

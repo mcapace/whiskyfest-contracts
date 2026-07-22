@@ -62,6 +62,33 @@ export type ParticipationReportRow = {
   target_id: string | null;
   /** Portal flag: manual signed PDF received for this pipeline row. */
   manual_upload_received: boolean;
+  /** Booth count from Marvin sheet when matched (confirmed merge). */
+  sheet_booth_count: number | null;
+  /** Contract booth count before sheet/override merge (confirmed). */
+  contract_booth_count: number | null;
+  /** Contract grand total before additional/override (confirmed). */
+  contract_spend_cents: number | null;
+  /** Kate-entered extra billed outside the contract (confirmed). */
+  additional_spend_cents: number;
+  /** When set, replaces contract + additional on the report (confirmed). */
+  total_spend_override_cents: number | null;
+  /** True when displayed total uses Kate’s override or additional billed. */
+  spend_is_adjusted: boolean;
+  /** True when displayed booths use sheet or Kate override (not raw contract). */
+  booths_from_sheet_or_override: boolean;
+};
+
+/** Kate overrides for an executed (Confirmed) contract on the participation report. */
+export type WfParticipationConfirmedOverride = {
+  id: string;
+  event_id: string;
+  contract_id: string;
+  booth_count_override: number | null;
+  additional_spend_cents: number;
+  total_spend_override_cents: number | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 /** Same-event contracts available to link from Pending / New business. */
