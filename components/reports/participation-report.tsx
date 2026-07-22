@@ -670,7 +670,7 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
           </p>
           {tab === 'pending' ? (
             <p className="hidden text-[11px] text-muted-foreground sm:block">
-              ⋯ to Convert / Import / link · click +N on brands to expand
+              Convert starts a DocuSign draft · Manage for Import PDF / link · click +N on brands
             </p>
           ) : null}
         </div>
