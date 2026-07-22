@@ -8,16 +8,11 @@ import {
 } from '@/lib/participation-report-shared';
 
 /**
- * WhiskyFest & Tequila 2026 participation sheet (Marvin layout):
- * CONFIRMED / PENDING RENEWALS / NEW BUSINESS.
+ * Sole source for Pending renewals + New business:
+ * https://docs.google.com/spreadsheets/d/10Wmm1V2B0z8olqutieFCM8iJeFCudEWHars6YPrv7GY
+ * (WhiskyFest & Tequila 2026 — Marvin)
  */
-export const PARTICIPATION_MARVIN_SHEET_ID =
-  process.env['SHEETS_PARTICIPATION_MARVIN_ID']?.trim() ||
-  '10Wmm1V2B0z8olqutieFCM8iJeFCudEWHars6YPrv7GY';
-
-/** @deprecated Kept for env compatibility — pending now uses Marvin sheet. */
-export const PARTICIPATION_PENDING_SHEET_ID =
-  process.env['SHEETS_PARTICIPATION_PENDING_ID']?.trim() || PARTICIPATION_MARVIN_SHEET_ID;
+export const PARTICIPATION_MARVIN_SHEET_ID = '10Wmm1V2B0z8olqutieFCM8iJeFCudEWHars6YPrv7GY';
 
 export type LiveSheetPipelineRow = {
   section: PipelineSection;
@@ -45,9 +40,7 @@ function isHeaderOrTotal(company: string, firstCol: string): boolean {
   return false;
 }
 
-type MarvinSection = 'pending' | 'new_business' | null;
-
-function detectSection(firstCol: string): MarvinSection | 'skip' {
+function detectSection(firstCol: string): 'pending' | 'new_business' | 'skip' | null {
   const a = firstCol.toUpperCase();
   if (a.includes('PENDING RENEWAL')) return 'pending';
   if (a.includes('NEW BUSINESS')) return 'new_business';
@@ -56,14 +49,13 @@ function detectSection(firstCol: string): MarvinSection | 'skip' {
 }
 
 /**
- * Pull pending renewals + new business live from WhiskyFest & Tequila 2026 sheet.
- * Pending accounts and Notes come from the PENDING RENEWALS block.
+ * Pending accounts + Notes and New business — live from WhiskyFest & Tequila 2026 only.
  */
 export async function fetchLiveParticipationSheetRows(): Promise<{
   pending: LiveSheetPipelineRow[];
   newBusiness: LiveSheetPipelineRow[];
   fetchedAt: string;
-  sources: { pendingSheetId: string; marvinSheetId: string };
+  sources: { marvinSheetId: string };
 }> {
   const sheets = getSheetsClient();
   const marvinSheetId = PARTICIPATION_MARVIN_SHEET_ID;
@@ -90,7 +82,6 @@ export async function fetchLiveParticipationSheetRows(): Promise<{
       continue;
     }
     if (detected === 'skip') {
-      // Leaving CONFIRMED / grand total headers — only clear section on CONFIRMED start
       if (a.toUpperCase().includes('CONFIRMED') && !a.toUpperCase().includes('PENDING')) {
         section = null;
       }
@@ -113,8 +104,7 @@ export async function fetchLiveParticipationSheetRows(): Promise<{
     const booths = parseBoothCount(cell(row, 3));
     const rate = parseMoneyToCents(cell(row, 4));
     const spend = parseMoneyToCents(cell(row, 6));
-    // Notes column (H) on PENDING RENEWALS / sometimes NEW BUSINESS
-    const notes = cell(row, 7);
+    const notes = cell(row, 7); // Notes column on PENDING RENEWALS
 
     if (section === 'pending') {
       if (seenPending.has(key)) continue;
@@ -153,7 +143,7 @@ export async function fetchLiveParticipationSheetRows(): Promise<{
     pending,
     newBusiness,
     fetchedAt: new Date().toISOString(),
-    sources: { pendingSheetId: marvinSheetId, marvinSheetId },
+    sources: { marvinSheetId },
   };
 }
 

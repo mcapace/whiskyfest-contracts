@@ -174,15 +174,17 @@ function SectionTable({
                       <p className="mb-1 text-xs text-muted-foreground">{row.pipeline_status}</p>
                       {row.sheet_notes ? (
                         <p className="mb-2 text-xs text-muted-foreground">
-                          <span className="font-medium text-foreground/80">Sheet: </span>
+                          <span className="font-medium text-foreground/80">Notes (WF &amp; Tequila 2026): </span>
                           {row.sheet_notes}
                         </p>
-                      ) : null}
+                      ) : (
+                        <p className="mb-2 text-xs text-muted-foreground">No notes on sheet</p>
+                      )}
                       {row.target_id && onNotesSave ? (
                         <NotesEditor targetId={row.target_id} initial={row.notes} onSave={onNotesSave} />
-                      ) : (
-                        <p className="text-xs text-foreground">{row.notes || '—'}</p>
-                      )}
+                      ) : row.notes ? (
+                        <p className="text-xs text-foreground">{row.notes}</p>
+                      ) : null}
                     </td>
                   ) : null}
                   {showConvert ? (
@@ -240,7 +242,7 @@ function NotesEditor({
         onChange={(e) => setValue(e.target.value)}
         rows={2}
         className="w-full resize-y rounded-md border border-border/60 bg-bg-page px-2 py-1.5 text-xs text-foreground"
-        placeholder="Your portal notes (kept separate from the Google Sheet)…"
+        placeholder="Optional portal notes (not from the Google Sheet)…"
       />
       {dirty ? (
         <Button
