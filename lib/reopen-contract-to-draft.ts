@@ -15,6 +15,7 @@ export async function voidContractEnvelopeIfPresent(
   }
 }
 
+/** Clears DocuSign + execution + AR handoff so a corrected deal can be re-sent cleanly. */
 export function contractReopenToDraftPatch(from: 'voided' | 'cancelled') {
   const base = {
     status: 'draft' as const,
@@ -28,6 +29,11 @@ export function contractReopenToDraftPatch(from: 'voided' | 'cancelled') {
     events_approved_at: null,
     events_approved_by: null,
     events_approval_reason: null,
+    accounting_notified_at: null,
+    invoice_status: 'pending' as const,
+    invoice_sent_at: null,
+    invoice_sent_by: null,
+    paid_at: null,
   };
   if (from === 'voided') {
     return {

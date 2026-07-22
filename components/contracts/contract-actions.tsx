@@ -359,6 +359,8 @@ export function ContractActions({
     (isAdmin || isEventsTeam) &&
     (status === 'sent' || status === 'partially_signed') &&
     Boolean(docusignEnvelopeId);
+  /** Fully executed: void so amount/terms can be corrected via Edit and re-send. */
+  const canVoidExecuted = (isAdmin || isEventsTeam) && status === 'executed';
   const canSyncDocuSign =
     (isAdmin || isEventsTeam) &&
     Boolean(docusignEnvelopeId) &&
@@ -408,7 +410,7 @@ export function ContractActions({
     if (canEditVoided) return true;
     if (canRedraftCancelled) return true;
     if (legacyImport && (signedPdfHref || canEditImported || canVoidImported)) return true;
-    if (status === 'executed' && signedPdfHref) return true;
+    if (status === 'executed' && (signedPdfHref || canVoidExecuted)) return true;
     if (status === 'error' && isAdmin) return true;
     return false;
   }, [
@@ -424,6 +426,7 @@ export function ContractActions({
     canEditVoided,
     canRedraftCancelled,
     canVoidImported,
+    canVoidExecuted,
     canCancelSigned,
     signedPdfHref,
   ]);
@@ -820,6 +823,20 @@ export function ContractActions({
             </ActionWithHelp>
           )}
 
+          {canVoidExecuted && (
+            <ActionWithHelp helpText={CONTRACT_ACTION_HELP.voidExecutedContract}>
+              <Button
+                data-tour="contract-void-executed-btn"
+                className={btnDanger}
+                onClick={() => setOpenVoid(true)}
+                disabled={busy || readOnly}
+                title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+              >
+                <ContractActionButtonLabel icon={AlertTriangle} label="Void to correct" />
+              </Button>
+            </ActionWithHelp>
+          )}
+
           {status === 'error' && isAdmin && (
             <>
               <ActionWithHelp helpText={CONTRACT_ACTION_HELP.viewErrorDetails}>
@@ -1161,18 +1178,31 @@ export function ContractActions({
       <Dialog open={openVoid} onOpenChange={setOpenVoid}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{status === 'imported' ? 'Void imported record?' : 'Void Contract?'}</DialogTitle>
+            <DialogTitle>
+              {status === 'imported'
+                ? 'Void imported record?'
+                : status === 'executed'
+                  ? 'Void executed contract?'
+                  : 'Void Contract?'}
+            </DialogTitle>
             <DialogDescription>
               {status === 'imported' ? (
                 <>
                   This permanently marks the imported contract <strong>voided</strong>. Use only when this legacy deal
                   should not remain in the pipeline. PDFs stay in storage for audit unless removed separately.
                 </>
+              ) : status === 'executed' ? (
+                <>
+                  Marks this fully signed contract <strong>voided</strong> so you can fix the dollar amount (or other
+                  terms) and re-send. Accounting is notified not to invoice the prior PDF. After voiding, use{' '}
+                  <strong>Edit and re-send</strong> on this same record — update pricing, regenerate the PDF, then send
+                  via DocuSign again.
+                </>
               ) : (
                 <>
                   Voiding permanently invalidates this DocuSign envelope and marks the contract <strong>voided</strong>.
-                  Use this only when the deal is off and will not be revived. To fix terms and re-send, use{' '}
-                  <strong>Recall</strong> instead.
+                  Use this when the deal is off. To fix terms and re-send without leaving voided, prefer{' '}
+                  <strong>Recall</strong>. After void, you can still use <strong>Edit and re-send</strong>.
                 </>
               )}
             </DialogDescription>
@@ -1185,11 +1215,24 @@ export function ContractActions({
                 value={voidReason}
                 onChange={(e) => setVoidReason(e.target.value.slice(0, 100))}
                 maxLength={100}
-                placeholder="e.g., Wrong signer, incorrect amount, duplicate"
+                placeholder={
+                  status === 'executed'
+                    ? 'e.g., Incorrect package amount — correcting and re-sending'
+                    : 'e.g., Wrong signer, incorrect amount, duplicate'
+                }
               />
               <p className="text-right text-xs text-muted-foreground">{voidReason.length}/100</p>
             </div>
-            {status !== 'imported' ? (
+            {status === 'executed' ? (
+              <div className="rounded-md border border-amber-800/25 bg-amber-950/[0.04] p-3 text-sm text-foreground/90">
+                <p className="font-medium text-amber-950">Next steps</p>
+                <ol className="mt-1 list-decimal space-y-0.5 pl-4 text-[13px] text-muted-foreground">
+                  <li>Void with a clear reason</li>
+                  <li>Click <strong>Edit and re-send</strong></li>
+                  <li>Update the amount → regenerate PDF → send via DocuSign</li>
+                </ol>
+              </div>
+            ) : status !== 'imported' ? (
               <div className="rounded-md border border-border/60 bg-muted/30 p-3">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Who will be notified</p>
                 <ul className="space-y-1 text-sm text-foreground/90">
@@ -1220,7 +1263,7 @@ export function ContractActions({
               disabled={busy || voidReason.trim().length < 5}
             >
               {pending && action === 'void' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Void Contract
+              {status === 'executed' ? 'Void to correct' : 'Void Contract'}
             </Button>
           </DialogFooter>
         </DialogContent>

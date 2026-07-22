@@ -319,18 +319,18 @@ export async function exportBilledExhibitorsToGoogleSheet(
 
 /**
  * Refresh the billed exhibitors sheet for this contract's portal.
- * Call after invoice sent, paid, or recall (pending) so rows stay in sync —
- * pending contracts are omitted from the export, removing accidental "sent" rows.
+ * Call after invoice sent, paid, recall, or contract void so rows stay in sync —
+ * non-executed / non-sent contracts are omitted from the export.
  */
 export async function syncBilledContractToGoogleSheet(contractId: string): Promise<void> {
   const supabase = getSupabaseAdmin();
   const { data: contract } = await supabase
-    .from('contracts_with_totals')
-    .select('*')
+    .from('contracts')
+    .select('id, event_id')
     .eq('id', contractId)
-    .maybeSingle<ContractWithTotals>();
+    .maybeSingle();
 
-  if (!contract || contract.status !== 'executed') return;
+  if (!contract) return;
 
   const { data: event } = await supabase.from('events').select('*').eq('id', contract.event_id).maybeSingle<Event>();
   if (!event) return;

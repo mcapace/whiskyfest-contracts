@@ -4,10 +4,12 @@ import { auth } from '@/lib/auth';
 import { resolveContractActor } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { voidEnvelope } from '@/lib/docusign';
-import { notifyContractVoided } from '@/lib/notifications';
+import { voidContractEnvelopeIfPresent } from '@/lib/reopen-contract-to-draft';
+import { notifyAccountingExecutedContractVoided, notifyContractVoided } from '@/lib/notifications';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { syncExhibitorRosterWriteback } from '@/lib/exhibitor-roster-sync-hook';
-import type { Contract, ContractWithTotals, Event } from '@/types/db';
+import { syncBilledContractToGoogleSheet } from '@/lib/sheets-billed-export';
+import type { Contract, ContractWithTotals, Event, InvoiceStatus } from '@/types/db';
 
 const schema = z.object({
   reason: z.string().trim().min(5, 'Reason must be at least 5 characters').max(100, 'Reason must be 100 characters or less'),
@@ -15,7 +17,9 @@ const schema = z.object({
 
 export const runtime = 'nodejs';
 
-/** Admin/events only: void an in-flight DocuSign envelope and mark contract as voided. */
+const VOIDABLE_STATUSES = new Set(['sent', 'partially_signed', 'imported', 'executed']);
+
+/** Admin/events: void DocuSign (when present) and mark contract voided — including executed deals for amount corrections. */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
   const gate = await resolveContractActor(session);
@@ -43,19 +47,25 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   if (!contract) return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
 
-  if (contract.status !== 'sent' && contract.status !== 'partially_signed' && contract.status !== 'imported') {
+  if (!VOIDABLE_STATUSES.has(contract.status)) {
     return NextResponse.json({ error: `Cannot void contract in status: ${contract.status}` }, { status: 403 });
   }
 
   const envelopeId = contract.docusign_envelope_id?.trim() ?? null;
+  const wasExecuted = contract.status === 'executed';
+  const reason = parsed.data.reason;
 
-  if (contract.status !== 'imported') {
+  if (contract.status === 'imported') {
+    // No DocuSign envelope.
+  } else if (wasExecuted) {
+    // Completed envelopes often cannot be voided in DocuSign — continue either way.
+    await voidContractEnvelopeIfPresent(envelopeId, reason);
+  } else {
     if (!envelopeId) {
       return NextResponse.json({ error: 'No DocuSign envelope found for this contract.' }, { status: 409 });
     }
-
     try {
-      await voidEnvelope(envelopeId, parsed.data.reason);
+      await voidEnvelope(envelopeId, reason);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       return NextResponse.json({ error: msg }, { status: 502 });
@@ -64,6 +74,26 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const nowIso = new Date().toISOString();
   const previousStatus = contract.status;
+  const priorInvoice = (contract.invoice_status ?? 'pending') as InvoiceStatus;
+
+  const accountingPatch: Record<string, unknown> = {};
+  if (wasExecuted) {
+    const shouldVoidInvoice =
+      priorInvoice === 'invoice_sent' ||
+      priorInvoice === 'paid' ||
+      priorInvoice === 'pending' ||
+      priorInvoice === 'invoice_voided';
+    accountingPatch.accounting_notified_at = null;
+    accountingPatch.invoice_sent_at = null;
+    accountingPatch.invoice_sent_by = null;
+    accountingPatch.paid_at = null;
+    if (shouldVoidInvoice && priorInvoice !== 'not_invoiced') {
+      accountingPatch.invoice_status = 'invoice_voided';
+    }
+    const stamp = `[${nowIso.slice(0, 10)}] Contract voided after execution by ${gate.actor.email}: ${reason}`;
+    const priorNotes = contract.accounting_notes?.trim();
+    accountingPatch.accounting_notes = priorNotes ? `${priorNotes}\n${stamp}` : stamp;
+  }
 
   const { error: updErr } = await supabase
     .from('contracts')
@@ -71,7 +101,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       status: 'voided',
       voided_at: nowIso,
       voided_by: gate.actor.email,
-      voided_reason: parsed.data.reason,
+      voided_reason: reason,
+      ...accountingPatch,
     })
     .eq('id', contract.id);
 
@@ -80,13 +111,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   await supabase.from('audit_log').insert({
     contract_id: contract.id,
     actor_email: gate.actor.email,
-    action: 'contract_voided',
+    action: wasExecuted ? 'executed_contract_voided' : 'contract_voided',
     from_status: previousStatus,
     to_status: 'voided',
     metadata: {
-      reason: parsed.data.reason,
+      reason,
       envelope_id: envelopeId ?? undefined,
       previous_status: previousStatus,
+      prior_invoice_status: wasExecuted ? priorInvoice : undefined,
+      prior_accounting_notified_at: wasExecuted ? contract.accounting_notified_at : undefined,
     },
   });
 
@@ -103,20 +136,40 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
   }
 
+  if (wasExecuted) {
+    void syncBilledContractToGoogleSheet(contract.id);
+  }
+
   if (latest) {
     try {
       await notifyContractVoided({
         contract: latest,
         event: event ?? null,
         voidedBy: { email: gate.actor.email, name: gate.actor.appUser.name ?? null },
-        reason: parsed.data.reason,
+        reason,
         voidedAtIso: nowIso,
+        wasExecuted,
       });
     } catch (err) {
       console.error('[notifyContractVoided]', err);
     }
   }
 
+  if (wasExecuted && latest) {
+    try {
+      await notifyAccountingExecutedContractVoided({
+        contract: latest,
+        event: event ?? null,
+        voidedBy: { email: gate.actor.email, name: gate.actor.appUser.name ?? null },
+        reason,
+        voidedAtIso: nowIso,
+        priorInvoiceStatus: priorInvoice,
+      });
+    } catch (err) {
+      console.error('[notifyAccountingExecutedContractVoided]', err);
+    }
+  }
+
   revalidateContractPaths(contract.id);
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, wasExecuted });
 }

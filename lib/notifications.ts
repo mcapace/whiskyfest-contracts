@@ -682,8 +682,8 @@ export async function notifySalesRepContractSentBack(
 }
 
 /**
- * Notify sales rep + events team that a contract was voided while in DocuSign.
- * DocuSign itself notifies exhibitor recipients about the envelope void.
+ * Notify sales rep + events team that a contract was voided.
+ * DocuSign itself notifies exhibitor recipients when an in-flight envelope is voided.
  */
 export async function notifyContractVoided(params: {
   contract: Pick<Contract, 'id' | 'event_id' | 'exhibitor_company_name' | 'sales_rep_id'> & {
@@ -694,6 +694,8 @@ export async function notifyContractVoided(params: {
   voidedBy: { email: string; name?: string | null };
   reason: string;
   voidedAtIso: string;
+  /** When true, copy explains Edit and re-send after an executed void. */
+  wasExecuted?: boolean;
 }): Promise<void> {
   const apiKey = process.env['SENDGRID_API_KEY'];
   if (!apiKey) {
@@ -707,31 +709,38 @@ export async function notifyContractVoided(params: {
   const company = params.contract.exhibitor_company_name;
   const voider = params.voidedBy.name ? `${params.voidedBy.name} <${params.voidedBy.email}>` : params.voidedBy.email;
   const atLabel = new Date(params.voidedAtIso).toLocaleString('en-US');
+  const nextStep = params.wasExecuted
+    ? 'To correct the amount (or other terms) and send again: open the contract → Edit and re-send → update pricing → regenerate PDF → send via DocuSign.'
+    : 'To fix terms and re-send the same record: open the contract → Edit and re-send (or leave voided if this deal is dead).';
 
   sgMail.setApiKey(apiKey);
 
   const subject = `${company} contract voided`;
+  const intro = params.wasExecuted
+    ? `The fully executed ${eventTitle} contract for ${company} has been voided so it can be corrected and re-sent.`
+    : `The ${eventTitle} contract for ${company} has been voided.`;
+
   const text = [
-    `The ${eventTitle} contract for ${company} has been voided before countersignature.`,
+    intro,
     '',
     `Voided by: ${voider}`,
     `Reason: ${params.reason}`,
     `Voided at: ${atLabel}`,
     '',
-    `If you need to resend this contract with corrections, you'll need to create a new contract.`,
+    nextStep,
     '',
     `Open contract: ${detailUrl}`,
   ].join('\n');
 
   const html = `
     <div style="font-family: system-ui, sans-serif; max-width: 560px;">
-      <p>The contract for <strong>${escapeHtml(company)}</strong> has been voided before countersignature.</p>
+      <p>${escapeHtml(intro)}</p>
       <p style="margin-top:14px;">
         <strong>Voided by:</strong> ${escapeHtml(voider)}<br/>
         <strong>Reason:</strong> ${escapeHtml(params.reason)}<br/>
         <strong>Voided at:</strong> ${escapeHtml(atLabel)}
       </p>
-      <p style="margin-top:14px;">If you need to resend this contract with corrections, you'll need to create a new contract.</p>
+      <p style="margin-top:14px;">${escapeHtml(nextStep)}</p>
       <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in ${escapeHtml(mail.workspaceLabel)}</a></p>
     </div>
   `;
@@ -757,6 +766,70 @@ export async function notifyContractVoided(params: {
     subject: `${company} contract voided — visibility`,
     text,
     html,
+  });
+}
+
+/** Alert AR when an already-executed (handed-off) contract is voided for correction. */
+export async function notifyAccountingExecutedContractVoided(params: {
+  contract: Pick<
+    Contract,
+    'id' | 'exhibitor_company_name' | 'exhibitor_legal_name'
+  > & {
+    grand_total_cents?: number | null;
+    total_amount_cents?: number | null;
+  };
+  event: Pick<Event, 'name' | 'year' | 'product_key'> | null;
+  voidedBy: { email: string; name?: string | null };
+  reason: string;
+  voidedAtIso: string;
+  priorInvoiceStatus: string;
+}): Promise<void> {
+  const apiKey = process.env['SENDGRID_API_KEY'];
+  if (!apiKey) {
+    console.warn('[notifyAccountingExecutedContractVoided] SENDGRID_API_KEY not set — skipping');
+    return;
+  }
+
+  const to =
+    process.env['ACCOUNTING_HANDOFF_EMAIL']?.trim().toLowerCase() ||
+    process.env['ACCOUNTING_EMAIL']?.trim().toLowerCase()?.split(',')[0]?.trim() ||
+    'accountsreceivable@mshanken.com';
+  const productKey = params.event?.product_key ?? 'whiskyfest';
+  const productFrom = sendGridFromForProduct(productKey);
+  const fromAddress =
+    productKey === 'wine_spectator'
+      ? productFrom.email
+      : process.env['ACCOUNTING_FROM_EMAIL']?.trim() || productFrom.email;
+  const eventTitle = params.event ? `${params.event.name} ${params.event.year}`.trim() : 'Contract';
+  const company = params.contract.exhibitor_company_name;
+  const voider = params.voidedBy.name ? `${params.voidedBy.name} <${params.voidedBy.email}>` : params.voidedBy.email;
+  const totalCents = params.contract.grand_total_cents ?? params.contract.total_amount_cents ?? 0;
+  const totalLabel = formatCurrency(totalCents);
+  const detailUrl = `${appBaseUrl()}/accounting/${params.contract.id}`;
+
+  sgMail.setApiKey(apiKey);
+
+  const subject = `Executed contract voided: ${company} — do not invoice prior PDF`;
+  const text = [
+    `${eventTitle} — ${company} was voided after full execution.`,
+    '',
+    `Prior contract total: ${totalLabel}`,
+    `Prior invoice status: ${params.priorInvoiceStatus}`,
+    `Voided by: ${voider}`,
+    `Reason: ${params.reason}`,
+    `Voided at: ${new Date(params.voidedAtIso).toLocaleString('en-US')}`,
+    '',
+    'A corrected contract may be re-sent. Do not invoice (or re-invoice) from the prior executed PDF.',
+    'If an invoice was already sent, void/reissue on your side as needed.',
+    '',
+    `Accounting record: ${detailUrl}`,
+  ].join('\n');
+
+  await sgMail.send({
+    to,
+    from: { email: fromAddress, name: productFrom.name },
+    subject,
+    text,
   });
 }
 

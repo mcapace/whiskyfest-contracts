@@ -2,7 +2,10 @@
 
 export const CONTRACT_ACTION_HELP = {
   voidContract:
-    'Permanently invalidate this contract when the deal is dead. The envelope is voided and the record stays voided — not editable. Use Recall if you only need to fix details and re-send.',
+    'Invalidate this contract when the deal is dead or the executed terms are wrong. For executed deals, void first, then use Edit and re-send to fix the amount and send a new DocuSign. Accounting is notified when an executed contract is voided.',
+
+  voidExecutedContract:
+    'Void a fully executed contract so you can correct the dollar amount (or other terms) and re-send. Accounting is alerted not to invoice the prior PDF. Then use Edit and re-send on this same record.',
 
   cancel: 'Use when the deal is off. Terminates the contract entirely.',
 
@@ -30,7 +33,8 @@ export const CONTRACT_ACTION_HELP = {
     'Releases this legacy imported agreement to accounting — same AR email handoff as fully signed DocuSign contracts.',
 
   editImportedContract: 'Fix typos or amounts on an imported record before it is released to accounting.',
-  editVoidedContract: 'Reopen this voided deal for edits. Saving moves it back to draft so you can regenerate and re-send.',
+  editVoidedContract:
+    'Reopen this voided deal for edits (including after voiding an executed contract). Saving moves it back to draft so you can update pricing, regenerate the PDF, and re-send.',
   redraftCancelled:
     'Return this cancelled contract to draft, void any linked DocuSign envelope, and open the editor so you can regenerate and send again.',
 
