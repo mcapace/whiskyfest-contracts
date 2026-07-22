@@ -770,11 +770,15 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
             {!query && activeRows.length > 0 ? (
               <tfoot>
                 <tr className="border-t border-border/60 bg-bg-surface-raised/70">
-                  <td className="px-3 py-2 text-xs font-semibold" colSpan={3}>
+                  <td className="px-3 py-1.5 align-middle font-medium text-foreground" colSpan={3}>
                     Total
                   </td>
-                  <td className="px-3 py-2 text-right text-xs font-semibold tabular-nums">{activeMeta.booths}</td>
-                  <td className="px-3 py-2 text-right text-xs font-semibold tabular-nums">{money(activeMeta.spend)}</td>
+                  <td className="px-3 py-1.5 align-middle text-right tabular-nums font-medium text-foreground">
+                    {activeMeta.booths}
+                  </td>
+                  <td className="px-3 py-1.5 align-middle text-right tabular-nums font-medium text-foreground">
+                    {money(activeMeta.spend)}
+                  </td>
                   {showManage ? <td /> : null}
                   <td />
                 </tr>
