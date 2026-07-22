@@ -1,6 +1,8 @@
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
+import { eventTemplateProfile } from '@/lib/contract-template-profile';
+import { isBigSmokeDiscountedAgainstList } from '@/lib/big-smoke-pricing';
 import { isNoChargeBoothContract } from '@/lib/no-charge-booth';
-import { isNyweVendorEvent } from '@/lib/nywe-pricing';
+import { isNyweVendorOnlyEvent } from '@/lib/nywe-pricing';
 import type { Contract, Event } from '@/types/db';
 
 /** WhiskyFest list booth rate when no event context is available. */
@@ -10,23 +12,31 @@ export function standardBoothRateCentsForEvent(event?: Pick<Event, 'booth_rate_c
   return event?.booth_rate_cents ?? STANDARD_BOOTH_RATE_CENTS;
 }
 
-// True if the contract is discounted (booth rate below the event list price).
+/** True if the WhiskyFest booth rate is below the event list price. */
 export function isDiscountedRate(boothCents: number, event?: Pick<Event, 'booth_rate_cents'> | null): boolean {
   return boothCents < standardBoothRateCentsForEvent(event);
 }
 
-// True if the contract requires discount approval right now.
+/** True if the contract requires discount approval right now. */
 export function requiresDiscountApproval(
   contract: Pick<Contract, 'booth_rate_cents' | 'discount_approved_at'> & {
     no_charge_booth?: boolean | null;
     order_type?: Contract['order_type'] | null;
-    booth_count?: number;
+    booth_count?: number | null;
+    package_key?: string | null;
+    package_selections?: unknown;
   },
   event?: Pick<Event, 'booth_rate_cents' | 'contract_template_profile'> | null,
 ): boolean {
   if (isNoChargeBoothContract(contract)) return false;
   if (isSponsorshipOnlyOrder(contract)) return false;
-  if (isNyweVendorEvent(event)) return false;
+  // Flat NYWE license has no negotiated booth discount path.
+  if (isNyweVendorOnlyEvent(event)) return false;
+
+  if (event && eventTemplateProfile(event) === 'big_smoke') {
+    return isBigSmokeDiscountedAgainstList(contract) && !contract.discount_approved_at;
+  }
+
   return isDiscountedRate(contract.booth_rate_cents, event) && !contract.discount_approved_at;
 }
 

@@ -94,18 +94,14 @@ export async function requireEventEditor(eventId: string): Promise<
   return { ok: false, res: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
 }
 
-/** Full admin, or Wine Spectator admin on a wine_spectator contract. */
-export async function requireAdminOrWineSpectatorContractAdmin(contractId: string): Promise<
+/** Full admin, Wine Spectator admin on WS contracts, or Big Smoke admin/events on BS contracts. */
+export async function requireAdminOrProductContractAdmin(contractId: string): Promise<
   { ok: true; session: Session } | { ok: false; res: NextResponse }
 > {
   const r = await requireAuth();
   if (!r.ok) return r;
 
   if (r.session.user.role === 'admin') return { ok: true, session: r.session };
-
-  if (!isWineSpectatorAdmin(r.session.user)) {
-    return { ok: false, res: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
-  }
 
   const supabase = getSupabaseAdmin();
   const { data: row } = await supabase
@@ -115,9 +111,24 @@ export async function requireAdminOrWineSpectatorContractAdmin(contractId: strin
     .maybeSingle();
 
   const productKey = (row as { events?: { product_key?: string } } | null)?.events?.product_key;
-  if (productKey !== PRODUCT_WINE_SPECTATOR) {
-    return { ok: false, res: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+
+  if (productKey === PRODUCT_WINE_SPECTATOR && isWineSpectatorAdmin(r.session.user)) {
+    return { ok: true, session: r.session };
   }
 
-  return { ok: true, session: r.session };
+  if (
+    productKey === PRODUCT_BIG_SMOKE &&
+    (isBigSmokeAdmin(r.session.user) || Boolean(r.session.user.is_events_team))
+  ) {
+    return { ok: true, session: r.session };
+  }
+
+  return { ok: false, res: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+}
+
+/** @deprecated Prefer requireAdminOrProductContractAdmin. */
+export async function requireAdminOrWineSpectatorContractAdmin(contractId: string): Promise<
+  { ok: true; session: Session } | { ok: false; res: NextResponse }
+> {
+  return requireAdminOrProductContractAdmin(contractId);
 }

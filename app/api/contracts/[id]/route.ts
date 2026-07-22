@@ -23,7 +23,7 @@ import { isLegacyImportedContract } from '@/lib/legacy-import';
 import { billingFieldsFromOptionalBody } from '@/lib/nywe-billing';
 import { refreshNyweBillingFromRosterForContract } from '@/lib/nywe-roster-billing-sync';
 import { applyNyweLicensePricingIfNeeded, isNyweVendorOnlyEvent, isPackageFeeEvent, signerTitleForContract } from '@/lib/nywe-pricing';
-import { pricingFromBigSmokeInput } from '@/lib/big-smoke-pricing';
+import { pricingFromBigSmokeInput, resolveBigSmokeStoredBoothRate } from '@/lib/big-smoke-pricing';
 import { eventTemplateProfile } from '@/lib/contract-template-profile';
 import {
   assertNoChargeBoothAllowed,
@@ -137,18 +137,26 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       booth_count: bigSmokePricing?.booth_count ?? p.booth_count,
       booth_rate_cents: noChargeRequested
         ? 0
-        : (bigSmokePricing?.booth_rate_cents ?? incomingBoothRate),
+        : bigSmokePricing
+          ? resolveBigSmokeStoredBoothRate(bigSmokePricing, incomingBoothRate)
+          : incomingBoothRate,
     });
     const boothRateChanged = nywePricing.booth_rate_cents !== contract.booth_rate_cents;
     const savedLineItems = nyweOnly ? [] : (p.line_items ?? []);
     const nextPackageKey = bigSmokePricing?.package_key ?? null;
     const nextPackageSelections = bigSmokePricing?.package_selections ?? null;
+    const listFeeCents = bigSmokePricing?.fee_cents ?? null;
+    const nextFeeCents = nywePricing.booth_count * nywePricing.booth_rate_cents;
+    const priorFeeCents = contract.booth_count * contract.booth_rate_cents;
     const shouldResetDiscountApproval =
       !noChargeRequested &&
-      !isPackageFeeEvent(patchEvent) &&
       boothRateChanged &&
-      (nywePricing.booth_rate_cents >= STANDARD_BOOTH_RATE_CENTS ||
-        nywePricing.booth_rate_cents < contract.booth_rate_cents);
+      (isBigSmoke
+        ? listFeeCents != null &&
+          (nextFeeCents >= listFeeCents || nextFeeCents < priorFeeCents)
+        : !isPackageFeeEvent(patchEvent) &&
+          (nywePricing.booth_rate_cents >= STANDARD_BOOTH_RATE_CENTS ||
+            nywePricing.booth_rate_cents < contract.booth_rate_cents));
 
     const nyweBilling = nyweOnly || isBigSmoke ? billingFieldsFromOptionalBody(p) : null;
 

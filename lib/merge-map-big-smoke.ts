@@ -50,7 +50,11 @@ export function buildBigSmokeMergeMap(
     package_selections: packageSelectionsFromContract(contract),
     package_key: contract.package_key,
   });
-  const feeCents = priced?.fee_cents ?? contract.booth_subtotal_cents ?? contract.grand_total_cents;
+  const actualFeeCents = (contract.booth_count ?? 0) * (contract.booth_rate_cents ?? 0);
+  const feeCents =
+    actualFeeCents > 0
+      ? actualFeeCents
+      : (contract.booth_subtotal_cents ?? priced?.fee_cents ?? contract.grand_total_cents);
   const fee =
     feeCents != null
       ? (feeCents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

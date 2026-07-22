@@ -17,9 +17,12 @@ import { isDiscountedRate, standardBoothRateCentsForEvent } from '@/lib/contract
 import { isNyweVendorOnlyEvent, nyweLicenseFeeCents } from '@/lib/nywe-pricing';
 import {
   BIG_SMOKE_PACKAGES,
+  bigSmokeContractFeeCents,
   bigSmokePackageDisplayName,
+  bigSmokeRateFromNegotiatedFee,
   normalizeBigSmokePackageSelections,
   packageSelectionsFromContract,
+  pricingFromBigSmokeInput,
   pricingFromBigSmokeSelections,
   type BigSmokePackageKey,
   type BigSmokePackageSelection,
@@ -251,6 +254,28 @@ export function NewContractForm({
   const [packageSelections, setPackageSelections] = useState<PackageSelectionDraft[]>(() =>
     draftSelectionsFromInitial(initialValues),
   );
+  const initialBigSmokeList = pricingFromBigSmokeInput({
+    package_selections: packageSelectionsFromContract(initialValues ?? {}),
+    package_key: initialValues?.package_key,
+  });
+  const initialBigSmokeFee = bigSmokeContractFeeCents({
+    booth_count: initialValues?.booth_count,
+    booth_rate_cents: initialValues?.booth_rate_cents,
+  });
+  const [specialPricing, setSpecialPricing] = useState(() =>
+    Boolean(
+      initialBigSmokeList &&
+        initialBigSmokeFee > 0 &&
+        initialBigSmokeFee !== initialBigSmokeList.fee_cents,
+    ),
+  );
+  const [specialFeeInput, setSpecialFeeInput] = useState(() =>
+    initialBigSmokeList &&
+    initialBigSmokeFee > 0 &&
+    initialBigSmokeFee !== initialBigSmokeList.fee_cents
+      ? (initialBigSmokeFee / 100).toFixed(2)
+      : '',
+  );
 
   const [form, setForm] = useState(() => ({
     event_id:               initialValues?.event_id ?? defaultEvent?.id ?? '',
@@ -443,13 +468,24 @@ export function NewContractForm({
         setBoothRateInput('0.00');
         return;
       }
-      setForm((f) => ({
-        ...f,
-        booth_count: priced.booth_count,
-        booth_rate_cents: priced.booth_rate_cents,
-      }));
+      setForm((f) => {
+        const nextRate = specialPricing
+          ? bigSmokeRateFromNegotiatedFee(
+              priced.booth_count,
+              Math.round(Math.max(0, Number(specialFeeInput.replace(/[$,\s]/g, '')) || 0) * 100),
+            )
+          : priced.booth_rate_cents;
+        return {
+          ...f,
+          booth_count: priced.booth_count,
+          booth_rate_cents: nextRate,
+        };
+      });
       setBoothCountInput(String(priced.booth_count));
-      setBoothRateInput((priced.booth_rate_cents / 100).toFixed(2));
+      if (!specialPricing) {
+        setBoothRateInput((priced.booth_rate_cents / 100).toFixed(2));
+        setSpecialFeeInput((priced.fee_cents / 100).toFixed(2));
+      }
       return;
     }
     const cents = isNyweFlatEvent ? nyweLicenseFeeCents(selectedEvent) : (selectedEvent.booth_rate_cents ?? 1500000);
@@ -460,7 +496,7 @@ export function NewContractForm({
     }));
     setBoothRateInput((cents / 100).toFixed(2));
     if (isNyweFlatEvent) setBoothCountInput('1');
-  }, [selectedEvent?.id, dealKind, isNyweFlatEvent, isBigSmokeEvent, packageSelections, noChargeBooth]);
+  }, [selectedEvent?.id, dealKind, isNyweFlatEvent, isBigSmokeEvent, packageSelections, noChargeBooth, specialPricing, specialFeeInput]);
 
   function applyBigSmokePricingFromDrafts(drafts: PackageSelectionDraft[]) {
     const priced = pricingFromBigSmokeSelections(selectionsFromDrafts(drafts));
@@ -469,13 +505,22 @@ export function NewContractForm({
       setBoothRateInput('0.00');
       return;
     }
+    const nextRate = specialPricing
+      ? bigSmokeRateFromNegotiatedFee(
+          priced.booth_count,
+          Math.round(Math.max(0, Number(specialFeeInput.replace(/[$,\s]/g, '')) || 0) * 100),
+        )
+      : priced.booth_rate_cents;
     setForm((f) => ({
       ...f,
       booth_count: priced.booth_count,
-      booth_rate_cents: priced.booth_rate_cents,
+      booth_rate_cents: nextRate,
     }));
     setBoothCountInput(String(priced.booth_count));
-    setBoothRateInput((priced.booth_rate_cents / 100).toFixed(2));
+    setBoothRateInput((nextRate / 100).toFixed(2));
+    if (!specialPricing) {
+      setSpecialFeeInput((priced.fee_cents / 100).toFixed(2));
+    }
   }
 
   function updatePackageSelection(id: string, patch: Partial<Pick<PackageSelectionDraft, 'key' | 'qty'>>) {
@@ -652,6 +697,13 @@ export function NewContractForm({
       const bigSmokePriced = isBigSmokeEvent
         ? pricingFromBigSmokeSelections(selectionsFromDrafts(packageSelections))
         : null;
+      const specialFeeCents = specialPricing
+        ? Math.round(Math.max(0, Number(specialFeeInput.replace(/[$,\s]/g, '')) || 0) * 100)
+        : null;
+      if (isBigSmokeEvent && specialPricing && (specialFeeCents == null || specialFeeCents <= 0)) {
+        setErr('Enter a special package fee greater than $0, or turn off special pricing.');
+        return;
+      }
       const formForSave = {
         ...form,
         event_id: resolvedEventId,
@@ -668,7 +720,9 @@ export function NewContractForm({
           : useNoCharge
             ? 0
             : bigSmokePriced
-              ? bigSmokePriced.booth_rate_cents
+              ? specialPricing && specialFeeCents != null
+                ? bigSmokeRateFromNegotiatedFee(bigSmokePriced.booth_count, specialFeeCents)
+                : bigSmokePriced.booth_rate_cents
               : isNyweFlatEvent && selectedEvent
                 ? nyweLicenseFeeCents(selectedEvent)
                 : form.booth_rate_cents,
@@ -1063,16 +1117,99 @@ export function NewContractForm({
                   </Button>
                 </div>
                 {selectedBigSmokePricing ? (
-                  <div className="rounded-lg border border-border/60 bg-muted/10 p-4">
-                    <p className="text-sm font-medium text-foreground">{selectedBigSmokePricing.displayName}</p>
-                    <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-fest-900">
-                      {formatCurrency(selectedBigSmokePricing.fee_cents)}
-                    </p>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      {selectedBigSmokePricing.booth_count} booth
-                      {selectedBigSmokePricing.booth_count === 1 ? '' : 's'}
-                      {' · '}Cigar Aficionado Big Smoke Las Vegas rate sheet
-                    </p>
+                  <div className="space-y-3">
+                    <div className="rounded-lg border border-border/60 bg-muted/10 p-4">
+                      <p className="text-sm font-medium text-foreground">{selectedBigSmokePricing.displayName}</p>
+                      <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-fest-900">
+                        {formatCurrency(
+                          specialPricing
+                            ? Math.round(Math.max(0, Number(specialFeeInput.replace(/[$,\s]/g, '')) || 0) * 100)
+                            : selectedBigSmokePricing.fee_cents,
+                        )}
+                      </p>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        {selectedBigSmokePricing.booth_count} booth
+                        {selectedBigSmokePricing.booth_count === 1 ? '' : 's'}
+                        {' · '}
+                        {specialPricing
+                          ? `List ${formatCurrency(selectedBigSmokePricing.fee_cents)} · special pricing`
+                          : 'Cigar Aficionado Big Smoke Las Vegas rate sheet'}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2 rounded-lg border border-border/60 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Special pricing</p>
+                          <p className="text-xs text-muted-foreground">
+                            Negotiated package fee below (or above) the rate sheet. Discounted fees need admin approval
+                            before DocuSign.
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant={specialPricing ? 'default' : 'outline'}
+                          size="sm"
+                          disabled={busy}
+                          onClick={() => {
+                            const next = !specialPricing;
+                            setSpecialPricing(next);
+                            if (next) {
+                              setSpecialFeeInput((selectedBigSmokePricing.fee_cents / 100).toFixed(2));
+                            } else {
+                              setForm((f) => ({
+                                ...f,
+                                booth_rate_cents: selectedBigSmokePricing.booth_rate_cents,
+                              }));
+                              setBoothRateInput((selectedBigSmokePricing.booth_rate_cents / 100).toFixed(2));
+                              setSpecialFeeInput((selectedBigSmokePricing.fee_cents / 100).toFixed(2));
+                            }
+                          }}
+                        >
+                          {specialPricing ? 'Special pricing on' : 'Use special pricing'}
+                        </Button>
+                      </div>
+                      {specialPricing ? (
+                        <div className="space-y-2 pt-1">
+                          <Label htmlFor="bs-special-fee">Negotiated package fee (USD)</Label>
+                          <Input
+                            id="bs-special-fee"
+                            type="text"
+                            inputMode="decimal"
+                            disabled={busy}
+                            value={specialFeeInput}
+                            placeholder={(selectedBigSmokePricing.fee_cents / 100).toFixed(2)}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              setSpecialFeeInput(raw);
+                              const dollars = Number(raw.replace(/[$,\s]/g, ''));
+                              if (!Number.isFinite(dollars) || dollars < 0) return;
+                              const cents = Math.round(dollars * 100);
+                              const rate = bigSmokeRateFromNegotiatedFee(
+                                selectedBigSmokePricing.booth_count,
+                                cents,
+                              );
+                              setForm((f) => ({ ...f, booth_rate_cents: rate }));
+                              setBoothRateInput((rate / 100).toFixed(2));
+                            }}
+                          />
+                          {(() => {
+                            const negotiated = Math.round(
+                              Math.max(0, Number(specialFeeInput.replace(/[$,\s]/g, '')) || 0) * 100,
+                            );
+                            if (negotiated > 0 && negotiated < selectedBigSmokePricing.fee_cents) {
+                              return (
+                                <p className="rounded-md border border-amber-800/25 bg-amber-950/[0.04] px-3 py-2 text-xs text-amber-950">
+                                  Below list ({formatCurrency(selectedBigSmokePricing.fee_cents)}). An admin must
+                                  approve this discount before the contract can be sent.
+                                </p>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 ) : null}
               </div>

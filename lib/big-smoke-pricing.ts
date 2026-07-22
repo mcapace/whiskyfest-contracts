@@ -174,6 +174,55 @@ export function pricingFromBigSmokeInput(input: {
   return pricingFromBigSmokePackage(input.package_key);
 }
 
+/** Per-booth rate so booth_count × rate ≈ negotiated total fee. */
+export function bigSmokeRateFromNegotiatedFee(boothCount: number, negotiatedFeeCents: number): number {
+  if (boothCount < 1) return 0;
+  return Math.round(Math.max(0, negotiatedFeeCents) / boothCount);
+}
+
+/** Actual package fee stored on the contract (booth_count × booth_rate). */
+export function bigSmokeContractFeeCents(contract: {
+  booth_count?: number | null;
+  booth_rate_cents?: number | null;
+}): number {
+  return Math.max(0, (contract.booth_count ?? 0) * (contract.booth_rate_cents ?? 0));
+}
+
+/** True when contract fee is below the rate-sheet list total for the selected packages. */
+export function isBigSmokeDiscountedAgainstList(
+  contract: {
+    booth_count?: number | null;
+    booth_rate_cents?: number | null;
+    package_key?: string | null;
+    package_selections?: unknown;
+  },
+): boolean {
+  const list = pricingFromBigSmokeInput({
+    package_selections: packageSelectionsFromContract(contract),
+    package_key: contract.package_key,
+  });
+  if (!list) return false;
+  return bigSmokeContractFeeCents(contract) < list.fee_cents;
+}
+
+/**
+ * Prefer client negotiated per-booth rate when packages are set; otherwise catalog rate.
+ * Near-list totals (rounding) snap back to the catalog rate.
+ */
+export function resolveBigSmokeStoredBoothRate(
+  list: BigSmokePricing,
+  clientBoothRateCents: number | null | undefined,
+): number {
+  if (clientBoothRateCents == null || !Number.isFinite(clientBoothRateCents) || clientBoothRateCents < 0) {
+    return list.booth_rate_cents;
+  }
+  const clientFee = clientBoothRateCents * list.booth_count;
+  if (Math.abs(clientFee - list.fee_cents) <= list.booth_count) {
+    return list.booth_rate_cents;
+  }
+  return Math.round(clientBoothRateCents);
+}
+
 /** Hydrate form rows from DB (selections JSON or legacy package_key). */
 export function packageSelectionsFromContract(contract: {
   package_key?: string | null;

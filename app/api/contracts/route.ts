@@ -18,9 +18,9 @@ import {
   isNyweVendorOnlyEvent,
   signerTitleForContract,
 } from '@/lib/nywe-pricing';
-import { pricingFromBigSmokeInput } from '@/lib/big-smoke-pricing';
+import { pricingFromBigSmokeInput, resolveBigSmokeStoredBoothRate } from '@/lib/big-smoke-pricing';
 import { billingFieldsFromOptionalBody } from '@/lib/nywe-billing';
-import { isDiscountedRate } from '@/lib/contracts';
+import { requiresDiscountApproval } from '@/lib/contracts';
 import {
   assertNoChargeBoothAllowed,
   isNoChargeBoothContract,
@@ -180,7 +180,9 @@ export async function POST(req: Request) {
     booth_count: bigSmokePricing?.booth_count ?? p.booth_count,
     booth_rate_cents: noChargeRequested
       ? 0
-      : (bigSmokePricing?.booth_rate_cents ?? p.booth_rate_cents),
+      : bigSmokePricing
+        ? resolveBigSmokeStoredBoothRate(bigSmokePricing, p.booth_rate_cents)
+        : p.booth_rate_cents,
   });
   // NYWE licenses are flat — no line items. Big Smoke + WhiskyFest allow sponsorship line items.
   const savedLineItems = nyweOnly ? [] : (p.line_items ?? []);
@@ -307,7 +309,7 @@ export async function POST(req: Request) {
   if (
     !noChargeRequested &&
     p.order_type !== 'sponsorship_only' &&
-    isDiscountedRate(row.booth_rate_cents, eventRow)
+    requiresDiscountApproval(row, eventRow)
   ) {
     try {
       const { data: withTotals } = await supabase

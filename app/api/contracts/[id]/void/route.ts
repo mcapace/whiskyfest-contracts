@@ -87,7 +87,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     accountingPatch.invoice_sent_at = null;
     accountingPatch.invoice_sent_by = null;
     accountingPatch.paid_at = null;
-    if (shouldVoidInvoice && priorInvoice !== 'not_invoiced') {
+    if (shouldVoidInvoice) {
       accountingPatch.invoice_status = 'invoice_voided';
     }
     const stamp = `[${nowIso.slice(0, 10)}] Contract voided after execution by ${gate.actor.email}: ${reason}`;

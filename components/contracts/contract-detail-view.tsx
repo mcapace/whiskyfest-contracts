@@ -233,7 +233,7 @@ export function ContractDetailView({
                   {formatCurrency(standardBoothRateCentsForEvent(event))} standard. This contract is paused until an admin
                   approves the discount.
                 </p>
-                {isAdmin ? (
+                {isAdmin || isEventsTeam ? (
                   <p className="mt-2 text-xs text-amber-800">
                     Open <strong>Actions</strong> and click <strong>Approve Discount</strong> to continue.
                   </p>
@@ -524,7 +524,23 @@ export function ContractDetailView({
                       </p>
                       <Detail label="Package" value={bigSmokePriced.displayName} />
                       <Detail label="Booths" value={String(bigSmokePriced.booth_count)} />
-                      <Detail label="Package fee" value={formatCurrency(bigSmokePriced.fee_cents)} mono />
+                      {(() => {
+                        const actualFee =
+                          contract.booth_subtotal_cents ??
+                          contract.booth_count * contract.booth_rate_cents;
+                        return (
+                          <>
+                            <Detail label="Package fee" value={formatCurrency(actualFee)} mono />
+                            {actualFee < bigSmokePriced.fee_cents ? (
+                              <Detail
+                                label="Rate-sheet list"
+                                value={formatCurrency(bigSmokePriced.fee_cents)}
+                                mono
+                              />
+                            ) : null}
+                          </>
+                        );
+                      })()}
                     </>
                   ) : (
                     <>

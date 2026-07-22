@@ -361,6 +361,7 @@ export function ContractActions({
     Boolean(docusignEnvelopeId);
   /** Fully executed: void so amount/terms can be corrected via Edit and re-send. */
   const canVoidExecuted = (isAdmin || isEventsTeam) && status === 'executed';
+  const canApproveDiscount = discountApprovalPending && (isAdmin || isEventsTeam);
   const canSyncDocuSign =
     (isAdmin || isEventsTeam) &&
     Boolean(docusignEnvelopeId) &&
@@ -393,7 +394,7 @@ export function ContractActions({
 
   const fabVisible = useMemo(() => {
     if (status === 'draft') return true;
-    if (discountApprovalPending && (isAdmin || status === 'ready_for_review' || status === 'pending_events_review' || status === 'approved')) {
+    if (discountApprovalPending && (isAdmin || isEventsTeam || status === 'ready_for_review' || status === 'pending_events_review' || status === 'approved')) {
       return true;
     }
     if (status === 'ready_for_review' || status === 'pending_events_review') {
@@ -447,7 +448,7 @@ export function ContractActions({
           >
           {status === 'draft' && (
             <>
-              {discountApprovalPending && isAdmin && (
+              {canApproveDiscount && (
                 <ActionWithHelp helpText={CONTRACT_ACTION_HELP.approveDiscount}>
                   <Button
                     className={`${contractActionBtnPrimary} border-amber-600 bg-amber-600 text-white hover:bg-amber-700`}
@@ -510,8 +511,7 @@ export function ContractActions({
           )}
 
           {(status === 'ready_for_review' || status === 'pending_events_review' || status === 'approved') &&
-            discountApprovalPending &&
-            isAdmin && (
+            canApproveDiscount && (
             <>
               <ActionWithHelp helpText={CONTRACT_ACTION_HELP.approveDiscount}>
                 <Button
@@ -553,7 +553,7 @@ export function ContractActions({
 
           {(status === 'ready_for_review' || status === 'pending_events_review' || status === 'approved') &&
             discountApprovalPending &&
-            !isAdmin && (
+            !canApproveDiscount && (
             <>
               <WhenDiscountBlocks active={discountApprovalPending}>
                 <ActionWithHelp helpText={CONTRACT_ACTION_HELP.regeneratePdf}>
