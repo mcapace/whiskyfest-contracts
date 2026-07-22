@@ -1,8 +1,21 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useMemo, useState, useTransition, type ReactNode } from 'react';
 import Link from 'next/link';
-import { ArrowDownAZ, ArrowUpAZ, Download, ExternalLink, Loader2, Plus, Sheet } from 'lucide-react';
+import {
+  ArrowDownAZ,
+  ArrowUpAZ,
+  Check,
+  ChevronDown,
+  Download,
+  ExternalLink,
+  FileSpreadsheet,
+  FileUp,
+  Link2,
+  Loader2,
+  Plus,
+  Sheet,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
 import { formatCurrency, cn } from '@/lib/utils';
@@ -14,6 +27,7 @@ import type {
 import { companiesMatch } from '@/lib/participation-report-shared';
 
 type SortKey = 'company_name' | 'booth_count' | 'total_spend_cents' | 'sales_rep_initials';
+type SectionTone = 'confirmed' | 'pending' | 'new';
 
 function money(cents: number): string {
   return formatCurrency(cents, { showCents: false });
@@ -27,6 +41,14 @@ function sortRows(rows: ParticipationReportRow[], key: SortKey, dir: 'asc' | 'de
     if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * mul;
     return String(av ?? '').localeCompare(String(bv ?? ''), undefined, { sensitivity: 'base' }) * mul;
   });
+}
+
+function statusTone(status: string): string {
+  const s = status.toLowerCase();
+  if (s.includes('executed') || s.includes('manual upload')) return 'bg-emerald-950/10 text-emerald-900';
+  if (s.includes('signed') || s.includes('progress') || s.includes('sent')) return 'bg-amber-950/10 text-amber-950';
+  if (s.includes('no contract')) return 'bg-stone-900/5 text-stone-600';
+  return 'bg-stone-900/5 text-stone-700';
 }
 
 function SortHeader({
@@ -50,7 +72,8 @@ function SortHeader({
       type="button"
       onClick={() => onSort(sortKey)}
       className={cn(
-        'inline-flex items-center gap-1 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground',
+        'inline-flex items-center gap-1 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:text-foreground',
+        active && 'text-foreground',
         className,
       )}
     >
@@ -62,6 +85,8 @@ function SortHeader({
 
 function SectionTable({
   title,
+  subtitle,
+  tone,
   rows,
   showNotes,
   showConvert,
@@ -72,8 +97,11 @@ function SectionTable({
   sortKey,
   sortDir,
   onSort,
+  headerAction,
 }: {
   title: string;
+  subtitle?: string;
+  tone: SectionTone;
   rows: ParticipationReportRow[];
   showNotes: boolean;
   showConvert?: boolean;
@@ -84,153 +112,194 @@ function SectionTable({
   sortKey: SortKey;
   sortDir: 'asc' | 'desc';
   onSort: (key: SortKey) => void;
+  headerAction?: ReactNode;
 }) {
   const sorted = useMemo(() => sortRows(rows, sortKey, sortDir), [rows, sortKey, sortDir]);
   const booths = rows.reduce((a, r) => a + (r.booth_count || 0), 0);
   const spend = rows.reduce((a, r) => a + (r.total_spend_cents || 0), 0);
+  const colSpan = (showNotes ? 8 : 7) + (showConvert ? 1 : 0);
+
+  const bar =
+    tone === 'confirmed'
+      ? 'bg-emerald-800'
+      : tone === 'pending'
+        ? 'bg-[hsl(var(--accent-brand))]'
+        : 'bg-[#182d6d]';
 
   return (
-    <section className="space-y-3">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h2 className="font-display text-2xl font-medium tracking-tight text-foreground">{title}</h2>
-          <p className="text-sm text-muted-foreground">
-            {rows.length} companies · {booths} booths · {money(spend)}
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <span className={cn('h-8 w-1.5 shrink-0 rounded-full', bar)} aria-hidden />
+            <h2 className="font-display text-3xl font-medium tracking-tight text-foreground">{title}</h2>
+          </div>
+          <p className="pl-5 text-sm text-muted-foreground">
+            {subtitle ?? `${rows.length} companies · ${booths} booths · ${money(spend)}`}
           </p>
         </div>
+        {headerAction}
       </div>
-      <div className="overflow-x-auto rounded-lg border border-border/60">
-        <table className="w-full min-w-[720px] border-collapse text-sm">
-          <thead className="bg-bg-surface-raised/80">
-            <tr className="border-b border-border/60">
-              <th className="px-3 py-2.5 text-left">
-                <SortHeader label="Rep" sortKey="sales_rep_initials" activeKey={sortKey} dir={sortDir} onSort={onSort} />
-              </th>
-              <th className="px-3 py-2.5 text-left">
-                <SortHeader label="Company" sortKey="company_name" activeKey={sortKey} dir={sortDir} onSort={onSort} />
-              </th>
-              <th className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Brands
-              </th>
-              <th className="px-3 py-2.5 text-right">
-                <SortHeader
-                  label="Booths"
-                  sortKey="booth_count"
-                  activeKey={sortKey}
-                  dir={sortDir}
-                  onSort={onSort}
-                  className="justify-end"
-                />
-              </th>
-              <th className="px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Rate
-              </th>
-              <th className="px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Spons.
-              </th>
-              <th className="px-3 py-2.5 text-right">
-                <SortHeader
-                  label="Total"
-                  sortKey="total_spend_cents"
-                  activeKey={sortKey}
-                  dir={sortDir}
-                  onSort={onSort}
-                  className="justify-end"
-                />
-              </th>
-              {showNotes ? (
-                <th className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Notes / Status
+
+      <div className="overflow-hidden rounded-xl border border-border/70 bg-bg-surface/80 shadow-[0_1px_0_rgba(40,28,12,0.04)]">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-border/70 bg-bg-surface-raised/90">
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Rep" sortKey="sales_rep_initials" activeKey={sortKey} dir={sortDir} onSort={onSort} />
                 </th>
-              ) : null}
-              {showConvert ? (
-                <th className="min-w-[260px] px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Action
+                <th className="px-4 py-3 text-left">
+                  <SortHeader label="Company" sortKey="company_name" activeKey={sortKey} dir={sortDir} onSort={onSort} />
                 </th>
-              ) : null}
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={(showNotes ? 8 : 7) + (showConvert ? 1 : 0)}
-                  className="px-3 py-8 text-center text-muted-foreground"
-                >
-                  No rows yet.
-                </td>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Brands
+                </th>
+                <th className="px-4 py-3 text-right">
+                  <SortHeader
+                    label="Booths"
+                    sortKey="booth_count"
+                    activeKey={sortKey}
+                    dir={sortDir}
+                    onSort={onSort}
+                    className="justify-end"
+                  />
+                </th>
+                <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Rate
+                </th>
+                <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Spons.
+                </th>
+                <th className="px-4 py-3 text-right">
+                  <SortHeader
+                    label="Total"
+                    sortKey="total_spend_cents"
+                    activeKey={sortKey}
+                    dir={sortDir}
+                    onSort={onSort}
+                    className="justify-end"
+                  />
+                </th>
+                {showNotes ? (
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                    Notes
+                  </th>
+                ) : null}
+                {showConvert ? (
+                  <th className="min-w-[220px] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                    Manage
+                  </th>
+                ) : null}
               </tr>
-            ) : (
-              sorted.map((row) => (
-                <tr key={row.id} className="border-b border-border/40 align-top last:border-0">
-                  <td className="px-3 py-2.5 font-medium text-foreground">{row.sales_rep_initials}</td>
-                  <td className="px-3 py-2.5">
-                    {row.contract_id ? (
-                      <Link href={`/contracts/${row.contract_id}`} className="font-medium text-accent-brand hover:underline">
-                        {row.company_name}
-                      </Link>
-                    ) : (
-                      <span className="font-medium text-foreground">{row.company_name}</span>
-                    )}
+            </thead>
+            <tbody>
+              {sorted.length === 0 ? (
+                <tr>
+                  <td colSpan={colSpan} className="px-4 py-12 text-center text-muted-foreground">
+                    No companies in this section yet.
                   </td>
-                  <td className="max-w-[280px] px-3 py-2.5 text-muted-foreground">{row.brands_text || '—'}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">{row.booth_count || '—'}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">
-                    {row.rate_per_booth_cents ? money(row.rate_per_booth_cents) : '—'}
-                  </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">{row.sponsorship_label || 'N'}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums font-medium">{money(row.total_spend_cents)}</td>
-                  {showNotes ? (
-                    <td className="min-w-[220px] px-3 py-2.5">
-                      <p className="mb-1 text-xs text-muted-foreground">{row.pipeline_status}</p>
-                      {row.sheet_notes ? (
-                        <p className="mb-2 text-xs text-muted-foreground">
-                          <span className="font-medium text-foreground/80">Notes (WF &amp; Tequila 2026): </span>
-                          {row.sheet_notes}
-                        </p>
-                      ) : (
-                        <p className="mb-2 text-xs text-muted-foreground">No notes on sheet</p>
-                      )}
-                      {row.target_id && onNotesSave ? (
-                        <NotesEditor targetId={row.target_id} initial={row.notes} onSave={onNotesSave} />
-                      ) : row.notes ? (
-                        <p className="text-xs text-foreground">{row.notes}</p>
-                      ) : null}
-                    </td>
-                  ) : null}
-                  {showConvert ? (
-                    <td className="px-3 py-2.5">
-                      {row.target_id && onLinkContract && onManualUploadToggle && linkableContracts ? (
-                        <PipelineActions
-                          row={row}
-                          linkableContracts={linkableContracts}
-                          onLinkContract={onLinkContract}
-                          onManualUploadToggle={onManualUploadToggle}
-                        />
-                      ) : row.contract_id ? (
-                        <Button asChild type="button" size="sm" variant="outline">
-                          <Link href={`/contracts/${row.contract_id}`}>Open contract</Link>
-                        </Button>
-                      ) : null}
-                    </td>
-                  ) : null}
                 </tr>
-              ))
-            )}
-          </tbody>
-          <tfoot>
-            <tr className="bg-bg-surface-raised/60 font-semibold">
-              <td className="px-3 py-2.5" colSpan={3}>
-                TOTAL
-              </td>
-              <td className="px-3 py-2.5 text-right tabular-nums">{booths}</td>
-              <td colSpan={2} />
-              <td className="px-3 py-2.5 text-right tabular-nums">{money(spend)}</td>
-              {showNotes ? <td /> : null}
-              {showConvert ? <td /> : null}
-            </tr>
-          </tfoot>
-        </table>
+              ) : (
+                sorted.map((row, i) => (
+                  <tr
+                    key={row.id}
+                    className={cn(
+                      'border-b border-border/40 align-top last:border-0 transition-colors hover:bg-amber-950/[0.03]',
+                      i % 2 === 1 && 'bg-stone-900/[0.015]',
+                    )}
+                  >
+                    <td className="px-4 py-3">
+                      <span className="inline-flex min-w-[2.25rem] justify-center rounded-md bg-stone-900/5 px-1.5 py-0.5 text-xs font-semibold tracking-wide text-foreground">
+                        {row.sales_rep_initials}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {row.contract_id ? (
+                        <Link
+                          href={`/contracts/${row.contract_id}`}
+                          className="font-medium text-foreground underline decoration-[hsl(var(--accent-brand)/0.35)] underline-offset-2 transition-colors hover:text-[hsl(var(--accent-brand))]"
+                        >
+                          {row.company_name}
+                        </Link>
+                      ) : (
+                        <span className="font-medium text-foreground">{row.company_name}</span>
+                      )}
+                      {row.manual_upload_received ? (
+                        <span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-emerald-800">
+                          <Check className="h-3 w-3" /> Manual PDF received
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="max-w-[260px] px-4 py-3 text-muted-foreground leading-snug">
+                      {row.brands_text || '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-foreground">{row.booth_count || '—'}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                      {row.rate_per_booth_cents ? money(row.rate_per_booth_cents) : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                      {row.sponsorship_label || 'N'}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-foreground">
+                      {money(row.total_spend_cents)}
+                    </td>
+                    {showNotes ? (
+                      <td className="min-w-[200px] max-w-[280px] px-4 py-3">
+                        <span
+                          className={cn(
+                            'mb-2 inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium',
+                            statusTone(row.pipeline_status),
+                          )}
+                        >
+                          {row.pipeline_status}
+                        </span>
+                        {row.sheet_notes ? (
+                          <p className="mb-2 text-xs leading-relaxed text-muted-foreground">{row.sheet_notes}</p>
+                        ) : (
+                          <p className="mb-2 text-xs italic text-muted-foreground/70">No sheet notes</p>
+                        )}
+                        {row.target_id && onNotesSave ? (
+                          <NotesEditor targetId={row.target_id} initial={row.notes} onSave={onNotesSave} />
+                        ) : row.notes ? (
+                          <p className="text-xs text-foreground">{row.notes}</p>
+                        ) : null}
+                      </td>
+                    ) : null}
+                    {showConvert ? (
+                      <td className="px-4 py-3">
+                        {row.target_id && onLinkContract && onManualUploadToggle && linkableContracts ? (
+                          <PipelineActions
+                            row={row}
+                            linkableContracts={linkableContracts}
+                            onLinkContract={onLinkContract}
+                            onManualUploadToggle={onManualUploadToggle}
+                          />
+                        ) : row.contract_id ? (
+                          <Button asChild type="button" size="sm" variant="outline">
+                            <Link href={`/contracts/${row.contract_id}`}>Open contract</Link>
+                          </Button>
+                        ) : null}
+                      </td>
+                    ) : null}
+                  </tr>
+                ))
+              )}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-border/70 bg-bg-surface-raised/95">
+                <td className="px-4 py-3 font-display text-base font-medium" colSpan={3}>
+                  Total
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums font-semibold">{booths}</td>
+                <td colSpan={2} />
+                <td className="px-4 py-3 text-right tabular-nums font-semibold">{money(spend)}</td>
+                {showNotes ? <td /> : null}
+                {showConvert ? <td /> : null}
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       </div>
     </section>
   );
@@ -248,6 +317,7 @@ function PipelineActions({
   onManualUploadToggle: (targetId: string, received: boolean) => Promise<void>;
 }) {
   const targetId = row.target_id!;
+  const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -290,70 +360,99 @@ function PipelineActions({
     <div className="space-y-2 text-left">
       <div className="flex flex-wrap gap-1.5">
         {row.contract_id ? (
-          <Button asChild type="button" size="sm" variant="outline">
+          <Button asChild type="button" size="sm" variant="outline" className="h-8">
             <Link href={`/contracts/${row.contract_id}`}>Open</Link>
           </Button>
-        ) : null}
-        <Button asChild type="button" size="sm" variant={row.contract_id ? 'outline' : 'default'}>
-          <Link href={`/contracts/new?fromPipeline=${targetId}`}>Convert</Link>
-        </Button>
-        <Button asChild type="button" size="sm" variant="outline">
-          <Link href={`/contracts/import?fromPipeline=${targetId}`}>Import PDF</Link>
-        </Button>
-      </div>
-
-      <div className="space-y-1">
-        <label className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Link existing contract
-        </label>
-        <select
-          className="w-full max-w-[280px] rounded-md border border-border/60 bg-bg-page px-2 py-1.5 text-xs text-foreground disabled:opacity-60"
-          value={row.contract_id ?? ''}
-          disabled={pending}
-          onChange={(e) => {
-            const v = e.target.value;
-            patchLink(v ? v : null);
-          }}
+        ) : (
+          <Button asChild type="button" size="sm" className="h-8">
+            <Link href={`/contracts/new?fromPipeline=${targetId}`}>Convert</Link>
+          </Button>
+        )}
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-8"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
         >
-          <option value="">— Not linked —</option>
-          {suggested.length > 0 ? (
-            <optgroup label="Likely matches">
-              {suggested.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.company_name} · {c.status} · {c.booth_count} booth
-                  {c.booth_count === 1 ? '' : 's'} · {money(c.total_cents)}
-                </option>
-              ))}
-            </optgroup>
-          ) : null}
-          <optgroup label={suggested.length ? 'All event contracts' : 'Event contracts'}>
-            {(suggested.length ? others : linkableContracts).map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.company_name} · {c.status} · {c.booth_count} booth
-                {c.booth_count === 1 ? '' : 's'} · {money(c.total_cents)}
-              </option>
-            ))}
-          </optgroup>
-        </select>
+          More
+          <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-180')} />
+        </Button>
       </div>
 
-      <label className="flex items-center gap-2 text-xs text-foreground">
-        <input
-          type="checkbox"
-          className="h-3.5 w-3.5 rounded border-border"
-          checked={row.manual_upload_received}
-          disabled={pending}
-          onChange={(e) => toggleManual(e.target.checked)}
-        />
-        Manual upload received
-      </label>
+      {open ? (
+        <div className="space-y-3 rounded-lg border border-border/60 bg-bg-page/80 p-3 animate-in fade-in-0 slide-in-from-top-1 duration-200">
+          <div className="flex flex-wrap gap-1.5">
+            {row.contract_id ? (
+              <Button asChild type="button" size="sm" variant="outline" className="h-8">
+                <Link href={`/contracts/new?fromPipeline=${targetId}`}>
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                  New draft
+                </Link>
+              </Button>
+            ) : null}
+            <Button asChild type="button" size="sm" variant="outline" className="h-8">
+              <Link href={`/contracts/import?fromPipeline=${targetId}`}>
+                <FileUp className="h-3.5 w-3.5" />
+                Import PDF
+              </Link>
+            </Button>
+          </div>
 
-      {pending ? (
-        <p className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-          <Loader2 className="h-3 w-3 animate-spin" /> Saving…
-        </p>
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              <Link2 className="h-3 w-3" />
+              Link existing
+            </label>
+            <select
+              className="w-full rounded-md border border-border/60 bg-bg-surface px-2.5 py-2 text-xs text-foreground disabled:opacity-60"
+              value={row.contract_id ?? ''}
+              disabled={pending}
+              onChange={(e) => {
+                const v = e.target.value;
+                patchLink(v ? v : null);
+              }}
+            >
+              <option value="">— Not linked —</option>
+              {suggested.length > 0 ? (
+                <optgroup label="Likely matches">
+                  {suggested.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.company_name} · {c.status} · {money(c.total_cents)}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
+              <optgroup label={suggested.length ? 'All event contracts' : 'Event contracts'}>
+                {(suggested.length ? others : linkableContracts).map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.company_name} · {c.status} · {money(c.total_cents)}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          </div>
+
+          <label className="flex items-center gap-2 text-xs text-foreground">
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5 rounded border-border accent-[hsl(var(--accent-brand))]"
+              checked={row.manual_upload_received}
+              disabled={pending}
+              onChange={(e) => toggleManual(e.target.checked)}
+            />
+            Manual upload received
+          </label>
+
+          {pending ? (
+            <p className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" /> Saving…
+            </p>
+          ) : null}
+          {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
+        </div>
       ) : null}
-      {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
     </div>
   );
 }
@@ -372,19 +471,20 @@ function NotesEditor({
   const dirty = value !== initial;
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5">
       <textarea
         value={value}
         onChange={(e) => setValue(e.target.value)}
         rows={2}
-        className="w-full resize-y rounded-md border border-border/60 bg-bg-page px-2 py-1.5 text-xs text-foreground"
-        placeholder="Optional portal notes (not from the Google Sheet)…"
+        className="w-full resize-y rounded-md border border-border/50 bg-bg-page/70 px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/60 focus:border-[hsl(var(--accent-brand)/0.5)] focus:outline-none focus:ring-1 focus:ring-[hsl(var(--accent-brand)/0.35)]"
+        placeholder="Portal notes…"
       />
       {dirty ? (
         <Button
           type="button"
           size="sm"
           variant="outline"
+          className="h-7 text-xs"
           disabled={pending}
           onClick={() =>
             startTransition(async () => {
@@ -393,9 +493,45 @@ function NotesEditor({
           }
         >
           {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-          Save portal notes
+          Save
         </Button>
       ) : null}
+    </div>
+  );
+}
+
+function SummaryStat({
+  label,
+  booths,
+  spend,
+  tone,
+}: {
+  label: string;
+  booths: number;
+  spend: number;
+  tone: SectionTone;
+}) {
+  const bar =
+    tone === 'confirmed'
+      ? 'from-emerald-800/15 via-transparent to-transparent'
+      : tone === 'pending'
+        ? 'from-[hsl(34_62%_49%/0.18)] via-transparent to-transparent'
+        : 'from-[hsl(222_58%_30%/0.12)] via-transparent to-transparent';
+
+  return (
+    <div
+      className={cn(
+        'relative overflow-hidden rounded-xl border border-border/60 bg-bg-surface px-5 py-4',
+        'bg-gradient-to-br',
+        bar,
+      )}
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+      <p className="mt-2 font-display text-3xl font-medium tabular-nums tracking-tight text-foreground">
+        {booths}
+        <span className="ml-2 text-base font-normal text-muted-foreground">booths</span>
+      </p>
+      <p className="mt-0.5 text-sm tabular-nums text-muted-foreground">{money(spend)}</p>
     </div>
   );
 }
@@ -500,6 +636,7 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
   async function exportCsv() {
     setExporting(true);
     setExportMsg(null);
+    setSheetUrl(null);
     try {
       const res = await fetch('/api/reports/participation/export', {
         method: 'POST',
@@ -587,92 +724,93 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
   }
 
   return (
-    <div className="space-y-10">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-2">
-          <h1 className="font-display text-4xl font-medium tracking-tight text-foreground sm:text-5xl">
-            Participation report
+    <div className="relative space-y-12">
+      <div
+        className="pointer-events-none absolute inset-x-0 -top-6 h-56 bg-[radial-gradient(ellipse_at_top,_rgba(182,125,45,0.12),_transparent_55%)]"
+        aria-hidden
+      />
+
+      <header className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+        <div className="max-w-2xl space-y-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[hsl(var(--accent-brand))]">
+            WhiskyFest · {report.event.year}
+          </p>
+          <h1 className="font-display text-5xl font-medium tracking-tight text-foreground sm:text-6xl">
+            Participation
           </h1>
-          <p className="max-w-2xl text-sm text-muted-foreground">
-            {report.event.name} {report.event.year} — Confirmed from executed contracts. Pending renewals and new
-            business (including Notes) pull live from the WhiskyFest &amp; Tequila 2026 sheet on every load. For pending
-            accounts you can Convert (DocuSign), Import a signed PDF, link an existing contract, or mark manual upload
-            received. Add portal notes per company; sort any column and export when Stephen needs the sheet.
+          <p className="text-base text-muted-foreground leading-relaxed">
+            Confirmed from executed contracts. Pending and new business sync from the WhiskyFest &amp; Tequila
+            2026 sheet.
           </p>
           {report.sheetsFetchedAt ? (
-            <p className="text-xs text-muted-foreground">
-              Sheets synced {new Date(report.sheetsFetchedAt).toLocaleString()}
-              {report.sheetsFromCache ? ' (cached · refreshes about every 5 min)' : ''}
+            <p className="text-xs text-muted-foreground/80">
+              Sheet synced {new Date(report.sheetsFetchedAt).toLocaleString()}
+              {report.sheetsFromCache ? ' · cached (~5 min)' : ' · live'}
               {report.sheetsError ? ` · ${report.sheetsError}` : ''}
             </p>
           ) : report.sheetsError ? (
-            <p className="text-xs text-destructive">Sheets sync failed: {report.sheetsError}</p>
+            <p className="text-xs text-destructive">{report.sheetsError}</p>
           ) : null}
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={exportCsv} disabled={exporting}>
-            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            Export CSV
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={exportExcel} disabled={exporting}>
-            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            Export Excel
-          </Button>
-          <Button type="button" size="sm" onClick={exportSheets} disabled={exporting}>
-            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sheet className="h-4 w-4" />}
-            Export to Google Sheets
-          </Button>
+
+        <div className="flex flex-col items-stretch gap-2 sm:items-end">
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={exportExcel} disabled={exporting}>
+              {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              Excel
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={exportCsv} disabled={exporting}>
+              {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              CSV
+            </Button>
+            <Button type="button" size="sm" onClick={exportSheets} disabled={exporting}>
+              {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sheet className="h-4 w-4" />}
+              Google Sheets
+            </Button>
+          </div>
+          {exportMsg ? (
+            <p className="max-w-sm text-right text-xs text-muted-foreground">
+              {exportMsg}{' '}
+              {sheetUrl ? (
+                <a
+                  href={sheetUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 font-medium text-[hsl(var(--accent-brand))] hover:underline"
+                >
+                  Open
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              ) : null}
+            </p>
+          ) : null}
         </div>
       </header>
 
-      {exportMsg ? (
-        <p className="text-sm text-muted-foreground">
-          {exportMsg}{' '}
-          {sheetUrl ? (
-            <a
-              href={sheetUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 font-medium text-accent-brand hover:underline"
-            >
-              Open spreadsheet
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-          ) : null}
-        </p>
-      ) : null}
-
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-lg border border-border/60 bg-bg-surface-raised/40 px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Confirmed</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
-            {report.totals.confirmedBooths}{' '}
-            <span className="text-base font-normal text-muted-foreground">booths</span>
-          </p>
-          <p className="text-sm tabular-nums text-muted-foreground">{money(report.totals.confirmedSpendCents)}</p>
-        </div>
-        <div className="rounded-lg border border-border/60 bg-bg-surface-raised/40 px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Pending renewals</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
-            {report.totals.pendingBooths}{' '}
-            <span className="text-base font-normal text-muted-foreground">booths</span>
-          </p>
-          <p className="text-sm tabular-nums text-muted-foreground">{money(report.totals.pendingSpendCents)}</p>
-        </div>
-        <div className="rounded-lg border border-border/60 bg-bg-surface-raised/40 px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Confirmed + Pending</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
-            {report.totals.confirmedPlusPendingBooths}{' '}
-            <span className="text-base font-normal text-muted-foreground">booths</span>
-          </p>
-          <p className="text-sm tabular-nums text-muted-foreground">
-            {money(report.totals.confirmedPlusPendingSpendCents)}
-          </p>
-        </div>
+      <div className="relative grid gap-3 sm:grid-cols-3">
+        <SummaryStat
+          label="Confirmed"
+          booths={report.totals.confirmedBooths}
+          spend={report.totals.confirmedSpendCents}
+          tone="confirmed"
+        />
+        <SummaryStat
+          label="Pending renewals"
+          booths={report.totals.pendingBooths}
+          spend={report.totals.pendingSpendCents}
+          tone="pending"
+        />
+        <SummaryStat
+          label="Confirmed + Pending"
+          booths={report.totals.confirmedPlusPendingBooths}
+          spend={report.totals.confirmedPlusPendingSpendCents}
+          tone="new"
+        />
       </div>
 
       <SectionTable
         title="Confirmed"
+        tone="confirmed"
         rows={report.confirmed}
         showNotes={false}
         sortKey={sortKey}
@@ -682,6 +820,8 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
 
       <SectionTable
         title="Pending renewals"
+        tone="pending"
+        subtitle={`${report.pending.length} companies · ${report.totals.pendingBooths} booths · ${money(report.totals.pendingSpendCents)} · Convert, import PDF, or link an existing contract`}
         rows={report.pending}
         showNotes
         showConvert
@@ -694,77 +834,80 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
         onSort={onSort}
       />
 
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div />
+      <SectionTable
+        title="New business"
+        tone="new"
+        subtitle={`${report.newBusiness.length} inquiries · track outreach, convert, or import when signed`}
+        rows={report.newBusiness}
+        showNotes
+        showConvert
+        onNotesSave={saveNotes}
+        linkableContracts={report.linkableContracts ?? []}
+        onLinkContract={linkContract}
+        onManualUploadToggle={setManualUpload}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSort={onSort}
+        headerAction={
           <Button type="button" variant="outline" size="sm" onClick={() => setShowAdd((v) => !v)}>
             <Plus className="h-4 w-4" />
             Add inquiry
           </Button>
-        </div>
-        {showAdd ? (
-          <form
-            onSubmit={addInquiry}
-            className="grid gap-3 rounded-lg border border-border/60 bg-bg-surface-raised/30 p-4 sm:grid-cols-2"
-          >
-            <div className="space-y-1.5 sm:col-span-1">
-              <Label htmlFor="inq-company">Company</Label>
-              <Input
-                id="inq-company"
-                value={addCompany}
-                onChange={(e) => setAddCompany(e.target.value)}
-                required
-                placeholder="Exhibitor company"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="inq-rep">Sales rep</Label>
-              <select
-                id="inq-rep"
-                value={addRepId}
-                onChange={(e) => setAddRepId(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              >
-                <option value="">—</option>
-                {report.salesReps.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="inq-notes">Notes</Label>
-              <Input
-                id="inq-notes"
-                value={addNotes}
-                onChange={(e) => setAddNotes(e.target.value)}
-                placeholder="Inquiry status, call notes…"
-              />
-            </div>
-            {addError ? <p className="text-sm text-destructive sm:col-span-2">{addError}</p> : null}
-            <div className="sm:col-span-2">
-              <Button type="submit" size="sm" disabled={addPending || !addCompany.trim()}>
-                {addPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Save inquiry
-              </Button>
-            </div>
-          </form>
-        ) : null}
-        <SectionTable
-          title="New business — inquiry tracking"
-          rows={report.newBusiness}
-          showNotes
-          showConvert
-          onNotesSave={saveNotes}
-          linkableContracts={report.linkableContracts ?? []}
-          onLinkContract={linkContract}
-          onManualUploadToggle={setManualUpload}
-          sortKey={sortKey}
-          sortDir={sortDir}
-          onSort={onSort}
-        />
-      </div>
+        }
+      />
+
+      {showAdd ? (
+        <form
+          onSubmit={addInquiry}
+          className="grid gap-3 rounded-xl border border-border/70 bg-bg-surface p-5 sm:grid-cols-2"
+        >
+          <div className="space-y-1.5">
+            <Label htmlFor="inq-company">Company</Label>
+            <Input
+              id="inq-company"
+              value={addCompany}
+              onChange={(e) => setAddCompany(e.target.value)}
+              required
+              placeholder="Exhibitor company"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="inq-rep">Sales rep</Label>
+            <select
+              id="inq-rep"
+              value={addRepId}
+              onChange={(e) => setAddRepId(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="">—</option>
+              {report.salesReps.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="inq-notes">Notes</Label>
+            <Input
+              id="inq-notes"
+              value={addNotes}
+              onChange={(e) => setAddNotes(e.target.value)}
+              placeholder="Inquiry status, call notes…"
+            />
+          </div>
+          {addError ? <p className="text-sm text-destructive sm:col-span-2">{addError}</p> : null}
+          <div className="flex gap-2 sm:col-span-2">
+            <Button type="submit" size="sm" disabled={addPending || !addCompany.trim()}>
+              {addPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Save inquiry
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setShowAdd(false)}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      ) : null}
     </div>
   );
 }
