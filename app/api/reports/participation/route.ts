@@ -5,6 +5,7 @@ import { buildParticipationReport } from '@/lib/participation-report';
 import { canAccessParticipationReport } from '@/lib/participation-report-shared';
 
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 /** GET /api/reports/participation — full Confirmed / Pending / New Business payload. */
 export async function GET(req: Request) {

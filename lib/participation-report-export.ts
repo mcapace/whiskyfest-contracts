@@ -78,7 +78,11 @@ function dataRow(row: ParticipationReportRow, includeNotes: boolean): string[] {
     money(row.total_spend_cents),
   ];
   if (includeNotes) {
-    const noteParts = [row.pipeline_status !== 'No contract' ? row.pipeline_status : '', row.notes]
+    const noteParts = [
+      row.pipeline_status !== 'No contract' ? row.pipeline_status : '',
+      row.sheet_notes ? `Sheet: ${row.sheet_notes}` : '',
+      row.notes ? `Portal: ${row.notes}` : '',
+    ]
       .map((s) => s.trim())
       .filter(Boolean);
     base.push(noteParts.join(' — '));
@@ -187,7 +191,9 @@ export function buildParticipationCsv(report: ParticipationReport): string {
       rateLabel(row.rate_per_booth_cents),
       row.sponsorship_label,
       money(row.total_spend_cents),
-      [row.pipeline_status, row.notes].filter(Boolean).join(' — '),
+      [row.pipeline_status, row.sheet_notes && `Sheet: ${row.sheet_notes}`, row.notes && `Portal: ${row.notes}`]
+        .filter(Boolean)
+        .join(' — '),
     ]);
   }
   for (const row of report.newBusiness) {
@@ -200,7 +206,9 @@ export function buildParticipationCsv(report: ParticipationReport): string {
       rateLabel(row.rate_per_booth_cents),
       row.sponsorship_label,
       money(row.total_spend_cents),
-      [row.pipeline_status, row.notes].filter(Boolean).join(' — '),
+      [row.pipeline_status, row.sheet_notes && `Sheet: ${row.sheet_notes}`, row.notes && `Portal: ${row.notes}`]
+        .filter(Boolean)
+        .join(' — '),
     ]);
   }
   push([]);

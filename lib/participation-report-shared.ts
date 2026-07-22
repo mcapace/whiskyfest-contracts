@@ -49,7 +49,10 @@ export type ParticipationReportRow = {
   sponsorship_label: string;
   sponsorship_cents: number;
   total_spend_cents: number;
+  /** Kate’s portal notes (editable). */
   notes: string;
+  /** Live notes from Google Sheets (read-only reference). */
+  sheet_notes: string;
   /** Pipeline status for pending/new business (contract lifecycle). */
   pipeline_status: string;
   contract_id: string | null;
@@ -71,6 +74,9 @@ export type ParticipationReport = {
     confirmedPlusPendingSpendCents: number;
   };
   salesReps: Pick<SalesRep, 'id' | 'name' | 'email'>[];
+  /** ISO timestamp of last live Google Sheets pull (pending + new business). */
+  sheetsFetchedAt: string | null;
+  sheetsError: string | null;
 };
 
 /** Normalize company names for matching across sheets / contracts. */

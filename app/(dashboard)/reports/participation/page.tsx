@@ -5,6 +5,7 @@ import { canAccessParticipationReport } from '@/lib/participation-report-shared'
 import { ParticipationReportClient } from '@/components/reports/participation-report';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export default async function ParticipationReportPage() {
   const actor = await requireContractActorForPage();

@@ -1,6 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { fetchBoothBrandsByContractIds } from '@/lib/contract-booth-brand-queries';
 import { PRODUCT_WHISKYFEST } from '@/lib/product-portal';
+import {
+  fetchLiveParticipationSheetRows,
+  resolveRepIdFromInitials,
+  type LiveSheetPipelineRow,
+} from '@/lib/participation-sheets-live';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import {
   brandsFromContract,
@@ -52,6 +57,18 @@ function findMatchingContract(
   return null;
 }
 
+function findPortalTarget(
+  companyName: string,
+  section: PipelineSection,
+  targets: WfPipelineTarget[],
+): WfPipelineTarget | null {
+  for (const t of targets) {
+    if (t.section !== section) continue;
+    if (companiesMatch(companyName, t.company_name)) return t;
+  }
+  return null;
+}
+
 function confirmedRow(
   contract: ContractWithTotals,
   brandNames: string[],
@@ -71,6 +88,7 @@ function confirmedRow(
     sponsorship_cents: sponsorship.cents,
     total_spend_cents: contract.grand_total_cents ?? contract.total_amount_cents ?? 0,
     notes: '',
+    sheet_notes: '',
     pipeline_status: 'Executed',
     contract_id: contract.id,
     contract_status: contract.status,
@@ -78,46 +96,118 @@ function confirmedRow(
   };
 }
 
-function targetRow(
-  target: WfPipelineTarget,
-  contract: ContractWithTotals | null,
-  brandNames: string[],
-): ParticipationReportRow {
+function isGraduatedOrConfirmed(
+  companyName: string,
+  match: ContractWithTotals | null,
+  confirmedContracts: ContractWithTotals[],
+): boolean {
+  if (match && contractIsGraduated(match.status)) return true;
+  return confirmedContracts.some((c) => companiesMatch(companyName, c.exhibitor_company_name));
+}
+
+function sheetDrivenRow(options: {
+  sheet: LiveSheetPipelineRow;
+  portal: WfPipelineTarget | null;
+  contract: ContractWithTotals | null;
+  brandNames: string[];
+  salesReps: Pick<SalesRep, 'id' | 'name' | 'email'>[];
+}): ParticipationReportRow {
+  const { sheet, portal, contract, brandNames, salesReps } = options;
   const fromContract = contract && !contractIsGraduated(contract.status);
-  const sponsorshipCents = fromContract
-    ? sponsorshipFromContract(contract).cents
-    : target.sponsorship_cents;
-  const sponsorshipLabel = fromContract
-    ? sponsorshipFromContract(contract).label
-    : target.sponsorship_cents > 0
-      ? `$${(target.sponsorship_cents / 100).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
-      : 'N';
+  const rep =
+    salesReps.find((r) => r.id === portal?.sales_rep_id) ||
+    salesReps.find((r) => {
+      const email = r.email?.toLowerCase();
+      const initials = salesRepInitials(r.name, r.email);
+      return initials === sheet.rep_initials.toUpperCase() || email?.startsWith(sheet.rep_initials.toLowerCase());
+    });
+
+  const sponsorship = fromContract
+    ? sponsorshipFromContract(contract)
+    : { label: 'N' as string, cents: 0 };
+
+  const portalNotes = portal?.notes?.trim() || '';
+  const sheetNotes = sheet.sheet_notes?.trim() || '';
 
   return {
-    id: target.id,
-    section: target.section,
-    company_name: target.company_name,
-    sales_rep_id: target.sales_rep_id,
-    sales_rep_name: target.sales_rep_name ?? null,
-    sales_rep_initials: salesRepInitials(target.sales_rep_name, target.sales_rep_email),
+    id: portal?.id ?? `sheet:${sheet.section}:${normalizeCompanyKey(sheet.company_name)}`,
+    section: sheet.section,
+    company_name: sheet.company_name,
+    sales_rep_id: portal?.sales_rep_id ?? rep?.id ?? null,
+    sales_rep_name: portal?.sales_rep_name ?? rep?.name ?? null,
+    sales_rep_initials: sheet.rep_initials || salesRepInitials(rep?.name, rep?.email),
     brands_text: fromContract
-      ? brandsFromContract(contract, brandNames) || (target.brands_text ?? '')
-      : target.brands_text ?? '',
-    booth_count: fromContract ? contract.booth_count ?? target.booth_count : target.booth_count,
+      ? brandsFromContract(contract, brandNames) || sheet.brands_text
+      : sheet.brands_text,
+    booth_count: fromContract ? contract.booth_count ?? sheet.booth_count : sheet.booth_count,
     rate_per_booth_cents: fromContract
-      ? contract.booth_rate_cents ?? target.rate_per_booth_cents
-      : target.rate_per_booth_cents,
-    sponsorship_label: sponsorshipLabel,
-    sponsorship_cents: sponsorshipCents,
+      ? contract.booth_rate_cents ?? sheet.rate_per_booth_cents
+      : sheet.rate_per_booth_cents,
+    sponsorship_label: sponsorship.label,
+    sponsorship_cents: sponsorship.cents,
     total_spend_cents: fromContract
-      ? contract.grand_total_cents ?? target.total_spend_cents
-      : target.total_spend_cents,
-    notes: target.notes ?? '',
+      ? contract.grand_total_cents ?? sheet.total_spend_cents
+      : sheet.total_spend_cents,
+    notes: portalNotes,
+    sheet_notes: sheetNotes,
     pipeline_status: pipelineStatusLabel(contract),
-    contract_id: contract?.id ?? target.linked_contract_id,
+    contract_id: contract?.id ?? portal?.linked_contract_id ?? null,
     contract_status: contract?.status ?? null,
-    target_id: target.id,
+    target_id: portal?.id ?? null,
   };
+}
+
+/**
+ * Ensure a portal target exists for a live sheet row so Kate can save notes.
+ * Does not overwrite existing portal notes.
+ */
+async function ensurePortalTargetFromSheet(options: {
+  supabase: SupabaseClient;
+  eventId: string;
+  sheet: LiveSheetPipelineRow;
+  portal: WfPipelineTarget | null;
+  repId: string | null;
+}): Promise<string | null> {
+  const { supabase, eventId, sheet, portal, repId } = options;
+  if (portal?.id) {
+    // Refresh structural fields from sheet; keep Kate's notes.
+    await supabase
+      .from('wf_pipeline_targets')
+      .update({
+        company_name: sheet.company_name,
+        sales_rep_id: repId ?? portal.sales_rep_id,
+        brands_text: sheet.brands_text || portal.brands_text,
+        booth_count: sheet.booth_count,
+        rate_per_booth_cents: sheet.rate_per_booth_cents,
+        total_spend_cents: sheet.total_spend_cents,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', portal.id);
+    return portal.id;
+  }
+
+  const { data, error } = await supabase
+    .from('wf_pipeline_targets')
+    .insert({
+      event_id: eventId,
+      section: sheet.section,
+      company_name: sheet.company_name,
+      sales_rep_id: repId,
+      brands_text: sheet.brands_text || null,
+      booth_count: sheet.booth_count,
+      rate_per_booth_cents: sheet.rate_per_booth_cents,
+      sponsorship_cents: 0,
+      total_spend_cents: sheet.total_spend_cents,
+      notes: null,
+      is_active: true,
+    })
+    .select('id')
+    .single();
+  if (error) {
+    console.error('[participation] ensurePortalTarget', sheet.company_name, error.message);
+    return null;
+  }
+  return data?.id ?? null;
 }
 
 /** Build full participation report for the active WhiskyFest event. */
@@ -164,7 +254,8 @@ export async function buildParticipationReport(options?: {
   const confirmedContracts = contracts.filter((c) => contractIsConfirmed(c.status));
   const confirmed = confirmedContracts.map((c) => confirmedRow(c, brandsByContract.get(c.id) ?? []));
 
-  const confirmedKeys = new Set(confirmed.map((r) => normalizeCompanyKey(r.company_name)));
+  const salesReps = (repsData ?? []) as Pick<SalesRep, 'id' | 'name' | 'email'>[];
+  const repByEmail = new Map(salesReps.map((r) => [r.email.toLowerCase(), r.id]));
 
   const targets: WfPipelineTarget[] = (targetsData ?? []).map((row) => {
     const r = row as WfPipelineTarget & {
@@ -177,19 +268,119 @@ export async function buildParticipationReport(options?: {
     };
   });
 
+  let sheetsFetchedAt: string | null = null;
+  let sheetsError: string | null = null;
+  let livePending: LiveSheetPipelineRow[] = [];
+  let liveNewBiz: LiveSheetPipelineRow[] = [];
+
+  try {
+    const live = await fetchLiveParticipationSheetRows();
+    livePending = live.pending;
+    liveNewBiz = live.newBusiness;
+    sheetsFetchedAt = live.fetchedAt;
+  } catch (err) {
+    sheetsError = err instanceof Error ? err.message : 'Failed to load Google Sheets';
+    console.error('[participation] live sheets pull failed', err);
+  }
+
   const pending: ParticipationReportRow[] = [];
   const newBusiness: ParticipationReportRow[] = [];
+  const coveredPending = new Set<string>();
+  const coveredNew = new Set<string>();
 
-  for (const target of targets) {
-    const match = findMatchingContract(target.company_name, target.linked_contract_id, byId, contracts);
-    // Hide once signed or executed (Confirmed shows executed only).
-    if (match && contractIsGraduated(match.status)) continue;
-    if (confirmedContracts.some((c) => companiesMatch(target.company_name, c.exhibitor_company_name))) {
-      continue;
+  for (const sheet of livePending) {
+    if (isGraduatedOrConfirmed(sheet.company_name, null, confirmedContracts)) {
+      const match = findMatchingContract(sheet.company_name, null, byId, contracts);
+      if (isGraduatedOrConfirmed(sheet.company_name, match, confirmedContracts)) continue;
     }
-    if ([...confirmedKeys].some((k) => normalizeCompanyKey(target.company_name) === k)) continue;
+    const match = findMatchingContract(sheet.company_name, null, byId, contracts);
+    if (isGraduatedOrConfirmed(sheet.company_name, match, confirmedContracts)) continue;
 
-    const row = targetRow(target, match, match ? brandsByContract.get(match.id) ?? [] : []);
+    const portal = findPortalTarget(sheet.company_name, 'pending_renewal', targets);
+    const repId = resolveRepIdFromInitials(sheet.rep_initials, repByEmail);
+    const targetId = await ensurePortalTargetFromSheet({
+      supabase,
+      eventId: event.id,
+      sheet,
+      portal,
+      repId,
+    });
+    const portalFresh = targetId
+      ? ({ ...(portal ?? {}), id: targetId, notes: portal?.notes ?? null } as WfPipelineTarget)
+      : portal;
+
+    const row = sheetDrivenRow({
+      sheet,
+      portal: portalFresh,
+      contract: match,
+      brandNames: match ? brandsByContract.get(match.id) ?? [] : [],
+      salesReps,
+    });
+    if (targetId) row.target_id = targetId;
+    pending.push(row);
+    coveredPending.add(normalizeCompanyKey(sheet.company_name));
+  }
+
+  for (const sheet of liveNewBiz) {
+    const match = findMatchingContract(sheet.company_name, null, byId, contracts);
+    if (isGraduatedOrConfirmed(sheet.company_name, match, confirmedContracts)) continue;
+
+    const portal = findPortalTarget(sheet.company_name, 'new_business', targets);
+    const repId = resolveRepIdFromInitials(sheet.rep_initials, repByEmail);
+    const targetId = await ensurePortalTargetFromSheet({
+      supabase,
+      eventId: event.id,
+      sheet,
+      portal,
+      repId,
+    });
+    const portalFresh = targetId
+      ? ({ ...(portal ?? {}), id: targetId, notes: portal?.notes ?? null } as WfPipelineTarget)
+      : portal;
+
+    const row = sheetDrivenRow({
+      sheet,
+      portal: portalFresh,
+      contract: match,
+      brandNames: match ? brandsByContract.get(match.id) ?? [] : [],
+      salesReps,
+    });
+    if (targetId) row.target_id = targetId;
+    newBusiness.push(row);
+    coveredNew.add(normalizeCompanyKey(sheet.company_name));
+  }
+
+  // Portal-only rows Kate added that are not on the sheets yet
+  for (const target of targets) {
+    const key = normalizeCompanyKey(target.company_name);
+    if (target.section === 'pending_renewal' && coveredPending.has(key)) continue;
+    if (target.section === 'new_business' && coveredNew.has(key)) continue;
+    // If sheets loaded successfully, only keep portal-only new_business adds (not stale pending seed)
+    if (!sheetsError && target.section === 'pending_renewal') continue;
+
+    const match = findMatchingContract(target.company_name, target.linked_contract_id, byId, contracts);
+    if (isGraduatedOrConfirmed(target.company_name, match, confirmedContracts)) continue;
+
+    const row: ParticipationReportRow = {
+      id: target.id,
+      section: target.section,
+      company_name: target.company_name,
+      sales_rep_id: target.sales_rep_id,
+      sales_rep_name: target.sales_rep_name ?? null,
+      sales_rep_initials: salesRepInitials(target.sales_rep_name, target.sales_rep_email),
+      brands_text: target.brands_text ?? '',
+      booth_count: target.booth_count,
+      rate_per_booth_cents: target.rate_per_booth_cents,
+      sponsorship_label: target.sponsorship_cents > 0 ? 'Y' : 'N',
+      sponsorship_cents: target.sponsorship_cents,
+      total_spend_cents: target.total_spend_cents,
+      notes: target.notes ?? '',
+      sheet_notes: '',
+      pipeline_status: pipelineStatusLabel(match),
+      contract_id: match?.id ?? target.linked_contract_id,
+      contract_status: match?.status ?? null,
+      target_id: target.id,
+    };
     if (target.section === 'pending_renewal') pending.push(row);
     else newBusiness.push(row);
   }
@@ -215,7 +406,9 @@ export async function buildParticipationReport(options?: {
       confirmedPlusPendingBooths: confirmedBooths + pendingBooths,
       confirmedPlusPendingSpendCents: confirmedSpendCents + pendingSpendCents,
     },
-    salesReps: (repsData ?? []) as Pick<SalesRep, 'id' | 'name' | 'email'>[],
+    salesReps,
+    sheetsFetchedAt,
+    sheetsError,
   };
 }
 

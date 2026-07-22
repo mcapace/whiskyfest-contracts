@@ -160,8 +160,14 @@ function SectionTable({
                   <td className="px-3 py-2.5 text-right tabular-nums">{row.sponsorship_label || 'N'}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums font-medium">{money(row.total_spend_cents)}</td>
                   {showNotes ? (
-                    <td className="min-w-[200px] px-3 py-2.5">
+                    <td className="min-w-[220px] px-3 py-2.5">
                       <p className="mb-1 text-xs text-muted-foreground">{row.pipeline_status}</p>
+                      {row.sheet_notes ? (
+                        <p className="mb-2 text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground/80">Sheet: </span>
+                          {row.sheet_notes}
+                        </p>
+                      ) : null}
                       {row.target_id && onNotesSave ? (
                         <NotesEditor targetId={row.target_id} initial={row.notes} onSave={onNotesSave} />
                       ) : (
@@ -210,7 +216,7 @@ function NotesEditor({
         onChange={(e) => setValue(e.target.value)}
         rows={2}
         className="w-full resize-y rounded-md border border-border/60 bg-bg-page px-2 py-1.5 text-xs text-foreground"
-        placeholder="Notes…"
+        placeholder="Your portal notes (kept separate from the Google Sheet)…"
       />
       {dirty ? (
         <Button
@@ -225,7 +231,7 @@ function NotesEditor({
           }
         >
           {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-          Save notes
+          Save portal notes
         </Button>
       ) : null}
     </div>
@@ -365,9 +371,18 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
             Participation report
           </h1>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            {report.event.name} {report.event.year} — Confirmed from executed contracts; pending renewals from last
-            year; new business from inquiries. Sort any column and export when Stephen needs the sheet.
+            {report.event.name} {report.event.year} — Confirmed from executed contracts. Pending renewals and new
+            business are pulled live from Google Sheets on every load (so sheet edits stay in sync). Add your own
+            portal notes per company; sort any column and export when Stephen needs the sheet.
           </p>
+          {report.sheetsFetchedAt ? (
+            <p className="text-xs text-muted-foreground">
+              Sheets synced {new Date(report.sheetsFetchedAt).toLocaleString()}
+              {report.sheetsError ? ` · Warning: ${report.sheetsError}` : ''}
+            </p>
+          ) : report.sheetsError ? (
+            <p className="text-xs text-destructive">Sheets sync failed: {report.sheetsError}</p>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" onClick={exportCsv} disabled={exporting}>
