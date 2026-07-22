@@ -10,16 +10,15 @@ import {
   ChevronDown,
   CircleDot,
   Clock3,
-  Download,
   ExternalLink,
   FileSpreadsheet,
   FileUp,
+  LayoutList,
   Link2,
   Loader2,
   Plus,
   Search,
   Send,
-  Sheet,
   Sparkles,
   X,
 } from 'lucide-react';
@@ -35,6 +34,7 @@ import { companiesMatch } from '@/lib/participation-report-shared';
 
 type SortKey = 'company_name' | 'booth_count' | 'total_spend_cents' | 'sales_rep_initials';
 type TabId = 'confirmed' | 'pending' | 'new_business';
+type ViewId = TabId | 'all';
 
 const TAB_THEME: Record<
   TabId,
@@ -87,6 +87,48 @@ const TAB_THEME: Record<
 
 function money(cents: number): string {
   return formatCurrency(cents, { showCents: false });
+}
+
+/** Microsoft Excel mark for export actions. */
+function ExcelLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden>
+      <path
+        fill="#185C37"
+        d="M14.5 2H6.2C5 2 4 3 4 4.2v15.6C4 21 5 22 6.2 22h11.6c1.2 0 2.2-1 2.2-2.2V7.5L14.5 2Z"
+      />
+      <path fill="#21A366" d="M14.5 2v4.3c0 1.2 1 2.2 2.2 2.2H21L14.5 2Z" />
+      <path
+        fill="#fff"
+        d="M9.05 8.4h5.9c.5 0 .9.4.9.9v6.4c0 .5-.4.9-.9.9h-5.9c-.5 0-.9-.4-.9-.9V9.3c0-.5.4-.9.9-.9Zm.7 1.5v1.3h1.55V9.9H9.75Zm2.35 0v1.3h1.55V9.9H12.1Zm2.35 0v1.3h1.55V9.9H14.45Zm-4.7 2.1v1.3h1.55v-1.3H9.75Zm2.35 0v1.3h1.55v-1.3H12.1Zm2.35 0v1.3h1.55v-1.3H14.45Zm-4.7 2.1v1.3h1.55v-1.3H9.75Zm2.35 0v1.3h1.55v-1.3H12.1Zm2.35 0v1.3h1.55v-1.3H14.45Z"
+      />
+      <path
+        fill="#107C41"
+        d="M3.2 7.6h8.1c.55 0 1 .45 1 1v6.8c0 .55-.45 1-1 1H3.2c-.55 0-1-.45-1-1V8.6c0-.55.45-1 1-1Z"
+      />
+      <path
+        fill="#fff"
+        d="M5.05 15.4 7.25 12l-2.1-3.3h1.55l1.25 2.15c.12.22.2.38.26.5h.02c.08-.18.17-.35.27-.55L9.8 8.7h1.45L9.1 12l2.25 3.4H9.8l-1.4-2.35c-.08-.14-.15-.28-.22-.43h-.02c-.06.14-.13.29-.22.45l-1.4 2.33H5.05Z"
+      />
+    </svg>
+  );
+}
+
+/** Google Sheets mark for export actions. */
+function GoogleSheetsLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden>
+      <path
+        fill="#0F9D58"
+        d="M14.5 2H6.2C5 2 4 3 4 4.2v15.6C4 21 5 22 6.2 22h11.6c1.2 0 2.2-1 2.2-2.2V7.5L14.5 2Z"
+      />
+      <path fill="#87C985" d="M14.5 2v4.3c0 1.2 1 2.2 2.2 2.2H21L14.5 2Z" />
+      <path
+        fill="#fff"
+        d="M8 9.2h8c.33 0 .6.27.6.6v7c0 .33-.27.6-.6.6H8c-.33 0-.6-.27-.6-.6v-7c0-.33.27-.6.6-.6Zm.7 1.3v1.55h3.1V10.5H8.7Zm3.9 0v1.55h3.7V10.5h-3.7Zm-3.9 2.35v1.55h3.1v-1.55H8.7Zm3.9 0v1.55h3.7v-1.55h-3.7Zm-3.9 2.35V16.8h3.1v-1.6H8.7Zm3.9 0V16.8h3.7v-1.6h-3.7Z"
+      />
+    </svg>
+  );
 }
 
 function statusVisual(status: string): {
@@ -448,7 +490,7 @@ function RowMenu({
 
 export function ParticipationReportClient({ initial }: { initial: ParticipationReport }) {
   const [report, setReport] = useState(initial);
-  const [tab, setTab] = useState<TabId>('pending');
+  const [view, setView] = useState<ViewId>('pending');
   const [query, setQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('company_name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -486,9 +528,22 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
     },
   ];
 
-  const activeRows = useMemo(() => {
-    const base =
-      tab === 'confirmed' ? report.confirmed : tab === 'pending' ? report.pending : report.newBusiness;
+  const viewAll = view === 'all';
+  const totalCompanies = report.confirmed.length + report.pending.length + report.newBusiness.length;
+  const sectionsToShow: TabId[] = viewAll ? ['confirmed', 'pending', 'new_business'] : [view];
+
+  function rowsFor(id: TabId): ParticipationReportRow[] {
+    if (id === 'confirmed') return report.confirmed;
+    if (id === 'pending') return report.pending;
+    return report.newBusiness;
+  }
+
+  function metaFor(id: TabId) {
+    return tabs.find((t) => t.id === id)!;
+  }
+
+  function filteredRows(id: TabId): ParticipationReportRow[] {
+    const base = rowsFor(id);
     const q = query.trim().toLowerCase();
     const filtered = q
       ? base.filter(
@@ -501,12 +556,7 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
         )
       : base;
     return sortRows(filtered, sortKey, sortDir);
-  }, [tab, report, query, sortKey, sortDir]);
-
-  const showManage = tab !== 'confirmed';
-  const activeMeta = tabs.find((t) => t.id === tab)!;
-  const theme = TAB_THEME[tab];
-  const ThemeIcon = theme.icon;
+  }
 
   function onSort(key: SortKey) {
     if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -631,7 +681,7 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
       setAddCompany('');
       setAddNotes('');
       setShowAdd(false);
-      setTab('new_business');
+      setView('new_business');
       await refresh();
     } finally {
       setAddPending(false);
@@ -663,16 +713,40 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
             {report.sheetsError ? ` · ${report.sheetsError}` : ''}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Button type="button" variant="outline" size="sm" className="h-8" disabled={exporting} onClick={() => runExport('xlsx')}>
-            {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9 gap-2 border-[#185C37]/30 bg-[#185C37]/[0.04] px-3 hover:bg-[#185C37]/[0.08]"
+            disabled={exporting}
+            title="Formatted spreadsheet with section colors"
+            onClick={() => runExport('xlsx')}
+          >
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExcelLogo className="h-4 w-4 shrink-0" />}
             Excel
           </Button>
-          <Button type="button" variant="outline" size="sm" className="h-8" disabled={exporting} onClick={() => runExport('csv')}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9 px-3"
+            disabled={exporting}
+            title="Same layout as Excel (plain text — no cell colors)"
+            onClick={() => runExport('csv')}
+          >
             CSV
           </Button>
-          <Button type="button" size="sm" className="h-8" disabled={exporting} onClick={() => runExport('sheets')}>
-            {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sheet className="h-3.5 w-3.5" />}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9 gap-2 border-[#0F9D58]/35 bg-[#0F9D58]/[0.06] px-3 hover:bg-[#0F9D58]/[0.1]"
+            disabled={exporting}
+            title="Formatted Google Sheet shared with you"
+            onClick={() => runExport('sheets')}
+          >
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <GoogleSheetsLogo className="h-4 w-4 shrink-0" />}
             Sheets
           </Button>
         </div>
@@ -694,12 +768,12 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
         {tabs.map((t) => {
           const tone = TAB_THEME[t.id];
           const Icon = tone.icon;
-          const active = tab === t.id;
+          const active = viewAll || view === t.id;
           return (
             <button
               key={`snap-${t.id}`}
               type="button"
-              onClick={() => setTab(t.id)}
+              onClick={() => setView(t.id)}
               className={cn(
                 'flex items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition-all',
                 active
@@ -727,6 +801,27 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
       {/* Tabs + search */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap gap-1 rounded-lg border border-border/70 bg-bg-surface p-1">
+          <button
+            type="button"
+            onClick={() => setView('all')}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors',
+              viewAll
+                ? 'bg-foreground text-background shadow-sm'
+                : 'text-muted-foreground hover:bg-stone-900/5 hover:text-foreground',
+            )}
+          >
+            <LayoutList className="h-3.5 w-3.5" />
+            <span className="font-medium">View all</span>
+            <span
+              className={cn(
+                'rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums',
+                viewAll ? 'bg-white/20 text-white' : 'bg-stone-900/5 text-muted-foreground',
+              )}
+            >
+              {totalCompanies}
+            </span>
+          </button>
           {tabs.map((t) => {
             const tone = TAB_THEME[t.id];
             const Icon = tone.icon;
@@ -734,10 +829,12 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
               <button
                 key={t.id}
                 type="button"
-                onClick={() => setTab(t.id)}
+                onClick={() => setView(t.id)}
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors',
-                  tab === t.id ? tone.tabActive : 'text-muted-foreground hover:bg-stone-900/5 hover:text-foreground',
+                  !viewAll && view === t.id
+                    ? tone.tabActive
+                    : 'text-muted-foreground hover:bg-stone-900/5 hover:text-foreground',
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -745,7 +842,7 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
                 <span
                   className={cn(
                     'rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums',
-                    tab === t.id ? 'bg-white/20 text-white' : 'bg-stone-900/5 text-muted-foreground',
+                    !viewAll && view === t.id ? 'bg-white/20 text-white' : 'bg-stone-900/5 text-muted-foreground',
                   )}
                 >
                   {t.count}
@@ -765,7 +862,7 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
               className="h-8 w-full rounded-md border border-border/70 bg-bg-surface pl-8 pr-3 text-sm outline-none focus:border-[hsl(var(--accent-brand)/0.5)] focus:ring-1 focus:ring-[hsl(var(--accent-brand)/0.3)]"
             />
           </div>
-          {tab === 'new_business' ? (
+          {viewAll || view === 'new_business' ? (
             <Button type="button" variant="outline" size="sm" className="h-8" onClick={() => setShowAdd((v) => !v)}>
               <Plus className="h-3.5 w-3.5" />
               Inquiry
@@ -803,189 +900,248 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
         </form>
       ) : null}
 
-      {/* Compact table */}
-      <div className={cn('overflow-hidden rounded-xl border bg-bg-surface', theme.accentBorder)}>
-        <div className={cn('flex items-center justify-between gap-3 border-b px-3 py-2.5', theme.accentSoft, theme.accentBorder)}>
-          <p className={cn('flex items-center gap-2 text-xs', theme.accentText)}>
-            <span className={cn('flex h-6 w-6 items-center justify-center rounded-md text-white', theme.accent)}>
-              <ThemeIcon className="h-3.5 w-3.5" />
-            </span>
-            <span>
-              <span className="font-semibold">{activeMeta.label}</span>
-              <span className="text-muted-foreground">
-                {' · '}
-                {activeRows.length}
-                {query ? ` match${activeRows.length === 1 ? '' : 'es'}` : ' companies'}
-                {' · '}
-                {activeMeta.booths} booths · {money(activeMeta.spend)}
-              </span>
-            </span>
-          </p>
-          {tab === 'pending' ? (
-            <p className="hidden text-[11px] text-muted-foreground sm:block">
-              Convert = DocuSign · Manage = Import / link · +N expands brands
-            </p>
-          ) : null}
-        </div>
+      <div className={cn('space-y-4', viewAll && 'space-y-5')}>
+        {sectionsToShow.map((sectionId) => {
+          const theme = TAB_THEME[sectionId];
+          const ThemeIcon = theme.icon;
+          const sectionMeta = metaFor(sectionId);
+          const rows = filteredRows(sectionId);
+          const showManage = sectionId !== 'confirmed';
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-border/60 bg-bg-surface-raised/80 text-left">
-                <th className="w-14 px-3 py-2">
-                  <SortHeader label="Rep" sortKey="sales_rep_initials" activeKey={sortKey} dir={sortDir} onSort={onSort} />
-                </th>
-                <th className="min-w-[160px] px-3 py-2">
-                  <SortHeader label="Company" sortKey="company_name" activeKey={sortKey} dir={sortDir} onSort={onSort} />
-                </th>
-                <th className="min-w-[180px] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  Brands
-                </th>
-                <th className="w-16 px-3 py-2 text-right">
-                  <SortHeader label="#" sortKey="booth_count" activeKey={sortKey} dir={sortDir} onSort={onSort} align="right" />
-                </th>
-                <th className="w-24 px-3 py-2 text-right">
-                  <SortHeader label="Total" sortKey="total_spend_cents" activeKey={sortKey} dir={sortDir} onSort={onSort} align="right" />
-                </th>
-                {showManage ? (
-                  <th className="min-w-[140px] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    Status / notes
-                  </th>
-                ) : null}
-                {showManage ? (
-                  <th className="min-w-[170px] px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    Actions
-                  </th>
-                ) : (
-                  <th className="w-16 px-2 py-2" />
+          return (
+            <div
+              key={sectionId}
+              className={cn('overflow-hidden rounded-xl border bg-bg-surface', theme.accentBorder)}
+            >
+              <div
+                className={cn(
+                  'flex items-center justify-between gap-3 border-b px-3 py-2.5',
+                  theme.accentSoft,
+                  theme.accentBorder,
                 )}
-              </tr>
-            </thead>
-            <tbody>
-              {activeRows.length === 0 ? (
-                <tr>
-                  <td colSpan={showManage ? 7 : 6} className="px-3 py-10 text-center text-sm text-muted-foreground">
-                    {query ? 'No matches.' : 'Nothing in this section yet.'}
-                  </td>
-                </tr>
-              ) : (
-                activeRows.map((row) => {
-                  const status = statusVisual(row.pipeline_status);
-                  const StatusIcon = status.Icon;
-                  return (
-                    <tr
-                      key={row.id}
-                      className={cn('border-b border-border/40 last:border-0', theme.rowHover)}
-                    >
-                      <td className="px-3 py-1.5 align-middle">
-                        <span
-                          className={cn(
-                            'inline-flex min-w-[2rem] justify-center rounded-md px-1.5 py-0.5 text-[11px] font-semibold tracking-wide',
-                            theme.accentSoft,
-                            theme.accentText,
-                          )}
-                        >
-                          {row.sales_rep_initials}
-                        </span>
-                      </td>
-                      <td className="px-3 py-1.5 align-middle">
-                        <div className="flex items-center gap-1.5">
-                          {row.contract_id ? (
-                            <Link
-                              href={`/contracts/${row.contract_id}`}
-                              className="font-medium text-foreground hover:text-[hsl(var(--accent-brand))] hover:underline"
-                            >
-                              {row.company_name}
-                            </Link>
-                          ) : (
-                            <span className="font-medium text-foreground">{row.company_name}</span>
-                          )}
-                          {row.manual_upload_received ? (
-                            <span
-                              className="inline-flex items-center gap-0.5 rounded bg-emerald-800/10 px-1 py-0.5 text-[10px] font-semibold text-emerald-900"
-                              title="Manual upload received"
-                            >
-                              <Check className="h-3 w-3" />
-                              PDF
-                            </span>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td className="max-w-[260px] px-3 py-1.5 align-top">
-                        <BrandsCell text={row.brands_text} />
-                      </td>
-                      <td className="px-3 py-1.5 align-middle text-right tabular-nums">{row.booth_count || '—'}</td>
-                      <td className="px-3 py-1.5 align-middle text-right tabular-nums font-medium">{money(row.total_spend_cents)}</td>
+              >
+                <p className={cn('flex items-center gap-2 text-xs', theme.accentText)}>
+                  <span className={cn('flex h-6 w-6 items-center justify-center rounded-md text-white', theme.accent)}>
+                    <ThemeIcon className="h-3.5 w-3.5" />
+                  </span>
+                  <span>
+                    <span className="font-semibold">{sectionMeta.label}</span>
+                    <span className="text-muted-foreground">
+                      {' · '}
+                      {rows.length}
+                      {query ? ` match${rows.length === 1 ? '' : 'es'}` : ' companies'}
+                      {' · '}
+                      {sectionMeta.booths} booths · {money(sectionMeta.spend)}
+                    </span>
+                  </span>
+                </p>
+                {sectionId === 'pending' ? (
+                  <p className="hidden text-[11px] text-muted-foreground sm:block">
+                    Convert = DocuSign · Manage = Import / link · +N expands brands
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[700px] border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-border/60 bg-bg-surface-raised/80 text-left">
+                      <th className="w-14 px-3 py-2">
+                        <SortHeader
+                          label="Rep"
+                          sortKey="sales_rep_initials"
+                          activeKey={sortKey}
+                          dir={sortDir}
+                          onSort={onSort}
+                        />
+                      </th>
+                      <th className="min-w-[160px] px-3 py-2">
+                        <SortHeader
+                          label="Company"
+                          sortKey="company_name"
+                          activeKey={sortKey}
+                          dir={sortDir}
+                          onSort={onSort}
+                        />
+                      </th>
+                      <th className="min-w-[180px] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        Brands
+                      </th>
+                      <th className="w-16 px-3 py-2 text-right">
+                        <SortHeader
+                          label="#"
+                          sortKey="booth_count"
+                          activeKey={sortKey}
+                          dir={sortDir}
+                          onSort={onSort}
+                          align="right"
+                        />
+                      </th>
+                      <th className="w-24 px-3 py-2 text-right">
+                        <SortHeader
+                          label="Total"
+                          sortKey="total_spend_cents"
+                          activeKey={sortKey}
+                          dir={sortDir}
+                          onSort={onSort}
+                          align="right"
+                        />
+                      </th>
                       {showManage ? (
-                        <td className="max-w-[200px] px-3 py-1.5 align-middle">
-                          <span
-                            className={cn(
-                              'inline-flex max-w-full items-center gap-1 truncate rounded-md px-1.5 py-0.5 text-[10px] font-medium',
-                              status.className,
-                            )}
-                            title={row.pipeline_status}
-                          >
-                            <StatusIcon className="h-3 w-3 shrink-0" />
-                            <span className="truncate">{row.pipeline_status}</span>
-                          </span>
-                          {(row.sheet_notes || row.notes) && (
-                            <p
-                              className="mt-0.5 truncate text-[11px] text-muted-foreground/80"
-                              title={[row.sheet_notes, row.notes].filter(Boolean).join(' · ')}
-                            >
-                              {truncate(row.sheet_notes || row.notes, 40)}
-                            </p>
-                          )}
-                        </td>
+                        <th className="min-w-[140px] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                          Status / notes
+                        </th>
                       ) : null}
-                      <td className="px-2 py-1.5 align-middle text-right">
-                        {showManage ? (
-                          <RowMenu
-                            row={row}
-                            linkableContracts={report.linkableContracts ?? []}
-                            onLinkContract={linkContract}
-                            onManualUploadToggle={setManualUpload}
-                            onNotesSave={saveNotes}
-                          />
-                        ) : row.contract_id ? (
-                          <Button asChild type="button" size="sm" variant="outline" className="h-7 gap-1 px-2 text-xs">
-                            <Link href={`/contracts/${row.contract_id}`}>
-                              <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-800" />
-                              Open
-                            </Link>
-                          </Button>
-                        ) : null}
-                      </td>
+                      {showManage ? (
+                        <th className="min-w-[170px] px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                          Actions
+                        </th>
+                      ) : (
+                        <th className="w-16 px-2 py-2" />
+                      )}
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-            {!query && activeRows.length > 0 ? (
-              <tfoot>
-                <tr className={cn('border-t', theme.accentSoft, theme.accentBorder)}>
-                  <td className="px-3 py-1.5 align-middle font-medium text-foreground" colSpan={3}>
-                    Total
-                  </td>
-                  <td className="px-3 py-1.5 align-middle text-right tabular-nums font-medium text-foreground">
-                    {activeMeta.booths}
-                  </td>
-                  <td className="px-3 py-1.5 align-middle text-right tabular-nums font-medium text-foreground">
-                    {money(activeMeta.spend)}
-                  </td>
-                  {showManage ? <td /> : null}
-                  <td />
-                </tr>
-              </tfoot>
-            ) : null}
-          </table>
-        </div>
+                  </thead>
+                  <tbody>
+                    {rows.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={showManage ? 7 : 6}
+                          className="px-3 py-10 text-center text-sm text-muted-foreground"
+                        >
+                          {query ? 'No matches.' : 'Nothing in this section yet.'}
+                        </td>
+                      </tr>
+                    ) : (
+                      rows.map((row) => {
+                        const status = statusVisual(row.pipeline_status);
+                        const StatusIcon = status.Icon;
+                        return (
+                          <tr
+                            key={row.id}
+                            className={cn('border-b border-border/40 last:border-0', theme.rowHover)}
+                          >
+                            <td className="px-3 py-1.5 align-middle">
+                              <span
+                                className={cn(
+                                  'inline-flex min-w-[2rem] justify-center rounded-md px-1.5 py-0.5 text-[11px] font-semibold tracking-wide',
+                                  theme.accentSoft,
+                                  theme.accentText,
+                                )}
+                              >
+                                {row.sales_rep_initials}
+                              </span>
+                            </td>
+                            <td className="px-3 py-1.5 align-middle">
+                              <div className="flex items-center gap-1.5">
+                                {row.contract_id ? (
+                                  <Link
+                                    href={`/contracts/${row.contract_id}`}
+                                    className="font-medium text-foreground hover:text-[hsl(var(--accent-brand))] hover:underline"
+                                  >
+                                    {row.company_name}
+                                  </Link>
+                                ) : (
+                                  <span className="font-medium text-foreground">{row.company_name}</span>
+                                )}
+                                {row.manual_upload_received ? (
+                                  <span
+                                    className="inline-flex items-center gap-0.5 rounded bg-emerald-800/10 px-1 py-0.5 text-[10px] font-semibold text-emerald-900"
+                                    title="Manual upload received"
+                                  >
+                                    <Check className="h-3 w-3" />
+                                    PDF
+                                  </span>
+                                ) : null}
+                              </div>
+                            </td>
+                            <td className="max-w-[260px] px-3 py-1.5 align-top">
+                              <BrandsCell text={row.brands_text} />
+                            </td>
+                            <td className="px-3 py-1.5 align-middle text-right tabular-nums">
+                              {row.booth_count || '—'}
+                            </td>
+                            <td className="px-3 py-1.5 align-middle text-right tabular-nums font-medium">
+                              {money(row.total_spend_cents)}
+                            </td>
+                            {showManage ? (
+                              <td className="max-w-[200px] px-3 py-1.5 align-middle">
+                                <span
+                                  className={cn(
+                                    'inline-flex max-w-full items-center gap-1 truncate rounded-md px-1.5 py-0.5 text-[10px] font-medium',
+                                    status.className,
+                                  )}
+                                  title={row.pipeline_status}
+                                >
+                                  <StatusIcon className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">{row.pipeline_status}</span>
+                                </span>
+                                {(row.sheet_notes || row.notes) && (
+                                  <p
+                                    className="mt-0.5 truncate text-[11px] text-muted-foreground/80"
+                                    title={[row.sheet_notes, row.notes].filter(Boolean).join(' · ')}
+                                  >
+                                    {truncate(row.sheet_notes || row.notes, 40)}
+                                  </p>
+                                )}
+                              </td>
+                            ) : null}
+                            <td className="px-2 py-1.5 align-middle text-right">
+                              {showManage ? (
+                                <RowMenu
+                                  row={row}
+                                  linkableContracts={report.linkableContracts ?? []}
+                                  onLinkContract={linkContract}
+                                  onManualUploadToggle={setManualUpload}
+                                  onNotesSave={saveNotes}
+                                />
+                              ) : row.contract_id ? (
+                                <Button
+                                  asChild
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 gap-1 px-2 text-xs"
+                                >
+                                  <Link href={`/contracts/${row.contract_id}`}>
+                                    <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-800" />
+                                    Open
+                                  </Link>
+                                </Button>
+                              ) : null}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                  {!query && rows.length > 0 ? (
+                    <tfoot>
+                      <tr className={cn('border-t', theme.accentSoft, theme.accentBorder)}>
+                        <td className="px-3 py-1.5 align-middle font-medium text-foreground" colSpan={3}>
+                          Total
+                        </td>
+                        <td className="px-3 py-1.5 align-middle text-right tabular-nums font-medium text-foreground">
+                          {sectionMeta.booths}
+                        </td>
+                        <td className="px-3 py-1.5 align-middle text-right tabular-nums font-medium text-foreground">
+                          {money(sectionMeta.spend)}
+                        </td>
+                        {showManage ? <td /> : null}
+                        <td />
+                      </tr>
+                    </tfoot>
+                  ) : null}
+                </table>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {tab === 'confirmed' ? (
+      {viewAll || view === 'confirmed' ? (
         <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
           <BadgeCheck className="h-3.5 w-3.5 text-emerald-800" />
-          Confirmed = executed contracts only. Pending and new business stay on their tabs until signed/executed.
+          Confirmed = executed contracts only. Pending and new business stay listed until signed/executed.
         </p>
       ) : null}
     </div>
