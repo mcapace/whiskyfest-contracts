@@ -166,12 +166,31 @@ export function parseBoothCount(raw: string | number | null | undefined): number
 export const CONFIRMED_CONTRACT_STATUSES: ContractStatus[] = ['executed'];
 export const GRADUATED_CONTRACT_STATUSES: ContractStatus[] = ['signed', 'executed'];
 
+/**
+ * In-flight contracts a pending row can safely link to (avoid duplicating an
+ * account that already has a draft/sent deal). Excludes signed/executed.
+ */
+export const PIPELINE_LINKABLE_CONTRACT_STATUSES: ContractStatus[] = [
+  'draft',
+  'ready_for_review',
+  'pending_events_review',
+  'approved',
+  'sent',
+  'partially_signed',
+  'imported',
+  'error',
+];
+
 export function contractIsConfirmed(status: ContractStatus): boolean {
   return CONFIRMED_CONTRACT_STATUSES.includes(status);
 }
 
 export function contractIsGraduated(status: ContractStatus): boolean {
   return GRADUATED_CONTRACT_STATUSES.includes(status);
+}
+
+export function contractIsPipelineLinkable(status: ContractStatus): boolean {
+  return PIPELINE_LINKABLE_CONTRACT_STATUSES.includes(status);
 }
 
 export function pipelineStatusLabel(

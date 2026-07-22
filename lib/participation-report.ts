@@ -12,6 +12,7 @@ import {
   companiesMatch,
   contractIsConfirmed,
   contractIsGraduated,
+  contractIsPipelineLinkable,
   normalizeCompanyKey,
   pipelineStatusLabel,
   salesRepInitials,
@@ -435,13 +436,15 @@ export async function buildParticipationReport(options?: {
       confirmedPlusPendingSpendCents: confirmedSpendCents + pendingSpendCents,
     },
     salesReps,
-    linkableContracts: contracts.map((c) => ({
-      id: c.id,
-      company_name: c.exhibitor_company_name,
-      status: c.status,
-      booth_count: c.booth_count ?? 0,
-      total_cents: c.grand_total_cents ?? c.total_amount_cents ?? 0,
-    })),
+    linkableContracts: contracts
+      .filter((c) => contractIsPipelineLinkable(c.status))
+      .map((c) => ({
+        id: c.id,
+        company_name: c.exhibitor_company_name,
+        status: c.status,
+        booth_count: c.booth_count ?? 0,
+        total_cents: c.grand_total_cents ?? c.total_amount_cents ?? 0,
+      })),
     sheetsFetchedAt,
     sheetsError,
     sheetsFromCache,

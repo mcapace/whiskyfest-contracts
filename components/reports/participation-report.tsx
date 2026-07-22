@@ -67,19 +67,47 @@ function parseBrandList(raw: string): string[] {
 
 function BrandsCell({ text }: { text: string }) {
   const brands = parseBrandList(text);
+  const [expanded, setExpanded] = useState(false);
   if (!brands.length) return <span className="text-muted-foreground">—</span>;
 
   const full = brands.join(' · ');
   const first = brands[0]!;
   const rest = brands.length - 1;
 
+  if (expanded) {
+    return (
+      <div className="space-y-1">
+        <ul className="space-y-0.5 text-xs text-muted-foreground">
+          {brands.map((b, i) => (
+            <li key={`${i}-${b}`} className="leading-snug">
+              <span className="mr-1 tabular-nums text-muted-foreground/60">{i + 1}.</span>
+              {b}
+            </li>
+          ))}
+        </ul>
+        <button
+          type="button"
+          className="text-[10px] font-semibold uppercase tracking-wide text-[hsl(var(--accent-brand))] hover:underline"
+          onClick={() => setExpanded(false)}
+        >
+          Show less
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex min-w-0 items-center gap-1.5" title={full}>
+    <div className="flex min-w-0 items-center gap-1.5" title={rest > 0 ? full : undefined}>
       <span className="min-w-0 truncate text-xs text-muted-foreground">{first}</span>
       {rest > 0 ? (
-        <span className="shrink-0 rounded bg-stone-900/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">
+        <button
+          type="button"
+          className="shrink-0 rounded bg-stone-900/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground transition-colors hover:bg-stone-900/15 hover:text-foreground"
+          aria-label={`Show ${rest} more brand${rest === 1 ? '' : 's'}`}
+          onClick={() => setExpanded(true)}
+        >
           +{rest}
-        </span>
+        </button>
       ) : null}
     </div>
   );
@@ -205,11 +233,11 @@ function RowMenu({
 
             <div className="mt-3 space-y-1">
               <label className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                Link existing
+                Link in-progress contract
               </label>
               <select
                 className="w-full rounded-md border border-border/70 bg-bg-page px-2 py-1.5 text-xs"
-                value={row.contract_id ?? ''}
+                value={row.contract_id && linkableContracts.some((c) => c.id === row.contract_id) ? row.contract_id : ''}
                 disabled={pending}
                 onChange={(e) => {
                   const v = e.target.value;
@@ -225,7 +253,7 @@ function RowMenu({
               >
                 <option value="">— Not linked —</option>
                 {suggested.length ? (
-                  <optgroup label="Likely matches">
+                  <optgroup label="Likely matches (in progress)">
                     {suggested.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.company_name} · {c.status}
@@ -233,7 +261,7 @@ function RowMenu({
                     ))}
                   </optgroup>
                 ) : null}
-                <optgroup label={suggested.length ? 'All contracts' : 'Event contracts'}>
+                <optgroup label={suggested.length ? 'Other in-progress' : 'In-progress contracts'}>
                   {(suggested.length ? others : linkableContracts).map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.company_name} · {c.status}
@@ -241,6 +269,9 @@ function RowMenu({
                   ))}
                 </optgroup>
               </select>
+              <p className="text-[10px] leading-snug text-muted-foreground">
+                Draft / sent / in review only — not signed or executed. Use this to avoid a duplicate account.
+              </p>
             </div>
 
             <label className="mt-3 flex items-center gap-2 text-xs">
@@ -630,7 +661,9 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
             {activeMeta.booths} booths · {money(activeMeta.spend)}
           </p>
           {tab === 'pending' ? (
-            <p className="hidden text-[11px] text-muted-foreground sm:block">⋯ opens Convert / Import PDF / link</p>
+            <p className="hidden text-[11px] text-muted-foreground sm:block">
+              ⋯ to Convert / Import / link an in-progress contract · click +N to expand brands
+            </p>
           ) : null}
         </div>
 
