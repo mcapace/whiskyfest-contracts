@@ -17,8 +17,10 @@ import {
   Building2,
   Settings,
   Upload,
+  ClipboardList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { canAccessParticipationReport } from '@/lib/participation-report-shared';
 import {
   isAccountingPath,
   isBigSmokePath,
@@ -101,6 +103,8 @@ type SidebarNavItem = {
   label: string;
   icon: LucideIcon;
   adminOnly?: boolean;
+  /** Exclusive allowlist (Kate + Michael) — not all admins. */
+  participationReportOk?: boolean;
   wineSpectatorAdminOk?: boolean;
   bigSmokeAdminOk?: boolean;
   legacyImport?: boolean;
@@ -112,6 +116,7 @@ const whiskyfestNav: SidebarNavItem[] = [
   { href: '/contracts', label: 'All Contracts', icon: FileText },
   { href: '/contracts/import', label: 'Import Contract', icon: Upload, legacyImport: true },
   { href: '/sponsors', label: 'Sponsors', icon: Building2 },
+  { href: '/reports/participation', label: 'Participation', icon: ClipboardList, participationReportOk: true },
   { href: '/settings', label: 'Settings', icon: Settings },
   { href: '/sales-reps', label: 'Sales Reps', icon: UserRound, adminOnly: true },
   { href: '/events', label: 'Events', icon: CalendarDays, adminOnly: true },
@@ -288,6 +293,7 @@ export function Sidebar({
   const pathname = usePathname();
   const portalKind = usePortalKind();
   const isAdmin = user.role === 'admin';
+  const showParticipationReport = canAccessParticipationReport(user.email);
   const wineSpectatorAdmin = Boolean(user.wineSpectatorAdmin);
   const bigSmokeAdmin = Boolean(user.bigSmokeAdmin);
   const pipelineAccess = Boolean(user.pipelineAccess);
@@ -408,6 +414,9 @@ export function Sidebar({
           <>
             {nav
               .filter((item) => {
+                if ('participationReportOk' in item && item.participationReportOk) {
+                  return showParticipationReport;
+                }
                 if ('adminOnly' in item && item.adminOnly) {
                   if (isAdmin) return true;
                   if (wineSpectatorPortal && wineSpectatorAdmin && item.wineSpectatorAdminOk) return true;
