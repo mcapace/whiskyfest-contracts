@@ -164,7 +164,9 @@ export function buildParticipationSheetValues(report: ParticipationReport): Buil
     'header',
   );
   for (const row of report.newBusiness) push(dataRow(row, true), 'data');
-  push(['TOTAL', '', '', report.newBusiness.length ? '—' : '—', '', '', '—', ''], 'total');
+  const newBizBooths = report.newBusiness.reduce((a, r) => a + (r.booth_count || 0), 0);
+  const newBizSpend = report.newBusiness.reduce((a, r) => a + (r.total_spend_cents || 0), 0);
+  push(['TOTAL', '', '', newBizBooths || '', '', '', newBizSpend ? money(newBizSpend) : '', ''], 'total');
   push([], 'blank');
   push([], 'blank');
 
@@ -466,68 +468,20 @@ function formatRequests(sheetId: number, built: BuiltSheet): SheetsRequest[] {
 }
 
 export function buildParticipationCsv(report: ParticipationReport): string {
-  const lines: string[] = [];
+  // Same Marvin layout as Excel/Sheets (structure). CSV cannot carry colors;
+  // open Excel or Google Sheets export for full formatting.
+  const built = buildParticipationSheetValues(report);
   const esc = (v: string | number) => {
     const s = String(v ?? '');
     if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
     return s;
   };
-  const push = (cells: (string | number)[]) => lines.push(cells.map(esc).join(','));
-
-  push(['Section', 'Sales Rep', 'Company', 'Brands', 'Booths', 'Rate per Booth', 'Sponsorship', 'Total Spend', 'Notes / Status']);
-  for (const row of report.confirmed) {
-    push([
-      'Confirmed',
-      row.sales_rep_initials,
-      row.company_name,
-      row.brands_text,
-      row.booth_count,
-      rateLabel(row.rate_per_booth_cents),
-      row.sponsorship_label,
-      money(row.total_spend_cents),
-      '',
-    ]);
-  }
-  for (const row of report.pending) {
-    push([
-      'Pending Renewals',
-      row.sales_rep_initials,
-      row.company_name,
-      row.brands_text,
-      row.booth_count,
-      rateLabel(row.rate_per_booth_cents),
-      row.sponsorship_label,
-      money(row.total_spend_cents),
-      notesCell(row).replace(/\n/g, ' | '),
-    ]);
-  }
-  for (const row of report.newBusiness) {
-    push([
-      'New Business',
-      row.sales_rep_initials,
-      row.company_name,
-      row.brands_text,
-      row.booth_count,
-      rateLabel(row.rate_per_booth_cents),
-      row.sponsorship_label,
-      money(row.total_spend_cents),
-      notesCell(row).replace(/\n/g, ' | '),
-    ]);
-  }
-  push([]);
-  push(['Confirmed booths', report.totals.confirmedBooths, 'Confirmed spend', money(report.totals.confirmedSpendCents)]);
-  push(['Pending booths', report.totals.pendingBooths, 'Pending spend', money(report.totals.pendingSpendCents)]);
-  push([
-    'Confirmed + Pending booths',
-    report.totals.confirmedPlusPendingBooths,
-    'Confirmed + Pending spend',
-    money(report.totals.confirmedPlusPendingSpendCents),
-  ]);
-
-  return lines.join('\n');
+  const lines = built.values.map((row) => row.map(esc).join(','));
+  // UTF-8 BOM so Excel opens currency/accents correctly
+  return `\uFEFF${lines.join('\n')}`;
 }
 
-/** Formatted .xlsx buffer matching the Marvin participation layout. */
+/** Formatted .xlsx buffer matching the Marvin / Google Sheets participation layout. */
 export async function buildParticipationExcel(report: ParticipationReport): Promise<Buffer> {
   const ExcelJS = (await import('exceljs')).default;
   const built = buildParticipationSheetValues(report);
@@ -536,7 +490,8 @@ export async function buildParticipationExcel(report: ParticipationReport): Prom
   workbook.created = new Date();
 
   const sheet = workbook.addWorksheet('Participation Status', {
-    views: [{ state: 'frozen', ySplit: 1, showGridLines: false }],
+    views: [{ state: 'frozen', ySplit: 2, showGridLines: false }],
+    properties: { defaultRowHeight: 18 },
   });
 
   sheet.columns = [
@@ -553,63 +508,117 @@ export async function buildParticipationExcel(report: ParticipationReport): Prom
   const hex = {
     titleBg: '1F2937',
     titleFg: 'FFFFFF',
+    subtitleBg: 'F0F2F4',
+    subtitleFg: '59636B',
     confirmedBg: '2E7D54',
     pendingBg: 'B87324',
-    newBizBg: '385E8C',
+    newBizBg: '182D6D',
     headerBg: 'EDEFF1',
+    headerBorder: 'BFC5CC',
     totalBg: 'F2F2ED',
+    totalBorder: 'CCD0D4',
     grandBg: '1F2937',
     altRow: 'F7F8F8',
     white: 'FFFFFF',
   };
 
+  const solid = (argb: string) =>
+    ({ type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: `FF${argb}` } });
+
+  let sectionTone: 'confirmed' | 'pending' | 'new' = 'confirmed';
+  let dataStripe = 0;
+
   built.values.forEach((cells, rowIndex) => {
     const kind = built.kinds[rowIndex]!;
     const excelRow = sheet.addRow(cells);
-    excelRow.height = kind === 'title' ? 28 : kind === 'section' ? 22 : 18;
+
+    if (kind === 'title') excelRow.height = 36;
+    else if (kind === 'section') excelRow.height = 24;
+    else if (kind === 'header' || kind === 'total' || kind === 'grand') excelRow.height = 20;
+    else excelRow.height = 18;
+
+    // Ensure empty cells still get fills (section / title bars)
+    for (let c = 1; c <= built.colCount; c++) {
+      if (!excelRow.getCell(c).value && cells[c - 1] === '') {
+        excelRow.getCell(c).value = '';
+      }
+    }
 
     excelRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      const isNumericCol = colNumber >= 4 && colNumber <= 7;
       cell.alignment = {
         vertical: 'middle',
         wrapText: true,
-        horizontal: colNumber >= 4 && colNumber <= 7 ? 'right' : 'left',
+        horizontal: isNumericCol ? 'right' : 'left',
       };
-      cell.font = { name: 'Calibri', size: kind === 'title' ? 16 : 11 };
+      cell.font = { name: 'Calibri', size: 10, color: { argb: 'FF1F2937' } };
 
       if (kind === 'title') {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${hex.titleBg}` } };
+        cell.fill = solid(hex.titleBg);
         cell.font = { name: 'Calibri', size: 16, bold: true, color: { argb: `FF${hex.titleFg}` } };
+        cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
       } else if (kind === 'subtitle') {
-        cell.font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF6B7280' } };
+        cell.fill = solid(hex.subtitleBg);
+        cell.font = { name: 'Calibri', size: 9, italic: true, color: { argb: `FF${hex.subtitleFg}` } };
       } else if (kind === 'section') {
+        const label = String(cells[0] ?? '').toUpperCase();
+        if (label.includes('CONFIRMED') && !label.includes('PENDING')) sectionTone = 'confirmed';
+        else if (label.includes('PENDING')) sectionTone = 'pending';
+        else if (label.includes('NEW BUSINESS')) sectionTone = 'new';
+        dataStripe = 0;
+
         const bg =
-          String(cells[0]).includes('CONFIRMED') && !String(cells[0]).includes('PENDING')
+          sectionTone === 'confirmed'
             ? hex.confirmedBg
-            : String(cells[0]).includes('PENDING')
+            : sectionTone === 'pending'
               ? hex.pendingBg
-              : String(cells[0]).includes('NEW BUSINESS')
-                ? hex.newBizBg
-                : hex.titleBg;
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${bg}` } };
-        cell.font = { name: 'Calibri', size: 12, bold: true, color: { argb: `FF${hex.white}` } };
-      } else if (kind === 'header') {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${hex.headerBg}` } };
-        cell.font = { name: 'Calibri', size: 10, bold: true };
-      } else if (kind === 'total') {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${hex.totalBg}` } };
-        cell.font = { name: 'Calibri', size: 11, bold: true };
-      } else if (kind === 'grand') {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${hex.grandBg}` } };
+              : hex.newBizBg;
+        cell.fill = solid(bg);
         cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: `FF${hex.white}` } };
-      } else if (kind === 'data' && rowIndex % 2 === 1) {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${hex.altRow}` } };
+        cell.alignment = { vertical: 'middle', horizontal: 'left' };
+      } else if (kind === 'header') {
+        cell.fill = solid(hex.headerBg);
+        cell.font = { name: 'Calibri', size: 9, bold: true, color: { argb: 'FF1F2937' } };
+        cell.border = {
+          bottom: { style: 'thin', color: { argb: `FF${hex.headerBorder}` } },
+        };
+      } else if (kind === 'data') {
+        if (dataStripe % 2 === 1) cell.fill = solid(hex.altRow);
+        cell.font = {
+          name: 'Calibri',
+          size: 10,
+          bold: colNumber === 2,
+          color: { argb: 'FF1F2937' },
+        };
+      } else if (kind === 'total') {
+        cell.fill = solid(hex.totalBg);
+        cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF1F2937' } };
+        cell.border = {
+          top: { style: 'thin', color: { argb: `FF${hex.totalBorder}` } },
+        };
+      } else if (kind === 'grand') {
+        cell.fill = solid(hex.grandBg);
+        cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: `FF${hex.white}` } };
+      } else if (kind === 'blank') {
+        cell.font = { name: 'Calibri', size: 10 };
       }
     });
+
+    if (kind === 'data') dataStripe += 1;
   });
 
-  // Freeze after title row is weak for this layout; freeze first header is complex.
-  // Keep top row visible instead.
-  sheet.views = [{ state: 'frozen', ySplit: 1, showGridLines: false }];
+  // Merges — title, subtitle, section banners, grand label
+  sheet.mergeCells(1, 1, 1, built.colCount);
+  sheet.mergeCells(2, 1, 2, built.colCount);
+  built.kinds.forEach((kind, i) => {
+    const rowNum = i + 1;
+    if (kind === 'section') {
+      sheet.mergeCells(rowNum, 1, rowNum, built.colCount);
+    }
+    if (kind === 'grand') {
+      sheet.mergeCells(rowNum, 1, rowNum, 3);
+    }
+  });
 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);

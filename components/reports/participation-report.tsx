@@ -593,7 +593,13 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
       a.download = `wf-ny-${report.event.year}-participation.${format === 'xlsx' ? 'xlsx' : 'csv'}`;
       a.click();
       URL.revokeObjectURL(url);
-      setExportMsg(format === 'xlsx' ? 'Excel downloaded.' : 'CSV downloaded.');
+      setExportMsg(
+        format === 'xlsx'
+          ? 'Formatted Excel downloaded.'
+          : format === 'csv'
+            ? 'CSV downloaded (same layout as Excel; open Excel/Sheets for colors).'
+            : 'Export done.',
+      );
     } catch {
       setExportMsg('Export failed.');
     } finally {
