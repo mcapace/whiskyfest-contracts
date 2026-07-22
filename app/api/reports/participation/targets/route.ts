@@ -33,6 +33,7 @@ const patchSchema = z.object({
   total_spend_cents: z.number().int().min(0).optional(),
   notes: z.string().max(8000).nullable().optional(),
   linked_contract_id: z.string().uuid().nullable().optional(),
+  manual_upload_received: z.boolean().optional(),
   is_active: z.boolean().optional(),
   section: z.enum(['pending_renewal', 'new_business']).optional(),
 });

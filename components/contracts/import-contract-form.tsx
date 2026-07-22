@@ -46,11 +46,32 @@ export function ImportContractForm({
   currentUserEmail,
   isAdmin,
   isEventsTeam = false,
+  pipelineTargetId,
+  pipelineBanner,
+  initialValues,
+  initialBoothBrands,
 }: {
   events: Event[];
   currentUserEmail: string | null;
   isAdmin: boolean;
   isEventsTeam?: boolean;
+  pipelineTargetId?: string;
+  pipelineBanner?: string | null;
+  initialValues?: {
+    event_id: string;
+    exhibitor_company_name: string;
+    exhibitor_legal_name: string;
+    booth_count: number;
+    booth_rate_cents: number;
+    sales_rep_id: string;
+    notes: string;
+  };
+  initialBoothBrands?: {
+    booth_index: number;
+    brand_name: string;
+    brand_category?: string | null;
+    expressions: string[];
+  }[];
 }) {
   const canPickAnySalesRep = isAdmin || isEventsTeam;
   const router = useRouter();
@@ -63,8 +84,8 @@ export function ImportContractForm({
     if (err) errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [err]);
 
-  const defaultEvent = events[0];
-  const [eventId, setEventId] = useState(defaultEvent?.id ?? '');
+  const defaultEvent = events.find((e) => e.id === initialValues?.event_id) ?? events[0];
+  const [eventId, setEventId] = useState(initialValues?.event_id ?? defaultEvent?.id ?? '');
 
   const resolvedEventId =
     eventId && events.some((ev) => ev.id === eventId) ? eventId : (events[0]?.id ?? undefined);
@@ -72,8 +93,8 @@ export function ImportContractForm({
   useEffect(() => {
     if (!eventId && events[0]?.id) setEventId(events[0].id);
   }, [eventId, events]);
-  const [exhibitorCompany, setExhibitorCompany] = useState('');
-  const [exhibitorLegal, setExhibitorLegal] = useState('');
+  const [exhibitorCompany, setExhibitorCompany] = useState(initialValues?.exhibitor_company_name ?? '');
+  const [exhibitorLegal, setExhibitorLegal] = useState(initialValues?.exhibitor_legal_name ?? '');
   const [signerName, setSignerName] = useState('');
   const [signerEmail, setSignerEmail] = useState('');
   const [signerTitle, setSignerTitle] = useState('');
@@ -84,12 +105,23 @@ export function ImportContractForm({
   const [state, setState] = useState('');
   const [zip, setZip] = useState('');
   const [country, setCountry] = useState('');
-  const [salesRepId, setSalesRepId] = useState('');
-  const [boothCountInput, setBoothCountInput] = useState('1');
-  const [boothRateInput, setBoothRateInput] = useState('');
-  const [grandTotalInput, setGrandTotalInput] = useState('');
+  const [salesRepId, setSalesRepId] = useState(initialValues?.sales_rep_id ?? '');
+  const [boothCountInput, setBoothCountInput] = useState(
+    String(Math.max(1, initialValues?.booth_count ?? 1)),
+  );
+  const [boothRateInput, setBoothRateInput] = useState(
+    initialValues?.booth_rate_cents != null && initialValues.booth_rate_cents > 0
+      ? String(initialValues.booth_rate_cents / 100)
+      : '',
+  );
+  const [grandTotalInput, setGrandTotalInput] = useState(() => {
+    if (initialValues?.booth_count && initialValues?.booth_rate_cents) {
+      return String((initialValues.booth_count * initialValues.booth_rate_cents) / 100);
+    }
+    return '';
+  });
   const [exhibitorNotes, setExhibitorNotes] = useState('');
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState(initialValues?.notes ?? '');
   const [billingName, setBillingName] = useState('');
   const [billingEmail, setBillingEmail] = useState('');
   const [billingAddressNotes, setBillingAddressNotes] = useState('');
@@ -101,9 +133,16 @@ export function ImportContractForm({
   const [sponsorshipLines, setSponsorshipLines] = useState<SponsorshipLineDraft[]>([
     { key: 'line-1', description: '', amountInput: '' },
   ]);
-  const [boothBrandRows, setBoothBrandRows] = useState<BoothBrandValue[]>([
-    { brand_name: '', brand_category: 'Other', expressions: [] },
-  ]);
+  const [boothBrandRows, setBoothBrandRows] = useState<BoothBrandValue[]>(() => {
+    if (initialBoothBrands?.length) {
+      return initialBoothBrands.map((b) => ({
+        brand_name: b.brand_name,
+        brand_category: (b.brand_category as BrandCategory) || suggestBrandCategory(b.brand_name),
+        expressions: b.expressions ?? [],
+      }));
+    }
+    return [{ brand_name: '', brand_category: 'Other', expressions: [] }];
+  });
 
   const boothCount = useMemo(() => {
     const n = parseInt(boothCountInput.trim(), 10);
@@ -267,6 +306,7 @@ export function ImportContractForm({
       fd.set('billing_address_notes', billingAddressNotes.trim());
       fd.set('booth_brands_json', JSON.stringify(booth_brands));
       fd.set('signed_pdf', pdfFile);
+      if (pipelineTargetId) fd.set('pipeline_target_id', pipelineTargetId);
 
       const res = await fetch('/api/contracts/import', { method: 'POST', body: fd });
       const j = await res.json().catch(() => ({}));
@@ -294,11 +334,17 @@ export function ImportContractForm({
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <Link
-          href="/contracts"
+          href={pipelineTargetId ? '/reports/participation' : '/contracts'}
           className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> All contracts
+          <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
+          {pipelineTargetId ? 'Back to Participation' : 'All contracts'}
         </Link>
+        {pipelineBanner ? (
+          <p className="mb-3 rounded-md border border-accent-brand/30 bg-accent-brand/5 px-3 py-2 text-sm text-foreground">
+            {pipelineBanner}
+          </p>
+        ) : null}
         <h1 className="font-serif text-3xl font-semibold tracking-tight">Import contract</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Upload a sponsor agreement that was signed before this platform launched (paper, email PDF, or legacy

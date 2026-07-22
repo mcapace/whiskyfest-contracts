@@ -1,4 +1,5 @@
 import { getSheetsClient } from '@/lib/sheets-tracker';
+import { isGoogleSheetsQuotaError } from '@/lib/roster-sheets-pull-policy';
 import {
   normalizeCompanyKey,
   parseBoothCount,
@@ -14,6 +15,9 @@ import {
  */
 export const PARTICIPATION_MARVIN_SHEET_ID = '10Wmm1V2B0z8olqutieFCM8iJeFCudEWHars6YPrv7GY';
 
+/** Keep Sheets reads under the per-minute quota (page loads + exports share this cache). */
+const LIVE_SHEETS_CACHE_TTL_MS = 5 * 60 * 1000;
+
 export type LiveSheetPipelineRow = {
   section: PipelineSection;
   company_name: string;
@@ -25,6 +29,24 @@ export type LiveSheetPipelineRow = {
   sheet_notes: string;
   rsvp: string;
 };
+
+export type LiveParticipationSheetPayload = {
+  pending: LiveSheetPipelineRow[];
+  newBusiness: LiveSheetPipelineRow[];
+  fetchedAt: string;
+  sources: { marvinSheetId: string };
+  fromCache: boolean;
+  stale?: boolean;
+};
+
+type CacheEntry = {
+  payload: Omit<LiveParticipationSheetPayload, 'fromCache' | 'stale'>;
+  expiresAt: number;
+};
+
+let memoryCache: CacheEntry | null = null;
+let cachedTabTitle: string | null = null;
+let inflight: Promise<LiveParticipationSheetPayload> | null = null;
 
 function cell(row: string[], idx: number): string {
   return (row[idx] ?? '').toString().trim();
@@ -48,25 +70,10 @@ function detectSection(firstCol: string): 'pending' | 'new_business' | 'skip' | 
   return null;
 }
 
-/**
- * Pending accounts + Notes and New business — live from WhiskyFest & Tequila 2026 only.
- */
-export async function fetchLiveParticipationSheetRows(): Promise<{
+function parseMarvinRows(values: string[][]): {
   pending: LiveSheetPipelineRow[];
   newBusiness: LiveSheetPipelineRow[];
-  fetchedAt: string;
-  sources: { marvinSheetId: string };
-}> {
-  const sheets = getSheetsClient();
-  const marvinSheetId = PARTICIPATION_MARVIN_SHEET_ID;
-
-  const meta = await sheets.spreadsheets.get({ spreadsheetId: marvinSheetId });
-  const tab = meta.data.sheets?.[0]?.properties?.title || 'Sheet1';
-  const marvinRes = await sheets.spreadsheets.values.get({
-    spreadsheetId: marvinSheetId,
-    range: `'${tab.replace(/'/g, "''")}'!A1:I120`,
-  });
-
+} {
   const pending: LiveSheetPipelineRow[] = [];
   const newBusiness: LiveSheetPipelineRow[] = [];
   const seenPending = new Set<string>();
@@ -74,7 +81,7 @@ export async function fetchLiveParticipationSheetRows(): Promise<{
 
   let section: 'pending' | 'new_business' | null = null;
 
-  for (const row of (marvinRes.data.values ?? []) as string[][]) {
+  for (const row of values) {
     const a = cell(row, 0);
     const detected = detectSection(a);
     if (detected === 'pending' || detected === 'new_business') {
@@ -104,7 +111,7 @@ export async function fetchLiveParticipationSheetRows(): Promise<{
     const booths = parseBoothCount(cell(row, 3));
     const rate = parseMoneyToCents(cell(row, 4));
     const spend = parseMoneyToCents(cell(row, 6));
-    const notes = cell(row, 7); // Notes column on PENDING RENEWALS
+    const notes = cell(row, 7);
 
     if (section === 'pending') {
       if (seenPending.has(key)) continue;
@@ -139,12 +146,95 @@ export async function fetchLiveParticipationSheetRows(): Promise<{
     });
   }
 
+  return { pending, newBusiness };
+}
+
+async function resolveMarvinTabTitle(
+  sheets: ReturnType<typeof getSheetsClient>,
+  spreadsheetId: string,
+): Promise<string> {
+  if (cachedTabTitle) return cachedTabTitle;
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: 'sheets.properties.title',
+  });
+  cachedTabTitle = meta.data.sheets?.[0]?.properties?.title || 'Sheet1';
+  return cachedTabTitle;
+}
+
+async function pullMarvinValuesLive(): Promise<Omit<LiveParticipationSheetPayload, 'fromCache' | 'stale'>> {
+  const sheets = getSheetsClient();
+  const marvinSheetId = PARTICIPATION_MARVIN_SHEET_ID;
+
+  const loadValues = async (tab: string) =>
+    sheets.spreadsheets.values.get({
+      spreadsheetId: marvinSheetId,
+      range: `'${tab.replace(/'/g, "''")}'!A1:I120`,
+    });
+
+  // Prefer a single values.get. Only hit spreadsheets.get when the tab title is unknown.
+  let tab = cachedTabTitle ?? (await resolveMarvinTabTitle(sheets, marvinSheetId));
+  let marvinRes;
+  try {
+    marvinRes = await loadValues(tab);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (isGoogleSheetsQuotaError(message)) throw err;
+
+    // Tab may have been renamed — refresh title once and retry (not on quota errors).
+    cachedTabTitle = null;
+    tab = await resolveMarvinTabTitle(sheets, marvinSheetId);
+    marvinRes = await loadValues(tab);
+  }
+
+  const { pending, newBusiness } = parseMarvinRows((marvinRes.data.values ?? []) as string[][]);
   return {
     pending,
     newBusiness,
     fetchedAt: new Date().toISOString(),
     sources: { marvinSheetId },
   };
+}
+
+/**
+ * Pending accounts + Notes and New business — live from WhiskyFest & Tequila 2026 only.
+ * Results are cached in-memory for a few minutes to stay under Sheets API read quotas.
+ */
+export async function fetchLiveParticipationSheetRows(options?: {
+  force?: boolean;
+}): Promise<LiveParticipationSheetPayload> {
+  const now = Date.now();
+  if (!options?.force && memoryCache && memoryCache.expiresAt > now) {
+    return { ...memoryCache.payload, fromCache: true };
+  }
+
+  if (inflight) return inflight;
+
+  inflight = (async () => {
+    try {
+      const payload = await pullMarvinValuesLive();
+      memoryCache = {
+        payload,
+        expiresAt: Date.now() + LIVE_SHEETS_CACHE_TTL_MS,
+      };
+      return { ...payload, fromCache: false };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (memoryCache && isGoogleSheetsQuotaError(message)) {
+        console.warn('[participation] Sheets quota hit — serving cached Marvin rows', message);
+        return {
+          ...memoryCache.payload,
+          fromCache: true,
+          stale: true,
+        };
+      }
+      throw err;
+    } finally {
+      inflight = null;
+    }
+  })();
+
+  return inflight;
 }
 
 export function resolveRepIdFromInitials(

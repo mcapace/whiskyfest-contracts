@@ -93,6 +93,7 @@ function confirmedRow(
     contract_id: contract.id,
     contract_status: contract.status,
     target_id: null,
+    manual_upload_received: false,
   };
 }
 
@@ -128,6 +129,7 @@ function sheetDrivenRow(options: {
 
   const portalNotes = portal?.notes?.trim() || '';
   const sheetNotes = sheet.sheet_notes?.trim() || '';
+  const manualUpload = Boolean(portal?.manual_upload_received);
 
   return {
     id: portal?.id ?? `sheet:${sheet.section}:${normalizeCompanyKey(sheet.company_name)}`,
@@ -150,10 +152,11 @@ function sheetDrivenRow(options: {
       : sheet.total_spend_cents,
     notes: portalNotes,
     sheet_notes: sheetNotes,
-    pipeline_status: pipelineStatusLabel(contract),
+    pipeline_status: pipelineStatusLabel(contract, manualUpload),
     contract_id: contract?.id ?? portal?.linked_contract_id ?? null,
     contract_status: contract?.status ?? null,
     target_id: portal?.id ?? null,
+    manual_upload_received: manualUpload,
   };
 }
 
@@ -270,6 +273,7 @@ export async function buildParticipationReport(options?: {
 
   let sheetsFetchedAt: string | null = null;
   let sheetsError: string | null = null;
+  let sheetsFromCache = false;
   let livePending: LiveSheetPipelineRow[] = [];
   let liveNewBiz: LiveSheetPipelineRow[] = [];
 
@@ -278,6 +282,11 @@ export async function buildParticipationReport(options?: {
     livePending = live.pending;
     liveNewBiz = live.newBusiness;
     sheetsFetchedAt = live.fetchedAt;
+    sheetsFromCache = live.fromCache;
+    if (live.stale) {
+      sheetsError =
+        'Google Sheets read quota was hit — showing cached pending/new business (refreshes every few minutes).';
+    }
   } catch (err) {
     sheetsError = err instanceof Error ? err.message : 'Failed to load Google Sheets';
     console.error('[participation] live sheets pull failed', err);
@@ -312,6 +321,7 @@ export async function buildParticipationReport(options?: {
           id: targetId,
           notes: portal?.notes ?? null,
           linked_contract_id: portal?.linked_contract_id ?? match?.id ?? null,
+          manual_upload_received: portal?.manual_upload_received ?? false,
         } as WfPipelineTarget)
       : portal;
 
@@ -351,6 +361,7 @@ export async function buildParticipationReport(options?: {
           id: targetId,
           notes: portal?.notes ?? null,
           linked_contract_id: portal?.linked_contract_id ?? match?.id ?? null,
+          manual_upload_received: portal?.manual_upload_received ?? false,
         } as WfPipelineTarget)
       : portal;
 
@@ -392,10 +403,11 @@ export async function buildParticipationReport(options?: {
       total_spend_cents: target.total_spend_cents,
       notes: target.notes ?? '',
       sheet_notes: '',
-      pipeline_status: pipelineStatusLabel(match),
+      pipeline_status: pipelineStatusLabel(match, Boolean(target.manual_upload_received)),
       contract_id: match?.id ?? target.linked_contract_id,
       contract_status: match?.status ?? null,
       target_id: target.id,
+      manual_upload_received: Boolean(target.manual_upload_received),
     };
     if (target.section === 'pending_renewal') pending.push(row);
     else newBusiness.push(row);
@@ -423,8 +435,16 @@ export async function buildParticipationReport(options?: {
       confirmedPlusPendingSpendCents: confirmedSpendCents + pendingSpendCents,
     },
     salesReps,
+    linkableContracts: contracts.map((c) => ({
+      id: c.id,
+      company_name: c.exhibitor_company_name,
+      status: c.status,
+      booth_count: c.booth_count ?? 0,
+      total_cents: c.grand_total_cents ?? c.total_amount_cents ?? 0,
+    })),
     sheetsFetchedAt,
     sheetsError,
+    sheetsFromCache,
   };
 }
 
@@ -500,6 +520,7 @@ export async function updatePipelineTarget(
     total_spend_cents: number;
     notes: string | null;
     linked_contract_id: string | null;
+    manual_upload_received: boolean;
     is_active: boolean;
     section: PipelineSection;
   }>,

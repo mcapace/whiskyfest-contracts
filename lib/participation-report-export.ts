@@ -4,6 +4,7 @@ import {
   type ParticipationReport,
   type ParticipationReportRow,
 } from '@/lib/participation-report';
+import { PARTICIPATION_REPORT_ALLOWED_EMAILS } from '@/lib/participation-report-shared';
 import { formatBoothAmount, getSheetsClient } from '@/lib/sheets-tracker';
 
 type SheetsRequest = sheets_v4.Schema$Request;
@@ -526,15 +527,170 @@ export function buildParticipationCsv(report: ParticipationReport): string {
   return lines.join('\n');
 }
 
+/** Formatted .xlsx buffer matching the Marvin participation layout. */
+export async function buildParticipationExcel(report: ParticipationReport): Promise<Buffer> {
+  const ExcelJS = (await import('exceljs')).default;
+  const built = buildParticipationSheetValues(report);
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'WhiskyFest Contracts';
+  workbook.created = new Date();
+
+  const sheet = workbook.addWorksheet('Participation Status', {
+    views: [{ state: 'frozen', ySplit: 1, showGridLines: false }],
+  });
+
+  sheet.columns = [
+    { width: 12 },
+    { width: 28 },
+    { width: 42 },
+    { width: 12 },
+    { width: 14 },
+    { width: 16 },
+    { width: 14 },
+    { width: 36 },
+  ];
+
+  const hex = {
+    titleBg: '1F2937',
+    titleFg: 'FFFFFF',
+    confirmedBg: '2E7D54',
+    pendingBg: 'B87324',
+    newBizBg: '385E8C',
+    headerBg: 'EDEFF1',
+    totalBg: 'F2F2ED',
+    grandBg: '1F2937',
+    altRow: 'F7F8F8',
+    white: 'FFFFFF',
+  };
+
+  built.values.forEach((cells, rowIndex) => {
+    const kind = built.kinds[rowIndex]!;
+    const excelRow = sheet.addRow(cells);
+    excelRow.height = kind === 'title' ? 28 : kind === 'section' ? 22 : 18;
+
+    excelRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      cell.alignment = {
+        vertical: 'middle',
+        wrapText: true,
+        horizontal: colNumber >= 4 && colNumber <= 7 ? 'right' : 'left',
+      };
+      cell.font = { name: 'Calibri', size: kind === 'title' ? 16 : 11 };
+
+      if (kind === 'title') {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${hex.titleBg}` } };
+        cell.font = { name: 'Calibri', size: 16, bold: true, color: { argb: `FF${hex.titleFg}` } };
+      } else if (kind === 'subtitle') {
+        cell.font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF6B7280' } };
+      } else if (kind === 'section') {
+        const bg =
+          String(cells[0]).includes('CONFIRMED') && !String(cells[0]).includes('PENDING')
+            ? hex.confirmedBg
+            : String(cells[0]).includes('PENDING')
+              ? hex.pendingBg
+              : String(cells[0]).includes('NEW BUSINESS')
+                ? hex.newBizBg
+                : hex.titleBg;
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${bg}` } };
+        cell.font = { name: 'Calibri', size: 12, bold: true, color: { argb: `FF${hex.white}` } };
+      } else if (kind === 'header') {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${hex.headerBg}` } };
+        cell.font = { name: 'Calibri', size: 10, bold: true };
+      } else if (kind === 'total') {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${hex.totalBg}` } };
+        cell.font = { name: 'Calibri', size: 11, bold: true };
+      } else if (kind === 'grand') {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${hex.grandBg}` } };
+        cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: `FF${hex.white}` } };
+      } else if (kind === 'data' && rowIndex % 2 === 1) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${hex.altRow}` } };
+      }
+    });
+  });
+
+  // Freeze after title row is weak for this layout; freeze first header is complex.
+  // Keep top row visible instead.
+  sheet.views = [{ state: 'frozen', ySplit: 1, showGridLines: false }];
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
 export type ParticipationExportResult = {
   spreadsheetId: string;
   webViewLink: string;
   title: string;
 };
 
+function normalizeShareEmails(emails: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of emails) {
+    const email = raw?.trim().toLowerCase();
+    if (!email || !email.includes('@') || seen.has(email)) continue;
+    seen.add(email);
+    out.push(email);
+  }
+  return out;
+}
+
+/** Grant editor access so Kate/Michael (and any extras) can open the export immediately. */
+async function shareParticipationSpreadsheet(
+  drive: ReturnType<typeof getDriveClient>,
+  spreadsheetId: string,
+  emails: string[],
+  notifyEmail: string | null,
+) {
+  const notify = notifyEmail?.trim().toLowerCase() || null;
+  const failures: string[] = [];
+
+  for (const email of emails) {
+    try {
+      await drive.permissions.create({
+        fileId: spreadsheetId,
+        supportsAllDrives: true,
+        sendNotificationEmail: Boolean(notify && email === notify),
+        fields: 'id',
+        requestBody: {
+          type: 'user',
+          role: 'writer',
+          emailAddress: email,
+        },
+      });
+    } catch (err) {
+      console.error('[participation-export] share failed', email, err);
+      failures.push(email);
+    }
+  }
+
+  // If we couldn't share with the person who exported, try anyone-with-link as editor
+  // so the Open spreadsheet button still works without a Google "Request access" wall.
+  if (notify && failures.includes(notify)) {
+    try {
+      await drive.permissions.create({
+        fileId: spreadsheetId,
+        supportsAllDrives: true,
+        sendNotificationEmail: false,
+        fields: 'id',
+        requestBody: {
+          type: 'anyone',
+          role: 'writer',
+          allowFileDiscovery: false,
+        },
+      });
+    } catch (err) {
+      console.error('[participation-export] anyone-with-link fallback failed', err);
+      throw new Error(
+        `Spreadsheet was created but could not be shared with ${notify}. Ask an admin to open it and share, or set GOOGLE_PARTICIPATION_EXPORT_FOLDER_ID to a Shared Drive Kate can access.`,
+      );
+    }
+  }
+}
+
 /** Create a dated, formatted Google Spreadsheet in Marvin layout and return its link. */
 export async function exportParticipationReportToGoogleSheet(options?: {
   eventId?: string | null;
+  /** Email of the person who clicked Export — always gets editor access. */
+  shareWithEmail?: string | null;
 }): Promise<ParticipationExportResult> {
   const report = await buildParticipationReport({ eventId: options?.eventId });
   if (!report) throw new Error('No active WhiskyFest event found');
@@ -585,6 +741,23 @@ export async function exportParticipationReportToGoogleSheet(options?: {
       ],
     },
   });
+
+  const envExtras = (process.env['GOOGLE_PARTICIPATION_EXPORT_SHARE_EMAILS'] ?? '')
+    .split(/[,;\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const shareEmails = normalizeShareEmails([
+    options?.shareWithEmail,
+    ...PARTICIPATION_REPORT_ALLOWED_EMAILS,
+    ...envExtras,
+  ]);
+  await shareParticipationSpreadsheet(
+    drive,
+    spreadsheetId,
+    shareEmails,
+    options?.shareWithEmail ?? null,
+  );
 
   const webViewLink =
     created.data.webViewLink ||

@@ -28,6 +28,8 @@ export type WfPipelineTarget = {
   total_spend_cents: number;
   notes: string | null;
   linked_contract_id: string | null;
+  /** Signed PDF received manually (outside DocuSign). */
+  manual_upload_received: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -58,6 +60,17 @@ export type ParticipationReportRow = {
   contract_id: string | null;
   contract_status: ContractStatus | null;
   target_id: string | null;
+  /** Portal flag: manual signed PDF received for this pipeline row. */
+  manual_upload_received: boolean;
+};
+
+/** Same-event contracts available to link from Pending / New business. */
+export type ParticipationLinkableContract = {
+  id: string;
+  company_name: string;
+  status: ContractStatus;
+  booth_count: number;
+  total_cents: number;
 };
 
 export type ParticipationReport = {
@@ -74,9 +87,13 @@ export type ParticipationReport = {
     confirmedPlusPendingSpendCents: number;
   };
   salesReps: Pick<SalesRep, 'id' | 'name' | 'email'>[];
+  /** Contracts on this event for the “link existing” dropdown. */
+  linkableContracts: ParticipationLinkableContract[];
   /** ISO timestamp of last live Google Sheets pull (pending + new business). */
   sheetsFetchedAt: string | null;
   sheetsError: string | null;
+  /** True when pending/new business came from the short-lived Sheets cache. */
+  sheetsFromCache: boolean;
 };
 
 /** Normalize company names for matching across sheets / contracts. */
@@ -157,8 +174,13 @@ export function contractIsGraduated(status: ContractStatus): boolean {
   return GRADUATED_CONTRACT_STATUSES.includes(status);
 }
 
-export function pipelineStatusLabel(contract: ContractWithTotals | null): string {
-  if (!contract) return 'No contract';
+export function pipelineStatusLabel(
+  contract: ContractWithTotals | null,
+  manualUploadReceived = false,
+): string {
+  if (!contract) {
+    return manualUploadReceived ? 'Manual upload received' : 'No contract';
+  }
   switch (contract.status) {
     case 'draft':
     case 'ready_for_review':

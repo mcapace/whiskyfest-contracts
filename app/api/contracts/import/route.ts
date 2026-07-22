@@ -16,6 +16,36 @@ import type { Contract } from '@/types/db';
 export const runtime = 'nodejs';
 const MAX_IMPORT_PDF_BYTES = 10 * 1024 * 1024; // 10MB
 
+async function linkImportedContractToPipeline(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  pipelineTargetId: string | null,
+  contractId: string,
+  eventId: string,
+  actorEmail: string,
+) {
+  if (!pipelineTargetId) return;
+  const { error } = await supabase
+    .from('wf_pipeline_targets')
+    .update({
+      linked_contract_id: contractId,
+      manual_upload_received: true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', pipelineTargetId)
+    .eq('event_id', eventId)
+    .eq('is_active', true);
+  if (error) {
+    console.error('[import] pipeline link failed', pipelineTargetId, error.message);
+    return;
+  }
+  await supabase.from('audit_log').insert({
+    contract_id: contractId,
+    actor_email: actorEmail,
+    action: 'pipeline_target_linked',
+    metadata: { pipeline_target_id: pipelineTargetId, via: 'manual_import' },
+  });
+}
+
 function parseMoneyToCents(raw: string): number | null {
   const t = raw.replace(/[$,]/g, '').trim();
   if (!t) return null;
@@ -117,8 +147,10 @@ export async function POST(req: Request) {
     billing_contact_name: z.string().optional().nullable(),
     billing_contact_email: z.string().optional().nullable(),
     billing_address_notes: z.string().optional().nullable(),
+    pipeline_target_id: z.string().uuid().optional().nullable(),
   });
 
+  const pipelineRaw = String(form.get('pipeline_target_id') ?? '').trim();
   const parsed = bodySchema.safeParse({
     event_id: String(form.get('event_id') ?? ''),
     exhibitor_company_name: String(form.get('exhibitor_company_name') ?? ''),
@@ -144,6 +176,7 @@ export async function POST(req: Request) {
     billing_contact_name: form.get('billing_contact_name') ? String(form.get('billing_contact_name')) : null,
     billing_contact_email: form.get('billing_contact_email') ? String(form.get('billing_contact_email')) : null,
     billing_address_notes: form.get('billing_address_notes') ? String(form.get('billing_address_notes')) : null,
+    pipeline_target_id: pipelineRaw || null,
   });
 
   if (!parsed.success) {
@@ -305,6 +338,14 @@ export async function POST(req: Request) {
       to_status: 'pending_events_review',
       metadata: { originally_signed_at: signedDay, order_type: 'sponsorship_only' },
     });
+
+    await linkImportedContractToPipeline(
+      supabase,
+      p.pipeline_target_id ?? null,
+      contractId,
+      p.event_id,
+      actorEmail,
+    );
 
     revalidateContractPaths(contractId);
     return NextResponse.json({ ok: true, id: contractId });
@@ -473,6 +514,14 @@ export async function POST(req: Request) {
     to_status: 'pending_events_review',
     metadata: { originally_signed_at: signedDay },
   });
+
+  await linkImportedContractToPipeline(
+    supabase,
+    p.pipeline_target_id ?? null,
+    contractId,
+    p.event_id,
+    actorEmail,
+  );
 
   revalidateContractPaths(contractId);
 

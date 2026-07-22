@@ -29,6 +29,7 @@
     "cmdk": "^1.0.4",
     "date-fns": "^4.1.0",
     "driver.js": "^1.4.0",
+    "exceljs": "^4.4.0",
     "framer-motion": "^11.11.11",
     "googleapis": "^144.0.0",
     "jsonwebtoken": "^9.0.3",
