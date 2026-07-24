@@ -354,7 +354,11 @@ export function ContractActions({
     Boolean(docusignEnvelopeId);
   const canReviseAndSend =
     canRecall && clientSendEnabled && !discountApprovalPending && Boolean(reviseInitial);
-  const canResendWithChanges = canReminder && !discountApprovalPending;
+  const canResendWithChanges =
+    (isAdmin || isEventsTeam) &&
+    !discountApprovalPending &&
+    Boolean(docusignEnvelopeId) &&
+    (status === 'sent' || status === 'partially_signed' || status === 'error');
   const canVoid =
     (isAdmin || isEventsTeam) &&
     (status === 'sent' || status === 'partially_signed') &&
@@ -844,9 +848,21 @@ export function ContractActions({
                   <ContractActionButtonLabel icon={CircleAlert} label="View Error Details" />
                 </Button>
               </ActionWithHelp>
+              {canResendWithChanges && (
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.resendWithChanges}>
+                  <Button
+                    className={btnPrimary}
+                    onClick={() => setOpenResendWithChanges(true)}
+                    disabled={readOnly}
+                    title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                  >
+                    <ContractActionButtonLabel icon={Repeat2} label="Resend with Changes" />
+                  </Button>
+                </ActionWithHelp>
+              )}
               <ActionWithHelp helpText={CONTRACT_ACTION_HELP.resetToDraft}>
                 <Button
-                  className={btnPrimary}
+                  className={canResendWithChanges ? btnSecondary : btnPrimary}
                   onClick={() => {
                     if (!window.confirm('Reset this contract to draft? Internal notes will be cleared.')) return;
                     runAction('reset-error', 'reset-error', undefined, 'draft');
@@ -1108,7 +1124,10 @@ export function ContractActions({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Resend with Changes</DialogTitle>
-            <DialogDescription>The current DocuSign contract will be voided and a new one will be sent.</DialogDescription>
+            <DialogDescription>
+              Voids the current DocuSign envelope and sends a new one to the signer below. Use this when the
+              signing contact changed — Send Reminder only re-notifies whoever is already on the old envelope.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">

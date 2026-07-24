@@ -26,7 +26,7 @@ import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import { requiresDiscountApproval } from '@/lib/contracts';
-import { sendEnvelope, voidEnvelope } from '@/lib/docusign';
+import { fetchEnvelopeStatus, sendEnvelope, voidEnvelope } from '@/lib/docusign';
 import { syncExhibitorRosterWritebackById } from '@/lib/exhibitor-roster-sync-hook';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { docusignBrandIdForEvent } from '@/lib/product-email';
@@ -69,9 +69,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       { status: 403 },
     );
   }
-  if (contract.status !== 'sent' && contract.status !== 'partially_signed') {
+  // `error` covers declined/voided envelopes (e.g. wrong signer declined) so we can send a fresh envelope.
+  if (contract.status !== 'sent' && contract.status !== 'partially_signed' && contract.status !== 'error') {
     return NextResponse.json(
-      { error: 'Resend with Changes is only available while the DocuSign contract is sent or partially signed.' },
+      {
+        error:
+          'Resend with Changes is only available while the DocuSign contract is sent, partially signed, or in error after a declined/voided envelope.',
+      },
       { status: 409 },
     );
   }
@@ -99,10 +103,17 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }
 
   try {
-    await voidEnvelope(oldEnvelopeId, `Resent with updated info — ${gate.session.user.email}`);
+    const { status: envelopeStatus } = await fetchEnvelopeStatus(oldEnvelopeId);
+    const envLower = envelopeStatus.toLowerCase();
+    if (envLower !== 'voided' && envLower !== 'declined') {
+      await voidEnvelope(oldEnvelopeId, `Resent with updated info — ${gate.session.user.email}`);
+    }
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: msg }, { status: 502 });
+    // Already terminal envelopes sometimes reject void; still allow a new send.
+    if (!/voided|declined|completed|complete/i.test(msg)) {
+      return NextResponse.json({ error: msg }, { status: 502 });
+    }
   }
 
   if (parsed.data.signer_1_name || parsed.data.signer_1_email) {
@@ -179,6 +190,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         sent_at: sentAt,
         pdf_storage_path: draftStoragePath,
         drafted_at,
+        notes: null,
       })
       .eq('id', contract.id);
     if (updateError) {

@@ -20,6 +20,8 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     .update({
       status: 'draft',
       notes: null,
+      // Drop the dead/declined envelope so Sync cannot re-error this record.
+      docusign_envelope_id: null,
     })
     .eq('id', params.id);
 

@@ -12,8 +12,18 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { getSheetsClient } from '@/lib/sheets-tracker';
 import type { ContractStatus, ContractWithTotals, Event } from '@/types/db';
 
-/** After countersign / execution, DocuSign owns signer identity on the envelope. */
-const SIGNER_LOCKED_STATUSES: ContractStatus[] = ['partially_signed', 'signed', 'executed'];
+/**
+ * Once an envelope is out (or finished), DocuSign owns signer identity.
+ * Roster/sheet edits must not overwrite portal signer while status is `sent` —
+ * that made Torbreck look like Andrew while reminders still went to Mary.
+ * Use Resend with Changes to void and send a new envelope to the new signer.
+ */
+const SIGNER_LOCKED_STATUSES: ContractStatus[] = [
+  'sent',
+  'partially_signed',
+  'signed',
+  'executed',
+];
 
 function tabRange(tab: string, a1: string): string {
   const needsQuote = /\s|'/.test(tab);

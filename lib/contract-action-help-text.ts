@@ -10,7 +10,7 @@ export const CONTRACT_ACTION_HELP = {
   cancel: 'Use when the deal is off. Terminates the contract entirely.',
 
   sendReminder:
-    'Ask DocuSign to resend its standard signing email to outstanding recipients on the same envelope. Use when the client can receive @docusign.net mail; pair with Send personal note when they cannot.',
+    'Ask DocuSign to email the same recipients already on this envelope again. Does not change who signs — if the contact changed, use Resend with Changes instead.',
 
   sendPersonalNudge:
     'Send a personal follow-up to the unsigned signer with a secure link to sign the same original DocuSign agreement (bulk or individual send). Does not void or resend the envelope. Optionally CC a colleague.',
@@ -18,7 +18,8 @@ export const CONTRACT_ACTION_HELP = {
   syncFromDocusign:
     'Pull the latest signature status from DocuSign and update this contract if a webhook was missed (exhibitor signed or fully executed).',
 
-  resendWithChanges: 'Recall current envelope, edit contract, send new envelope.',
+  resendWithChanges:
+    'Void the current DocuSign envelope (or skip if already declined/voided) and send a new one — required when changing the signer name or email. Also available from Error after a declined envelope. Editing the portal/sheet contact alone does not update DocuSign.',
 
   recall:
     'Pull the envelope back to make edits. Returns the contract to draft so booths, brands, pricing, and signer can change before you generate a new PDF and send again.',
