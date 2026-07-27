@@ -1228,7 +1228,7 @@ export function ParticipationReportClient({ initial }: { initial: ParticipationR
                 ) : null}
                 {isConfirmed ? (
                   <p className="hidden text-[11px] text-muted-foreground sm:block">
-                    Booths from Marvin sheet · Adjust = separate billing / booth override
+                    Booths from Marvin # of Booths 2026 · Adjust = separate billing / booth override
                   </p>
                 ) : null}
               </div>

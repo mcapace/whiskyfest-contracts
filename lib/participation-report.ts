@@ -94,15 +94,17 @@ function confirmedRow(options: {
   const sponsorship = sponsorshipFromContract(contract);
   const contractBooths = contract.booth_count ?? 0;
   const contractSpend = contract.grand_total_cents ?? contract.total_amount_cents ?? 0;
-  const sheetBooths = sheet?.booth_count && sheet.booth_count > 0 ? sheet.booth_count : null;
+  // Marvin "# of Booths - 2026 Confirmed/Pending" — include 0 (e.g. sponsorship-only).
+  const sheetMatched = Boolean(sheet);
+  const sheetBooths = sheetMatched ? sheet!.booth_count : null;
 
   let boothCount = contractBooths;
   let boothsFromSheetOrOverride = false;
   if (override?.booth_count_override != null) {
     boothCount = override.booth_count_override;
     boothsFromSheetOrOverride = true;
-  } else if (sheetBooths != null) {
-    boothCount = sheetBooths;
+  } else if (sheetMatched) {
+    boothCount = sheet!.booth_count;
     boothsFromSheetOrOverride = true;
   }
 
@@ -216,7 +218,8 @@ function sheetDrivenRow(options: {
     brands_text: fromContract
       ? brandsFromContract(contract, brandNames) || sheet.brands_text
       : sheet.brands_text,
-    booth_count: fromContract ? contract.booth_count ?? sheet.booth_count : sheet.booth_count,
+    // Always use Marvin 2026 booths for pending/new — not the linked contract count.
+    booth_count: sheet.booth_count,
     rate_per_booth_cents: fromContract
       ? contract.booth_rate_cents ?? sheet.rate_per_booth_cents
       : sheet.rate_per_booth_cents,
