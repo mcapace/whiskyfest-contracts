@@ -18,6 +18,7 @@ import {
   downloadImportedContractPdf,
 } from '@/lib/contract-pdf-storage';
 import { sendAccountingEmail } from '@/lib/email';
+import { notifyContractExecuted } from '@/lib/notifications';
 import { accountingContractUrl } from '@/lib/product-email';
 import { productKeyFromEvent } from '@/lib/product-portal';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
@@ -166,6 +167,11 @@ export async function releaseContractToAccounting(options: {
           console.error('Failed to update Sheets tracker', err);
         }
         await syncExhibitorRosterWriteback(finished);
+      }
+      try {
+        await notifyContractExecuted(finished ?? contract, event);
+      } catch (err) {
+        console.error('[release-to-accounting] notifyContractExecuted failed', contract.id, err);
       }
       return { ok: true, executedAt };
     }
@@ -365,6 +371,12 @@ export async function releaseContractToAccounting(options: {
       console.error('Failed to update Sheets tracker', err);
     }
     await syncExhibitorRosterWriteback(executedContract);
+  }
+
+  try {
+    await notifyContractExecuted(executedContract ?? contract, event);
+  } catch (err) {
+    console.error('[release-to-accounting] notifyContractExecuted failed', contract.id, err);
   }
 
   return { ok: true, executedAt: now };

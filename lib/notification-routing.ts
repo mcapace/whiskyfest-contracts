@@ -10,6 +10,7 @@ export type NotificationKind =
   | 'discount_approved'
   | 'partial_signature'
   | 'fully_signed'
+  | 'contract_executed'
   | 'pending_review'
   | 'events_approved'
   | 'contract_recalled'
@@ -204,6 +205,22 @@ export async function resolveNotificationRecipients(
     const to = rep ? [rep] : team.slice(0, 1);
     const bcc = exclude(rep ? team : team.slice(1), new Set(to));
     return { skip: to.length === 0 && bcc.length === 0, to, cc: [], bcc };
+  }
+
+  /**
+   * All products: alert deal owner when status becomes executed (handed to AR).
+   * TO = assigned sales rep when present, else creator.
+   * CC = creator when different from TO (e.g. Katherine creates Stephen/Jody deals).
+   * Assistants are merged by the caller via mergeAssistantCc (Katherine → Stephen & Jody).
+   */
+  if (kind === 'contract_executed') {
+    const rep = await getSalesRepEmail(ctx.salesRepId);
+    const createdBy = await resolvedCreatedBy(ctx);
+    const owner = rep ?? createdBy;
+    if (!owner) return empty('No sales rep or creator for executed alert');
+    const cc =
+      createdBy && createdBy !== owner.toLowerCase() ? [createdBy] : [];
+    return { skip: false, to: [owner], cc, bcc: [] };
   }
 
   if (kind === 'pending_review') {

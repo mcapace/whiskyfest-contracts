@@ -454,6 +454,79 @@ export async function notifyContractFullySigned(
   });
 }
 
+/**
+ * Email assigned sales rep (+ assistants) and creator when a contract is executed / handed to accounting.
+ * Covers WhiskyFest, Big Smoke, and NYWE (all events).
+ */
+export async function notifyContractExecuted(
+  contract: Pick<
+    Contract,
+    | 'id'
+    | 'event_id'
+    | 'exhibitor_company_name'
+    | 'sales_rep_id'
+    | 'created_by'
+    | 'booth_count'
+    | 'booth_rate_cents'
+  > & {
+    sales_rep_name?: string | null;
+    sales_rep_email?: string | null;
+    booth_subtotal_cents?: number;
+    line_items_subtotal_cents?: number | null;
+    grand_total_cents?: number;
+  },
+  event: Pick<Event, 'name' | 'year' | 'product_key' | 'workflow_profile' | 'shanken_signatory_email'> | null,
+): Promise<void> {
+  const mail = await contractMailMeta(contract, event);
+
+  const eventTitle = event ? `${event.name} ${event.year}`.trim() : 'Event';
+  const company = contract.exhibitor_company_name.trim();
+  const detailUrl = mail.detailUrl;
+
+  const boothSub = contract.booth_subtotal_cents ?? contract.booth_count * contract.booth_rate_cents;
+  const grand =
+    typeof contract.grand_total_cents === 'number'
+      ? contract.grand_total_cents
+      : boothSub + (contract.line_items_subtotal_cents ?? 0);
+  const pricingText = contractPricingTextLines({
+    booth_subtotal_cents: boothSub,
+    line_items_subtotal_cents: contract.line_items_subtotal_cents,
+    grand_total_cents: grand,
+  }).join('\n');
+
+  const subject = `${company} — contract executed`;
+  const text = [
+    `The ${eventTitle} contract for ${company} has been executed and handed to accounting.`,
+    ``,
+    pricingText,
+    ``,
+    `Open contract: ${detailUrl}`,
+  ].join('\n');
+
+  const html = `
+    <div style="font-family: system-ui, sans-serif; max-width: 560px;">
+      <p>The ${escapeHtml(eventTitle)} contract for <strong>${escapeHtml(company)}</strong> has been <strong>executed</strong> and handed to accounting.</p>
+      ${contractPricingHtmlFragment({
+        booth_subtotal_cents: boothSub,
+        line_items_subtotal_cents: contract.line_items_subtotal_cents,
+        grand_total_cents: grand,
+      })}
+      <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in ${escapeHtml(mail.workspaceLabel)}</a></p>
+    </div>
+  `;
+
+  await sendRoutedContractEmail({
+    kind: 'contract_executed',
+    ctx: contractNotifyContext(contract, event),
+    logLabel: 'notifyContractExecuted',
+    from: mail.from,
+    subject,
+    text,
+    html,
+    assistantRepId: contract.sales_rep_id,
+  });
+}
+
 /** Alert events team that a contract PDF is ready for review. */
 export async function notifyEventsTeamOfPendingReview(
   contract: Pick<Contract, 'id' | 'event_id' | 'exhibitor_company_name' | 'booth_rate_cents' | 'booth_count'> & {
