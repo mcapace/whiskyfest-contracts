@@ -1,5 +1,7 @@
 import { isEventsManagedWorkflow, isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
+import { NO_CHARGE_BOOTH_ASSISTANT_EMAIL } from '@/lib/no-charge-booth';
 import { NYWE_COUNTERSIGNER_EMAILS } from '@/lib/nywe-countersigner';
+import { PRODUCT_WHISKYFEST } from '@/lib/product-portal';
 import { WHISKYFEST_BIG_SMOKE_COUNTERSIGNER_EMAILS } from '@/lib/wf-bslv-countersigner';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { Event } from '@/types/db';
@@ -31,13 +33,15 @@ export type ContractNotificationContext = {
 async function resolveWorkflow(ctx: ContractNotificationContext): Promise<{
   eventsManaged: boolean;
   nywe: boolean;
+  whiskyfest: boolean;
   countersignerEmail: string | null;
 }> {
-  if (ctx.event?.workflow_profile != null) {
+  if (ctx.event?.workflow_profile != null || ctx.event?.product_key != null) {
     const event = ctx.event as Pick<Event, 'workflow_profile' | 'product_key' | 'shanken_signatory_email'>;
     return {
       eventsManaged: isEventsManagedWorkflow(event),
       nywe: isNyweEventsManagedEvent(event),
+      whiskyfest: (event.product_key ?? '').toLowerCase() === PRODUCT_WHISKYFEST,
       countersignerEmail: event.shanken_signatory_email?.trim().toLowerCase() || null,
     };
   }
@@ -88,9 +92,10 @@ function countersignerExcluded(): Set<string> {
 async function loadEventWorkflow(eventId: string | null | undefined): Promise<{
   eventsManaged: boolean;
   nywe: boolean;
+  whiskyfest: boolean;
   countersignerEmail: string | null;
 }> {
-  if (!eventId) return { eventsManaged: false, nywe: false, countersignerEmail: null };
+  if (!eventId) return { eventsManaged: false, nywe: false, whiskyfest: false, countersignerEmail: null };
 
   const supabase = getSupabaseAdmin();
   const { data: event } = await supabase
@@ -99,13 +104,14 @@ async function loadEventWorkflow(eventId: string | null | undefined): Promise<{
     .eq('id', eventId)
     .maybeSingle<Pick<Event, 'workflow_profile' | 'product_key' | 'shanken_signatory_email'>>();
 
-  if (!event) return { eventsManaged: false, nywe: false, countersignerEmail: null };
+  if (!event) return { eventsManaged: false, nywe: false, whiskyfest: false, countersignerEmail: null };
 
   const eventsManaged = isEventsManagedWorkflow(event);
   const nywe = isNyweEventsManagedEvent(event);
+  const whiskyfest = (event.product_key ?? '').toLowerCase() === PRODUCT_WHISKYFEST;
   const countersignerEmail = event.shanken_signatory_email?.trim().toLowerCase() || null;
 
-  return { eventsManaged, nywe, countersignerEmail };
+  return { eventsManaged, nywe, whiskyfest, countersignerEmail };
 }
 
 async function getActiveEventsTeamEmails(): Promise<string[]> {
@@ -210,16 +216,21 @@ export async function resolveNotificationRecipients(
   /**
    * All products: alert deal owner when status becomes executed (handed to AR).
    * TO = assigned sales rep when present, else creator.
-   * CC = creator when different from TO (e.g. Katherine creates Stephen/Jody deals).
-   * Assistants are merged by the caller via mergeAssistantCc (Katherine → Stephen & Jody).
+   * CC = creator when different from TO.
+   * WhiskyFest only: always CC Katherine Brumley for every rep's deals.
+   * Assistants are merged by the caller via mergeAssistantCc.
    */
   if (kind === 'contract_executed') {
     const rep = await getSalesRepEmail(ctx.salesRepId);
     const createdBy = await resolvedCreatedBy(ctx);
     const owner = rep ?? createdBy;
     if (!owner) return empty('No sales rep or creator for executed alert');
-    const cc =
-      createdBy && createdBy !== owner.toLowerCase() ? [createdBy] : [];
+    const cc: string[] = [];
+    if (createdBy && createdBy !== owner.toLowerCase()) cc.push(createdBy);
+    if (wf.whiskyfest) {
+      const kate = NO_CHARGE_BOOTH_ASSISTANT_EMAIL.toLowerCase();
+      if (kate !== owner.toLowerCase() && !cc.includes(kate)) cc.push(kate);
+    }
     return { skip: false, to: [owner], cc, bcc: [] };
   }
 

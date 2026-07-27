@@ -456,7 +456,7 @@ export async function notifyContractFullySigned(
 
 /**
  * Email assigned sales rep (+ assistants) and creator when a contract is executed / handed to accounting.
- * Covers WhiskyFest, Big Smoke, and NYWE (all events).
+ * Covers WhiskyFest, Big Smoke, and NYWE. On WhiskyFest, Katherine is always CC'd for every rep.
  */
 export async function notifyContractExecuted(
   contract: Pick<
