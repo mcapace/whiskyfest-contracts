@@ -258,8 +258,12 @@ export function ContractActions({
         queueMicrotask(() => router.refresh());
       } else {
         contractLive?.setOptimisticStatus(null);
-        const j = await res.json().catch(() => ({}));
-        alert(`Action failed: ${j.error ?? res.status}`);
+        const j = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          message?: string;
+        };
+        const detail = j.error || j.message || `HTTP ${res.status}`;
+        alert(`Action failed: ${detail}`);
       }
       setAction(null);
     });
