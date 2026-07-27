@@ -55,6 +55,82 @@ function cell(row: string[], idx: number): string {
   return (row[idx] ?? '').toString().trim();
 }
 
+function normalizeHeader(raw: string): string {
+  return raw.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Marvin layout (2026): Sales Rep | Company | Brands | Booths 2025 | Booths 2026 | Rate | Sponsorship | Total Spend | Notes
+ * Older single-booth layout had Rate in col E and Total Spend in col G — that mis-read 2026 booth counts as $.
+ */
+type ColumnMap = {
+  company: number;
+  brands: number;
+  booths: number;
+  rate: number;
+  spend: number;
+  notes: number;
+};
+
+/** Dual booth-year columns (current Marvin sheet). */
+const DUAL_BOOTH_COLUMNS: ColumnMap = {
+  company: 1,
+  brands: 2,
+  booths: 4,
+  rate: 5,
+  spend: 7,
+  notes: 8,
+};
+
+/** Legacy single booths column (pre dual 2025/2026 headers). */
+const LEGACY_COLUMNS: ColumnMap = {
+  company: 1,
+  brands: 2,
+  booths: 3,
+  rate: 4,
+  spend: 6,
+  notes: 7,
+};
+
+function findHeaderIndex(headers: string[], ...needles: string[]): number {
+  for (let i = 0; i < headers.length; i++) {
+    const h = headers[i] ?? '';
+    if (needles.every((n) => h.includes(n))) return i;
+  }
+  return -1;
+}
+
+/** Build a column map from a "Sales Rep" header row; falls back to dual-booth layout. */
+function columnMapFromHeaderRow(row: string[]): ColumnMap {
+  const headers = row.map((c) => normalizeHeader(String(c ?? '')));
+  if (!headers[0]?.includes('sales rep')) return DUAL_BOOTH_COLUMNS;
+
+  const company = findHeaderIndex(headers, 'company');
+  const brands = findHeaderIndex(headers, 'brand');
+  // Prefer 2026 booths when both years exist; else any booths column.
+  let booths = findHeaderIndex(headers, 'booth', '2026');
+  if (booths < 0) booths = findHeaderIndex(headers, 'booth');
+  const rate = findHeaderIndex(headers, 'rate');
+  const spend = findHeaderIndex(headers, 'total spend');
+  const notes = findHeaderIndex(headers, 'note');
+
+  const hasDualBoothYears =
+    findHeaderIndex(headers, 'booth', '2025') >= 0 && findHeaderIndex(headers, 'booth', '2026') >= 0;
+
+  if (company < 0 || booths < 0 || rate < 0 || spend < 0) {
+    return hasDualBoothYears ? DUAL_BOOTH_COLUMNS : LEGACY_COLUMNS;
+  }
+
+  return {
+    company,
+    brands: brands >= 0 ? brands : 2,
+    booths,
+    rate,
+    spend,
+    notes: notes >= 0 ? notes : spend + 1,
+  };
+}
+
 function isHeaderOrTotal(company: string, firstCol: string): boolean {
   const c = company.toLowerCase();
   const a = firstCol.toLowerCase();
@@ -75,15 +151,19 @@ function detectSection(firstCol: string): 'pending' | 'new_business' | 'confirme
   return null;
 }
 
-function parseDataRow(row: string[], a: string): Omit<LiveSheetPipelineRow, 'section'> | null {
-  const company = cell(row, 1);
+function parseDataRow(
+  row: string[],
+  a: string,
+  cols: ColumnMap,
+): Omit<LiveSheetPipelineRow, 'section'> | null {
+  const company = cell(row, cols.company);
   if (!company || isHeaderOrTotal(company, a)) return null;
 
-  const brands = cell(row, 2);
-  const booths = parseBoothCount(cell(row, 3));
-  const rate = parseMoneyToCents(cell(row, 4));
-  const spend = parseMoneyToCents(cell(row, 6));
-  const notes = cell(row, 7);
+  const brands = cell(row, cols.brands);
+  const booths = parseBoothCount(cell(row, cols.booths));
+  const rate = parseMoneyToCents(cell(row, cols.rate));
+  const spend = parseMoneyToCents(cell(row, cols.spend));
+  const notes = cell(row, cols.notes);
   const rateCents = rate || (booths > 0 && spend > 0 ? Math.round(spend / booths) : 0);
 
   return {
@@ -111,12 +191,14 @@ function parseMarvinRows(values: string[][]): {
   const seenConfirmed = new Set<string>();
 
   let section: 'pending' | 'new_business' | 'confirmed' | null = null;
+  let cols: ColumnMap = DUAL_BOOTH_COLUMNS;
 
   for (const row of values) {
     const a = cell(row, 0);
     const detected = detectSection(a);
     if (detected === 'pending' || detected === 'new_business' || detected === 'confirmed') {
       section = detected;
+      cols = DUAL_BOOTH_COLUMNS;
       continue;
     }
     if (detected === 'skip') {
@@ -130,9 +212,12 @@ function parseMarvinRows(values: string[][]): {
       section = null;
       continue;
     }
-    if (aUp === 'SALES REP') continue;
+    if (aUp === 'SALES REP') {
+      cols = columnMapFromHeaderRow(row);
+      continue;
+    }
 
-    const parsed = parseDataRow(row, a);
+    const parsed = parseDataRow(row, a, cols);
     if (!parsed) continue;
     const key = normalizeCompanyKey(parsed.company_name);
 
@@ -196,7 +281,7 @@ async function pullMarvinValuesLive(): Promise<Omit<LiveParticipationSheetPayloa
   const loadValues = async (tab: string) =>
     sheets.spreadsheets.values.get({
       spreadsheetId: marvinSheetId,
-      range: `'${tab.replace(/'/g, "''")}'!A1:I120`,
+      range: `'${tab.replace(/'/g, "''")}'!A1:J120`,
     });
 
   // Prefer a single values.get. Only hit spreadsheets.get when the tab title is unknown.
