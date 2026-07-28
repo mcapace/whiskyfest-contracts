@@ -20,10 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import type { ContractWithTotals, Event, InvoiceStatus } from '@/types/db';
 import { ExportBilledButton } from '@/components/accounting/export-billed-button';
-import {
-  DownloadAccountingCsvButton,
-  type AccountingCsvRow,
-} from '@/components/accounting/download-accounting-csv-button';
+import { AccountingListExportButtons } from '@/components/accounting/accounting-list-export-buttons';
 
 const DISPLAY_CAP = 500;
 
@@ -301,22 +298,14 @@ export async function AccountingDashboardView({
     return `${shown} · ${parts.join(' · ')} · sorted by ${sort} (${dir})`;
   })();
 
-  const csvRows: AccountingCsvRow[] = displayed.map((c) => {
-    const ev = eventMap.get(c.event_id);
-    const inv = (c.invoice_status ?? 'pending') as InvoiceStatus;
-    return {
-      company: c.exhibitor_company_name,
-      event: ev?.name ?? '',
-      billingContact: c.billing_contact_name?.trim() || '',
-      billingEmail: c.billing_contact_email?.trim() || '',
-      total: formatCurrency(c.grand_total_cents),
-      salesRep: c.sales_rep_name ?? c.sales_rep_email ?? '',
-      executed: c.executed_at ? formatTimestamp(c.executed_at) : '',
-      invoiceStatus: formatInvoiceStatus(inv),
-    };
-  });
-
-  const csvFilename = `${portalLabel.replace(/\s+/g, '-').toLowerCase()}-accounting.csv`;
+  const exportFilters = {
+    invoice: invoice === 'all' ? undefined : invoice,
+    q: q || undefined,
+    rep: showSalesRep ? repQ || undefined : undefined,
+    event: eventId || undefined,
+    sort: sort === 'executed' ? undefined : sort,
+    dir: sort === 'executed' && dir === 'desc' ? undefined : dir,
+  };
 
   return (
     <div className="space-y-10">
@@ -415,12 +404,8 @@ export async function AccountingDashboardView({
             <h2 className="font-serif text-lg font-semibold">Executed contracts</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">{filterDescription}</p>
           </div>
-          <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
-            <DownloadAccountingCsvButton
-              rows={csvRows}
-              filename={csvFilename}
-              includeSalesRep={showSalesRep}
-            />
+          <div className="flex flex-col items-start gap-3">
+            <AccountingListExportButtons productKey={productKey} filters={exportFilters} />
             <ExportBilledButton productKey={productKey} />
           </div>
         </div>
