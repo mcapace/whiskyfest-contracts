@@ -84,6 +84,7 @@ export function accountingListHeaders(productKey: AccountingPortalKey): string[]
   ];
 }
 
+/** Cell values for CSV (Total as formatted currency string). */
 export function accountingListRowCells(
   row: AccountingListExportRow,
   productKey: AccountingPortalKey,
@@ -98,6 +99,56 @@ export function accountingListRowCells(
     row.executed,
     row.invoiceStatus,
   ];
+}
+
+/** Cell values for Excel/Sheets (Total as number for currency formatting). */
+function accountingListRichRowCells(
+  row: AccountingListExportRow,
+  productKey: AccountingPortalKey,
+): Array<string | number> {
+  return [
+    row.company,
+    row.event,
+    row.billingContact,
+    row.billingEmail,
+    row.totalCents / 100,
+    ...(showSalesRep(productKey) ? [row.salesRep] : []),
+    row.executed,
+    row.invoiceStatus,
+  ];
+}
+
+function productTheme(productKey: AccountingPortalKey) {
+  if (productKey === 'wine_spectator') {
+    return {
+      titleBg: '881337',
+      accent: 'BE123C',
+      headerBg: 'FFF1F2',
+      headerFg: '881337',
+      altRow: 'FFF7F8',
+    };
+  }
+  if (productKey === 'big_smoke') {
+    return {
+      titleBg: '78350F',
+      accent: 'B45309',
+      headerBg: 'FFFBEB',
+      headerFg: '78350F',
+      altRow: 'FFFCF5',
+    };
+  }
+  return {
+    titleBg: '1F2937',
+    accent: '3F6212',
+    headerBg: 'F0F2F4',
+    headerFg: '1F2937',
+    altRow: 'F7F8F8',
+  };
+}
+
+function totalColumnIndex(productKey: AccountingPortalKey): number {
+  // 0-based: Company, Event, Billing contact, Billing email, Total
+  return 4;
 }
 
 /** Load executed AR contracts for a portal with the same filters/sort as the dashboard. */
@@ -250,32 +301,90 @@ export async function buildAccountingListExcel(
   workbook.creator = 'M. Shanken Contracts';
   workbook.created = new Date();
 
+  const theme = productTheme(productKey);
+  const headers = accountingListHeaders(productKey);
+  const colCount = headers.length;
+  const totalCol = totalColumnIndex(productKey) + 1; // 1-based for ExcelJS
+
+  const solid = (argb: string) =>
+    ({ type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: `FF${argb}` } });
+
   const sheet = workbook.addWorksheet('AR list', {
-    views: [{ state: 'frozen', ySplit: 1 }],
+    views: [{ state: 'frozen', ySplit: 3, showGridLines: false }],
+    properties: { defaultRowHeight: 18 },
   });
 
-  const headers = accountingListHeaders(productKey);
-  sheet.addRow(headers);
-  sheet.getRow(1).font = { bold: true };
-  sheet.getRow(1).fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FFEDEFF1' },
-  };
-
-  for (const row of rows) {
-    sheet.addRow(accountingListRowCells(row, productKey));
-  }
-
   sheet.columns = headers.map((h) => ({
-    header: h,
-    width: h === 'Company' || h === 'Event' ? 28 : h === 'Billing email' ? 28 : 16,
+    width:
+      h === 'Company' || h === 'Event'
+        ? 28
+        : h === 'Billing email' || h === 'Billing contact'
+          ? 26
+          : h === 'Invoice status'
+            ? 16
+            : 14,
   }));
 
-  const title = workbook.addWorksheet('About');
-  title.addRow([`${productLabel} accounting export`]);
-  title.addRow([`Generated ${new Date().toISOString()}`]);
-  title.addRow([`${rows.length} row(s)`]);
+  const generated = new Date().toLocaleString('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+
+  const titleRow = sheet.addRow([`${productLabel} · Accounts receivable`]);
+  titleRow.height = 32;
+  for (let c = 1; c <= colCount; c++) {
+    const cell = titleRow.getCell(c);
+    cell.fill = solid(theme.titleBg);
+    cell.font = { name: 'Calibri', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.alignment = { vertical: 'middle', horizontal: 'left' };
+  }
+  sheet.mergeCells(1, 1, 1, colCount);
+
+  const subtitleRow = sheet.addRow([
+    `${rows.length} contract${rows.length === 1 ? '' : 's'} · Generated ${generated}`,
+  ]);
+  subtitleRow.height = 20;
+  for (let c = 1; c <= colCount; c++) {
+    const cell = subtitleRow.getCell(c);
+    cell.fill = solid('F3F4F6');
+    cell.font = { name: 'Calibri', size: 9, italic: true, color: { argb: 'FF6B7280' } };
+    cell.alignment = { vertical: 'middle', horizontal: 'left' };
+  }
+  sheet.mergeCells(2, 1, 2, colCount);
+
+  const headerRow = sheet.addRow(headers);
+  headerRow.height = 22;
+  headerRow.eachCell({ includeEmpty: true }, (cell) => {
+    cell.fill = solid(theme.headerBg);
+    cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: `FF${theme.headerFg}` } };
+    cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+    cell.border = {
+      bottom: { style: 'thin', color: { argb: `FF${theme.accent}` } },
+    };
+  });
+  headerRow.getCell(totalCol).alignment = { vertical: 'middle', horizontal: 'right' };
+
+  rows.forEach((row, index) => {
+    const excelRow = sheet.addRow(accountingListRichRowCells(row, productKey));
+    excelRow.height = 18;
+    excelRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      cell.font = {
+        name: 'Calibri',
+        size: 10,
+        bold: colNumber === 1,
+        color: { argb: 'FF1F2937' },
+      };
+      cell.alignment = {
+        vertical: 'middle',
+        horizontal: colNumber === totalCol ? 'right' : 'left',
+        wrapText: true,
+      };
+      if (index % 2 === 1) cell.fill = solid(theme.altRow);
+      if (colNumber === totalCol) {
+        cell.numFmt = '"$"#,##0.00';
+      }
+    });
+  });
 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
@@ -377,21 +486,36 @@ async function getOrCreateArListSpreadsheet(
   };
 }
 
-async function ensureTab(spreadsheetId: string, tabName: string): Promise<void> {
+async function ensureTab(spreadsheetId: string, tabName: string): Promise<number> {
   const sheets = getSheetsClient();
-  const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets.properties.title' });
-  const exists = meta.data.sheets?.some((sheet) => sheet.properties?.title === tabName);
-  if (exists) return;
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId,
+    fields: 'sheets.properties(sheetId,title)',
+  });
+  const existing = meta.data.sheets?.find((sheet) => sheet.properties?.title === tabName);
+  if (existing?.properties?.sheetId != null) return existing.properties.sheetId;
 
-  await sheets.spreadsheets.batchUpdate({
+  const added = await sheets.spreadsheets.batchUpdate({
     spreadsheetId,
     requestBody: {
       requests: [{ addSheet: { properties: { title: tabName } } }],
     },
   });
+  const sheetId = added.data.replies?.[0]?.addSheet?.properties?.sheetId;
+  if (sheetId == null) throw new Error('Could not create Google Sheets tab.');
+  return sheetId;
 }
 
-/** Full refresh of the filtered AR list into a Google Sheet (separate from billed export). */
+function hexToRgb(hex: string): { red: number; green: number; blue: number } {
+  const n = Number.parseInt(hex, 16);
+  return {
+    red: ((n >> 16) & 255) / 255,
+    green: ((n >> 8) & 255) / 255,
+    blue: (n & 255) / 255,
+  };
+}
+
+/** Full refresh of the filtered AR list into a formatted Google Sheet. */
 export async function exportAccountingListToGoogleSheet(filters: AccountingListFilters): Promise<{
   spreadsheetId: string;
   webViewLink: string;
@@ -402,10 +526,23 @@ export async function exportAccountingListToGoogleSheet(filters: AccountingListF
   const { rows, productLabel } = await queryAccountingList({ ...filters, limit: 5000 });
   const { spreadsheetId, webViewLink } = await getOrCreateArListSpreadsheet(filters.productKey);
   const tab = 'AR list';
-  await ensureTab(spreadsheetId, tab);
+  const sheetId = await ensureTab(spreadsheetId, tab);
 
   const headers = accountingListHeaders(filters.productKey);
-  const values = [headers, ...rows.map((row) => accountingListRowCells(row, filters.productKey))];
+  const colCount = headers.length;
+  const totalCol = totalColumnIndex(filters.productKey);
+  const theme = productTheme(filters.productKey);
+  const generated = new Date().toLocaleString('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+
+  const values: Array<Array<string | number>> = [
+    [`${productLabel} · Accounts receivable`],
+    [`${rows.length} contract${rows.length === 1 ? '' : 's'} · Generated ${generated}`],
+    headers,
+    ...rows.map((row) => accountingListRichRowCells(row, filters.productKey)),
+  ];
 
   const sheets = getSheetsClient();
   await sheets.spreadsheets.values.clear({
@@ -417,6 +554,159 @@ export async function exportAccountingListToGoogleSheet(filters: AccountingListF
     range: tabRange(tab, 'A1'),
     valueInputOption: 'USER_ENTERED',
     requestBody: { values },
+  });
+
+  const endRow = values.length;
+  const dataStart = 3; // 0-based row index of first data row
+  const widths = showSalesRep(filters.productKey)
+    ? [200, 200, 160, 200, 110, 140, 130, 120]
+    : [200, 200, 160, 200, 110, 130, 120];
+
+  const requests: object[] = [
+    {
+      updateSheetProperties: {
+        properties: {
+          sheetId,
+          gridProperties: { frozenRowCount: 3 },
+        },
+        fields: 'gridProperties.frozenRowCount',
+      },
+    },
+    ...widths.map((pixelSize, i) => ({
+      updateDimensionProperties: {
+        range: { sheetId, dimension: 'COLUMNS', startIndex: i, endIndex: i + 1 },
+        properties: { pixelSize },
+        fields: 'pixelSize',
+      },
+    })),
+    {
+      mergeCells: {
+        range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: colCount },
+        mergeType: 'MERGE_ALL',
+      },
+    },
+    {
+      mergeCells: {
+        range: { sheetId, startRowIndex: 1, endRowIndex: 2, startColumnIndex: 0, endColumnIndex: colCount },
+        mergeType: 'MERGE_ALL',
+      },
+    },
+    {
+      repeatCell: {
+        range: { sheetId, startRowIndex: 0, endRowIndex: endRow, startColumnIndex: 0, endColumnIndex: colCount },
+        cell: {
+          userEnteredFormat: {
+            textFormat: { fontFamily: 'Arial', fontSize: 10 },
+            verticalAlignment: 'MIDDLE',
+            wrapStrategy: 'WRAP',
+          },
+        },
+        fields: 'userEnteredFormat(textFormat,verticalAlignment,wrapStrategy)',
+      },
+    },
+    {
+      repeatCell: {
+        range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: colCount },
+        cell: {
+          userEnteredFormat: {
+            backgroundColor: hexToRgb(theme.titleBg),
+            textFormat: {
+              fontFamily: 'Arial',
+              fontSize: 16,
+              bold: true,
+              foregroundColor: { red: 1, green: 1, blue: 1 },
+            },
+            verticalAlignment: 'MIDDLE',
+          },
+        },
+        fields: 'userEnteredFormat(backgroundColor,textFormat,verticalAlignment)',
+      },
+    },
+    {
+      repeatCell: {
+        range: { sheetId, startRowIndex: 1, endRowIndex: 2, startColumnIndex: 0, endColumnIndex: colCount },
+        cell: {
+          userEnteredFormat: {
+            backgroundColor: { red: 0.95, green: 0.95, blue: 0.96 },
+            textFormat: {
+              fontFamily: 'Arial',
+              fontSize: 9,
+              italic: true,
+              foregroundColor: { red: 0.42, green: 0.45, blue: 0.5 },
+            },
+          },
+        },
+        fields: 'userEnteredFormat(backgroundColor,textFormat)',
+      },
+    },
+    {
+      repeatCell: {
+        range: { sheetId, startRowIndex: 2, endRowIndex: 3, startColumnIndex: 0, endColumnIndex: colCount },
+        cell: {
+          userEnteredFormat: {
+            backgroundColor: hexToRgb(theme.headerBg),
+            textFormat: {
+              fontFamily: 'Arial',
+              fontSize: 10,
+              bold: true,
+              foregroundColor: hexToRgb(theme.headerFg),
+            },
+            borders: {
+              bottom: { style: 'SOLID', width: 1, color: hexToRgb(theme.accent) },
+            },
+          },
+        },
+        fields: 'userEnteredFormat(backgroundColor,textFormat,borders)',
+      },
+    },
+    {
+      repeatCell: {
+        range: {
+          sheetId,
+          startRowIndex: dataStart,
+          endRowIndex: endRow,
+          startColumnIndex: totalCol,
+          endColumnIndex: totalCol + 1,
+        },
+        cell: {
+          userEnteredFormat: {
+            numberFormat: { type: 'CURRENCY', pattern: '$#,##0.00' },
+            horizontalAlignment: 'RIGHT',
+          },
+        },
+        fields: 'userEnteredFormat(numberFormat,horizontalAlignment)',
+      },
+    },
+    {
+      repeatCell: {
+        range: {
+          sheetId,
+          startRowIndex: dataStart,
+          endRowIndex: endRow,
+          startColumnIndex: 0,
+          endColumnIndex: 1,
+        },
+        cell: { userEnteredFormat: { textFormat: { bold: true } } },
+        fields: 'userEnteredFormat.textFormat.bold',
+      },
+    },
+  ];
+
+  // Zebra striping for odd data rows
+  for (let r = dataStart; r < endRow; r++) {
+    if ((r - dataStart) % 2 !== 1) continue;
+    requests.push({
+      repeatCell: {
+        range: { sheetId, startRowIndex: r, endRowIndex: r + 1, startColumnIndex: 0, endColumnIndex: colCount },
+        cell: { userEnteredFormat: { backgroundColor: hexToRgb(theme.altRow) } },
+        fields: 'userEnteredFormat.backgroundColor',
+      },
+    });
+  }
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: { requests },
   });
 
   return {
