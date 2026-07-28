@@ -3,11 +3,12 @@ import type { LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn, formatCurrency } from '@/lib/utils';
 
-const accentRing: Record<'whisky' | 'fest' | 'amber' | 'emerald', string> = {
+const accentRing: Record<'whisky' | 'fest' | 'amber' | 'emerald' | 'rose', string> = {
   whisky: 'text-whisky-800 bg-whisky-100/60 ring-whisky-300/30',
   fest: 'text-fest-800 bg-fest-100/90 ring-fest-300/30',
   amber: 'text-amber-700 bg-amber-100/60 ring-amber-300/30',
   emerald: 'text-emerald-700 bg-emerald-100/60 ring-emerald-300/30',
+  rose: 'text-rose-800 bg-rose-100/70 ring-rose-300/35',
 };
 
 export function ARStatCard({

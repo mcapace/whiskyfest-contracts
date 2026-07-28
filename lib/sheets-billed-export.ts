@@ -38,12 +38,18 @@ function tabRange(tab: string, a1: string): string {
 }
 
 function spreadsheetTitle(productKey: AccountingPortalKey): string {
-  return productKey === 'wine_spectator' ? 'NYWE Billed Exhibitors' : 'WhiskyFest Billed Exhibitors';
+  if (productKey === 'wine_spectator') return 'NYWE Billed Exhibitors';
+  if (productKey === 'big_smoke') return 'Big Smoke Billed Exhibitors';
+  return 'WhiskyFest Billed Exhibitors';
 }
 
 function configuredSpreadsheetId(productKey: AccountingPortalKey): string | null {
   const envKey =
-    productKey === 'wine_spectator' ? 'SHEETS_BILLED_NYWE_ID' : 'SHEETS_BILLED_WHISKYFEST_ID';
+    productKey === 'wine_spectator'
+      ? 'SHEETS_BILLED_NYWE_ID'
+      : productKey === 'big_smoke'
+        ? 'SHEETS_BILLED_BIG_SMOKE_ID'
+        : 'SHEETS_BILLED_WHISKYFEST_ID';
   return process.env[envKey]?.trim() || null;
 }
 

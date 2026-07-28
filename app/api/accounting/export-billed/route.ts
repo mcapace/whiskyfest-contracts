@@ -5,6 +5,7 @@ import { getEffectiveUserEmail } from '@/lib/effective-user';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { exportBilledExhibitorsToGoogleSheet } from '@/lib/sheets-billed-export';
 import {
+  PRODUCT_BIG_SMOKE,
   PRODUCT_WHISKYFEST,
   PRODUCT_WINE_SPECTATOR,
 } from '@/lib/product-portal';
@@ -14,7 +15,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 120;
 
 const bodySchema = z.object({
-  productKey: z.enum([PRODUCT_WHISKYFEST, PRODUCT_WINE_SPECTATOR]),
+  productKey: z.enum([PRODUCT_WHISKYFEST, PRODUCT_WINE_SPECTATOR, PRODUCT_BIG_SMOKE]),
 });
 
 async function requireAccountingActor() {

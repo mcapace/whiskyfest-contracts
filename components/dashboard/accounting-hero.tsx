@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { Landmark } from 'lucide-react';
+import { CigarAficionadoLogo } from '@/components/brand/cigar-aficionado-logo';
 import { NyweLogo } from '@/components/brand/nywe-logo';
 import { WhiskyAdvocateLogo } from '@/components/brand/whisky-advocate-logo';
 import { formatCurrency } from '@/lib/utils';
@@ -30,6 +31,7 @@ export function AccountingHero({
   className?: string;
 }) {
   const isNywe = productKey === 'wine_spectator';
+  const isBigSmoke = productKey === 'big_smoke';
 
   return (
     <section
@@ -38,7 +40,9 @@ export function AccountingHero({
         'overflow-hidden rounded-xl border shadow-wf-editorial',
         isNywe
           ? 'border-rose-900/25 bg-rose-950'
-          : 'border-brass-700/25 bg-gradient-to-br from-stone-900 via-oak-900 to-stone-950',
+          : isBigSmoke
+            ? 'border-amber-900/30 bg-gradient-to-br from-stone-950 via-amber-950 to-stone-950'
+            : 'border-brass-700/25 bg-gradient-to-br from-stone-900 via-oak-900 to-stone-950',
         className,
       )}
     >
@@ -47,6 +51,11 @@ export function AccountingHero({
           <>
             <div className="absolute inset-0 bg-gradient-to-br from-rose-950 via-stone-900 to-stone-950" />
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(190,24,93,0.18),transparent_55%)]" />
+          </>
+        ) : isBigSmoke ? (
+          <>
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-950 via-stone-950 to-stone-900" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(180,83,9,0.22),transparent_55%)]" />
           </>
         ) : (
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(212,175,55,0.14),transparent_55%)]" />
@@ -61,6 +70,13 @@ export function AccountingHero({
                 className="max-w-[220px]"
                 imageClassName="max-h-10 w-auto origin-left"
               />
+            ) : isBigSmoke ? (
+              <CigarAficionadoLogo
+                variant="onDark"
+                priority
+                className="max-w-[220px]"
+                imageClassName="max-h-10 w-auto origin-left"
+              />
             ) : (
               <WhiskyAdvocateLogo variant="onDark" className="max-w-[200px]" imageClassName="max-h-12" />
             )}
@@ -70,7 +86,9 @@ export function AccountingHero({
                 'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em]',
                 isNywe
                   ? 'border-rose-400/30 bg-rose-950/50 text-rose-100'
-                  : 'border-brass-500/30 bg-brass-950/40 text-brass-300',
+                  : isBigSmoke
+                    ? 'border-amber-400/35 bg-amber-950/45 text-amber-100'
+                    : 'border-brass-500/30 bg-brass-950/40 text-brass-300',
               )}
             >
               <Landmark className="h-3.5 w-3.5" />
@@ -90,7 +108,7 @@ export function AccountingHero({
       <div
         className={cn(
           'grid gap-px border-t bg-black/20 sm:grid-cols-3',
-          isNywe ? 'border-rose-400/10' : 'border-parchment-300/10',
+          isNywe ? 'border-rose-400/10' : isBigSmoke ? 'border-amber-400/15' : 'border-parchment-300/10',
         )}
       >
         <HeroStat label="Pending invoicing" count={pendingCount} href={`${dashboardBase}?invoice=pending`} />

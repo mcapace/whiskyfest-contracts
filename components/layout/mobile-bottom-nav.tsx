@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Calculator, Home, Landmark, LayoutDashboard, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isWineSpectatorPath } from '@/lib/product-portal';
-import { nyweHref } from '@/lib/portal-host';
+import { bigSmokeHref, nyweHref } from '@/lib/portal-host';
 import { usePortalKind } from '@/components/portal/portal-context';
 import { CommandPaletteTrigger } from '@/components/command-palette/command-palette';
 
@@ -41,7 +41,12 @@ export function MobileBottomNav({
   const wineSpectatorPortal = (nywePortal || isWineSpectatorPath(pathname)) && wineSpectatorAccess;
 
   if (accountingOnly) {
-    const accountingHref = nywePortal ? '/accounting/nywe' : '/accounting';
+    const accountingHref =
+      portalKind === 'nywe'
+        ? '/accounting/nywe'
+        : portalKind === 'big_smoke'
+          ? bigSmokeHref('/accounting/big-smoke', portalKind)
+          : '/accounting';
     return (
       <nav className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t border-border/60 bg-bg-surface-raised/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md lg:hidden">
         <NavIcon

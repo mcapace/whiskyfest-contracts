@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { CheckCircle2, Clock, DollarSign, FileText, Send, Ban } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, CheckCircle2, Clock, DollarSign, FileText, Send, Ban, CircleSlash } from 'lucide-react';
 import { requireAccountingPageAccess } from '@/lib/auth-accounting';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { cn, formatCurrency, formatTimestamp } from '@/lib/utils';
@@ -20,6 +20,15 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import type { ContractWithTotals, Event, InvoiceStatus } from '@/types/db';
 import { ExportBilledButton } from '@/components/accounting/export-billed-button';
+import {
+  DownloadAccountingCsvButton,
+  type AccountingCsvRow,
+} from '@/components/accounting/download-accounting-csv-button';
+
+const DISPLAY_CAP = 500;
+
+type SortKey = 'company' | 'event' | 'total' | 'executed' | 'invoice' | 'rep';
+type SortDir = 'asc' | 'desc';
 
 function portalChrome(productKey: AccountingPortalKey) {
   const isNywe = productKey === 'wine_spectator';
@@ -48,6 +57,69 @@ function portalChrome(productKey: AccountingPortalKey) {
   };
 }
 
+function parseSortKey(raw: string | undefined): SortKey {
+  if (raw === 'company' || raw === 'event' || raw === 'total' || raw === 'executed' || raw === 'invoice' || raw === 'rep') {
+    return raw;
+  }
+  return 'executed';
+}
+
+function parseSortDir(raw: string | undefined, sort: SortKey): SortDir {
+  if (raw === 'asc' || raw === 'desc') return raw;
+  return sort === 'company' || sort === 'event' || sort === 'rep' ? 'asc' : 'desc';
+}
+
+function invoiceSortRank(status: InvoiceStatus): number {
+  switch (status) {
+    case 'pending':
+      return 0;
+    case 'invoice_sent':
+      return 1;
+    case 'paid':
+      return 2;
+    case 'invoice_voided':
+      return 3;
+    case 'not_invoiced':
+      return 4;
+    default:
+      return 9;
+  }
+}
+
+function SortableHead({
+  label,
+  sortKey,
+  activeKey,
+  activeDir,
+  hrefFor,
+  align = 'left',
+}: {
+  label: string;
+  sortKey: SortKey;
+  activeKey: SortKey;
+  activeDir: SortDir;
+  hrefFor: (key: SortKey) => string;
+  align?: 'left' | 'right';
+}) {
+  const active = activeKey === sortKey;
+  const Icon = !active ? ArrowUpDown : activeDir === 'asc' ? ArrowUp : ArrowDown;
+  return (
+    <TableHead className={align === 'right' ? 'text-right' : undefined}>
+      <Link
+        href={hrefFor(sortKey)}
+        className={cn(
+          'inline-flex items-center gap-1 font-medium hover:text-foreground',
+          align === 'right' && 'justify-end',
+          active ? 'text-foreground' : 'text-muted-foreground',
+        )}
+      >
+        {label}
+        <Icon className="h-3.5 w-3.5 opacity-70" aria-hidden />
+      </Link>
+    </TableHead>
+  );
+}
+
 export async function AccountingDashboardView({
   productKey,
   searchParams,
@@ -60,6 +132,9 @@ export async function AccountingDashboardView({
   const invoice = parseInvoiceFilter(typeof searchParams?.invoice === 'string' ? searchParams.invoice : undefined);
   const q = typeof searchParams?.q === 'string' ? searchParams.q.trim() : '';
   const repQ = typeof searchParams?.rep === 'string' ? searchParams.rep.trim() : '';
+  const eventId = typeof searchParams?.event === 'string' ? searchParams.event.trim() : '';
+  const sort = parseSortKey(typeof searchParams?.sort === 'string' ? searchParams.sort : undefined);
+  const dir = parseSortDir(typeof searchParams?.dir === 'string' ? searchParams.dir : undefined, sort);
 
   const supabase = getSupabaseAdmin();
   const [{ data: eventsData }, { data: allExecutedRows }] = await Promise.all([
@@ -78,10 +153,23 @@ export async function AccountingDashboardView({
     events,
     productKey,
   );
+  const eventMap = new Map(events.map((e) => [e.id, e]));
+
+  const eventOptions = [...new Map(
+    allExecuted
+      .map((c) => {
+        const ev = eventMap.get(c.event_id);
+        return ev ? ([ev.id, ev] as const) : null;
+      })
+      .filter((row): row is readonly [string, Event] => Boolean(row)),
+  ).values()].sort((a, b) => a.name.localeCompare(b.name) || b.year - a.year);
 
   let contracts = allExecuted;
   if (invoice !== 'all') {
     contracts = contracts.filter((c) => (c.invoice_status ?? 'pending') === invoice);
+  }
+  if (eventId) {
+    contracts = contracts.filter((c) => c.event_id === eventId);
   }
   if (q) {
     const lower = q.toLowerCase();
@@ -90,6 +178,7 @@ export async function AccountingDashboardView({
         c.exhibitor_company_name,
         c.billing_contact_name,
         c.billing_contact_email,
+        c.signer_1_name,
         c.signer_1_email,
       ]
         .filter(Boolean)
@@ -107,8 +196,42 @@ export async function AccountingDashboardView({
     );
   }
 
-  contracts = contracts.slice(0, 500);
-  const eventMap = new Map(events.map((e) => [e.id, e]));
+  const filteredCount = contracts.length;
+
+  contracts = [...contracts].sort((a, b) => {
+    const mul = dir === 'asc' ? 1 : -1;
+    const evA = eventMap.get(a.event_id)?.name ?? '';
+    const evB = eventMap.get(b.event_id)?.name ?? '';
+    let cmp = 0;
+    switch (sort) {
+      case 'company':
+        cmp = a.exhibitor_company_name.localeCompare(b.exhibitor_company_name);
+        break;
+      case 'event':
+        cmp = evA.localeCompare(evB);
+        break;
+      case 'total':
+        cmp = (a.grand_total_cents ?? 0) - (b.grand_total_cents ?? 0);
+        break;
+      case 'executed':
+        cmp = (a.executed_at ?? '').localeCompare(b.executed_at ?? '');
+        break;
+      case 'invoice':
+        cmp =
+          invoiceSortRank((a.invoice_status ?? 'pending') as InvoiceStatus) -
+          invoiceSortRank((b.invoice_status ?? 'pending') as InvoiceStatus);
+        break;
+      case 'rep':
+        cmp = (a.sales_rep_name ?? a.sales_rep_email ?? '').localeCompare(
+          b.sales_rep_name ?? b.sales_rep_email ?? '',
+        );
+        break;
+    }
+    if (cmp !== 0) return cmp * mul;
+    return (b.executed_at ?? '').localeCompare(a.executed_at ?? '');
+  });
+
+  const displayed = contracts.slice(0, DISPLAY_CAP);
 
   const sumFor = (inv: InvoiceStatus | 'all') =>
     allExecuted
@@ -119,34 +242,81 @@ export async function AccountingDashboardView({
     allExecuted.filter((r) => inv === 'all' || (r.invoice_status ?? 'pending') === inv).length;
 
   const base = accountingDashboardHref(productKey);
-  const sp = new URLSearchParams();
-  if (q) sp.set('q', q);
-  if (repQ) sp.set('rep', repQ);
-  const extra = sp.toString();
+  const showSalesRep = productKey !== 'wine_spectator';
+  const chrome = portalChrome(productKey);
+  const portalLabel = accountingPortalLabel(productKey);
 
-  function href(inv: InvoiceStatus | 'all') {
-    const p = new URLSearchParams(extra);
-    if (inv === 'all') p.delete('invoice');
-    else p.set('invoice', inv);
-    const s = p.toString();
+  function buildParams(overrides: Record<string, string | null | undefined> = {}) {
+    const p = new URLSearchParams();
+    const values: Record<string, string | undefined> = {
+      invoice: invoice === 'all' ? undefined : invoice,
+      q: q || undefined,
+      rep: showSalesRep ? repQ || undefined : undefined,
+      event: eventId || undefined,
+      sort: sort === 'executed' ? undefined : sort,
+      dir: overrides.dir === undefined && sort === 'executed' && dir === 'desc' ? undefined : dir,
+      ...overrides,
+    };
+    for (const [key, value] of Object.entries(values)) {
+      if (value == null || value === '') continue;
+      if (key === 'invoice' && value === 'all') continue;
+      p.set(key, value);
+    }
+    return p;
+  }
+
+  function hrefWith(overrides: Record<string, string | null | undefined> = {}) {
+    const s = buildParams(overrides).toString();
     return s ? `${base}?${s}` : base;
   }
 
-  const portalLabel = accountingPortalLabel(productKey);
-  const showSalesRep = productKey !== 'wine_spectator';
-  const showBillingColumns = productKey === 'wine_spectator';
-  const chrome = portalChrome(productKey);
+  function href(inv: InvoiceStatus | 'all') {
+    return hrefWith({ invoice: inv === 'all' ? null : inv });
+  }
+
+  function sortHref(key: SortKey) {
+    const nextDir: SortDir =
+      sort === key ? (dir === 'asc' ? 'desc' : 'asc') : key === 'company' || key === 'event' || key === 'rep' ? 'asc' : 'desc';
+    return hrefWith({ sort: key, dir: nextDir });
+  }
+
+  const hasActiveFilters = Boolean(q || repQ || eventId || invoice !== 'all');
 
   const filterDescription = (() => {
-    if (invoice === 'all' && !q && !repQ) {
-      return `${allExecuted.length} executed contract${allExecuted.length === 1 ? '' : 's'} · showing up to 500`;
-    }
     const parts: string[] = [];
     if (invoice !== 'all') parts.push(formatInvoiceStatus(invoice));
-    if (q) parts.push(`company “${q}”`);
+    if (eventId) {
+      const ev = eventMap.get(eventId);
+      parts.push(ev ? ev.name : 'selected event');
+    }
+    if (q) parts.push(`search “${q}”`);
     if (repQ) parts.push(`rep “${repQ}”`);
-    return `${contracts.length} match${contracts.length === 1 ? '' : 'es'} · ${parts.join(' · ')}`;
+    const shown =
+      filteredCount > DISPLAY_CAP
+        ? `Showing ${DISPLAY_CAP} of ${filteredCount}`
+        : `${filteredCount} contract${filteredCount === 1 ? '' : 's'}`;
+    if (parts.length === 0) {
+      return `${shown} · sorted by ${sort} (${dir})`;
+    }
+    return `${shown} · ${parts.join(' · ')} · sorted by ${sort} (${dir})`;
   })();
+
+  const csvRows: AccountingCsvRow[] = displayed.map((c) => {
+    const ev = eventMap.get(c.event_id);
+    const inv = (c.invoice_status ?? 'pending') as InvoiceStatus;
+    return {
+      company: c.exhibitor_company_name,
+      event: ev?.name ?? '',
+      billingContact: c.billing_contact_name?.trim() || '',
+      billingEmail: c.billing_contact_email?.trim() || '',
+      total: formatCurrency(c.grand_total_cents),
+      salesRep: c.sales_rep_name ?? c.sales_rep_email ?? '',
+      executed: c.executed_at ? formatTimestamp(c.executed_at) : '',
+      invoiceStatus: formatInvoiceStatus(inv),
+    };
+  });
+
+  const csvFilename = `${portalLabel.replace(/\s+/g, '-').toLowerCase()}-accounting.csv`;
 
   return (
     <div className="space-y-10">
@@ -169,7 +339,7 @@ export async function AccountingDashboardView({
 
       <section className="space-y-4">
         <h2 className="font-display text-2xl font-medium text-foreground">Overview</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           <ARStatCard
             href={href('pending')}
             title="Pending invoicing"
@@ -201,6 +371,16 @@ export async function AccountingDashboardView({
             activeRingClass={chrome.activeRing}
           />
           <ARStatCard
+            href={href('invoice_voided')}
+            title="Invoice voided"
+            count={countFor('invoice_voided')}
+            cents={sumFor('invoice_voided')}
+            active={invoice === 'invoice_voided'}
+            icon={CircleSlash}
+            accent="rose"
+            activeRingClass={chrome.activeRing}
+          />
+          <ARStatCard
             href={href('not_invoiced')}
             title="Do not invoice"
             count={countFor('not_invoiced')}
@@ -225,25 +405,58 @@ export async function AccountingDashboardView({
       </section>
 
       <Card className={cn('overflow-hidden', chrome.cardBorder)}>
-        <div className={cn('flex flex-col gap-4 border-b px-6 py-4 sm:flex-row sm:items-end sm:justify-between', chrome.cardHeaderBorder)}>
+        <div
+          className={cn(
+            'flex flex-col gap-4 border-b px-6 py-4 lg:flex-row lg:items-end lg:justify-between',
+            chrome.cardHeaderBorder,
+          )}
+        >
           <div>
             <h2 className="font-serif text-lg font-semibold">Executed contracts</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">{filterDescription}</p>
           </div>
-          <ExportBilledButton productKey={productKey} />
+          <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
+            <DownloadAccountingCsvButton
+              rows={csvRows}
+              filename={csvFilename}
+              includeSalesRep={showSalesRep}
+            />
+            <ExportBilledButton productKey={productKey} />
+          </div>
         </div>
 
         <div className="space-y-4 border-b border-border/50 px-6 py-4">
           <form className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end" action={base} method="get">
             {invoice !== 'all' ? <input type="hidden" name="invoice" value={invoice} /> : null}
+            {sort !== 'executed' ? <input type="hidden" name="sort" value={sort} /> : null}
+            {(sort !== 'executed' || dir !== 'desc') && dir ? (
+              <input type="hidden" name="dir" value={dir} />
+            ) : null}
             <div className="min-w-0 flex-1 space-y-1.5 md:max-w-xs">
               <label className="text-xs font-medium text-muted-foreground">Search</label>
-              <Input
-                name="q"
-                placeholder={showBillingColumns ? 'Company, billing name, or email…' : 'Company or contact…'}
-                defaultValue={q}
-              />
+              <Input name="q" placeholder="Company, billing name, or email…" defaultValue={q} />
             </div>
+            {eventOptions.length > 0 ? (
+              <div className="min-w-0 space-y-1.5 md:max-w-xs">
+                <label className="text-xs font-medium text-muted-foreground" htmlFor="accounting-event">
+                  Event
+                </label>
+                <select
+                  id="accounting-event"
+                  name="event"
+                  defaultValue={eventId}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value="">All events</option>
+                  {eventOptions.map((ev) => (
+                    <option key={ev.id} value={ev.id}>
+                      {ev.name}
+                      {ev.year ? ` (${ev.year})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
             {showSalesRep ? (
               <div className="min-w-0 space-y-1.5 md:max-w-xs">
                 <label className="text-xs font-medium text-muted-foreground">Sales rep</label>
@@ -251,12 +464,12 @@ export async function AccountingDashboardView({
               </div>
             ) : null}
             <div className="flex flex-wrap gap-2">
-              <Button type="submit">Search</Button>
-              {(q || repQ || invoice !== 'all') && (
+              <Button type="submit">Apply filters</Button>
+              {hasActiveFilters ? (
                 <Button variant="outline" type="button" asChild>
                   <Link href={base}>Clear</Link>
                 </Button>
-              )}
+              ) : null}
             </div>
           </form>
 
@@ -286,25 +499,25 @@ export async function AccountingDashboardView({
         </div>
 
         <CardContent className="p-0">
-          {contracts.length === 0 ? (
+          {displayed.length === 0 ? (
             <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
                 <FileText className="h-6 w-6" />
               </div>
               <h3 className="font-serif text-lg font-semibold">No contracts match these filters</h3>
               <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-                Try another status or clear search filters to see executed {portalLabel} contracts.
+                Try another status, event, or clear search filters to see executed {portalLabel} contracts.
               </p>
-              {(q || repQ || invoice !== 'all') && (
+              {hasActiveFilters ? (
                 <Button variant="outline" className="mt-6" asChild>
                   <Link href={base}>Clear filters</Link>
                 </Button>
-              )}
+              ) : null}
             </div>
           ) : (
             <>
               <div className="divide-y divide-border/50 md:hidden">
-                {contracts.map((c) => {
+                {displayed.map((c) => {
                   const ev = eventMap.get(c.event_id);
                   const inv = (c.invoice_status ?? 'pending') as InvoiceStatus;
                   return (
@@ -318,15 +531,19 @@ export async function AccountingDashboardView({
                           <p className="font-medium leading-snug">{c.exhibitor_company_name}</p>
                           <p className="mt-0.5 text-xs text-muted-foreground">{ev?.name ?? '—'}</p>
                         </div>
-                        <span className="font-mono text-sm font-semibold tabular-nums">{formatCurrency(c.grand_total_cents)}</span>
+                        <span className="font-mono text-sm font-semibold tabular-nums">
+                          {formatCurrency(c.grand_total_cents)}
+                        </span>
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        {showBillingColumns && c.billing_contact_name ? <span>{c.billing_contact_name}</span> : null}
-                        {showBillingColumns && c.billing_contact_email ? (
+                        {c.billing_contact_name ? <span>{c.billing_contact_name}</span> : null}
+                        {c.billing_contact_email ? (
                           <span className="truncate font-mono">{c.billing_contact_email}</span>
                         ) : null}
                         {showSalesRep ? <span>{c.sales_rep_name ?? c.sales_rep_email ?? '—'}</span> : null}
-                        <span className={`inline-flex rounded-full px-2 py-0.5 font-medium ${invoiceStatusBadgeClass(inv)}`}>
+                        <span
+                          className={`inline-flex rounded-full px-2 py-0.5 font-medium ${invoiceStatusBadgeClass(inv)}`}
+                        >
                           {formatInvoiceStatus(inv)}
                         </span>
                       </div>
@@ -334,46 +551,80 @@ export async function AccountingDashboardView({
                   );
                 })}
               </div>
-              <div className="hidden md:block overflow-x-auto">
+              <div className="hidden overflow-x-auto md:block">
                 <Table className="[&_tbody_tr:hover]:bg-muted/40">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Company</TableHead>
-                      {showBillingColumns ? (
-                        <>
-                          <TableHead>Billing contact</TableHead>
-                          <TableHead>Billing email</TableHead>
-                        </>
+                      <SortableHead
+                        label="Company"
+                        sortKey="company"
+                        activeKey={sort}
+                        activeDir={dir}
+                        hrefFor={sortHref}
+                      />
+                      <TableHead>Billing contact</TableHead>
+                      <TableHead>Billing email</TableHead>
+                      <SortableHead
+                        label="Event"
+                        sortKey="event"
+                        activeKey={sort}
+                        activeDir={dir}
+                        hrefFor={sortHref}
+                      />
+                      <SortableHead
+                        label="Total"
+                        sortKey="total"
+                        activeKey={sort}
+                        activeDir={dir}
+                        hrefFor={sortHref}
+                        align="right"
+                      />
+                      {showSalesRep ? (
+                        <SortableHead
+                          label="Sales rep"
+                          sortKey="rep"
+                          activeKey={sort}
+                          activeDir={dir}
+                          hrefFor={sortHref}
+                        />
                       ) : null}
-                      <TableHead>Event</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      {showSalesRep ? <TableHead>Sales rep</TableHead> : null}
-                      <TableHead>Executed</TableHead>
-                      <TableHead>Invoice</TableHead>
+                      <SortableHead
+                        label="Executed"
+                        sortKey="executed"
+                        activeKey={sort}
+                        activeDir={dir}
+                        hrefFor={sortHref}
+                      />
+                      <SortableHead
+                        label="Invoice status"
+                        sortKey="invoice"
+                        activeKey={sort}
+                        activeDir={dir}
+                        hrefFor={sortHref}
+                      />
                       <TableHead className="w-12" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {contracts.map((c) => {
+                    {displayed.map((c) => {
                       const ev = eventMap.get(c.event_id);
                       const inv = (c.invoice_status ?? 'pending') as InvoiceStatus;
                       return (
                         <TableRow key={c.id} className="group">
                           <TableCell>
-                            <Link href={`/accounting/${c.id}`} className="block font-medium hover:text-accent-brand">
+                            <Link
+                              href={`/accounting/${c.id}`}
+                              className="block font-medium hover:text-accent-brand"
+                            >
                               {c.exhibitor_company_name}
                             </Link>
                           </TableCell>
-                          {showBillingColumns ? (
-                            <>
-                              <TableCell className="text-sm">{c.billing_contact_name?.trim() || '—'}</TableCell>
-                              <TableCell className="max-w-[12rem] truncate text-sm font-mono text-muted-foreground">
-                                {c.billing_contact_email ?? '—'}
-                              </TableCell>
-                            </>
-                          ) : null}
+                          <TableCell className="text-sm">{c.billing_contact_name?.trim() || '—'}</TableCell>
+                          <TableCell className="max-w-[12rem] truncate text-sm font-mono text-muted-foreground">
+                            {c.billing_contact_email ?? '—'}
+                          </TableCell>
                           <TableCell className="text-sm text-muted-foreground">{ev?.name ?? '—'}</TableCell>
-                          <TableCell className="text-right font-mono tabular-nums font-semibold">
+                          <TableCell className="text-right font-mono text-sm font-semibold tabular-nums">
                             {formatCurrency(c.grand_total_cents)}
                           </TableCell>
                           {showSalesRep ? (
@@ -385,7 +636,9 @@ export async function AccountingDashboardView({
                             {c.executed_at ? formatTimestamp(c.executed_at) : '—'}
                           </TableCell>
                           <TableCell>
-                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${invoiceStatusBadgeClass(inv)}`}>
+                            <span
+                              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${invoiceStatusBadgeClass(inv)}`}
+                            >
                               {formatInvoiceStatus(inv)}
                             </span>
                           </TableCell>
@@ -403,6 +656,12 @@ export async function AccountingDashboardView({
                   </TableBody>
                 </Table>
               </div>
+              {filteredCount > DISPLAY_CAP ? (
+                <p className="border-t border-border/50 px-6 py-3 text-xs text-muted-foreground">
+                  Showing the first {DISPLAY_CAP} of {filteredCount} matching contracts. Narrow filters or download CSV
+                  for the visible page; Export billed includes all invoiced rows in Sheets.
+                </p>
+              ) : null}
             </>
           )}
         </CardContent>

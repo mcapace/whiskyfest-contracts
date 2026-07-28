@@ -310,7 +310,7 @@ export function AccountingDetailActions({
           <div className="rounded-lg border border-violet-300/80 bg-violet-50/60 p-4 text-sm text-violet-950 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-100 md:p-6">
             <p className="font-medium">Do Not Invoice</p>
             <p className="mt-2 text-violet-900/90 dark:text-violet-200/90">
-              This is a complimentary WhiskyFest booth contract. It appears in A/R for tracking but should not be
+              This is a complimentary booth/package contract. It appears in A/R for tracking but should not be
               invoiced.
             </p>
           </div>
