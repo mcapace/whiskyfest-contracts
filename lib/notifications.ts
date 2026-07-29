@@ -3,7 +3,9 @@ import { contractPricingHtmlFragment, contractPricingTextLines } from '@/lib/con
 import {
   appBaseUrl,
   appContractUrl,
+  accountingContractUrl,
   eventEmailContextForContract,
+  formatEventDisplayName,
   loadEventEmailContext,
   sendGridFromForEvent,
   sendGridFromForProduct,
@@ -309,7 +311,7 @@ export async function notifyPartialSignature(
   const nywe = event ? isNyweEventsManagedEvent(event) : false;
   const mail = await contractMailMeta(contract, event);
 
-  const eventTitle = event ? `${event.name} ${event.year}`.trim() : 'WhiskyFest';
+  const eventTitle = event ? formatEventDisplayName(event.name, event.year) : 'Event';
   const detailUrl = mail.detailUrl;
   const exhibitorPerson = (contract.signer_1_name ?? '').trim() || (nywe ? 'Winery contact' : 'Exhibitor');
   const company = contract.exhibitor_company_name.trim();
@@ -393,7 +395,7 @@ export async function notifyContractFullySigned(
 
   const mail = await contractMailMeta(contract, event);
 
-  const eventTitle = event ? `${event.name} ${event.year}`.trim() : 'WhiskyFest';
+  const eventTitle = event ? formatEventDisplayName(event.name, event.year) : 'Event';
   const company = contract.exhibitor_company_name.trim();
   const exhibitorPerson = (contract.signer_1_name ?? '').trim() || 'Exhibitor';
   const countersignerLine = countersignerDisplayName.trim() || 'Countersigner';
@@ -479,7 +481,7 @@ export async function notifyContractExecuted(
 ): Promise<void> {
   const mail = await contractMailMeta(contract, event);
 
-  const eventTitle = event ? `${event.name} ${event.year}`.trim() : 'Event';
+  const eventTitle = event ? formatEventDisplayName(event.name, event.year) : 'Event';
   const company = contract.exhibitor_company_name.trim();
   const detailUrl = mail.detailUrl;
 
@@ -667,7 +669,9 @@ export async function notifySalesRepContractRecalled(params: {
   const mail = await contractMailMeta(params.contract, params.event);
 
   const detailUrl = mail.detailUrl;
-  const eventTitle = params.event ? `${params.event.name} ${params.event.year}`.trim() : 'WhiskyFest';
+  const eventTitle = params.event
+    ? formatEventDisplayName(params.event.name, params.event.year)
+    : 'Event';
   const actorLine = params.recalledBy.name
     ? `${params.recalledBy.name} <${params.recalledBy.email}>`
     : params.recalledBy.email;
@@ -778,7 +782,9 @@ export async function notifyContractVoided(params: {
 
   const mail = await contractMailMeta(params.contract, params.event);
   const detailUrl = mail.detailUrl;
-  const eventTitle = params.event ? `${params.event.name} ${params.event.year}`.trim() : 'WhiskyFest';
+  const eventTitle = params.event
+    ? formatEventDisplayName(params.event.name, params.event.year)
+    : 'Event';
   const company = params.contract.exhibitor_company_name;
   const voider = params.voidedBy.name ? `${params.voidedBy.name} <${params.voidedBy.email}>` : params.voidedBy.email;
   const atLabel = new Date(params.voidedAtIso).toLocaleString('en-US');
@@ -873,12 +879,14 @@ export async function notifyAccountingExecutedContractVoided(params: {
     productKey === 'wine_spectator'
       ? productFrom.email
       : process.env['ACCOUNTING_FROM_EMAIL']?.trim() || productFrom.email;
-  const eventTitle = params.event ? `${params.event.name} ${params.event.year}`.trim() : 'Contract';
+  const eventTitle = params.event
+    ? formatEventDisplayName(params.event.name, params.event.year)
+    : 'Contract';
   const company = params.contract.exhibitor_company_name;
   const voider = params.voidedBy.name ? `${params.voidedBy.name} <${params.voidedBy.email}>` : params.voidedBy.email;
   const totalCents = params.contract.grand_total_cents ?? params.contract.total_amount_cents ?? 0;
   const totalLabel = formatCurrency(totalCents);
-  const detailUrl = `${appBaseUrl()}/accounting/${params.contract.id}`;
+  const detailUrl = accountingContractUrl(params.contract.id, productKey);
 
   sgMail.setApiKey(apiKey);
 
