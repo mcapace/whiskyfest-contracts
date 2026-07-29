@@ -12,6 +12,8 @@ import { formatCurrency, formatTimestamp } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { AccountingDetailActions } from '@/components/accounting/accounting-detail-actions';
 import { InvoiceLifecycleTimeline } from '@/components/accounting/invoice-lifecycle';
+import { CopyableNotesPanel } from '@/components/ui/copyable-notes';
+import { INTERNAL_CONTRACT_NOTES_LABEL } from '@/lib/contract-notes-copy';
 import { accountingDashboardHref, productKeyFromEvent } from '@/lib/product-portal';
 import { accountingPortalLabel, type AccountingPortalKey } from '@/lib/accounting-portal';
 import type { ContractLineItem, ContractWithTotals, Event, InvoiceStatus } from '@/types/db';
@@ -171,54 +173,63 @@ export default async function AccountingContractDetailPage({ params }: { params:
           </CardContent>
         </Card>
 
-        <Card className="border-border/60">
-          <CardContent className="space-y-3 p-6">
-            <p className="wf-label-caps text-[0.6rem]">Signed PDF</p>
-            {pdfEmbedUrl ? (
-              <>
-                <div className="overflow-hidden rounded-lg border border-border/60 shadow-md">
-                  <iframe
-                    title="Signed PDF"
-                    src={pdfEmbedUrl}
-                    className="h-[800px] w-full rounded-lg border border-border/60 bg-background md:aspect-[8.5/11] md:h-auto"
-                  />
-                </div>
-                <a
-                  href={`/api/contracts/${contract.id}/pdf?variant=signed`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 font-mono text-sm text-accent-brand underline-offset-4 hover:underline"
-                >
-                  <ExternalLink className="h-4 w-4" /> Open / download PDF
-                </a>
-              </>
-            ) : contract.signed_pdf_url ? (
-              <>
-                <p className="text-sm text-muted-foreground">
+        <div className="space-y-6">
+          <Card className="border-border/60">
+            <CardContent className="space-y-3 p-6">
+              <p className="wf-label-caps text-[0.6rem]">Signed PDF</p>
+              {pdfEmbedUrl ? (
+                <>
+                  <div className="overflow-hidden rounded-lg border border-border/60 shadow-md">
+                    <iframe
+                      title="Signed PDF"
+                      src={pdfEmbedUrl}
+                      className="h-[800px] w-full rounded-lg border border-border/60 bg-background md:aspect-[8.5/11] md:h-auto"
+                    />
+                  </div>
                   <a
-                    href={contract.signed_pdf_url}
+                    href={`/api/contracts/${contract.id}/pdf?variant=signed`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-mono text-accent-brand underline-offset-4 hover:underline"
+                    className="inline-flex items-center gap-2 font-mono text-sm text-accent-brand underline-offset-4 hover:underline"
                   >
-                    Open PDF (legacy Google Drive)
+                    <ExternalLink className="h-4 w-4" /> Open / download PDF
                   </a>
-                </p>
-                <a
-                  href={`/api/contracts/${contract.id}/pdf?variant=signed`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 font-mono text-sm text-accent-brand underline-offset-4 hover:underline"
-                >
-                  <ExternalLink className="h-4 w-4" /> Download PDF
-                </a>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">No signed PDF URL on file.</p>
-            )}
-          </CardContent>
-        </Card>
+                </>
+              ) : contract.signed_pdf_url ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    <a
+                      href={contract.signed_pdf_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-accent-brand underline-offset-4 hover:underline"
+                    >
+                      Open PDF (legacy Google Drive)
+                    </a>
+                  </p>
+                  <a
+                    href={`/api/contracts/${contract.id}/pdf?variant=signed`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 font-mono text-sm text-accent-brand underline-offset-4 hover:underline"
+                  >
+                    <ExternalLink className="h-4 w-4" /> Download PDF
+                  </a>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">No signed PDF URL on file.</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
+
+      <CopyableNotesPanel
+        title={INTERNAL_CONTRACT_NOTES_LABEL}
+        hint="From the sales / events contract record. Copy into your ledger if needed. Sponsor never sees this."
+        text={contract.notes}
+        emptyLabel="No internal notes on this contract."
+      />
 
       <AccountingDetailActions
         contractId={contract.id}

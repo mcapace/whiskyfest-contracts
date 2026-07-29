@@ -30,7 +30,13 @@ import {
 } from '@/components/ui/dialog';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { CONTRACT_ACTION_HELP } from '@/lib/contract-action-help-text';
+import {
+  ACCOUNTING_NOTES_HINT,
+  ACCOUNTING_NOTES_LABEL,
+  ACCOUNTING_NOTES_ON_SEND_HINT,
+} from '@/lib/contract-notes-copy';
 import { Label, Textarea } from '@/components/ui/input';
+import { CopyTextButton } from '@/components/ui/copyable-notes';
 import type { InvoiceStatus } from '@/types/db';
 
 export function AccountingDetailActions({
@@ -67,6 +73,8 @@ export function AccountingDetailActions({
   const [err, setErr] = useState<string | null>(null);
   const [openVoid, setOpenVoid] = useState(false);
   const [voidReason, setVoidReason] = useState('');
+  const [openMarkSent, setOpenMarkSent] = useState(false);
+  const [markSentNotes, setMarkSentNotes] = useState('');
 
   const sidebarVisible =
     invoiceStatus === 'pending' || invoiceStatus === 'invoice_sent' || invoiceStatus === 'invoice_voided';
@@ -92,8 +100,22 @@ export function AccountingDetailActions({
     return true;
   }
 
-  function markInvoiceSent() {
-    startTransition(() => void patch({ mark_invoice_sent: true }));
+  function openMarkInvoiceSentDialog() {
+    setMarkSentNotes(notes);
+    setOpenMarkSent(true);
+  }
+
+  function submitMarkInvoiceSent() {
+    startTransition(async () => {
+      const ok = await patch({
+        mark_invoice_sent: true,
+        accounting_notes: markSentNotes,
+      });
+      if (ok) {
+        setNotes(markSentNotes);
+        setOpenMarkSent(false);
+      }
+    });
   }
 
   function markPaid() {
@@ -166,7 +188,7 @@ export function AccountingDetailActions({
                     type="button"
                     data-tour="accounting-mark-invoice-sent"
                     className={btnPrimary}
-                    onClick={markInvoiceSent}
+                    onClick={openMarkInvoiceSentDialog}
                     disabled={busy}
                     title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
                   >
@@ -235,7 +257,7 @@ export function AccountingDetailActions({
                       type="button"
                       data-tour="accounting-mark-invoice-sent"
                       className={btnPrimary}
-                      onClick={markInvoiceSent}
+                      onClick={openMarkInvoiceSentDialog}
                       disabled={busy}
                       title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
                     >
@@ -268,6 +290,38 @@ export function AccountingDetailActions({
           </div>
         </ContractActionsSidebar>
       </TooltipProvider>
+
+      <Dialog open={openMarkSent} onOpenChange={setOpenMarkSent}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mark invoice sent</DialogTitle>
+            <DialogDescription>
+              Records invoice sent and notifies sales / ops. Add optional notes for the team — they appear in the email
+              and on the contract page.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="mark-sent-accounting-notes">{ACCOUNTING_NOTES_LABEL} (optional)</Label>
+            <Textarea
+              id="mark-sent-accounting-notes"
+              value={markSentNotes}
+              onChange={(e) => setMarkSentNotes(e.target.value)}
+              rows={5}
+              placeholder="e.g. Invoice #12345 issued via NetSuite; PO required"
+              maxLength={20000}
+            />
+            <p className="text-xs text-muted-foreground">{ACCOUNTING_NOTES_ON_SEND_HINT}</p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpenMarkSent(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => void submitMarkInvoiceSent()} disabled={busy}>
+              {pending ? 'Saving…' : 'Mark invoice sent'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={openVoid} onOpenChange={setOpenVoid}>
         <DialogContent>
@@ -345,7 +399,13 @@ export function AccountingDetailActions({
         )}
 
         <div className="rounded-lg border border-border/60 bg-card/40 p-4 md:p-6">
-          <h3 className="font-serif text-lg font-semibold">Accounting notes</h3>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="font-serif text-lg font-semibold">{ACCOUNTING_NOTES_LABEL}</h3>
+              <p className="mt-1 text-xs text-muted-foreground">{ACCOUNTING_NOTES_HINT}</p>
+            </div>
+            {notes.trim() ? <CopyTextButton text={notes} label="Copy notes" /> : null}
+          </div>
           <Textarea className="mt-3 min-h-[120px]" value={notes} onChange={(e) => setNotes(e.target.value)} />
           <Button
             type="button"
@@ -358,7 +418,9 @@ export function AccountingDetailActions({
             <Save className="mr-2 h-4 w-4 shrink-0" aria-hidden />
             {pending ? 'Saving…' : 'Save notes'}
           </Button>
-          <p className="mt-2 text-xs text-muted-foreground">Saves to accounting_notes on this contract.</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Visible to invoice-sent email recipients on the contract page. Sponsor never sees these.
+          </p>
           {notesRecordUpdatedLabel ? (
             <p className="mt-1 text-xs text-muted-foreground">Last updated {notesRecordUpdatedLabel}</p>
           ) : null}

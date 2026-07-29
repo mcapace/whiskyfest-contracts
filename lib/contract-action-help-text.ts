@@ -42,7 +42,8 @@ export const CONTRACT_ACTION_HELP = {
   voidImportedRecord:
     'Permanently marks this imported record void when the deal should not continue in the system. No DocuSign envelope is involved.',
 
-  markInvoiceSent: 'Records invoice sent. Sales rep (or configured NYWE ops inbox) notified.',
+  markInvoiceSent:
+    'Records invoice sent. Optional accounting notes are saved and included in the email to the sales / ops recipients.',
 
   recallInvoiceSent:
     'Undo Invoice Sent and return this contract to Pending Invoice. Use if it was marked sent by mistake or the invoice needs to be corrected and re-sent. Does not notify the sales rep.',

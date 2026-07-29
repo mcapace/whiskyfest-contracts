@@ -64,19 +64,36 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     mark_paid,
     accounting_notes,
   } = parsed.data;
-  const ops = [
+  /** Status transitions are mutually exclusive. Notes may be saved alone or with mark_invoice_sent. */
+  const statusOps = [
     mark_invoice_sent === true,
     recall_invoice_sent === true,
     void_invoice_sent === true,
     restore_voided_invoice === true,
     mark_paid === true,
-    accounting_notes !== undefined,
-  ].filter(Boolean);
-  if (ops.length !== 1) {
+  ].filter(Boolean).length;
+  if (statusOps > 1) {
     return NextResponse.json(
       {
         error:
-          'Send exactly one of: mark_invoice_sent, recall_invoice_sent, void_invoice_sent, restore_voided_invoice, mark_paid, or accounting_notes.',
+          'Send exactly one of: mark_invoice_sent, recall_invoice_sent, void_invoice_sent, restore_voided_invoice, or mark_paid.',
+      },
+      { status: 400 },
+    );
+  }
+  if (statusOps === 0 && accounting_notes === undefined) {
+    return NextResponse.json(
+      {
+        error:
+          'Send mark_invoice_sent, recall_invoice_sent, void_invoice_sent, restore_voided_invoice, mark_paid, and/or accounting_notes.',
+      },
+      { status: 400 },
+    );
+  }
+  if (statusOps === 1 && !mark_invoice_sent && accounting_notes !== undefined) {
+    return NextResponse.json(
+      {
+        error: 'accounting_notes can only be saved alone or together with mark_invoice_sent.',
       },
       { status: 400 },
     );
@@ -122,6 +139,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       );
     }
     const now = new Date().toISOString();
+    const notesForNotify =
+      (accounting_notes !== undefined ? accounting_notes : contract.accounting_notes)?.trim() || null;
     const { error } = await supabase
       .from('contracts')
       .update({
@@ -129,6 +148,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         invoice_sent_at: now,
         invoice_sent_by: actor.email,
         updated_at: now,
+        ...(accounting_notes !== undefined ? { accounting_notes } : {}),
       })
       .eq('id', contract.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -141,6 +161,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         invoice_sent_at: now,
         from_status: inv,
         reissued_after_void: inv === 'invoice_voided',
+        ...(accounting_notes !== undefined
+          ? { accounting_notes_saved: Boolean(accounting_notes.trim()) }
+          : {}),
       },
     });
     revalidateContractPaths(contract.id);
@@ -153,6 +176,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       salesRepId: contract.sales_rep_id,
       eventId: contract.event_id,
       createdBy: contract.created_by,
+      accountingNotes: notesForNotify,
     }).catch((e) => console.error('[notifySalesRepInvoiceSent]', e));
 
     void syncBilledContractToGoogleSheet(contract.id);

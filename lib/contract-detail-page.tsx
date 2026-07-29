@@ -168,6 +168,7 @@ export async function ContractDetailPage({
   const showNotesSection =
     Boolean(contract.exhibitor_notes?.trim()) ||
     Boolean(contract.notes?.trim() && contract.status !== 'error') ||
+    Boolean(contract.accounting_notes?.trim()) ||
     canEditContractNotes ||
     legacyImport;
 

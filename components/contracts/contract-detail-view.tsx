@@ -12,9 +12,12 @@ import {
 } from '@/lib/big-smoke-pricing';
 import { listPackageLabel } from '@/lib/contract-deal-kind';
 import {
+  ACCOUNTING_NOTES_HINT,
+  ACCOUNTING_NOTES_LABEL,
   INTERNAL_CONTRACT_NOTES_LABEL,
   SPONSOR_CONTRACT_NOTES_LABEL,
 } from '@/lib/contract-notes-copy';
+import { CopyTextButton } from '@/components/ui/copyable-notes';
 import { dealKindLabel, type ContractDealKind } from '@/lib/contract-deal-kind';
 import { usesSingleSignerEnvelope } from '@/lib/single-signer-envelope';
 import { WF_BS_COUNTERSIGN_GROUP_LABEL } from '@/lib/wf-bslv-countersigner';
@@ -651,6 +654,26 @@ export function ContractDetailView({
                         {INTERNAL_CONTRACT_NOTES_LABEL}
                       </p>
                       <p className="mt-2 whitespace-pre-wrap">{contract.notes}</p>
+                    </div>
+                  ) : null}
+                  {contract.accounting_notes?.trim() ? (
+                    <div
+                      className={
+                        contract.exhibitor_notes?.trim() || (contract.notes && contract.status !== 'error')
+                          ? 'border-t border-border/50 pt-4'
+                          : undefined
+                      }
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            {ACCOUNTING_NOTES_LABEL}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">{ACCOUNTING_NOTES_HINT}</p>
+                        </div>
+                        <CopyTextButton text={contract.accounting_notes} label="Copy notes" />
+                      </div>
+                      <p className="mt-2 whitespace-pre-wrap">{contract.accounting_notes}</p>
                     </div>
                   ) : null}
                 </CardContent>

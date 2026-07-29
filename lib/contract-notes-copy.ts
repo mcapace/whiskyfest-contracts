@@ -15,3 +15,12 @@ export const INTERNAL_CONTRACT_NOTES_HINT =
 
 export const INTERNAL_CONTRACT_NOTES_PLACEHOLDER =
   'Rep handoff, negotiation history, events reminders…';
+
+/** AR-facing notes visible to invoice-sent email recipients on the contract page. */
+export const ACCOUNTING_NOTES_LABEL = 'Accounting notes';
+
+export const ACCOUNTING_NOTES_HINT =
+  'Notes from accounting for invoicing / the ledger. Visible to the team that receives invoice-sent notices.';
+
+export const ACCOUNTING_NOTES_ON_SEND_HINT =
+  'Optional — saved with Mark Invoice Sent and included in the invoice-sent email to the sales / ops recipients.';

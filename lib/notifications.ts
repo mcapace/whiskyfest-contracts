@@ -915,6 +915,8 @@ export async function notifySalesRepInvoiceSent(params: {
   salesRepId: string | null;
   eventId?: string | null;
   createdBy?: string | null;
+  /** Optional AR notes entered during mark-invoiced (shown in email + on contract). */
+  accountingNotes?: string | null;
 }): Promise<void> {
   const apiKey = process.env['SENDGRID_API_KEY'];
   if (!apiKey) {
@@ -940,20 +942,30 @@ export async function notifySalesRepInvoiceSent(params: {
   const detailUrl = mail.detailUrl;
   const subject = `Invoice sent for ${params.companyName}`;
   const amt = formatCurrency(params.grandTotalCents);
+  const accountingNotes = params.accountingNotes?.trim() || null;
 
   const text = [
     `An invoice has been sent for ${params.companyName}.`,
     ``,
     `Amount: ${amt}`,
     `Invoice sent: ${params.sentAtLabel}`,
+    ...(accountingNotes ? [``, `Accounting notes:`, accountingNotes] : []),
     ``,
     `Open contract: ${detailUrl}`,
   ].join('\n');
+
+  const notesHtml = accountingNotes
+    ? `<p style="margin-top:16px;padding:12px;background:#f8f6f1;border:1px solid #e5e0d5;border-radius:6px;">
+        <strong>Accounting notes</strong><br/>
+        <span style="white-space:pre-wrap;">${escapeHtml(accountingNotes)}</span>
+      </p>`
+    : '';
 
   const html = `
     <div style="font-family: system-ui, sans-serif; max-width: 560px;">
       <p><strong>Invoice sent</strong> for ${escapeHtml(params.companyName)}</p>
       <p>Amount: <strong>${escapeHtml(amt)}</strong><br/>Marked: ${escapeHtml(params.sentAtLabel)}</p>
+      ${notesHtml}
       <p style="margin-top:20px;"><a href="${detailUrl}">Open contract in ${escapeHtml(mail.workspaceLabel)}</a></p>
     </div>
   `;
