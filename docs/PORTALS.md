@@ -191,6 +191,17 @@ Each digest includes status counts, AR invoice buckets for executed contracts, i
 
 Override recipients with `PRODUCT_DIGEST_WHISKYFEST_EMAILS`, `PRODUCT_DIGEST_BIG_SMOKE_EMAILS`, `PRODUCT_DIGEST_NYWE_EMAILS`. Optional CC: `PRODUCT_DIGEST_CC_EMAILS`. Cron: `/api/cron/product-status-digest`.
 
+### Kate / Stephen email quiet mode (WhiskyFest)
+
+Katherine and Stephen are filtered out of mid-funnel noise (approved, sent-back, voided, fully signed, invoice paid, etc.):
+
+| Person | Default emails |
+|--------|----------------|
+| Kate Brumley | `contract_executed`, `invoice_sent` (all WhiskyFest deals) |
+| Stephen Senatore | `contract_executed` only |
+
+Overrides: `WHISKYFEST_KATE_NOTIFICATION_KINDS`, `WHISKYFEST_STEVE_NOTIFICATION_KINDS` (comma-separated kinds; empty Steve value = no workflow mail).
+
 ---
 
 *Last updated: July 2026.*  

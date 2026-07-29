@@ -1,5 +1,8 @@
 import { isEventsManagedWorkflow, isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
-import { NO_CHARGE_BOOTH_ASSISTANT_EMAIL } from '@/lib/no-charge-booth';
+import {
+  NO_CHARGE_BOOTH_ASSISTANT_EMAIL,
+  NO_CHARGE_BOOTH_OWNER_EMAIL,
+} from '@/lib/no-charge-booth';
 import { NYWE_COUNTERSIGNER_EMAILS } from '@/lib/nywe-countersigner';
 import { PRODUCT_WHISKYFEST } from '@/lib/product-portal';
 import { WHISKYFEST_BIG_SMOKE_COUNTERSIGNER_EMAILS } from '@/lib/wf-bslv-countersigner';
@@ -56,6 +59,87 @@ export type ResolvedRecipients = {
   cc: string[];
   bcc: string[];
 };
+
+/**
+ * Kate / Stephen: only a short allowlist of workflow emails (not approved / mid-funnel noise).
+ * Override with WHISKYFEST_KATE_NOTIFICATION_KINDS / WHISKYFEST_STEVE_NOTIFICATION_KINDS
+ * (comma-separated kinds). Empty Steve env value = no workflow emails for Stephen.
+ */
+const DEFAULT_KATE_NOTIFICATION_KINDS: NotificationKind[] = ['contract_executed', 'invoice_sent'];
+const DEFAULT_STEVE_NOTIFICATION_KINDS: NotificationKind[] = ['contract_executed'];
+
+function parseKindList(raw: string | undefined, fallback: NotificationKind[]): Set<NotificationKind> {
+  if (raw === undefined) return new Set(fallback);
+  const trimmed = raw.trim();
+  if (!trimmed) return new Set();
+  return new Set(
+    trimmed
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean) as NotificationKind[],
+  );
+}
+
+/** Email → allowed notification kinds. Unlisted emails are unrestricted. */
+export function quietRecipientAllowlists(): Map<string, Set<NotificationKind>> {
+  const map = new Map<string, Set<NotificationKind>>();
+  map.set(
+    NO_CHARGE_BOOTH_ASSISTANT_EMAIL.toLowerCase(),
+    parseKindList(process.env['WHISKYFEST_KATE_NOTIFICATION_KINDS'], DEFAULT_KATE_NOTIFICATION_KINDS),
+  );
+  map.set(
+    NO_CHARGE_BOOTH_OWNER_EMAIL.toLowerCase(),
+    parseKindList(process.env['WHISKYFEST_STEVE_NOTIFICATION_KINDS'], DEFAULT_STEVE_NOTIFICATION_KINDS),
+  );
+  return map;
+}
+
+/**
+ * Strip Kate/Steve from kinds they opted out of. If TO is emptied, promote from CC/BCC.
+ * If nobody remains, skip the send.
+ */
+export function applyQuietRecipientPolicy(
+  kind: NotificationKind,
+  routed: ResolvedRecipients,
+): ResolvedRecipients {
+  if (routed.skip) return routed;
+  const allow = quietRecipientAllowlists();
+
+  const keep = (email: string) => {
+    const e = email.trim().toLowerCase();
+    const allowed = allow.get(e);
+    if (!allowed) return true;
+    return allowed.has(kind);
+  };
+
+  let to = uniq(routed.to.filter(keep));
+  let cc = uniq(routed.cc.filter(keep));
+  let bcc = uniq(routed.bcc.filter(keep));
+
+  if (to.length === 0) {
+    const pool = [...cc, ...bcc];
+    if (pool.length === 0) {
+      return {
+        skip: true,
+        skipReason: `No recipients after quiet-recipient filter (${kind})`,
+        to: [],
+        cc: [],
+        bcc: [],
+      };
+    }
+    to = [pool[0]!];
+    const taken = new Set(to.map((e) => e.toLowerCase()));
+    cc = cc.filter((e) => !taken.has(e.toLowerCase()));
+    bcc = bcc.filter((e) => !taken.has(e.toLowerCase()));
+  }
+
+  const toSet = new Set(to.map((e) => e.toLowerCase()));
+  cc = cc.filter((e) => !toSet.has(e.toLowerCase()));
+  const ccSet = new Set(cc.map((e) => e.toLowerCase()));
+  bcc = bcc.filter((e) => !toSet.has(e.toLowerCase()) && !ccSet.has(e.toLowerCase()));
+
+  return { skip: false, to, cc, bcc };
+}
 
 function parseEmailList(raw: string | undefined): string[] {
   if (!raw?.trim()) return [];
@@ -219,6 +303,7 @@ export async function resolveNotificationRecipients(
    * CC = creator when different from TO.
    * WhiskyFest only: always CC Katherine Brumley for every rep's deals.
    * Assistants are merged by the caller via mergeAssistantCc.
+   * Quiet-recipient policy then limits Kate to executed + invoice_sent (Steve: executed only).
    */
   if (kind === 'contract_executed') {
     const rep = await getSalesRepEmail(ctx.salesRepId);
@@ -287,7 +372,13 @@ export async function resolveNotificationRecipients(
     }
     const rep = await getSalesRepEmail(ctx.salesRepId);
     if (!rep) return empty('No sales rep');
-    return { skip: false, to: [rep], cc: [], bcc: [] };
+    const cc: string[] = [];
+    // Mirror executed alerts: Kate gets invoice-sent for all WhiskyFest deals (not invoice-paid).
+    if (kind === 'invoice_sent' && wf.whiskyfest) {
+      const kate = NO_CHARGE_BOOTH_ASSISTANT_EMAIL.toLowerCase();
+      if (kate !== rep.toLowerCase()) cc.push(kate);
+    }
+    return { skip: false, to: [rep], cc, bcc: [] };
   }
 
   return empty('Unknown notification kind');

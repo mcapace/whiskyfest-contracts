@@ -17,6 +17,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import {
   mergeAssistantCc,
   resolveNotificationRecipients,
+  applyQuietRecipientPolicy,
   type ContractNotificationContext,
   type NotificationKind,
 } from '@/lib/notification-routing';
@@ -85,6 +86,12 @@ async function sendRoutedContractEmail(params: {
   if (params.assistantRepId) {
     const assistants = await getAssistantEmailsForRep(params.assistantRepId);
     routed = mergeAssistantCc(routed, assistants);
+  }
+
+  routed = applyQuietRecipientPolicy(params.kind, routed);
+  if (routed.skip) {
+    console.info(`[${params.logLabel}] skipped — ${routed.skipReason ?? 'quiet recipient filter'}`);
+    return;
   }
 
   if (routed.to.length === 0) {
