@@ -117,7 +117,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
   const inv = (contract.invoice_status ?? 'pending') as InvoiceStatus;
 
-  if (accounting_notes !== undefined) {
+  /** Notes-only save (no invoice status change). */
+  if (accounting_notes !== undefined && mark_invoice_sent !== true) {
     const { error } = await supabase
       .from('contracts')
       .update({ accounting_notes: accounting_notes, updated_at: new Date().toISOString() })
@@ -139,8 +140,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       );
     }
     const now = new Date().toISOString();
+    const notesPayload = accounting_notes !== undefined ? accounting_notes : undefined;
     const notesForNotify =
-      (accounting_notes !== undefined ? accounting_notes : contract.accounting_notes)?.trim() || null;
+      (notesPayload !== undefined ? notesPayload : contract.accounting_notes)?.trim() || null;
     const { error } = await supabase
       .from('contracts')
       .update({
@@ -148,7 +150,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         invoice_sent_at: now,
         invoice_sent_by: actor.email,
         updated_at: now,
-        ...(accounting_notes !== undefined ? { accounting_notes } : {}),
+        ...(notesPayload !== undefined ? { accounting_notes: notesPayload } : {}),
       })
       .eq('id', contract.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -161,8 +163,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         invoice_sent_at: now,
         from_status: inv,
         reissued_after_void: inv === 'invoice_voided',
-        ...(accounting_notes !== undefined
-          ? { accounting_notes_saved: Boolean(accounting_notes.trim()) }
+        ...(notesPayload !== undefined
+          ? { accounting_notes_saved: Boolean(notesPayload.trim()) }
           : {}),
       },
     });
