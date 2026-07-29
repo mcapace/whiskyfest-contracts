@@ -173,8 +173,23 @@ Overrides: `WHISKYFEST_FROM_*`, `WINE_SPECTATOR_FROM_*` / `NYWE_FROM_*`, `BIG_SM
 | Workflow / templates | `lib/contract-template-profile.ts` |
 | Email branding | `lib/product-email.ts` |
 | Notification routing | `lib/notification-routing.ts` |
+| Status digests | `lib/product-status-digest.ts`, cron `/api/cron/product-status-digest` |
 | Copy / labels | `lib/nywe-copy.ts`, `lib/big-smoke-copy.ts`, `lib/contract-notes-copy.ts` |
 | Seed / migrations | e.g. `072_big_smoke_portal.sql`, NYWE event seeds |
+
+## 8. Status digests (Kate / Jake / Susannah)
+
+Weekday emails at **9:00 AM, 1:00 PM, and 5:00 PM Eastern** summarize each portal’s pipeline for the product owner:
+
+| Portal | Default recipient |
+|--------|-------------------|
+| WhiskyFest | Kate Brumley (`kbrumley@mshanken.com`) |
+| Big Smoke (Cigar) | Jake Cohen (`jcohen@mshanken.com`) |
+| NYWE (Wine) | Susannah Nolan (`snolan@mshanken.com`) |
+
+Each digest includes status counts, AR invoice buckets for executed contracts, items needing attention (review / signing / countersign), and contracts updated in the last ~8 hours — plus portal + accounting links. From-address matches the product (WF / Big Smoke / NYWE).
+
+Override recipients with `PRODUCT_DIGEST_WHISKYFEST_EMAILS`, `PRODUCT_DIGEST_BIG_SMOKE_EMAILS`, `PRODUCT_DIGEST_NYWE_EMAILS`. Optional CC: `PRODUCT_DIGEST_CC_EMAILS`. Cron: `/api/cron/product-status-digest`.
 
 ---
 
