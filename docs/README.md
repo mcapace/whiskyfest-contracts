@@ -1,9 +1,16 @@
 # Docs Index
 
-This folder contains operational and technical documentation for the WhiskyFest Contracts app.
+Operational and technical documentation for the M. Shanken contract portals (**WhiskyFest**, **NYWE**, **Big Smoke**).
 
-- [Architecture](./ARCHITECTURE.md)
-- [Workflow](./WORKFLOW.md)
+## Start here by topic
+
+- [Event platforms](./PORTALS.md) — hosts, product keys, workflow profiles, notes model (per platform)
+- [Accounting & notes](./ACCOUNTING.md) — AR invoice states, Mark Invoice Sent, email routing, copy-to-ledger
+- [Workflow](./WORKFLOW.md) — contract lifecycle (draft → signed → executed) with state + sequence diagrams
+- [Architecture](./ARCHITECTURE.md) — system overview + diagrams
+
+## Reference
+
 - [Deployment](./DEPLOYMENT.md)
 - [API](./API.md)
 - [Schema](./SCHEMA.md)

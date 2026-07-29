@@ -174,42 +174,48 @@ sequenceDiagram
 
 What happens after a contract is fully signed and moves into the accounting phase.
 
+> **Full AR documentation** (all platforms, void/recall, notes, email routing, mermaid): see **[ACCOUNTING.md](./ACCOUNTING.md)**.  
+> **Per-platform hosts and workflows**: see **[PORTALS.md](./PORTALS.md)**.
+
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Events as Events Team
+    participant Events as Events Team / Admin
     participant App
     participant DB as Database
-    participant Accounting as Accounting<br/>(AR Team, Danielle Bixler)
-    participant Rep as Sales Rep
+    participant Accounting as Accounting<br/>(AR Team)
+    participant Recipients as Rep or ops inbox
     
     Note over App: Contract is fully signed<br/>Status = signed
     
-    Admin->>App: Click Release to Accounting
-    App->>DB: Status = executed<br/>executed_at = now<br/>accounting_notified_at = now
-    App-->>Accounting: Email with signed PDF attached<br/>+ contract summary table<br/>+ total amount
-    App-->>Rep: Email: contract released to accounting
+    Events->>App: Release to Accounting<br/>(NYWE may auto-release)
+    App->>DB: Status = executed<br/>executed_at = now<br/>invoice_status = pending
+    App-->>Accounting: Email with signed PDF / summary
+    App-->>Recipients: Email: contract released / executed alert
     
-    Note over Accounting: Opens email<br/>Reviews contract details<br/>Prepares invoice
+    Note over Accounting: Opens product AR dashboard<br/>Reviews internal notes (Copy)<br/>Prepares invoice
     
-    Accounting->>App: Open contract in accounting dashboard
-    Accounting->>App: Click Mark Invoice Sent<br/>(optional: add invoice number in notes)
-    App->>DB: invoice_status = invoice_sent<br/>invoice_sent_at = now<br/>invoice_sent_by = user email
-    App-->>Rep: Email: invoice sent to exhibitor
+    Accounting->>App: Mark Invoice Sent<br/>(optional accounting notes)
+    App->>DB: invoice_status = invoice_sent<br/>optional accounting_notes
+    App-->>Recipients: Email: invoice sent + notes
     
     Note over Accounting: Payment arrives
-    Accounting->>App: Click Mark Paid
-    App->>DB: invoice_status = paid<br/>paid_at = now<br/>paid_by = user email
-    App-->>Rep: Email: payment received
+    Accounting->>App: Mark Paid
+    App->>DB: invoice_status = paid
+    App-->>Recipients: Email: payment received
 ```
 
 ### Accounting contract states
 
 | Invoice Status | Meaning |
 |---------------|---------|
-| **pending** | Contract is executed, ready to invoice. Default state when contract moves to executed. |
-| **invoice_sent** | Invoice has been sent to the exhibitor. Awaiting payment. |
-| **paid** | Payment has been received. Contract is closed from the accounting perspective. |
+| **pending** | Contract is executed, ready to invoice. Default when released (unless complimentary). |
+| **invoice_sent** | AR recorded invoice sent. Awaiting payment. |
+| **paid** | Payment received. Closed from the accounting perspective. |
+| **not_invoiced** | Do Not Invoice — complimentary; appears in AR for tracking only. |
+| **invoice_voided** | Sent invoice cancelled; can restore to pending or re-mark sent. |
+
+Also supported: **Recall Invoice Sent** (`invoice_sent` → `pending`) and **Void Invoice Sent** (`invoice_sent` → `invoice_voided`). Details in [ACCOUNTING.md](./ACCOUNTING.md).
 
 ---
 
@@ -388,6 +394,9 @@ Quick reference: what causes each status change?
 | error | draft | Admin Reset to Draft |
 | executed | invoice_sent (invoice_status) | Accounting clicks Mark Invoice Sent |
 | invoice_sent | paid (invoice_status) | Accounting clicks Mark Paid |
+| invoice_sent | pending (invoice_status) | Accounting clicks Recall Invoice Sent |
+| invoice_sent | invoice_voided (invoice_status) | Accounting voids sent invoice (reason required) |
+| invoice_voided | pending / invoice_sent | Restore to Pending, or Mark Invoice Sent again |
 | sent or partially_signed | voided | Admin/events clicks Void + provides reason |
 | any active state | cancelled | Admin/events clicks Cancel |
 
@@ -413,5 +422,5 @@ Quick reference: what causes each status change?
 
 ---
 
-*Last updated: April 2026 (docs aligned with exhibitor DocuSign capture, daily bubbles, admin release).*  
+*Last updated: July 2026 (multi-portal AR, invoice void/recall, accounting notes).*  
 *Contact: Michael Capace — mcapace@mshanken.com*

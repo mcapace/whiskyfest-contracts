@@ -52,9 +52,13 @@
 ## SendGrid
 
 - **Why**: reliable transactional delivery.
-- **Usage**: workflow notifications (release, void, cancel, accounting-relevant updates).
-- **From address**: typically `wfcontracts@whiskyadvocate.com` (WhiskyFest) or `WINE_SPECTATOR_FROM_EMAIL` (NYWE).
-- **Routing** (`lib/notification-routing.ts`): each notification type resolves recipients explicitly — no blanket “email the whole events team” for NYWE.
-  - **WhiskyFest**: sales rep in **To**, events team / assistants in **Bcc** / **Cc** where needed.
-  - **NYWE**: countersigner excluded from invoice/void noise; exhibitor-signed mail skipped (DocuSign only); invoice mail to `NYWE_OPS_NOTIFICATION_EMAILS`.
-  - **Env**: `NYWE_OPS_NOTIFICATION_EMAILS`, `NYWE_EVENTS_REVIEW_EMAILS`, `NOTIFICATION_EXCLUDED_EMAILS`.
+- **Usage**: workflow notifications (release, void, cancel, invoice sent/paid, etc.).
+- **From address** (by `product_key`):
+  - WhiskyFest → `wfcontracts@whiskyadvocate.com` (or `WHISKYFEST_FROM_EMAIL`)
+  - NYWE → `nywecontracts@winespectator.com` (or `WINE_SPECTATOR_FROM_EMAIL` / `NYWE_FROM_EMAIL`)
+  - Big Smoke → `bigsmokecontracts@cigaraficionado.com` (or `BIG_SMOKE_FROM_EMAIL`)
+- **Routing** (`lib/notification-routing.ts`): each notification type resolves recipients explicitly — no blanket “email the whole events team” for events-managed portals.
+  - **WhiskyFest** (`sales_rep`): invoice sent/paid → assigned sales rep (assistants CC when configured).
+  - **NYWE & Big Smoke** (`events_managed`): invoice sent/paid → ops inbox (`NYWE_OPS_NOTIFICATION_EMAILS`, else `EVENTS_MANAGED_INVOICE_NOTIFICATION_EMAILS`); fallback `created_by`. NYWE skips partial/fully-signed app mail (DocuSign / auto-release).
+  - **Env**: `NYWE_OPS_NOTIFICATION_EMAILS`, `EVENTS_MANAGED_INVOICE_NOTIFICATION_EMAILS`, `NYWE_EVENTS_REVIEW_EMAILS`, `NOTIFICATION_EXCLUDED_EMAILS`.
+- **Docs**: [PORTALS.md](./PORTALS.md), [ACCOUNTING.md](./ACCOUNTING.md).

@@ -1,6 +1,6 @@
-# WhiskyFest Contracts
+# WhiskyFest / NYWE / Big Smoke Contracts
 
-Internal contract management system for M. Shanken Communications — automates the sponsor contract workflow for WhiskyFest events from creation through accounting release.
+Internal contract management for M. Shanken Communications — three branded portals in one app, covering sponsor contracts from creation through accounting.
 
 ## Tech stack
 
@@ -12,10 +12,12 @@ Internal contract management system for M. Shanken Communications — automates 
 - **Templates & PDFs**: Google Docs API -> PDF export
 - **Email**: SendGrid
 - **Hosting**: Vercel
-- **Additional**: Google Drive (backup archive), Google Sheets (team tracker)
+- **Additional**: Google Drive (backup archive), Google Sheets (team tracker + billed AR export)
 
 ## Quick links
 
+- [Event platforms](./docs/PORTALS.md) — WhiskyFest · NYWE · Big Smoke hosts, keys, flows
+- [Accounting & notes](./docs/ACCOUNTING.md) — AR invoice lifecycle + notes visibility
 - [Architecture](./docs/ARCHITECTURE.md) — system overview + diagrams
 - [Workflow](./docs/WORKFLOW.md) — contract lifecycle with state + sequence diagrams
 - [Deployment](./docs/DEPLOYMENT.md) — how to deploy + environment setup
@@ -24,6 +26,7 @@ Internal contract management system for M. Shanken Communications — automates 
 - [Permissions](./docs/PERMISSIONS.md) — role-based access rules
 - [Integrations](./docs/INTEGRATIONS.md) — external services explained
 - [Troubleshooting](./docs/TROUBLESHOOTING.md) — common issues + fixes
+- [Docs index](./docs/README.md)
 
 ## Getting started
 

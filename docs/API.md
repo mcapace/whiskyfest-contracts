@@ -69,11 +69,15 @@ All endpoints are implemented as Next.js route handlers under `app/api`.
 
 ### `PATCH /api/accounting/contracts/[id]`
 - **Permissions**: accounting/admin
-- **Body**:
-  - `mark_invoice_sent: true`
+- **Body** (exactly one status action; `accounting_notes` may be sent alone or with `mark_invoice_sent`):
+  - `mark_invoice_sent: true` — optional `accounting_notes` saved and included in invoice-sent email
   - `mark_paid: true`
-  - `accounting_notes: string`
-- **Side effects**: invoice status fields + optional notifications
+  - `recall_invoice_sent: true` — `invoice_sent` → `pending`
+  - `void_invoice_sent: true` + `void_reason` (min 5 chars) — `invoice_sent` → `invoice_voided`
+  - `restore_voided_invoice: true` — `invoice_voided` → `pending`
+  - `accounting_notes: string` — save notes only
+- **Side effects**: invoice status fields, audit log, optional SendGrid (sent/paid), billed Google Sheet sync
+- **Docs**: [ACCOUNTING.md](./ACCOUNTING.md)
 
 ## Webhooks
 
