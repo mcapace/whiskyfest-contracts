@@ -43,7 +43,7 @@ create table if not exists events (
   year            int  not null,                   -- 2026
   booth_rate_cents int not null default 1500000,   -- $15,000 in cents
   shanken_signatory_name   text default 'Nicole Mazza',
-  shanken_signatory_title  text default 'Vice President, Events',
+  shanken_signatory_title  text default 'Event Director',
   shanken_signatory_email  text default 'nmazza@mshanken.com',
   is_active       boolean not null default true,
   created_at      timestamptz not null default now(),
