@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { isDocuSignBackgroundSyncDisabled } from '@/lib/docusign';
+import { isDocuSignBackgroundSyncDisabled, isDocuSignRateLimitError } from '@/lib/docusign';
 import {
   syncActiveEventExhibitorSignaturesFromDocuSign,
   type ExhibitorDocuSignSyncResult,
@@ -12,28 +12,62 @@ export const runtime = 'nodejs';
 export const maxDuration = 120;
 
 function emptyExhibitorSync(): ExhibitorDocuSignSyncResult {
-  return { scanned: 0, partiallySigned: 0, fullySigned: 0, unchanged: 0, errors: 0, errorSamples: [] };
+  return {
+    scanned: 0,
+    partiallySigned: 0,
+    fullySigned: 0,
+    unchanged: 0,
+    errors: 0,
+    errorSamples: [],
+    rateLimited: false,
+  };
 }
 
-/** Drain several DocuSign poll batches so completed countersignatures do not sit behind cooldown. */
+function mergeExhibitor(
+  totals: ExhibitorDocuSignSyncResult,
+  result: ExhibitorDocuSignSyncResult,
+): void {
+  totals.scanned += result.scanned;
+  totals.partiallySigned += result.partiallySigned;
+  totals.fullySigned += result.fullySigned;
+  totals.unchanged += result.unchanged;
+  totals.errors += result.errors;
+  totals.rateLimited = totals.rateLimited || result.rateLimited;
+  totals.errorSamples.push(
+    ...result.errorSamples.slice(0, Math.max(0, 8 - totals.errorSamples.length)),
+  );
+}
+
+/**
+ * Drain cooldown-eligible in-flight contracts, then force-poll a slice of overdue
+ * envelopes so completed DocuSign work cannot stay stuck behind batch/cooldown limits.
+ */
 async function drainExhibitorSignatureSync(): Promise<ExhibitorDocuSignSyncResult> {
   const totals = emptyExhibitorSync();
-  for (let batch = 0; batch < 4; batch += 1) {
+
+  for (let batch = 0; batch < 6; batch += 1) {
     const result = await syncActiveEventExhibitorSignaturesFromDocuSign({
-      batchSize: 25,
+      batchSize: 30,
       notify: false,
       concurrency: 3,
     });
-    totals.scanned += result.scanned;
-    totals.partiallySigned += result.partiallySigned;
-    totals.fullySigned += result.fullySigned;
-    totals.unchanged += result.unchanged;
-    totals.errors += result.errors;
-    totals.errorSamples.push(
-      ...result.errorSamples.slice(0, Math.max(0, 8 - totals.errorSamples.length)),
-    );
-    if (result.scanned === 0 || result.errors > 0) break;
+    mergeExhibitor(totals, result);
+    if (result.scanned === 0 || result.rateLimited) break;
   }
+
+  // Overdue catch-up: force-poll oldest in-flight envelopes sent ≥30 minutes ago,
+  // ignoring cooldown so a prior "still sent" poll cannot hide a later DocuSign completion.
+  if (!totals.rateLimited) {
+    const overdue = await syncActiveEventExhibitorSignaturesFromDocuSign({
+      batchSize: 40,
+      notify: false,
+      concurrency: 3,
+      forcePoll: true,
+      minSentAgeMs: 30 * 60 * 1000,
+    });
+    mergeExhibitor(totals, overdue);
+  }
+
   return totals;
 }
 
@@ -67,7 +101,13 @@ export async function POST(req: Request) {
       ? emptyExhibitorSync()
       : await drainExhibitorSignatureSync();
     const countersign = isDocuSignBackgroundSyncDisabled()
-      ? { scanned: 0, fullySigned: 0, unchanged: 0, errors: 0, errorSamples: [] as { id: string; company: string; error: string }[] }
+      ? {
+          scanned: 0,
+          fullySigned: 0,
+          unchanged: 0,
+          errors: 0,
+          errorSamples: [] as { id: string; company: string; error: string }[],
+        }
       : await syncNyweCountersignaturesFromDocuSign({ notify: false, limit: 40 });
     const accounting = await releaseSignedContractsToAccounting({ limit: 100 });
 
@@ -84,6 +124,10 @@ export async function POST(req: Request) {
     });
   } catch (err) {
     console.error('[auto-release-accounting cron] reconcile failed', err);
+    const msg = err instanceof Error ? err.message : String(err);
+    if (isDocuSignRateLimitError(err instanceof Error ? err : new Error(msg))) {
+      return NextResponse.json({ ok: false, error: 'DocuSign rate limited', detail: msg }, { status: 429 });
+    }
     return NextResponse.json({ error: 'Reconcile failed' }, { status: 500 });
   }
 }

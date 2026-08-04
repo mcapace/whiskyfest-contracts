@@ -194,7 +194,8 @@ export async function findRowByContractId(contractId: string): Promise<number | 
       tab: cfg.tab,
       spreadsheetId: cfg.spreadsheetId,
     });
-    throw err;
+    // Soft-fail: bad tab/range must never block DocuSign status advances.
+    return null;
   }
 }
 

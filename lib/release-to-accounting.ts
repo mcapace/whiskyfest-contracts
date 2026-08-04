@@ -178,10 +178,6 @@ export async function releaseContractToAccounting(options: {
     return { ok: false, error: 'Already released to accounting.', status: 409 };
   }
 
-  if (!process.env['SENDGRID_API_KEY']) {
-    return { ok: false, error: 'SENDGRID_API_KEY is not configured.', status: 500 };
-  }
-
   // Last chance to sync DocuSign billing tabs into DB before the AR email is composed.
   contract = await ensureExhibitorCaptureBeforeRelease(supabase, contract, actorEmail);
 
@@ -262,6 +258,10 @@ export async function releaseContractToAccounting(options: {
           ? 'Booth + sponsorship / line items'
           : 'Booth package';
 
+  if (!process.env['SENDGRID_API_KEY']) {
+    return { ok: false, error: 'SENDGRID_API_KEY is not configured.', status: 500 };
+  }
+
   const now = new Date().toISOString();
 
   // One email per contract — claim before SendGrid so webhook + cron + dashboard cannot duplicate.
@@ -283,46 +283,46 @@ export async function releaseContractToAccounting(options: {
 
   try {
     await sendAccountingEmail({
-    contractId: contract.id,
-    sponsorCompanyName: contract.exhibitor_company_name,
-    exhibitorLegalName: contract.exhibitor_legal_name,
-    signerName: contract.signer_1_name,
-    signerTitle: contract.signer_1_title,
-    signerEmail: contract.signer_1_email,
-    exhibitorTelephone: contract.exhibitor_telephone,
-    billingAddressLine,
-    exhibitorMailingAddress,
-    invoiceStatusLabel,
-    brandsPoured: contract.brands_poured,
-    orderTypeLabel,
-    lineItems: lineItemRows.map((row) => ({
-      description: row.description,
-      amountCents: row.amount_cents,
-    })),
-    isNyweVendor: nyweVendor,
-    exhibitorBillingContactName: hasDesignatedBilling ? contract.billing_contact_name : null,
-    exhibitorBillingContactEmail: hasDesignatedBilling ? contract.billing_contact_email : null,
-    billingCompanyName,
-    exhibitorBillingAddressDetail: hasDesignatedBilling
-      ? formatBillingAddressBlock(contract)
-      : null,
-    exhibitorEventContactName: exhibitorCaptured ? contract.event_contact_name : null,
-    exhibitorEventContactEmail: exhibitorCaptured ? contract.event_contact_email : null,
-    eventName: event.name,
-    eventYear: event.year,
-    boothCount: contract.booth_count,
-    boothRateCents: contract.booth_rate_cents,
-    discountLine,
-    boothSubtotalCents: contract.booth_subtotal_cents,
-    lineItemsSubtotalCents: contract.line_items_subtotal_cents,
-    grandTotalCents: contract.grand_total_cents,
-    salesRepName: contract.sales_rep_name ?? null,
-    executedAtFormatted: formatTimestamp(now),
-    countersignedByName: isLegacyImportedContract(contract) ? null : contract.countersigned_by_name,
-    signedPdfBytes,
-    accountingContractUrl: accountingContractUrl(contract.id, productKeyFromEvent(event)),
-    salesRepEmail: contract.sales_rep_email ?? contract.created_by,
-    productKey: event.product_key,
+      contractId: contract.id,
+      sponsorCompanyName: contract.exhibitor_company_name,
+      exhibitorLegalName: contract.exhibitor_legal_name,
+      signerName: contract.signer_1_name,
+      signerTitle: contract.signer_1_title,
+      signerEmail: contract.signer_1_email,
+      exhibitorTelephone: contract.exhibitor_telephone,
+      billingAddressLine,
+      exhibitorMailingAddress,
+      invoiceStatusLabel,
+      brandsPoured: contract.brands_poured,
+      orderTypeLabel,
+      lineItems: lineItemRows.map((row) => ({
+        description: row.description,
+        amountCents: row.amount_cents,
+      })),
+      isNyweVendor: nyweVendor,
+      exhibitorBillingContactName: hasDesignatedBilling ? contract.billing_contact_name : null,
+      exhibitorBillingContactEmail: hasDesignatedBilling ? contract.billing_contact_email : null,
+      billingCompanyName,
+      exhibitorBillingAddressDetail: hasDesignatedBilling
+        ? formatBillingAddressBlock(contract)
+        : null,
+      exhibitorEventContactName: exhibitorCaptured ? contract.event_contact_name : null,
+      exhibitorEventContactEmail: exhibitorCaptured ? contract.event_contact_email : null,
+      eventName: event.name,
+      eventYear: event.year,
+      boothCount: contract.booth_count,
+      boothRateCents: contract.booth_rate_cents,
+      discountLine,
+      boothSubtotalCents: contract.booth_subtotal_cents,
+      lineItemsSubtotalCents: contract.line_items_subtotal_cents,
+      grandTotalCents: contract.grand_total_cents,
+      salesRepName: contract.sales_rep_name ?? null,
+      executedAtFormatted: formatTimestamp(now),
+      countersignedByName: isLegacyImportedContract(contract) ? null : contract.countersigned_by_name,
+      signedPdfBytes,
+      accountingContractUrl: accountingContractUrl(contract.id, productKeyFromEvent(event)),
+      salesRepEmail: contract.sales_rep_email ?? contract.created_by,
+      productKey: event.product_key,
     });
   } catch (err) {
     await supabase

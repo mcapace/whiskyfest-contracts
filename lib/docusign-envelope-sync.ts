@@ -48,6 +48,13 @@ function routing2Signer(signers: DocuSignSignerRow[]): DocuSignSignerRow | undef
 export function isDocuSignEnvelopeFullySigned(
   envelopeStatus: string,
   signers: DocuSignSignerRow[],
+  options?: {
+    /**
+     * NYWE (and other single-signer products): exhibitor completion is enough even if a
+     * legacy routing-order-2 recipient is still pending in DocuSign.
+     */
+    exhibitorCompleteIsFull?: boolean;
+  },
 ): boolean {
   const envLower = envelopeStatus.toLowerCase();
   if (envLower === 'voided' || envLower === 'declined') return false;
@@ -56,6 +63,7 @@ export function isDocuSignEnvelopeFullySigned(
   const r1Done = r1 ? signerCompleted(r1) : false;
   const r2Done = r2 ? signerCompleted(r2) : false;
   const allSignersDone = signers.length > 0 && signers.every(signerCompleted);
+  if (options?.exhibitorCompleteIsFull && r1Done) return true;
   return envLower === 'completed' || allSignersDone || (r1Done && r2Done);
 }
 
@@ -368,11 +376,11 @@ export async function syncContractFromDocuSign(
     };
   }
 
-  await touchDocuSignPoll(supabase, contract.id);
-
   const { status: envelopeStatus } = await fetchEnvelopeStatus(envelopeId);
   const envLower = envelopeStatus.toLowerCase();
   const signers = await fetchEnvelopeSigners(envelopeId);
+  // Touch after a successful DocuSign read so API failures do not burn the cooldown window.
+  await touchDocuSignPoll(supabase, contract.id);
   const r1 = routing1Signer(signers);
   const r1Done = r1 ? signerCompleted(r1) : false;
 
@@ -394,7 +402,11 @@ export async function syncContractFromDocuSign(
     };
   }
 
-  if (isDocuSignEnvelopeFullySigned(envelopeStatus, signers)) {
+  if (
+    isDocuSignEnvelopeFullySigned(envelopeStatus, signers, {
+      exhibitorCompleteIsFull: Boolean(event && usesSingleSignerEnvelope(event)),
+    })
+  ) {
     try {
       const { updated } = await applyEnvelopeFullySigned(supabase, contract, event, envelopeId, {
         actorEmail,
@@ -417,6 +429,22 @@ export async function syncContractFromDocuSign(
       };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      // If apply already wrote signed/executed, do not clobber into error — cron will retry release.
+      const { data: afterFail } = await supabase
+        .from('contracts')
+        .select('status')
+        .eq('id', contract.id)
+        .maybeSingle();
+      const st = (afterFail as { status?: string } | null)?.status;
+      if (st === 'signed' || st === 'executed') {
+        return {
+          ok: true,
+          changed: true,
+          fromStatus: contract.status,
+          toStatus: st,
+          message: `Synced to ${st} (post-sign side effect failed: ${msg.slice(0, 200)})`,
+        };
+      }
       await supabase
         .from('contracts')
         .update({

@@ -9,6 +9,7 @@ import {
 } from '@/lib/docusign-envelope-sync';
 import { autoReleaseAfterFullySigned, contractNeedsAutoReleaseToAccounting } from '@/lib/auto-release-accounting';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
+import { usesSingleSignerEnvelope } from '@/lib/single-signer-envelope';
 import { updateContractRow } from '@/lib/sheets-tracker';
 import type { ContractWithTotals, Event } from '@/types/db';
 
@@ -184,15 +185,34 @@ export async function POST(req: Request) {
     (completedEvent || recipientCompletedEvent)
   ) {
     try {
-      const signers = await fetchEnvelopeSigners(envelopeId);
+      let signers = await fetchEnvelopeSigners(envelopeId);
       let envStatus = envelopeStatus?.trim() ?? '';
       if (!envStatus) {
         const st = await fetchEnvelopeStatus(envelopeId);
         envStatus = st.status;
       }
-      if (isDocuSignEnvelopeFullySigned(envStatus, signers)) {
+      const fullOpts = {
+        exhibitorCompleteIsFull: Boolean(event && usesSingleSignerEnvelope(event)),
+      };
+      // Connect can race ahead of recipient status — re-fetch once on envelope-completed.
+      if (completedEvent && !isDocuSignEnvelopeFullySigned(envStatus, signers, fullOpts)) {
+        await new Promise((r) => setTimeout(r, 1500));
+        const retry = await fetchEnvelopeStatus(envelopeId);
+        envStatus = retry.status;
+        signers = await fetchEnvelopeSigners(envelopeId);
+      }
+      if (isDocuSignEnvelopeFullySigned(envStatus, signers, fullOpts)) {
         await applyEnvelopeFullySigned(supabase, contract, event ?? null, envelopeId);
         return new NextResponse(null, { status: 200 });
+      }
+      // Ask Connect to retry envelope-completed when DocuSign still looks incomplete (transient race).
+      if (completedEvent) {
+        console.warn('[docusign-webhook] envelope-completed but not fully signed yet; requesting retry', {
+          contractId: contract.id,
+          envelopeId,
+          envStatus,
+        });
+        return new NextResponse(null, { status: 500 });
       }
     } catch (err) {
       console.error('DocuSign completion handling failed:', err);
