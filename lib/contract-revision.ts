@@ -234,6 +234,31 @@ export async function reviseAndSendContract(options: {
   contract = (await fetchContractWithTotalsById(supabase, contractId))!;
   contract = await refreshNyweBillingFromRosterForContract(supabase, contract, event);
 
+  // Roster refresh can overwrite intentional signer/CC edits — re-apply revise body fields.
+  const postRosterSignerPatch: Record<string, unknown> = {};
+  if (body.signer_1_name?.trim()) postRosterSignerPatch.signer_1_name = body.signer_1_name.trim();
+  if (body.signer_1_email?.trim()) postRosterSignerPatch.signer_1_email = body.signer_1_email.trim();
+  if (body.signer_cc_name !== undefined) {
+    postRosterSignerPatch.signer_cc_name = body.signer_cc_name?.trim() || null;
+  }
+  if (body.signer_cc_email !== undefined) {
+    postRosterSignerPatch.signer_cc_email = body.signer_cc_email?.trim() || null;
+  }
+  if (body.exhibitor_legal_name?.trim()) {
+    postRosterSignerPatch.exhibitor_legal_name = body.exhibitor_legal_name.trim();
+  }
+  if (body.exhibitor_company_name?.trim()) {
+    postRosterSignerPatch.exhibitor_company_name = body.exhibitor_company_name.trim();
+  }
+  if (Object.keys(postRosterSignerPatch).length > 0) {
+    const { error: signerPatchError } = await supabase
+      .from('contracts')
+      .update(postRosterSignerPatch)
+      .eq('id', contractId);
+    if (signerPatchError) throw new Error(signerPatchError.message);
+    contract = (await fetchContractWithTotalsById(supabase, contractId))!;
+  }
+
   if (requiresDiscountApproval(contract, event)) {
     throw new Error('Discount approval required before resending.');
   }
