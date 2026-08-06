@@ -21,6 +21,8 @@ export function resolveContractTemplateDocId(
   contract: ContractForTemplate,
   event?: EventForTemplate | null,
 ): string {
+  const templateProfile = event ? eventTemplateProfile(event) : 'whiskyfest';
+
   if (isSponsorshipOnlyOrder(contract)) {
     const eventSponsorshipId = event?.google_sponsorship_template_doc_id?.trim();
     if (eventSponsorshipId) return eventSponsorshipId;
@@ -31,15 +33,36 @@ export function resolveContractTemplateDocId(
   const eventBoothId = event?.google_template_doc_id?.trim();
   if (eventBoothId) return eventBoothId;
 
-  if (event && eventTemplateProfile(event) === 'big_smoke') {
+  // Big Smoke fallback: use BIG_SMOKE_TEMPLATE_DOC_ID env var or hardcoded Las Vegas template.
+  // WARNING: Each Big Smoke event SHOULD have its own google_template_doc_id configured in the database
+  // to avoid using the wrong template (e.g., Agua Caliente reception shouldn't use Las Vegas template).
+  // This fallback exists for backwards compatibility but may produce incorrect results for non-Las Vegas events.
+  if (templateProfile === 'big_smoke') {
     const fromEnv = process.env['BIG_SMOKE_TEMPLATE_DOC_ID']?.trim();
-    return fromEnv || BIG_SMOKE_TEMPLATE_DOC_ID;
+    const fallbackId = fromEnv || BIG_SMOKE_TEMPLATE_DOC_ID;
+    console.warn(
+      `[resolveContractTemplateDocId] Big Smoke event missing google_template_doc_id, ` +
+      `falling back to ${fallbackId}. This may use the wrong template. ` +
+      `Event should have its google_template_doc_id configured.`
+    );
+    return fallbackId;
   }
 
+  // WhiskyFest / NYWE fallback
   const boothId = process.env.GOOGLE_TEMPLATE_DOC_ID?.trim();
   if (!boothId) {
     throw new Error('GOOGLE_TEMPLATE_DOC_ID is not set');
   }
+  
+  // Warn if we're using WhiskyFest template for what might be a Big Smoke contract
+  if (event && !event.google_template_doc_id) {
+    console.warn(
+      `[resolveContractTemplateDocId] Event missing google_template_doc_id, ` +
+      `falling back to GOOGLE_TEMPLATE_DOC_ID (${templateProfile} profile). ` +
+      `Verify event.contract_template_profile is correct.`
+    );
+  }
+  
   return boothId;
 }
 
