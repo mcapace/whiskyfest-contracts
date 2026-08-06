@@ -12,7 +12,7 @@ import {
   contractDocuSignFileName,
   contractPdfBaseName,
 } from '@/lib/contract-document-naming';
-import { eventUsesContractOrderTable } from '@/lib/contract-template-profile';
+import { contractUsesOrderTable } from '@/lib/contract-template-profile';
 import {
   countersignerRequiredForEvent,
   countersignCcValidation,
@@ -170,7 +170,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     const mergeMap = buildContractMergeMap(mergedContract, event, 'docusign', boothBrands);
     const fileName = `${contractPdfBaseName(contract.exhibitor_company_name, event)} (DocuSign)`;
-    const usesOrderTable = eventUsesContractOrderTable(event);
+    const usesOrderTable = contractUsesOrderTable(event, mergedContract);
 
     let newEnvelopeId: string;
     try {

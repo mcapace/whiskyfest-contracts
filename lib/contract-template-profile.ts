@@ -18,6 +18,19 @@ export function eventUsesContractOrderTable(event: Pick<Event, 'contract_templat
   return eventTemplateProfile(event) === 'whiskyfest';
 }
 
+/**
+ * CONTRACT ORDER table + line-item row insert (WhiskyFest booth/sponsorship, or NYWE sponsorship-only).
+ * Flat NYWE vendor licenses do not use the order table.
+ */
+export function contractUsesOrderTable(
+  event: Pick<Event, 'contract_template_profile'>,
+  contract: { order_type?: string | null; booth_count?: number | null },
+): boolean {
+  if (eventUsesContractOrderTable(event)) return true;
+  if (eventTemplateProfile(event) !== 'nywe_vendor') return false;
+  return contract.order_type === 'sponsorship_only' || (contract.booth_count ?? 1) === 0;
+}
+
 export function isEventsManagedWorkflow(event: Pick<Event, 'workflow_profile'>): boolean {
   return event.workflow_profile === 'events_managed';
 }

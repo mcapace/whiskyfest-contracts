@@ -70,7 +70,9 @@ export default async function WineSpectatorNewContractPage({
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="font-display text-3xl font-medium text-foreground">New vendor license</h1>
+        <h1 className="font-display text-3xl font-medium text-foreground">
+          {initialDealKind === 'sponsorship_only' ? 'New sponsorship' : 'New vendor license'}
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">Wine Spectator · New York Wine Experience</p>
       </div>
       <NewContractForm

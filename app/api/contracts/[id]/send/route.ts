@@ -13,7 +13,7 @@ import {
   contractDocuSignFileName,
   contractPdfBaseName,
 } from '@/lib/contract-document-naming';
-import { eventUsesContractOrderTable } from '@/lib/contract-template-profile';
+import { contractUsesOrderTable } from '@/lib/contract-template-profile';
 import {
   countersignerRequiredForEvent,
   countersignCcValidation,
@@ -123,7 +123,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   }
   const safeCompany = contract.exhibitor_company_name.replace(/[^\w\s-]/g, '');
   const templateDocId = resolveContractTemplateDocId(contract, event);
-  const usesOrderTable = eventUsesContractOrderTable(event);
+  const usesOrderTable = contractUsesOrderTable(event, contract);
 
   try {
     const lineItems = await fetchContractLineItemsOrdered(supabase, contract.id);

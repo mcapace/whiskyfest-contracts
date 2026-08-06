@@ -8,7 +8,7 @@ import {
 } from '@/lib/contract-document-naming';
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import { insertContractAudit } from '@/lib/audit-log';
-import { eventUsesContractOrderTable, isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
+import { contractUsesOrderTable, isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
 import { persistContractDraftPdf } from '@/lib/contract-pdf-storage';
 import { resolveContractTemplateDocId } from '@/lib/contract-template';
 import {
@@ -158,7 +158,7 @@ export async function nyweClientSendContract(options: {
   }
 
   const templateDocId = resolveContractTemplateDocId(contract, event);
-  const usesOrderTable = eventUsesContractOrderTable(event);
+  const usesOrderTable = contractUsesOrderTable(event, contract);
 
   try {
     const lineItems = await fetchContractLineItemsOrdered(supabase, contract.id);

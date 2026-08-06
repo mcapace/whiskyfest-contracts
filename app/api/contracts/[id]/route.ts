@@ -133,16 +133,20 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             package_key: p.package_key,
           })
         : null;
-    const nywePricing = applyNyweLicensePricingIfNeeded(patchEvent, {
-      booth_count: bigSmokePricing?.booth_count ?? p.booth_count,
-      booth_rate_cents: noChargeRequested
-        ? 0
-        : bigSmokePricing
-          ? resolveBigSmokeStoredBoothRate(bigSmokePricing, incomingBoothRate)
-          : incomingBoothRate,
-    });
+    const nywePricing = applyNyweLicensePricingIfNeeded(
+      patchEvent,
+      {
+        booth_count: bigSmokePricing?.booth_count ?? p.booth_count,
+        booth_rate_cents: noChargeRequested
+          ? 0
+          : bigSmokePricing
+            ? resolveBigSmokeStoredBoothRate(bigSmokePricing, incomingBoothRate)
+            : incomingBoothRate,
+      },
+      { orderType: p.order_type },
+    );
     const boothRateChanged = nywePricing.booth_rate_cents !== contract.booth_rate_cents;
-    const savedLineItems = nyweOnly ? [] : (p.line_items ?? []);
+    const savedLineItems = nyweOnly && !sponsorshipOnly ? [] : (p.line_items ?? []);
     const nextPackageKey = bigSmokePricing?.package_key ?? null;
     const nextPackageSelections = bigSmokePricing?.package_selections ?? null;
     const listFeeCents = bigSmokePricing?.fee_cents ?? null;
@@ -183,10 +187,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         exhibitor_legal_name: p.exhibitor_legal_name,
         exhibitor_company_name: p.exhibitor_company_name,
         order_type: p.order_type ?? 'booth',
-        brands_poured: nyweOnly
-          ? (p.brands_poured?.trim() || p.exhibitor_company_name.trim() || null)
-          : sponsorshipOnly
-            ? sponsorBrandFromBody(p)
+        brands_poured: sponsorshipOnly
+          ? sponsorBrandFromBody(p)
+          : nyweOnly
+            ? (p.brands_poured?.trim() || p.exhibitor_company_name.trim() || null)
             : isBigSmoke
               ? p.exhibitor_company_name.trim() || null
               : null,
@@ -342,10 +346,14 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const incomingBoothRate =
     typeof p.booth_rate_cents === 'number' ? p.booth_rate_cents : contract.booth_rate_cents;
   const normalizedRate = signerPatchEvent
-    ? applyNyweLicensePricingIfNeeded(signerPatchEvent, {
-        booth_count: contract.booth_count,
-        booth_rate_cents: incomingBoothRate,
-      }).booth_rate_cents
+    ? applyNyweLicensePricingIfNeeded(
+        signerPatchEvent,
+        {
+          booth_count: contract.booth_count,
+          booth_rate_cents: incomingBoothRate,
+        },
+        { orderType: contract.order_type },
+      ).booth_rate_cents
     : incomingBoothRate;
   const boothRateChanged = normalizedRate !== contract.booth_rate_cents;
   const shouldResetDiscountApproval =

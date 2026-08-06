@@ -375,9 +375,15 @@ export function NewContractForm({
   const isBigSmokeEvent = selectedEvent?.contract_template_profile === 'big_smoke';
   /** Big Smoke assigns AEs like WhiskyFest; NYWE events-managed stays sales-rep-free. */
   const requiresSalesRep = isBigSmokeEvent || !eventsManaged;
-  /** NYWE flat license only — Big Smoke supports packages, sponsorships, and no-charge like WF. */
-  const boothOnlyEvent = isNyweFlatEvent;
+  /**
+   * NYWE vendor license only (flat fee, no line items). Sponsorship-only uses WF-style line items.
+   * Previously all NYWE was "boothOnly"; sponsorship unlocks deal type + line items.
+   */
+  const nyweLicenseMode = isNyweFlatEvent && dealKind !== 'sponsorship_only';
   const hideBoothBrands = isNyweFlatEvent || isBigSmokeEvent;
+  const dealKindsForEvent: ContractDealKind[] = isNyweFlatEvent
+    ? ['booth', 'sponsorship_only']
+    : [...CONTRACT_DEAL_KINDS];
   const selectedBigSmokePricing = pricingFromBigSmokeSelections(
     selectionsFromDrafts(packageSelections),
   );
@@ -389,7 +395,9 @@ export function NewContractForm({
       ? noChargeBooth
         ? 0
         : (selectedBigSmokePricing?.fee_cents ?? 0)
-      : form.booth_count * form.booth_rate_cents;
+      : nyweLicenseMode
+        ? form.booth_count * form.booth_rate_cents
+        : form.booth_count * form.booth_rate_cents;
   const lineItemsSumCents = lineItems.reduce((acc, row) => {
     const desc = row.description.trim();
     const raw = row.amountInput.trim().replace(/[$,]/g, '');
@@ -707,10 +715,10 @@ export function NewContractForm({
       const formForSave = {
         ...form,
         event_id: resolvedEventId,
-        signer_1_title: boothOnlyEvent ? null : form.signer_1_title.trim() || null,
+        signer_1_title: nyweLicenseMode ? null : form.signer_1_title.trim() || null,
         booth_count: bigSmokePriced
           ? bigSmokePriced.booth_count
-          : boothOnlyEvent
+          : nyweLicenseMode
             ? 1
             : sponsorshipOnly
               ? 0
@@ -754,7 +762,7 @@ export function NewContractForm({
             ? form.exhibitor_company_name.trim() || null
             : null,
         sponsor_brand: sponsorshipOnly ? sponsorBrand.trim() || null : null,
-        line_items: boothOnlyEvent ? [] : parsedLines.rows,
+        line_items: nyweLicenseMode ? [] : parsedLines.rows,
         booth_brands,
         no_charge_booth: useNoCharge,
         ...(pipelineTargetId ? { pipeline_target_id: pipelineTargetId } : {}),
@@ -885,7 +893,7 @@ export function NewContractForm({
                 </datalist>
               ) : null}
             </Field>
-            {matchedSponsor && !boothOnlyEvent ? (
+            {matchedSponsor && !nyweLicenseMode ? (
               <div className="rounded-lg border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm text-amber-950">
                 <div className="flex gap-2">
                   <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden />
@@ -917,7 +925,7 @@ export function NewContractForm({
                 </div>
               </div>
             ) : null}
-            {medianBooths != null && !matchedSponsor && !boothOnlyEvent ? (
+            {medianBooths != null && !matchedSponsor && !nyweLicenseMode ? (
               <p className="text-xs text-muted-foreground">
                 Typical booth count for this name in your history:{' '}
                 <button
@@ -996,7 +1004,9 @@ export function NewContractForm({
                     ? 'Choose one or more rate-sheet packages, then add sponsorship line items with amounts.'
                     : 'Choose one or more rate-sheet packages (e.g. Double + Single for 3 booths), or mark the booth as no charge. Switch deal type for paid sponsorships.'
                 : isNyweFlatEvent
-                  ? 'NYWE vendor licenses are a flat fee — not per-booth WhiskyFest pricing.'
+                  ? dealKind === 'sponsorship_only'
+                    ? 'NYWE sponsorship-only — line items only (no vendor license fee). Uses the sponsorship Google Doc template.'
+                    : 'NYWE vendor licenses are a flat fee — not per-booth WhiskyFest pricing. Switch deal type for sponsorship-only.'
                   : dealKind === 'sponsorship_only'
                     ? 'Sponsorship-only — line items only, no booth on the contract.'
                     : dealKind === 'booth_and_sponsorship'
@@ -1005,11 +1015,10 @@ export function NewContractForm({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {!boothOnlyEvent ? (
             <div className="space-y-2">
               <Label>Deal type</Label>
               <div className="flex flex-wrap gap-2">
-                {CONTRACT_DEAL_KINDS.map((kind) => (
+                {dealKindsForEvent.map((kind) => (
                   <Button
                     key={kind}
                     type="button"
@@ -1017,12 +1026,11 @@ export function NewContractForm({
                     onClick={() => switchDealKind(kind)}
                     disabled={busy}
                   >
-                    {dealKindMeta(kind).title}
+                    {isNyweFlatEvent && kind === 'booth' ? 'Vendor license' : dealKindMeta(kind).title}
                   </Button>
                 ))}
               </div>
             </div>
-            ) : null}
 
             {showNoChargeOption ? (
               <div className="space-y-2 rounded-lg border border-violet-200/80 bg-violet-50/40 p-4 dark:border-violet-900/50 dark:bg-violet-950/20">
@@ -1340,7 +1348,7 @@ export function NewContractForm({
             </div>
             ) : null}
 
-            {!boothOnlyEvent ? (
+            {!nyweLicenseMode ? (
             <div className="border-t border-border/60 pt-6">
               <h3 className="font-serif text-base font-semibold">
                 {dealKind === 'sponsorship_only'
@@ -1464,7 +1472,7 @@ export function NewContractForm({
                   {dealKind !== 'sponsorship_only' ? (
                     <div className="flex items-baseline justify-between text-sm">
                       <span className="text-muted-foreground">
-                        {isBigSmokeEvent ? 'Package fee' : boothOnlyEvent ? 'License fee' : 'Booth subtotal'}
+                        {isBigSmokeEvent ? 'Package fee' : nyweLicenseMode ? 'License fee' : 'Booth subtotal'}
                       </span>
                       <span className="font-mono tabular-nums">{formatCurrency(boothSubtotal)}</span>
                     </div>
@@ -1477,7 +1485,7 @@ export function NewContractForm({
                   )}
                   <div className="mt-4 flex items-baseline justify-between border-t border-fest-600/15 pt-3">
                     <span className="font-serif text-xl font-semibold">
-                      {isBigSmokeEvent ? 'Package total' : boothOnlyEvent ? 'License total' : 'Contract total'}
+                      {isBigSmokeEvent ? 'Package total' : nyweLicenseMode ? 'License total' : 'Contract total'}
                     </span>
                     <span className="font-serif text-2xl font-semibold tabular-nums text-fest-900">
                       {formatCurrency(grandTotal)}
@@ -1496,9 +1504,9 @@ export function NewContractForm({
             <CardDescription>Who signs on behalf of the exhibitor?</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className={cn('grid gap-4', boothOnlyEvent ? 'sm:grid-cols-1' : 'sm:grid-cols-2')}>
+            <div className={cn('grid gap-4', nyweLicenseMode ? 'sm:grid-cols-1' : 'sm:grid-cols-2')}>
               <Field label="Name"><Input value={form.signer_1_name} onChange={e => set('signer_1_name', e.target.value)} placeholder="Jane Sampleson" /></Field>
-              {!boothOnlyEvent ? (
+              {!nyweLicenseMode ? (
                 <Field label="Title"><Input value={form.signer_1_title} onChange={e => set('signer_1_title', e.target.value)} placeholder="VP Marketing" /></Field>
               ) : null}
             </div>

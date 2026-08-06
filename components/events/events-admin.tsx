@@ -44,6 +44,7 @@ function emptyForm(opts: { wineSpectatorOnly?: boolean; bigSmokePortal?: boolean
       contract_template_profile: 'big_smoke' as TemplateProfile,
       workflow_profile: 'events_managed' as 'sales_rep' | 'events_managed',
       google_template_doc_id: '',
+      google_sponsorship_template_doc_id: '',
       contract_document_label: 'Contract',
       docusign_email_subject_template: '',
     };
@@ -64,6 +65,7 @@ function emptyForm(opts: { wineSpectatorOnly?: boolean; bigSmokePortal?: boolean
     contract_template_profile: (opts.wineSpectatorOnly ? 'nywe_vendor' : 'whiskyfest') as TemplateProfile,
     workflow_profile: (opts.wineSpectatorOnly ? 'events_managed' : 'sales_rep') as 'sales_rep' | 'events_managed',
     google_template_doc_id: '',
+    google_sponsorship_template_doc_id: '',
     contract_document_label: 'Contract',
     docusign_email_subject_template: '',
   };
@@ -108,6 +110,7 @@ export function EventsAdmin({
       contract_template_profile: resolveTemplateProfile(ev),
       workflow_profile: (ev.workflow_profile === 'events_managed' ? 'events_managed' : 'sales_rep'),
       google_template_doc_id: ev.google_template_doc_id ?? '',
+      google_sponsorship_template_doc_id: ev.google_sponsorship_template_doc_id ?? '',
       contract_document_label: ev.contract_document_label ?? 'Contract',
       docusign_email_subject_template: ev.docusign_email_subject_template ?? '',
     });
@@ -159,6 +162,7 @@ export function EventsAdmin({
       contract_template_profile: form.contract_template_profile,
       workflow_profile: form.workflow_profile,
       google_template_doc_id: form.google_template_doc_id.trim() || null,
+      google_sponsorship_template_doc_id: form.google_sponsorship_template_doc_id.trim() || null,
       contract_document_label: form.contract_document_label.trim() || 'Contract',
       docusign_email_subject_template: form.docusign_email_subject_template.trim() || null,
     };
@@ -282,6 +286,16 @@ export function EventsAdmin({
               />
               <p className="text-xs text-muted-foreground">
                 Per-event booth/vendor Google Doc. Falls back to env when empty.
+              </p>
+            </Field>
+            <Field label="Sponsorship template doc ID">
+              <Input
+                value={form.google_sponsorship_template_doc_id}
+                onChange={e => set('google_sponsorship_template_doc_id', e.target.value)}
+                placeholder="1zjWwqp_0HlHuSw4-WKH2iC8Jr7pv-0f-"
+              />
+              <p className="text-xs text-muted-foreground">
+                Used for sponsorship-only deals. Falls back to GOOGLE_SPONSORSHIP_TEMPLATE_DOC_ID when empty.
               </p>
             </Field>
             <Field label="DocuSign email subject">

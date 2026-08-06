@@ -316,7 +316,7 @@ export function ContractsList({
         brandOptions={brandOptions}
         hideRepFilter={winePortal}
         hideBrandFilter={winePortal}
-        hideDealTypeFilter={winePortal}
+        hideDealTypeFilter={false}
       />
 
       {filtered.length === 0 ? (
@@ -401,7 +401,11 @@ export function ContractsList({
                       <StatusBadge status={c.status} />
                     </TableCell>
                     <TableCell className="text-sm text-foreground">
-                      {winePortal ? 'Vendor license' : listPackageLabel(c)}
+                      {winePortal
+                        ? c.order_type === 'sponsorship_only' || (c.booth_count ?? 1) === 0
+                          ? 'Sponsorship only'
+                          : 'Vendor license'
+                        : listPackageLabel(c)}
                     </TableCell>
                     <TableCell className="text-right font-semibold tabular-nums">{formatCurrency(c.grand_total_cents)}</TableCell>
                     {!winePortal ? (

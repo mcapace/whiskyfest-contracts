@@ -176,16 +176,20 @@ export async function POST(req: Request) {
           package_key: p.package_key,
         })
       : null;
-  const nywePricing = applyNyweLicensePricingIfNeeded(eventRow, {
-    booth_count: bigSmokePricing?.booth_count ?? p.booth_count,
-    booth_rate_cents: noChargeRequested
-      ? 0
-      : bigSmokePricing
-        ? resolveBigSmokeStoredBoothRate(bigSmokePricing, p.booth_rate_cents)
-        : p.booth_rate_cents,
-  });
-  // NYWE licenses are flat — no line items. Big Smoke + WhiskyFest allow sponsorship line items.
-  const savedLineItems = nyweOnly ? [] : (p.line_items ?? []);
+  const nywePricing = applyNyweLicensePricingIfNeeded(
+    eventRow,
+    {
+      booth_count: bigSmokePricing?.booth_count ?? p.booth_count,
+      booth_rate_cents: noChargeRequested
+        ? 0
+        : bigSmokePricing
+          ? resolveBigSmokeStoredBoothRate(bigSmokePricing, p.booth_rate_cents)
+          : p.booth_rate_cents,
+    },
+    { orderType: p.order_type },
+  );
+  // NYWE vendor licenses are flat — no line items. Sponsorship-only + WF/Big Smoke keep line items.
+  const savedLineItems = nyweOnly && !sponsorshipOnly ? [] : (p.line_items ?? []);
   const packageKey = bigSmokePricing?.package_key ?? null;
   const packageSelections = bigSmokePricing?.package_selections ?? null;
 
@@ -215,10 +219,10 @@ export async function POST(req: Request) {
       exhibitor_legal_name: p.exhibitor_legal_name,
       exhibitor_company_name: p.exhibitor_company_name,
       order_type: p.order_type ?? 'booth',
-      brands_poured: nyweOnly
-        ? (p.brands_poured?.trim() || p.exhibitor_company_name.trim() || null)
-        : sponsorshipOnly
-          ? sponsorBrandFromBody(p)
+      brands_poured: sponsorshipOnly
+        ? sponsorBrandFromBody(p)
+        : nyweOnly
+          ? (p.brands_poured?.trim() || p.exhibitor_company_name.trim() || null)
           : isBigSmoke
             ? p.exhibitor_company_name.trim() || null
             : null,

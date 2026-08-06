@@ -7,7 +7,7 @@ import { contractDraftPdfPath, uploadContractPdfToStorage } from '@/lib/contract
 import { fetchContractBoothBrandsOrdered } from '@/lib/contract-booth-brands';
 import { fetchContractLineItemsOrdered } from '@/lib/contract-line-items';
 import { contractPdfBaseName } from '@/lib/contract-document-naming';
-import { eventUsesContractOrderTable } from '@/lib/contract-template-profile';
+import { contractUsesOrderTable } from '@/lib/contract-template-profile';
 import { nyweLicenseAddressError } from '@/lib/nywe-billing';
 import { refreshNyweBillingFromRosterForContract } from '@/lib/nywe-roster-billing-sync';
 import { resolveContractTemplateDocId } from '@/lib/contract-template';
@@ -60,7 +60,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const templateDocId = resolveContractTemplateDocId(contract, event);
   const draftsFolderId = draftsFolderIdForEvent(event);
   const fileName = contractPdfBaseName(contract.exhibitor_company_name, event);
-  const usesOrderTable = eventUsesContractOrderTable(event);
+  const usesOrderTable = contractUsesOrderTable(event, contract);
 
   try {
     const pdfBytes = await renderContractPdfFromTemplate(

@@ -240,7 +240,7 @@ export async function releaseContractToAccounting(options: {
       ? `${formatCurrency(discountCents)} off list`
       : '—';
 
-  const nyweVendor = isNyweVendorEvent(event);
+  const nyweVendor = isNyweVendorEvent(event) && !isSponsorshipOnlyOrder(contract);
   const lineItemRows = await fetchContractLineItemsOrdered(supabase, contract.id);
   const exhibitorMailingAddress = formatExhibitorAddressBlock(contract) || null;
 
@@ -248,12 +248,12 @@ export async function releaseContractToAccounting(options: {
     ? formatInvoiceStatus('not_invoiced')
     : formatInvoiceStatus(contract.invoice_status ?? 'pending');
 
-  const orderTypeLabel = isNyweVendorOnlyEvent(event)
-    ? 'NYWE vendor license'
-    : isBigSmokeEventsManagedEvent(event)
-      ? 'Big Smoke festival package'
-      : isSponsorshipOnlyOrder(contract)
-        ? 'Sponsorship only'
+  const orderTypeLabel = isSponsorshipOnlyOrder(contract)
+    ? 'Sponsorship only'
+    : isNyweVendorOnlyEvent(event)
+      ? 'NYWE vendor license'
+      : isBigSmokeEventsManagedEvent(event)
+        ? 'Big Smoke festival package'
         : lineItemRows.length > 0
           ? 'Booth + sponsorship / line items'
           : 'Booth package';
@@ -300,6 +300,7 @@ export async function releaseContractToAccounting(options: {
         amountCents: row.amount_cents,
       })),
       isNyweVendor: nyweVendor,
+      isSponsorshipOnly: isSponsorshipOnlyOrder(contract),
       exhibitorBillingContactName: hasDesignatedBilling ? contract.billing_contact_name : null,
       exhibitorBillingContactEmail: hasDesignatedBilling ? contract.billing_contact_email : null,
       billingCompanyName,

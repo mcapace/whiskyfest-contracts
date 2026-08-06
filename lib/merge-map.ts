@@ -13,6 +13,7 @@ import { formatEventDateForMerge, getAgreementDatePartsInDisplayZone } from '@/l
 import { eventTemplateProfile } from '@/lib/contract-template-profile';
 import { buildBigSmokeMergeMap } from '@/lib/merge-map-big-smoke';
 import { buildNyweVendorMergeMap } from '@/lib/merge-map-nywe';
+import { nyweBillingMergeTokens, nyweExhibitorAddressMergeTokens } from '@/lib/nywe-billing';
 import { usesSingleSignerEnvelope } from '@/lib/single-signer-envelope';
 import { formatBoothBrandsBlock } from '@/lib/contract-booth-brands';
 import type { ContractBoothBrand, ContractWithTotals, Event } from '@/types/db';
@@ -105,7 +106,8 @@ export function buildContractMergeMap(
   boothBrands?: ContractBoothBrand[],
 ): Record<string, string> {
   const profile = eventTemplateProfile(event);
-  if (profile === 'nywe_vendor') {
+  // NYWE sponsorship-only uses the WhiskyFest-style merge + order table (not flat license tokens).
+  if (profile === 'nywe_vendor' && !isSponsorshipOnlyOrder(contract)) {
     return buildNyweVendorMergeMap(contract, event, mode);
   }
   if (profile === 'big_smoke') {
@@ -202,5 +204,14 @@ export function buildContractMergeMap(
     '{{revision_amendments}}': (contract.revision_amendments ?? '').trim(),
     ...anchors,
     ...exhibitorFieldMergeTokens(mode),
+    // NYWE sponsorship Doc still uses vendor-license billing tokens + license_fee fallbacks.
+    ...(profile === 'nywe_vendor' && isSponsorshipOnlyOrder(contract)
+      ? {
+          ...nyweExhibitorAddressMergeTokens(contract, mode),
+          ...nyweBillingMergeTokens(contract, mode),
+          '{{license_fee}}': moneyTokenNoDollar(contract.grand_total_cents),
+          '{{license_fee_balance}}': moneyTokenNoDollar(contract.grand_total_cents),
+        }
+      : {}),
   };
 }

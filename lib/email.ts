@@ -36,6 +36,8 @@ export interface AccountingEmailPayload {
   lineItems?: { description: string; amountCents: number }[];
   /** NYWE vendor license vs WhiskyFest booth package. */
   isNyweVendor?: boolean;
+  /** Sponsorship-only: line items drive total; omit booth/license fee rows. */
+  isSponsorshipOnly?: boolean;
   /** Set when exhibitor DocuSign tabs populated `exhibitor_fields_captured_at`. */
   exhibitorBillingContactName?: string | null;
   exhibitorBillingContactEmail?: string | null;
@@ -117,17 +119,28 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
     : `Contract Executed: ${p.sponsorCompanyName} — Ready for Invoicing`;
 
   const signerLine = [p.signerName, p.signerTitle].filter(Boolean).join(', ') || '—';
-  const intro = isWine
-    ? 'An NY Wine Experience vendor license has been executed and is ready for accounting.'
-    : isBigSmoke
-      ? 'A Big Smoke exhibitor contract has been executed and is ready for accounting.'
-      : 'A WhiskyFest sponsor contract has been executed and is ready for accounting.';
+  const sponsorshipOnly = Boolean(p.isSponsorshipOnly);
+  const intro = sponsorshipOnly
+    ? isWine
+      ? 'An NY Wine Experience sponsorship agreement has been executed and is ready for accounting.'
+      : isBigSmoke
+        ? 'A Big Smoke sponsorship agreement has been executed and is ready for accounting.'
+        : 'A WhiskyFest sponsorship agreement has been executed and is ready for accounting.'
+    : isWine
+      ? 'An NY Wine Experience vendor license has been executed and is ready for accounting.'
+      : isBigSmoke
+        ? 'A Big Smoke exhibitor contract has been executed and is ready for accounting.'
+        : 'A WhiskyFest sponsor contract has been executed and is ready for accounting.';
   const flatFeeLabel = isWine ? 'License fee' : isBigSmoke ? 'Package fee' : 'License fee';
 
   const li = p.lineItemsSubtotalCents ?? 0;
   const lineItemRows = (p.lineItems ?? []).filter((row) => row.description.trim());
-  const amountLines =
-    p.isNyweVendor
+  const amountLines = sponsorshipOnly
+    ? [
+        ...lineItemRows.map((row) => `  · ${row.description}: ${formatCents(row.amountCents)}`),
+        `Total: ${formatCents(p.grandTotalCents)}`,
+      ]
+    : p.isNyweVendor
       ? [`${flatFeeLabel}: ${formatCents(p.grandTotalCents)}`]
       : li > 0
         ? [
@@ -185,7 +198,7 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
     `Signer email: ${p.signerEmail ?? '—'}`,
     `Phone: ${p.exhibitorTelephone ?? '—'}`,
     `Event: ${eventDisplay}`,
-    ...(p.isNyweVendor
+    ...(p.isNyweVendor || sponsorshipOnly
       ? []
       : [
           `Booth count: ${p.boothCount}`,
@@ -280,14 +293,16 @@ export async function sendAccountingEmail(p: AccountingEmailPayload): Promise<vo
           ${row('Phone', escape(p.exhibitorTelephone ?? '—'))}
           ${row('Event', escape(eventDisplay))}
           ${
-            p.isNyweVendor
-              ? row(flatFeeLabel, escape(formatCents(p.grandTotalCents)))
-              : row('Booth count', escape(String(p.boothCount))) +
-                row('Booth rate', escape(formatCents(p.boothRateCents))) +
-                row('Discount', escape(p.discountLine)) +
-                row('Booth package', escape(formatCents(p.boothSubtotalCents))) +
-                lineItemsHtml +
-                row('Total', escape(formatCents(p.grandTotalCents)))
+            sponsorshipOnly
+              ? lineItemsHtml + row('Total', escape(formatCents(p.grandTotalCents)))
+              : p.isNyweVendor
+                ? row(flatFeeLabel, escape(formatCents(p.grandTotalCents)))
+                : row('Booth count', escape(String(p.boothCount))) +
+                  row('Booth rate', escape(formatCents(p.boothRateCents))) +
+                  row('Discount', escape(p.discountLine)) +
+                  row('Booth package', escape(formatCents(p.boothSubtotalCents))) +
+                  lineItemsHtml +
+                  row('Total', escape(formatCents(p.grandTotalCents)))
           }
           ${row('Sales rep', escape([p.salesRepName, p.salesRepEmail].filter(Boolean).join(' · ') || '—'))}
           ${row('Executed', escape(p.executedAtFormatted))}

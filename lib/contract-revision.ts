@@ -16,7 +16,7 @@ import {
   contractDocuSignFileName,
   contractPdfBaseName,
 } from '@/lib/contract-document-naming';
-import { eventUsesContractOrderTable } from '@/lib/contract-template-profile';
+import { contractUsesOrderTable } from '@/lib/contract-template-profile';
 import {
   countersignerRequiredForEvent,
   countersignCcValidation,
@@ -173,7 +173,7 @@ async function resolveRevisionPdfBytes(
   const boothBrands = await fetchContractBoothBrandsOrdered(supabase, contract.id);
   const mergeMap = buildContractMergeMap(contract, event, 'docusign', boothBrands);
   const templateDocId = resolveContractTemplateDocId(contract, event);
-  const usesOrderTable = eventUsesContractOrderTable(event);
+  const usesOrderTable = contractUsesOrderTable(event, contract);
   const postMergeRevisionRequests = plan ? docRequestsForRevisionPlan(plan) : undefined;
 
   return renderContractPdfFromTemplate(

@@ -4,7 +4,7 @@ import { fetchContractLineItemsOrdered } from '@/lib/contract-line-items';
 import { contractPdfBaseName } from '@/lib/contract-document-naming';
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import { resolveContractTemplateDocId } from '@/lib/contract-template';
-import { eventUsesContractOrderTable } from '@/lib/contract-template-profile';
+import { contractUsesOrderTable } from '@/lib/contract-template-profile';
 import { isNyweVendorEvent } from '@/lib/nywe-pricing';
 import { renderContractPdfFromTemplate } from '@/lib/google';
 import { buildContractMergeMap } from '@/lib/merge-map';
@@ -50,7 +50,7 @@ export async function renderNyweLiveDraftPdf(
   const mergeMap = buildContractMergeMap(contract, event, 'draft', boothBrands);
   const templateDocId = resolveContractTemplateDocId(contract, event);
   const fileName = contractPdfBaseName(contract.exhibitor_company_name, event);
-  const usesOrderTable = eventUsesContractOrderTable(event);
+  const usesOrderTable = contractUsesOrderTable(event, contract);
 
   return renderContractPdfFromTemplate(
     templateDocId,

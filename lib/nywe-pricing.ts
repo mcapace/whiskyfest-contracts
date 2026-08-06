@@ -44,10 +44,15 @@ export function normalizeNyweLicensePricing(
 export function applyNyweLicensePricingIfNeeded(
   event: Pick<Event, 'contract_template_profile' | 'booth_rate_cents'>,
   pricing: { booth_count: number; booth_rate_cents: number },
+  options?: { orderType?: string | null },
 ): { booth_count: number; booth_rate_cents: number } {
   // Big Smoke: form supplies package fee + booth count — do not flatten to NYWE single-booth.
   if (eventTemplateProfile(event) === 'big_smoke') {
     return pricing;
+  }
+  // NYWE sponsorship-only: booth 0 / rate 0 + line items (WhiskyFest pattern).
+  if (options?.orderType === 'sponsorship_only') {
+    return { booth_count: 0, booth_rate_cents: 0 };
   }
   if (!isNyweVendorOnlyEvent(event)) return pricing;
   return normalizeNyweLicensePricing(event);

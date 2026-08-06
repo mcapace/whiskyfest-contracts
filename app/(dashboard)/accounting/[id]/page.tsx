@@ -7,6 +7,7 @@ import { createContractPdfSignedUrl } from '@/lib/contract-pdf-storage';
 import { calculateDiscountCents, calculateListSubtotalCents, isDiscountedRate } from '@/lib/contracts';
 import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { contractHasBillingInfo } from '@/lib/nywe-billing';
+import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import { isNyweVendorEvent, nyweLicenseFeeCents } from '@/lib/nywe-pricing';
 import { formatCurrency, formatTimestamp } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -47,8 +48,11 @@ export default async function AccountingContractDetailPage({ params }: { params:
   const discountCents = calculateDiscountCents(contract.booth_count, contract.booth_rate_cents, event ?? undefined);
   const pctOff =
     listCents > 0 && discountCents > 0 ? Math.round((discountCents / listCents) * 1000) / 10 : null;
+  const sponsorshipOnly = isSponsorshipOnlyOrder(contract);
+  const nyweLicense = isNyweVendorEvent(event) && !sponsorshipOnly;
   const discountLabel =
-    !isNyweVendorEvent(event) &&
+    !nyweLicense &&
+    !sponsorshipOnly &&
     isDiscountedRate(contract.booth_rate_cents, event ?? undefined) &&
     discountCents > 0
       ? pctOff != null
@@ -132,19 +136,19 @@ export default async function AccountingContractDetailPage({ params }: { params:
                   )}
                 </>
               ) : null}
-              {!isNyweVendorEvent(event) ? (
+              {!nyweLicense ? (
                 <Detail label="Sales Rep" value={contract.sales_rep_name ?? contract.sales_rep_email ?? '—'} />
               ) : null}
               <Detail label="Event" value={event ? `${event.name} ${event.year}` : '—'} />
-              <Detail
-                label={isNyweVendorEvent(event) ? 'License fee' : 'Booth Rate'}
-                value={formatCurrency(
-                  isNyweVendorEvent(event)
-                    ? nyweLicenseFeeCents(event ?? undefined)
-                    : contract.booth_rate_cents,
-                )}
-              />
-              {!isNyweVendorEvent(event) ? (
+              {nyweLicense ? (
+                <Detail
+                  label="License fee"
+                  value={formatCurrency(nyweLicenseFeeCents(event ?? undefined))}
+                />
+              ) : sponsorshipOnly ? null : (
+                <Detail label="Booth Rate" value={formatCurrency(contract.booth_rate_cents)} />
+              )}
+              {!nyweLicense && !sponsorshipOnly ? (
                 <>
                   <Detail label="Discount" value={discountLabel} />
                   <Detail label="Booth subtotal" value={formatCurrency(contract.booth_subtotal_cents)} />

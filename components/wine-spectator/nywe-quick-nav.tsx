@@ -27,8 +27,14 @@ export function NyweQuickNav() {
     },
     {
       href: '/wine-spectator/contracts/new',
-      title: 'New contract',
-      description: 'Add a one-off exhibitor outside the roster',
+      title: 'New vendor license',
+      description: 'Add a flat NYWE vendor license outside the roster',
+      icon: Plus,
+    },
+    {
+      href: '/wine-spectator/contracts/new?deal=sponsorship_only',
+      title: 'New sponsorship',
+      description: 'Sponsorship-only agreement (line items, no license fee)',
       icon: Plus,
     },
   ];
