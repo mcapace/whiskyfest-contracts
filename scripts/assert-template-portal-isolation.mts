@@ -29,28 +29,28 @@ type Case = {
 };
 
 const cases: Case[] = [
-  {
-    name: 'Big Smoke sponsorship with no event spo id → Big Smoke booth, NOT WF spo',
-    contract: { order_type: 'sponsorship_only', booth_count: 0 },
-    event: {
-      name: 'Big Smoke Las Vegas 2026',
-      contract_template_profile: 'big_smoke',
-      google_template_doc_id: 'bs-booth-event',
-      google_sponsorship_template_doc_id: null,
+    {
+      name: 'Big Smoke sponsorship with no event spo id → BS sponsorship master, NOT WF spo',
+      contract: { order_type: 'sponsorship_only', booth_count: 0 },
+      event: {
+        name: 'Big Smoke Las Vegas 2026',
+        contract_template_profile: 'big_smoke',
+        google_template_doc_id: 'bs-booth-event',
+        google_sponsorship_template_doc_id: null,
+      },
+      expect: '1U3qWOoi5tZafogebwEncGzaY5ITH_eNDL3dsxgawzFY',
     },
-    expect: 'bs-booth-event',
-  },
-  {
-    name: 'Big Smoke sponsorship with no templates → BS env fallback, NOT WF spo',
-    contract: { order_type: 'sponsorship_only', booth_count: 0 },
-    event: {
-      name: 'Big Smoke Las Vegas 2026',
-      contract_template_profile: 'big_smoke',
-      google_template_doc_id: null,
-      google_sponsorship_template_doc_id: null,
+    {
+      name: 'Big Smoke sponsorship with no templates → BS sponsorship master, NOT WF spo',
+      contract: { order_type: 'sponsorship_only', booth_count: 0 },
+      event: {
+        name: 'Big Smoke Las Vegas 2026',
+        contract_template_profile: 'big_smoke',
+        google_template_doc_id: null,
+        google_sponsorship_template_doc_id: null,
+      },
+      expect: '1U3qWOoi5tZafogebwEncGzaY5ITH_eNDL3dsxgawzFY',
     },
-    expect: BS_FALLBACK,
-  },
   {
     name: 'Big Smoke booth uses event template',
     contract: { order_type: 'booth', booth_count: 1 },

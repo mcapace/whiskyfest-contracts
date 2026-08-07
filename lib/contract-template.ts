@@ -1,4 +1,7 @@
-import { BIG_SMOKE_TEMPLATE_DOC_ID } from '@/lib/big-smoke-template';
+import {
+  BIG_SMOKE_SPONSORSHIP_TEMPLATE_DOC_ID,
+  BIG_SMOKE_TEMPLATE_DOC_ID,
+} from '@/lib/big-smoke-template';
 import { eventTemplateProfile, type ContractTemplateProfile } from '@/lib/contract-template-profile';
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
 import type { Event } from '@/types/db';
@@ -25,6 +28,13 @@ function bigSmokeBoothFallbackDocId(): string {
   return process.env['BIG_SMOKE_TEMPLATE_DOC_ID']?.trim() || BIG_SMOKE_TEMPLATE_DOC_ID;
 }
 
+function bigSmokeSponsorshipFallbackDocId(): string {
+  return (
+    process.env['BIG_SMOKE_SPONSORSHIP_TEMPLATE_DOC_ID']?.trim() ||
+    BIG_SMOKE_SPONSORSHIP_TEMPLATE_DOC_ID
+  );
+}
+
 /**
  * Resolve sponsorship template without ever crossing portals.
  * WhiskyFest env sponsorship is WhiskyFest-only.
@@ -36,24 +46,23 @@ function resolveSponsorshipTemplateDocId(
   const eventSponsorshipId = event?.google_sponsorship_template_doc_id?.trim();
   if (eventSponsorshipId) return eventSponsorshipId;
 
-  // Same-portal booth/package template is safer than a WhiskyFest sponsorship env fallback.
-  const eventBoothId = event?.google_template_doc_id?.trim();
-  if (eventBoothId) return eventBoothId;
-
   if (profile === 'whiskyfest') {
     return requireEnvDocId('GOOGLE_SPONSORSHIP_TEMPLATE_DOC_ID');
   }
 
   if (profile === 'big_smoke') {
-    const fallbackId = bigSmokeBoothFallbackDocId();
+    const fallbackId = bigSmokeSponsorshipFallbackDocId();
     console.warn(
       `[resolveContractTemplateDocId] Big Smoke sponsorship missing google_sponsorship_template_doc_id ` +
-        `(event="${event?.name ?? 'unknown'}"); using Big Smoke booth template ${fallbackId}.`,
+        `(event="${event?.name ?? 'unknown'}"); using Big Smoke sponsorship master ${fallbackId}.`,
     );
     return fallbackId;
   }
 
-  // NYWE: never fall back to WhiskyFest sponsorship env.
+  // NYWE: same-portal license doc, then fail closed — never WhiskyFest sponsorship env.
+  const eventBoothId = event?.google_template_doc_id?.trim();
+  if (eventBoothId) return eventBoothId;
+
   throw new Error(
     `NYWE sponsorship template is not configured on the event` +
       `${event?.name ? ` "${event.name}"` : ''}. ` +
@@ -117,6 +126,7 @@ export function configuredContractTemplateDocIds(extraDocIds: string[] = []): st
     process.env.GOOGLE_TEMPLATE_DOC_ID?.trim(),
     process.env.GOOGLE_SPONSORSHIP_TEMPLATE_DOC_ID?.trim(),
     process.env['BIG_SMOKE_TEMPLATE_DOC_ID']?.trim() || BIG_SMOKE_TEMPLATE_DOC_ID,
+    process.env['BIG_SMOKE_SPONSORSHIP_TEMPLATE_DOC_ID']?.trim() || BIG_SMOKE_SPONSORSHIP_TEMPLATE_DOC_ID,
     ...extraDocIds,
   ].filter((id): id is string => Boolean(id));
   return [...new Set(ids)];

@@ -106,11 +106,11 @@ export function buildContractMergeMap(
   boothBrands?: ContractBoothBrand[],
 ): Record<string, string> {
   const profile = eventTemplateProfile(event);
-  // NYWE sponsorship-only uses the WhiskyFest-style merge + order table (not flat license tokens).
+  // Flat package/license maps — sponsorship-only uses WhiskyFest-style merge + order table.
   if (profile === 'nywe_vendor' && !isSponsorshipOnlyOrder(contract)) {
     return buildNyweVendorMergeMap(contract, event, mode);
   }
-  if (profile === 'big_smoke') {
+  if (profile === 'big_smoke' && !isSponsorshipOnlyOrder(contract)) {
     return buildBigSmokeMergeMap(contract, event, mode);
   }
 
@@ -204,11 +204,26 @@ export function buildContractMergeMap(
     '{{revision_amendments}}': (contract.revision_amendments ?? '').trim(),
     ...anchors,
     ...exhibitorFieldMergeTokens(mode),
-    // NYWE sponsorship Doc still uses vendor-license billing tokens + license_fee fallbacks.
+    // NYWE / Big Smoke sponsorship Docs still use billing + fee alias tokens alongside order table.
     ...(profile === 'nywe_vendor' && isSponsorshipOnlyOrder(contract)
       ? {
           ...nyweExhibitorAddressMergeTokens(contract, mode),
           ...nyweBillingMergeTokens(contract, mode),
+          '{{license_fee}}': moneyTokenNoDollar(contract.grand_total_cents),
+          '{{license_fee_balance}}': moneyTokenNoDollar(contract.grand_total_cents),
+        }
+      : {}),
+    ...(profile === 'big_smoke' && isSponsorshipOnlyOrder(contract)
+      ? {
+          ...nyweExhibitorAddressMergeTokens(contract, mode),
+          ...nyweBillingMergeTokens(contract, mode),
+          '{{event_name}}': event.name,
+          '{{event_contact_email}}':
+            (contract.event_contact_email ?? '').trim() ||
+            (contract.billing_contact_email ?? '').trim() ||
+            (contract.signer_1_email ?? '').trim(),
+          '{{package_fee}}': moneyTokenNoDollar(contract.grand_total_cents),
+          '{{package_fee_balance}}': moneyTokenNoDollar(contract.grand_total_cents),
           '{{license_fee}}': moneyTokenNoDollar(contract.grand_total_cents),
           '{{license_fee_balance}}': moneyTokenNoDollar(contract.grand_total_cents),
         }
