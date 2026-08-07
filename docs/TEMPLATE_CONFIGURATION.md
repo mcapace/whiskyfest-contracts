@@ -8,29 +8,42 @@ When generating a contract PDF, the system needs to know which Google Doc templa
 
 ## Template Resolution Logic
 
-The system follows this hierarchy (first match wins):
+Portal isolation is enforced: WhiskyFest env templates are **never** used for Big Smoke or NYWE.
 
-1. **Sponsorship-only contracts:**
-   - Use `event.google_sponsorship_template_doc_id` if set
-   - Fall back to `GOOGLE_SPONSORSHIP_TEMPLATE_DOC_ID` env var
+### Sponsorship-only
 
-2. **Event-specific template:**
-   - Use `event.google_template_doc_id` if set ✅ **RECOMMENDED**
+1. `event.google_sponsorship_template_doc_id` if set
+2. Else `event.google_template_doc_id` (same-portal booth/package doc)
+3. Else by profile:
+   - `whiskyfest` → `GOOGLE_SPONSORSHIP_TEMPLATE_DOC_ID`
+   - `big_smoke` → `BIG_SMOKE_TEMPLATE_DOC_ID` / Las Vegas hardcoded
+   - `nywe_vendor` → **fail closed** (throw) if no event docs
 
-3. **Big Smoke fallback:**
-   - If `event.contract_template_profile === 'big_smoke'`
-   - Use `BIG_SMOKE_TEMPLATE_DOC_ID` env var or hardcoded Las Vegas template
-   - ⚠️ **WARNING:** This may use the wrong template for non-Las Vegas Big Smoke events!
+### Booth / package / vendor license
 
-4. **WhiskyFest/NYWE fallback:**
-   - Use `GOOGLE_TEMPLATE_DOC_ID` env var
+1. `event.google_template_doc_id` if set ✅ **RECOMMENDED**
+2. Else by profile:
+   - `big_smoke` → `BIG_SMOKE_TEMPLATE_DOC_ID` / Las Vegas hardcoded
+   - `nywe_vendor` → **fail closed** (throw)
+   - `whiskyfest` → `GOOGLE_TEMPLATE_DOC_ID`
 
 ## Common Issues
 
-### Issue: Big Smoke contract generates WhiskyFest template
+### Issue: Big Smoke sponsorship generates WhiskyFest contract
 
 **Symptoms:**
-- Creating a contract for a Big Smoke event
+- Jake (or another AE) creates a Big Smoke **sponsorship-only** deal
+- PDF is WhiskyFest / WFNY branding
+
+**Root Cause (fixed):**
+Missing `google_sponsorship_template_doc_id` used to fall back to global `GOOGLE_SPONSORSHIP_TEMPLATE_DOC_ID` (WhiskyFest) for **every** portal.
+
+**Fix in code:** sponsorship fallbacks are portal-scoped. Also set `events.google_sponsorship_template_doc_id` on Big Smoke.
+
+### Issue: Big Smoke booth contract generates WhiskyFest template
+
+**Symptoms:**
+- Creating a booth/package contract for a Big Smoke event
 - Generated PDF uses WhiskyFest/WFNY template instead of Big Smoke template
 
 **Root Cause:**

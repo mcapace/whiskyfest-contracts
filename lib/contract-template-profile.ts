@@ -19,15 +19,18 @@ export function eventUsesContractOrderTable(event: Pick<Event, 'contract_templat
 }
 
 /**
- * CONTRACT ORDER table + line-item row insert (WhiskyFest booth/sponsorship, or NYWE sponsorship-only).
- * Flat NYWE vendor licenses do not use the order table.
+ * CONTRACT ORDER table + line-item row insert.
+ * - WhiskyFest: always (booth + sponsorship).
+ * - NYWE / Big Smoke: sponsorship-only only (flat vendor/package licenses skip the table).
+ * If the Google Doc has no GRAND TOTAL table, insert is a no-op warn.
  */
 export function contractUsesOrderTable(
   event: Pick<Event, 'contract_template_profile'>,
   contract: { order_type?: string | null; booth_count?: number | null },
 ): boolean {
   if (eventUsesContractOrderTable(event)) return true;
-  if (eventTemplateProfile(event) !== 'nywe_vendor') return false;
+  const profile = eventTemplateProfile(event);
+  if (profile !== 'nywe_vendor' && profile !== 'big_smoke') return false;
   return contract.order_type === 'sponsorship_only' || (contract.booth_count ?? 1) === 0;
 }
 
