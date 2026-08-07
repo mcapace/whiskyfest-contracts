@@ -38,7 +38,7 @@ const cases: Case[] = [
         google_template_doc_id: 'bs-booth-event',
         google_sponsorship_template_doc_id: null,
       },
-      expect: '1U3qWOoi5tZafogebwEncGzaY5ITH_eNDL3dsxgawzFY',
+      expect: '1SKSWkFiCO6YIiwkP2EmP9_H1gThD6j6BA4K8Fs0ouQc',
     },
     {
       name: 'Big Smoke sponsorship with no templates → BS sponsorship master, NOT WF spo',
@@ -49,7 +49,7 @@ const cases: Case[] = [
         google_template_doc_id: null,
         google_sponsorship_template_doc_id: null,
       },
-      expect: '1U3qWOoi5tZafogebwEncGzaY5ITH_eNDL3dsxgawzFY',
+      expect: '1SKSWkFiCO6YIiwkP2EmP9_H1gThD6j6BA4K8Fs0ouQc',
     },
   {
     name: 'Big Smoke booth uses event template',

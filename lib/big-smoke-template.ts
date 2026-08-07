@@ -6,4 +6,4 @@ export const BIG_SMOKE_TEMPLATE_DOC_ID = '17-kWFzFcaitKFvqbGxs7Q1X_I3lbEE7FdFhM0
  * Has CONTRACT ORDER + GRAND TOTAL for line items; dual-signer anchors.
  */
 export const BIG_SMOKE_SPONSORSHIP_TEMPLATE_DOC_ID =
-  '1U3qWOoi5tZafogebwEncGzaY5ITH_eNDL3dsxgawzFY';
+  '1SKSWkFiCO6YIiwkP2EmP9_H1gThD6j6BA4K8Fs0ouQc';
