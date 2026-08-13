@@ -3,7 +3,7 @@
  * (discount alerts, events-team blasts, etc.). Portal login is unaffected.
  */
 export const NOTIFICATION_BLOCKED_EMAILS = new Set([
-  'cmcgilvray@mshanken.com', // Connie McGilvray — opted out of all contract alerts
+  'cmcgilvray@mshanken.com', // Connie McGilvray — former employee; keep blocked if account reactivated
 ]);
 
 export function isNotificationBlockedEmail(email: string | null | undefined): boolean {
