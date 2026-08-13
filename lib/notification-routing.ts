@@ -173,6 +173,12 @@ function countersignerExcluded(): Set<string> {
   return globalExcluded();
 }
 
+/** Susannah is NYWE-only — strip her from WhiskyFest / Big Smoke internal notification lists. */
+function excludeNyweOnlyRecipients(emails: string[], nywe: boolean): string[] {
+  if (nywe) return emails;
+  return exclude(emails, NYWE_COUNTERSIGNER_EMAILS);
+}
+
 async function loadEventWorkflow(eventId: string | null | undefined): Promise<{
   eventsManaged: boolean;
   nywe: boolean;
@@ -268,9 +274,12 @@ export async function resolveNotificationRecipients(
   });
 
   if (kind === 'discount_request') {
-    // Exclude ops who opted out of discount mail (NOTIFICATION_EXCLUDED_EMAILS).
-    // Do not use countersignerExcluded() — that would drop Susannah from WhiskyFest discount alerts.
-    const admins = exclude(await getAdminEmails(), new Set(parseEmailList(process.env['NOTIFICATION_EXCLUDED_EMAILS'])));
+    // Admins only. Exclude ops who opted out + NYWE-only countersigner (Susannah).
+    const blocked = new Set([
+      ...parseEmailList(process.env['NOTIFICATION_EXCLUDED_EMAILS']),
+      ...NYWE_COUNTERSIGNER_EMAILS,
+    ]);
+    const admins = exclude(await getAdminEmails(), blocked);
     return admins.length ? { skip: false, to: admins, cc: [], bcc: [] } : empty('No admin recipients');
   }
 
@@ -290,7 +299,7 @@ export async function resolveNotificationRecipients(
     if (wf.nywe) {
       return empty('NYWE countersigned — auto-release handles accounting handoff');
     }
-    const team = await getActiveEventsTeamEmails();
+    const team = excludeNyweOnlyRecipients(await getActiveEventsTeamEmails(), false);
     const rep = await getSalesRepEmail(ctx.salesRepId);
     const to = rep ? [rep] : team.slice(0, 1);
     const bcc = exclude(rep ? team : team.slice(1), new Set(to));
@@ -329,7 +338,7 @@ export async function resolveNotificationRecipients(
       const bcc = exclude(candidates.slice(1), new Set(to));
       return { skip: to.length === 0, to, cc: [], bcc };
     }
-    const team = await getActiveEventsTeamEmails();
+    const team = excludeNyweOnlyRecipients(await getActiveEventsTeamEmails(), false);
     return team.length
       ? { skip: false, to: [team[0]!], cc: [], bcc: team.slice(1) }
       : empty('No events team recipients');
@@ -354,7 +363,7 @@ export async function resolveNotificationRecipients(
         ? { skip: false, to: [ops[0]!], cc: [], bcc: ops.slice(1) }
         : empty('No NYWE void visibility recipients');
     }
-    const team = await getActiveEventsTeamEmails();
+    const team = excludeNyweOnlyRecipients(await getActiveEventsTeamEmails(), false);
     return team.length
       ? { skip: false, to: [team[0]!], cc: [], bcc: team.slice(1) }
       : empty('No events team recipients');
