@@ -21,6 +21,7 @@ import {
   type ContractNotificationContext,
   type NotificationKind,
 } from '@/lib/notification-routing';
+import { notificationExcludedEmailSet } from '@/lib/notification-exclusions';
 import { formatCurrency } from '@/lib/utils';
 import type { Contract, Event } from '@/types/db';
 
@@ -154,12 +155,7 @@ export async function notifyAdminsOfDiscountRequest(
     .eq('role', 'admin')
     .eq('is_active', true);
 
-  const excluded = new Set(
-    (process.env['NOTIFICATION_EXCLUDED_EMAILS'] ?? '')
-      .split(',')
-      .map((s) => s.trim().toLowerCase())
-      .filter(Boolean),
-  );
+  const excluded = notificationExcludedEmailSet();
 
   const recipients = (admins ?? [])
     .map((a) => (a as { email: string }).email?.trim().toLowerCase())

@@ -4,6 +4,7 @@ import {
   NO_CHARGE_BOOTH_OWNER_EMAIL,
 } from '@/lib/no-charge-booth';
 import { NYWE_COUNTERSIGNER_EMAILS } from '@/lib/nywe-countersigner';
+import { notificationExcludedEmailSet } from '@/lib/notification-exclusions';
 import { PRODUCT_WHISKYFEST } from '@/lib/product-portal';
 import { WHISKYFEST_BIG_SMOKE_COUNTERSIGNER_EMAILS } from '@/lib/wf-bslv-countersigner';
 import { getSupabaseAdmin } from '@/lib/supabase';
@@ -97,6 +98,7 @@ export function quietRecipientAllowlists(): Map<string, Set<NotificationKind>> {
 /**
  * Strip Kate/Steve from kinds they opted out of. If TO is emptied, promote from CC/BCC.
  * If nobody remains, skip the send.
+ * Also strips hardcoded / env notification blocks (e.g. Connie).
  */
 export function applyQuietRecipientPolicy(
   kind: NotificationKind,
@@ -104,9 +106,11 @@ export function applyQuietRecipientPolicy(
 ): ResolvedRecipients {
   if (routed.skip) return routed;
   const allow = quietRecipientAllowlists();
+  const blocked = notificationExcludedEmailSet();
 
   const keep = (email: string) => {
     const e = email.trim().toLowerCase();
+    if (blocked.has(e)) return false;
     const allowed = allow.get(e);
     if (!allowed) return true;
     return allowed.has(kind);
@@ -166,7 +170,7 @@ function nyweReviewInbox(): string[] {
 }
 
 function globalExcluded(): Set<string> {
-  return new Set([...NYWE_COUNTERSIGNER_EMAILS, ...parseEmailList(process.env['NOTIFICATION_EXCLUDED_EMAILS'])]);
+  return new Set([...NYWE_COUNTERSIGNER_EMAILS, ...notificationExcludedEmailSet()]);
 }
 
 function countersignerExcluded(): Set<string> {
@@ -274,11 +278,8 @@ export async function resolveNotificationRecipients(
   });
 
   if (kind === 'discount_request') {
-    // Admins only. Exclude ops who opted out + NYWE-only countersigner (Susannah).
-    const blocked = new Set([
-      ...parseEmailList(process.env['NOTIFICATION_EXCLUDED_EMAILS']),
-      ...NYWE_COUNTERSIGNER_EMAILS,
-    ]);
+    // Admins only. Exclude opted-out ops + hardcoded blocks (Connie) + NYWE-only countersigner.
+    const blocked = new Set([...notificationExcludedEmailSet(), ...NYWE_COUNTERSIGNER_EMAILS]);
     const admins = exclude(await getAdminEmails(), blocked);
     return admins.length ? { skip: false, to: admins, cc: [], bcc: [] } : empty('No admin recipients');
   }
