@@ -9,8 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "assert:templates": "tsx scripts/assert-template-portal-isolation.mts",
-    "audit:templates": "tsx scripts/audit-event-templates.mts"
+    "assert-templates": "tsx scripts/assert-template-portal-isolation.mts",
+    "audit-templates": "tsx scripts/audit-event-templates.mts"
   },
   "dependencies": {
     "@googlemaps/js-api-loader": "^2.0.2",
