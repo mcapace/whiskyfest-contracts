@@ -10,6 +10,12 @@ import { WHISKYFEST_BIG_SMOKE_COUNTERSIGNER_EMAILS } from '@/lib/wf-bslv-counter
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { Event } from '@/types/db';
 
+/**
+ * Always notified when a contract enters events approval (`pending_events_review`).
+ * Covers WhiskyFest, Big Smoke, and NYWE.
+ */
+export const EVENTS_APPROVAL_ALERT_EMAILS = ['nmazza@mshanken.com'] as const;
+
 /** Internal SendGrid notification categories — each has explicit routing rules. */
 export type NotificationKind =
   | 'discount_request'
@@ -330,18 +336,25 @@ export async function resolveNotificationRecipients(
   }
 
   if (kind === 'pending_review') {
+    // Nicole always gets TO when a contract needs events approval — all portals.
+    const alwaysNotify = uniq([...EVENTS_APPROVAL_ALERT_EMAILS]);
+
     if (wf.nywe) {
       const configured = nyweReviewInbox();
       const fallback = wf.countersignerEmail ? [wf.countersignerEmail] : [];
       const owner = await resolvedCreatedBy(ctx);
-      const candidates = configured.length > 0 ? configured : fallback.length > 0 ? fallback : owner ? [owner] : [];
-      const to = candidates.slice(0, 1);
-      const bcc = exclude(candidates.slice(1), new Set(to));
+      const nyweCandidates =
+        configured.length > 0 ? configured : fallback.length > 0 ? fallback : owner ? [owner] : [];
+      const to = uniq([...alwaysNotify, ...nyweCandidates.slice(0, 1)]);
+      const bcc = exclude(uniq(nyweCandidates), new Set(to));
       return { skip: to.length === 0, to, cc: [], bcc };
     }
+
     const team = excludeNyweOnlyRecipients(await getActiveEventsTeamEmails(), false);
-    return team.length
-      ? { skip: false, to: [team[0]!], cc: [], bcc: team.slice(1) }
+    const to = alwaysNotify.length > 0 ? alwaysNotify : team.slice(0, 1);
+    const bcc = exclude(team, new Set(to));
+    return to.length
+      ? { skip: false, to, cc: [], bcc }
       : empty('No events team recipients');
   }
 

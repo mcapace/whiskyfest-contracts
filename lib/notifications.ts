@@ -563,7 +563,7 @@ export async function notifyEventsTeamOfPendingReview(
   const rateLabel = formatCents(contract.booth_rate_cents);
   const repLabel = contract.sales_rep_name ?? contract.sales_rep_email ?? '—';
   const detailUrl = mail.detailUrl;
-  const subject = `Review needed: ${contract.exhibitor_company_name} — ${totalLabel}`;
+  const subject = `Contract approval needed: ${contract.exhibitor_company_name} — ${totalLabel}`;
   const pricingLines = contractPricingTextLines({
     booth_subtotal_cents: boothSub,
     line_items_subtotal_cents: contract.line_items_subtotal_cents,
@@ -571,7 +571,7 @@ export async function notifyEventsTeamOfPendingReview(
   });
 
   const text = [
-    `A contract PDF has been submitted for events team review.`,
+    `A contract is waiting for events team approval before it can be sent via DocuSign.`,
     ``,
     `Exhibitor: ${contract.exhibitor_company_name}`,
     `Booth rate: ${rateLabel}`,
@@ -583,7 +583,8 @@ export async function notifyEventsTeamOfPendingReview(
 
   const html = `
     <div style="font-family: system-ui, sans-serif; max-width: 560px;">
-      <p><strong>Review needed</strong></p>
+      <p><strong>Contract approval needed</strong></p>
+      <p style="color:#444;font-size:14px;">This contract is in the events review queue and needs approval before DocuSign send.</p>
       <table style="margin-top:12px;font-size:14px;">
         <tr><td style="color:#666;padding:4px 12px 4px 0;">Exhibitor</td><td>${escapeHtml(contract.exhibitor_company_name)}</td></tr>
         <tr><td style="color:#666;padding:4px 12px 4px 0;">Booth rate</td><td>${escapeHtml(rateLabel)}</td></tr>
