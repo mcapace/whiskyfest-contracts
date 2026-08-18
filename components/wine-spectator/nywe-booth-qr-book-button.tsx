@@ -42,20 +42,22 @@ export function NyweBoothQrBookButton({
   }
 
   return (
-    <div className="space-y-1.5">
+    <div className="flex shrink-0 flex-col items-end gap-1">
       <Button
         type="button"
         variant="outline"
         size="sm"
-        className="h-9"
+        className="h-9 whitespace-nowrap"
         onClick={downloadBook}
         disabled={pending || readyCount === 0}
       >
         {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <BookOpen className="h-3.5 w-3.5" aria-hidden />}
         {pending ? 'Building QR book…' : 'Download QR book'}
       </Button>
-      <p className="text-xs text-muted-foreground">PDF book plus PNG and SVG files</p>
-      {message ? <p className="text-xs text-destructive">{message}</p> : null}
+      <p className="max-w-[11.5rem] text-right text-[11px] leading-snug text-muted-foreground">
+        PDF, PNG, and SVG
+      </p>
+      {message ? <p className="max-w-[11.5rem] text-right text-xs text-destructive">{message}</p> : null}
     </div>
   );
 }

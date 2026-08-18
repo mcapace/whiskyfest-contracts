@@ -111,6 +111,26 @@ export function formatRosterWineDisplay(wineName: string, vintage: string): stri
   return [wine, vin].filter(Boolean).join(' · ');
 }
 
+/** Split stored brands_poured (often `Wine · 2021` plus rating junk) for compact list chips. */
+export function parseRosterWineDisplay(brandsPoured: string | null | undefined): {
+  wine: string;
+  vintage: string | null;
+} | null {
+  let text = (brandsPoured ?? '').trim();
+  if (!text) return null;
+  text = text.split('|')[0]?.trim() ?? text;
+  text = text.replace(/\s*[·•]\s*wine spectator.*$/i, '').trim();
+  const vintageMatch = text.match(/(?:^|[·•,\s]+)((?:19|20)\d{2})\s*$/);
+  const vintage = vintageMatch?.[1] ?? null;
+  const wine = vintage
+    ? text.slice(0, vintageMatch!.index).replace(/[·•,\-\s]+$/g, '').trim()
+    : text;
+  if (!wine && !vintage) return null;
+  if (!wine && vintage) return { wine: '', vintage };
+  if (/^(?:19|20)\d{2}$/.test(wine) && !vintage) return { wine: '', vintage: wine };
+  return { wine, vintage };
+}
+
 export function rosterSheetFieldValue(
   row: { sheetFields?: { label: string; value: string }[] },
   label: string,

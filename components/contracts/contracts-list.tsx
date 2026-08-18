@@ -26,6 +26,7 @@ import { categorizeContractBrands } from '@/lib/brand-category';
 import { subscribeToAppContractEvents } from '@/lib/realtime-client';
 import { CONTRACT_DEAL_KINDS, dealKindFromContract, dealKindLabel, listPackageLabel } from '@/lib/contract-deal-kind';
 import { NyweBoothQrRowDownload, downloadNyweBoothQrFile } from '@/components/wine-spectator/nywe-booth-qr-row-download';
+import { WinePouredChips } from '@/components/contracts/wine-poured-chips';
 import type { BoothBrandRowsByContract } from '@/lib/sponsors';
 import type { ContractWithTotals, Event } from '@/types/db';
 
@@ -325,7 +326,13 @@ export function ContractsList({
         ]}
         dealTypeOptions={[
           { value: 'all', label: 'All' },
-          ...CONTRACT_DEAL_KINDS.map((kind) => ({ value: kind, label: dealKindLabel(kind) })),
+          ...(winePortal
+            ? [
+                { value: 'booth' as const, label: 'Vendor license' },
+                { value: 'sponsorship_only' as const, label: 'Sponsorship' },
+                { value: 'booth_and_sponsorship' as const, label: 'License + sponsorship' },
+              ]
+            : CONTRACT_DEAL_KINDS.map((kind) => ({ value: kind, label: dealKindLabel(kind) }))),
         ]}
         repOptions={repOptions}
         brandOptions={brandOptions}
@@ -403,16 +410,18 @@ export function ContractsList({
                 };
                 const cells = (
                   <>
-                    <TableCell>
-                      <div className="font-medium text-foreground">{c.exhibitor_company_name}</div>
-                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <TableCell className="align-top">
+                      <div className="min-w-0">
+                        <div className="font-medium text-foreground">{c.exhibitor_company_name}</div>
                         {winePortal && c.exhibitor_legal_name && c.exhibitor_legal_name !== c.exhibitor_company_name ? (
-                          <span className="text-xs text-muted-foreground">{c.exhibitor_legal_name}</span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">{eventMap.get(c.event_id) ?? '—'}</span>
-                        )}
-                        {pill ? (
-                          <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground">
+                          <div className="mt-0.5 truncate text-xs text-muted-foreground">{c.exhibitor_legal_name}</div>
+                        ) : !winePortal ? (
+                          <div className="mt-0.5 truncate text-xs text-muted-foreground">{eventMap.get(c.event_id) ?? '—'}</div>
+                        ) : null}
+                        {winePortal ? (
+                          <WinePouredChips brandsPoured={c.brands_poured} />
+                        ) : pill ? (
+                          <span className="mt-1.5 inline-block max-w-[14rem] truncate rounded-md bg-muted/70 px-1.5 py-0.5 text-[11px] text-muted-foreground">
                             {pill}
                           </span>
                         ) : null}

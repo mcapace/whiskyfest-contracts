@@ -3,41 +3,38 @@
 import { Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { ContractViewFilters } from '@/components/contracts/saved-views-dropdown';
 
 type Option = { value: string; label: string };
 
-function ChipGroup({
+function FilterSelect({
   label,
+  value,
   options,
-  selected,
-  onSelect,
+  onChange,
 }: {
   label: string;
+  value: string;
   options: Option[];
-  selected: string;
-  onSelect: (value: string) => void;
+  onChange: (value: string) => void;
 }) {
   return (
-    <div className="space-y-2">
-      <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-ink-500">{label}</p>
-      <div className="flex flex-wrap gap-1.5">
-        {options.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => onSelect(opt.value)}
-            className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-              selected === opt.value
-                ? 'border-oak-700 bg-oak-800 text-parchment-50'
-                : 'border-parchment-300 bg-parchment-50 text-ink-700 hover:bg-parchment-100'
-            }`}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
-    </div>
+    <label className="flex min-w-0 items-center gap-2">
+      <span className="shrink-0 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className="h-9 w-[10.5rem] bg-background shadow-none" aria-label={label}>
+          <SelectValue placeholder="All" />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value}>
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </label>
   );
 }
 
@@ -66,71 +63,78 @@ export function ContractsFilterBar({
   hideBrandFilter?: boolean;
   hideDealTypeFilter?: boolean;
 }) {
+  const isFiltered =
+    filters.status !== 'all' ||
+    filters.rep !== 'all' ||
+    filters.brand !== 'all' ||
+    filters.dealType !== 'all' ||
+    filters.listPreset !== 'none' ||
+    Boolean(searchDraft.trim());
+
+  function clearAll() {
+    onSearchDraftChange('');
+    onChange({ status: 'all', rep: 'all', brand: 'all', dealType: 'all', search: '', listPreset: 'none' });
+  }
+
   return (
-    <div className="space-y-4 rounded-lg border border-parchment-200 bg-parchment-50 p-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <ChipGroup
+    <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card px-3 py-3 sm:px-4 lg:flex-row lg:items-center">
+      <div className="relative min-w-0 flex-1">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={searchDraft}
+          onChange={(e) => onSearchDraftChange(e.target.value)}
+          placeholder={
+            hideBrandFilter ? 'Search winery, legal name, signer, wine' : 'Search company, signer, email, brands'
+          }
+          className="h-9 border-border/70 bg-background pl-8 pr-8 shadow-none"
+          aria-label="Search contracts"
+        />
+        {searchDraft ? (
+          <button
+            type="button"
+            onClick={() => onSearchDraftChange('')}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label="Clear search"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        ) : null}
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <FilterSelect
           label="Status"
           options={statusOptions}
-          selected={filters.status}
-          onSelect={(status) => onChange({ ...filters, status, listPreset: 'none' })}
+          value={filters.status}
+          onChange={(status) => onChange({ ...filters, status, listPreset: 'none' })}
         />
-        <div className="flex w-full max-w-md items-center gap-2">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-ink-500" />
-            <Input
-              value={searchDraft}
-              onChange={(e) => onSearchDraftChange(e.target.value)}
-              placeholder={hideBrandFilter ? 'Search winery, legal name, signer, brand' : 'Search company, signer, email, brands'}
-              className="pl-8 pr-8 font-sans"
-              aria-label="Search contracts"
-            />
-            {searchDraft ? (
-              <button
-                type="button"
-                onClick={() => onSearchDraftChange('')}
-                className="absolute right-2.5 top-2.5 text-ink-500 hover:text-oak-800"
-                aria-label="Clear search"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            ) : null}
-          </div>
-          <Button
-            variant="outline"
-            onClick={() => {
-              onSearchDraftChange('');
-              onChange({ status: 'all', rep: 'all', brand: 'all', dealType: 'all', search: '', listPreset: 'none' });
-            }}
-          >
-            Clear
-          </Button>
-        </div>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {!hideDealTypeFilter ? (
-          <ChipGroup
-            label="Deal type"
+          <FilterSelect
+            label="Deal"
             options={dealTypeOptions}
-            selected={filters.dealType}
-            onSelect={(dealType) => onChange({ ...filters, dealType, listPreset: 'none' })}
+            value={filters.dealType}
+            onChange={(dealType) => onChange({ ...filters, dealType, listPreset: 'none' })}
           />
         ) : null}
         {!hideRepFilter ? (
-          <ChipGroup
-            label="Sales rep"
+          <FilterSelect
+            label="Rep"
             options={repOptions}
-            selected={filters.rep}
-            onSelect={(rep) => onChange({ ...filters, rep, listPreset: 'none' })}
+            value={filters.rep}
+            onChange={(rep) => onChange({ ...filters, rep, listPreset: 'none' })}
           />
         ) : null}
         {!hideBrandFilter ? (
-          <ChipGroup
-            label="Brand category"
+          <FilterSelect
+            label="Brand"
             options={brandOptions}
-            selected={filters.brand}
-            onSelect={(brand) => onChange({ ...filters, brand, listPreset: 'none' })}
+            value={filters.brand}
+            onChange={(brand) => onChange({ ...filters, brand, listPreset: 'none' })}
           />
+        ) : null}
+        {isFiltered ? (
+          <Button type="button" variant="ghost" size="sm" className="h-9 px-2 text-muted-foreground" onClick={clearAll}>
+            Clear
+          </Button>
         ) : null}
       </div>
     </div>

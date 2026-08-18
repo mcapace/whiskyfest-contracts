@@ -80,7 +80,7 @@ function QueueRow({
         <p className="truncate text-sm font-medium">{title}</p>
         <p className="text-xs text-muted-foreground">{subtitle}</p>
       </div>
-      <div className="flex shrink-0 items-center gap-3">
+      <div className="flex shrink-0 items-center justify-end gap-3">
         {typeof amount === 'number' ? (
           <span className="text-sm tabular-nums text-muted-foreground">{formatCurrency(amount)}</span>
         ) : null}
@@ -183,38 +183,36 @@ export function NyweSusannahDashboard({
         ) : null}
 
         <section className="space-y-3 rounded-xl border border-fest-600/15 bg-muted/20 p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="flex items-center gap-2 text-sm font-medium">
-                <QrCode className="h-4 w-4 shrink-0" aria-hidden />
-                Booth QR codes
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Built from executed vendor licenses only (not drafts, not sponsorships).
-              </p>
-              <p className="mt-2 text-sm">
-                <span className="font-medium tabular-nums">{executedBoothCount}</span>
-                {' '}executed
-                {' · '}
-                <span className="font-medium tabular-nums">{qrReadyCount}</span>
-                {' '}ready to print
-                {' · '}
-                <span className="font-medium tabular-nums">{qrGeneratedCount}</span>
-                {' '}short link{qrGeneratedCount === 1 ? '' : 's'} created
-                {missingWebsite.length > 0 ? (
-                  <>
-                    {' · '}
-                    <span className="font-medium tabular-nums text-amber-900">{missingWebsite.length}</span>
-                    {' '}need a website
-                  </>
-                ) : null}
-              </p>
-            </div>
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <p className="flex min-w-0 items-center gap-2 text-sm font-medium">
+              <QrCode className="h-4 w-4 shrink-0" aria-hidden />
+              Booth QR codes
+            </p>
             <NyweBoothQrBookButton
               readyCount={qrReadyCount}
               eventYear={eventYear}
             />
           </div>
+          <p className="text-sm text-muted-foreground">
+            Built from executed vendor licenses only (not drafts, not sponsorships).
+          </p>
+          <p className="text-sm">
+            <span className="font-medium tabular-nums">{executedBoothCount}</span>
+            {' '}executed
+            {' · '}
+            <span className="font-medium tabular-nums">{qrReadyCount}</span>
+            {' '}ready to print
+            {' · '}
+            <span className="font-medium tabular-nums">{qrGeneratedCount}</span>
+            {' '}short link{qrGeneratedCount === 1 ? '' : 's'} created
+            {missingWebsite.length > 0 ? (
+              <>
+                {' · '}
+                <span className="font-medium tabular-nums text-amber-900">{missingWebsite.length}</span>
+                {' '}need a website
+              </>
+            ) : null}
+          </p>
 
           {missingWebsite.length > 0 ? (
             <div className="space-y-2">

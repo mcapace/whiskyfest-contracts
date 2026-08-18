@@ -7,6 +7,7 @@ import { formatCurrency, formatRelative } from '@/lib/utils';
 import { RelativeTime } from '@/components/ui/relative-time';
 import { useHydrated } from '@/hooks/use-hydrated';
 import { StatusBadge } from '@/components/contracts/status-badge';
+import { WinePouredChips } from '@/components/contracts/wine-poured-chips';
 import type { ContractWithTotals } from '@/types/db';
 
 export function ContractCard({
@@ -52,21 +53,27 @@ export function ContractCard({
         <StatusBadge status={contract.status} />
       </div>
       {vendorLicense ? (
-        <p className="mt-1 text-sm text-ink-600">
-          {[
-            contract.exhibitor_legal_name && contract.exhibitor_legal_name !== contract.exhibitor_company_name
-              ? contract.exhibitor_legal_name
-              : null,
-            contract.signer_1_name,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
-        </p>
-      ) : null}
-      {brands.length > 0 ? (
+        <>
+          <p className="mt-1 text-sm text-ink-600">
+            {[
+              contract.exhibitor_legal_name && contract.exhibitor_legal_name !== contract.exhibitor_company_name
+                ? contract.exhibitor_legal_name
+                : null,
+              contract.signer_1_name,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+          <WinePouredChips brandsPoured={contract.brands_poured} />
+        </>
+      ) : brands.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {brands.map((brand) => (
-            <span key={brand} className="rounded-full bg-parchment-100 px-2 py-0.5 text-xs text-ink-700">
+            <span
+              key={brand}
+              className="max-w-[14rem] truncate rounded-md bg-parchment-100 px-2 py-0.5 text-xs text-ink-700"
+              title={brand}
+            >
               {brand}
             </span>
           ))}

@@ -187,13 +187,13 @@ function matchesSearch(row: RosterRow, query: string): boolean {
 }
 
 const ROSTER_STICKY_LEFT_HEAD =
-  'sticky left-0 z-10 w-12 min-w-[3rem] border-r border-border/50 bg-white shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)]';
+  'sticky left-0 z-30 w-12 min-w-[3rem] isolate overflow-hidden border-r border-border bg-card shadow-[6px_0_10px_-6px_rgba(0,0,0,0.18)]';
 const ROSTER_STICKY_LEFT_BODY =
-  'sticky left-0 z-10 w-12 min-w-[3rem] border-r border-border/50 bg-white shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] group-hover:bg-accent/40';
+  'sticky left-0 z-20 w-12 min-w-[3rem] isolate overflow-hidden border-r border-border bg-card shadow-[6px_0_10px_-6px_rgba(0,0,0,0.18)] group-hover:bg-muted';
 const ROSTER_STICKY_RIGHT_HEAD =
-  'sticky right-0 z-10 min-w-[11rem] w-[11rem] overflow-hidden border-l border-border/50 bg-white pl-3 text-right shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)]';
+  'sticky right-0 z-30 min-w-[11rem] w-[11rem] isolate overflow-hidden border-l border-border bg-card pl-3 text-right shadow-[-6px_0_10px_-6px_rgba(0,0,0,0.18)]';
 const ROSTER_STICKY_RIGHT_BODY =
-  'sticky right-0 z-10 min-w-[11rem] w-[11rem] overflow-hidden border-l border-border/50 bg-white pl-3 text-right shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)] group-hover:bg-accent/40';
+  'sticky right-0 z-20 min-w-[11rem] w-[11rem] isolate overflow-hidden border-l border-border bg-card pl-3 text-right shadow-[-6px_0_10px_-6px_rgba(0,0,0,0.18)] group-hover:bg-muted';
 
 function CellText({ value, className }: { value: string; className?: string }) {
   if (!value) return <span className="text-muted-foreground">—</span>;
@@ -925,10 +925,13 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
         </p>
       ) : null}
 
-      <div className="relative isolate min-w-0 overflow-x-auto rounded-2xl border border-border/60 bg-white shadow-sm">
+      <div className="relative isolate min-w-0 overflow-x-auto rounded-2xl border border-border/60 bg-card shadow-sm">
         <Table
           wrapperClassName="overflow-visible min-w-full"
-          className={cn(columnMode === 'all' ? 'min-w-max text-xs' : 'min-w-max w-full')}
+          className={cn(
+            columnMode === 'all' ? 'min-w-max text-xs' : 'min-w-max w-full',
+            '[&_td]:overflow-hidden [&_th]:overflow-hidden',
+          )}
         >
           <TableHeader>
             <TableRow>
