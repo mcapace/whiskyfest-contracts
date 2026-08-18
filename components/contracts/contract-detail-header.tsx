@@ -18,6 +18,9 @@ export function ContractDetailHeader({
   showSalesRep = true,
   vendorLicense = false,
   packageOverride,
+  legalName,
+  signerName,
+  signerEmail,
 }: {
   title: string;
   subtitle: string;
@@ -31,6 +34,9 @@ export function ContractDetailHeader({
   vendorLicense?: boolean;
   /** When set (e.g. Big Smoke rate-sheet package), shown instead of deal-kind labeling. */
   packageOverride?: string;
+  legalName?: string | null;
+  signerName?: string | null;
+  signerEmail?: string | null;
 }) {
   const dealKind = dealKindFromContract({
     order_type: orderType,
@@ -49,11 +55,30 @@ export function ContractDetailHeader({
         <StatusBadge status={shownStatus} />
       </div>
       <p className="font-display text-lg italic text-ink-700">{subtitle}</p>
+      {legalName || signerName ? (
+        <div className="space-y-1 text-sm text-ink-700">
+          {legalName && legalName !== title ? (
+            <p>
+              <span className="text-ink-500">Legal / bill-to</span> ·{' '}
+              <span className="font-semibold text-oak-800">{legalName}</span>
+            </p>
+          ) : null}
+          {signerName ? (
+            <p>
+              <span className="text-ink-500">Signer</span> ·{' '}
+              <span className="font-semibold text-oak-800">{signerName}</span>
+              {signerEmail ? <span className="text-ink-500"> · {signerEmail}</span> : null}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       <div className="flex flex-wrap gap-6 border-t border-parchment-200 pt-3 text-sm text-ink-700">
         {vendorLicense ? (
           <p>
-            <span className="text-ink-500">Package</span> ·{' '}
-            <span className="font-semibold text-oak-800">Vendor license</span>
+            <span className="text-ink-500">Deal</span> ·{' '}
+            <span className="font-semibold text-oak-800">
+              {orderType === 'sponsorship_only' ? 'Sponsorship only' : 'Vendor license'}
+            </span>
           </p>
         ) : packageOverride ? (
           <p>

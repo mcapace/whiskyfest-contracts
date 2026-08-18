@@ -7,7 +7,7 @@ import {
 import { resolveContractStreetFromSheetCells } from '@/lib/exhibitor-roster-billing';
 import { formatRosterWineDisplay } from '@/lib/exhibitor-roster-columns';
 import { eventTemplateProfile } from '@/lib/contract-template-profile';
-import { rosterRowMatchesContract } from '@/lib/nywe-roster-identity';
+import { normalizeSheetContractId, rosterRowMatchesContract, sheetRowBelongsToContract } from '@/lib/nywe-roster-identity';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getSheetsClient } from '@/lib/sheets-tracker';
@@ -55,15 +55,15 @@ function patchChanged(
 
 export function contractPatchFromExhibitorRosterRow(
   row: ExhibitorRosterRow,
-  contract: Pick<ContractWithTotals, 'status' | 'exhibitor_company_name' | 'exhibitor_legal_name'>,
+  contract: Pick<ContractWithTotals, 'id' | 'status' | 'exhibitor_company_name' | 'exhibitor_legal_name'>,
 ): Record<string, string | null | boolean> | null {
   const winery = row.wineryName.trim();
   const billingCompany = row.billingCompany.trim() || winery;
   if (!winery && !billingCompany) return null;
 
-  // Row numbers drift when the Google Sheet is sorted. Do not copy another winery onto this contract.
-  if (!rosterRowMatchesContract(row, contract)) {
-    console.warn('[nywe-roster] skip patch — sheet row winery does not match contract', {
+  // Prefer CONTRACT ID; names are a safety check when the ID cell is empty.
+  if (!sheetRowBelongsToContract(row, contract as { id: string; exhibitor_company_name?: string | null; exhibitor_legal_name?: string | null })) {
+    console.warn('[nywe-roster] skip patch — sheet row does not belong to this contract', {
       status: contract.status,
       contractCompany: contract.exhibitor_company_name,
       sheetWinery: row.wineryName,
@@ -236,18 +236,48 @@ export async function syncLinkedContractsFromRosterRows(
     .not('source_sheet_id', 'is', null);
 
   const rowByKey = new Map(rows.map((row) => [row.rowKey, row]));
+  const rowByContractId = new Map<string, ExhibitorRosterRow>();
+  for (const row of rows) {
+    const id = normalizeSheetContractId(row.sheetContractId);
+    if (id) rowByContractId.set(id, row);
+  }
+
   let updated = 0;
 
   for (const contract of (contracts ?? []) as ContractWithTotals[]) {
-    if (!contract.source_sheet_id || !contract.source_sheet_tab || !contract.source_row_number) continue;
-    const rowKey = rosterRowKey(contract.source_sheet_id, contract.source_sheet_tab, contract.source_row_number);
-    const row = rowByKey.get(rowKey);
+    const byId = rowByContractId.get(contract.id.toLowerCase()) ?? null;
+    const byRow =
+      contract.source_sheet_id && contract.source_sheet_tab && contract.source_row_number
+        ? rowByKey.get(
+            rosterRowKey(contract.source_sheet_id, contract.source_sheet_tab, contract.source_row_number),
+          ) ?? null
+        : null;
+
+    const row = byId ?? (byRow && sheetRowBelongsToContract(byRow, contract) ? byRow : null);
     if (!row) continue;
 
-    const patch = contractPatchFromExhibitorRosterRow(row, contract);
-    if (!patch || !patchChanged(contract, patch)) continue;
+    const rowMoved =
+      Boolean(byId) &&
+      (contract.source_row_number !== row.rowNumber ||
+        contract.source_sheet_tab !== row.tab ||
+        contract.source_sheet_id !== row.spreadsheetId);
 
-    const { error } = await supabase.from('contracts').update(patch).eq('id', contract.id);
+    const patch = contractPatchFromExhibitorRosterRow(row, contract);
+    const needsRelink = rowMoved;
+    if ((!patch || !patchChanged(contract, patch)) && !needsRelink) continue;
+
+    const update = {
+      ...(patch ?? {}),
+      ...(needsRelink
+        ? {
+            source_sheet_id: row.spreadsheetId,
+            source_sheet_tab: row.tab,
+            source_row_number: row.rowNumber,
+          }
+        : {}),
+    };
+
+    const { error } = await supabase.from('contracts').update(update).eq('id', contract.id);
     if (error) {
       console.error('[syncLinkedContractsFromRosterRows]', contract.id, error.message);
       continue;

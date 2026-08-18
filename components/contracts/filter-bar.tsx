@@ -81,7 +81,7 @@ export function ContractsFilterBar({
             <Input
               value={searchDraft}
               onChange={(e) => onSearchDraftChange(e.target.value)}
-              placeholder={hideBrandFilter ? 'Search company, signer, email, wine' : 'Search company, signer, email, brands'}
+              placeholder={hideBrandFilter ? 'Search winery, legal name, signer, brand' : 'Search company, signer, email, brands'}
               className="pl-8 pr-8 font-sans"
               aria-label="Search contracts"
             />

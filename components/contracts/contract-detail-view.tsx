@@ -152,6 +152,9 @@ export function ContractDetailView({
           showSalesRep={!packageFeeEvent}
           vendorLicense={nyweLicense}
           packageOverride={packageOverride}
+          legalName={nyweLicense ? contract.exhibitor_legal_name : null}
+          signerName={nyweLicense ? contract.signer_1_name : null}
+          signerEmail={nyweLicense ? contract.signer_1_email : null}
         />
 
         <div className="grid gap-6 xl:grid-cols-[240px_minmax(0,1fr)]">

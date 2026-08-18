@@ -1,7 +1,8 @@
 /**
- * NYWE roster rows are keyed by Google Sheet row number.
- * If the sheet is sorted or rows are inserted, that number points at a different winery.
- * Never apply a roster patch unless the sheet winery still matches the contract.
+ * NYWE roster rows used to be keyed only by Google Sheet row number.
+ * If the sheet is sorted, that number points at a different winery.
+ * Prefer the sheet CONTRACT ID (portal UUID written back). Fall back to
+ * winery/billing names only when the ID cell is empty.
  */
 
 export function normalizeRosterIdentity(value: string | null | undefined): string {
@@ -28,6 +29,23 @@ export function rosterIdentitiesMatch(a: string | null | undefined, b: string | 
   const rightSet = new Set(rightTokens);
   const hits = leftTokens.filter((w) => rightSet.has(w)).length;
   return hits >= 2;
+}
+
+/** UUID from the sheet CONTRACT ID cell (ignores extra text). */
+export function normalizeSheetContractId(raw: string | null | undefined): string | null {
+  const match = (raw ?? '').trim().toLowerCase().match(
+    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/,
+  );
+  return match?.[0] ?? null;
+}
+
+export function sheetRowBelongsToContract(
+  row: { sheetContractId?: string | null; wineryName?: string | null; billingCompany?: string | null },
+  contract: { id: string; exhibitor_company_name?: string | null; exhibitor_legal_name?: string | null },
+): boolean {
+  const sheetId = normalizeSheetContractId(row.sheetContractId);
+  if (sheetId) return sheetId === contract.id.toLowerCase();
+  return rosterRowMatchesContract(row, contract);
 }
 
 /** True when the Google Sheet row is still the same winery as this contract. */

@@ -1,6 +1,6 @@
 import { getSheetsClient } from '@/lib/sheets-tracker';
 import { rosterStatusLabel } from '@/lib/exhibitor-roster';
-import { rosterIdentitiesMatch } from '@/lib/nywe-roster-identity';
+import { rosterIdentitiesMatch, normalizeSheetContractId } from '@/lib/nywe-roster-identity';
 import { formatTimestamp } from '@/lib/utils';
 import type { ContractStatus, ContractWithTotals } from '@/types/db';
 import {
@@ -83,7 +83,10 @@ export async function writeExhibitorRosterStatusForContract(
     const row = ((rowRes.data.values?.[0] ?? []) as string[]).map((v) => String(v ?? '').trim());
     const sheetWinery = wineryIdx >= 0 ? row[wineryIdx] : row[2];
     const sheetBilling = billingIdx >= 0 ? row[billingIdx] : '';
+    const sheetContractId = normalizeSheetContractId(row[statusStart + 1]);
+    const idMatches = sheetContractId === contract.id.toLowerCase();
     const matches =
+      idMatches ||
       rosterIdentitiesMatch(sheetWinery, contract.exhibitor_company_name) ||
       rosterIdentitiesMatch(sheetWinery, contract.exhibitor_legal_name) ||
       rosterIdentitiesMatch(sheetBilling, contract.exhibitor_company_name) ||

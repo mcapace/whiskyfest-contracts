@@ -206,6 +206,7 @@ export function ContractsList({
           .join(' ');
         const blob = [
           c.exhibitor_company_name,
+          c.exhibitor_legal_name,
           c.signer_1_name,
           c.signer_1_email,
           c.brands_poured,
@@ -261,10 +262,22 @@ export function ContractsList({
       ) : null}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-5xl font-medium tracking-tight text-foreground">Contracts</h1>
-          <p className="mt-2 font-sans text-sm text-foreground">
-            {filtered.length} shown · {activeCount} active · {pipelineCount} in pipeline
-          </p>
+          {winePortal ? (
+            <>
+              <p className="wf-label-caps text-[0.65rem] text-fest-800">Wine Spectator</p>
+              <h1 className="mt-1 font-display text-3xl font-medium tracking-tight text-foreground">Licenses</h1>
+              <p className="mt-2 font-sans text-sm text-muted-foreground">
+                {filtered.length} shown · {activeCount} active · {pipelineCount} in pipeline
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="font-display text-5xl font-medium tracking-tight text-foreground">Contracts</h1>
+              <p className="mt-2 font-sans text-sm text-foreground">
+                {filtered.length} shown · {activeCount} active · {pipelineCount} in pipeline
+              </p>
+            </>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <SavedViewsDropdown onApply={setFilters} customSaved={customViews} />
@@ -360,9 +373,10 @@ export function ContractsList({
           <Table className="font-sans [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-muted">
             <TableHeader>
               <TableRow>
-                <TableHead>Company / Brand</TableHead>
+                <TableHead>{winePortal ? 'Winery' : 'Company / Brand'}</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Package</TableHead>
+                <TableHead>{winePortal ? 'Deal type' : 'Package'}</TableHead>
+                {winePortal ? <TableHead>Signer</TableHead> : null}
                 <TableHead className="text-right">Total</TableHead>
                 {!winePortal ? <TableHead>Sales Rep</TableHead> : null}
                 <TableHead className="text-right">Last Activity</TableHead>
@@ -389,7 +403,11 @@ export function ContractsList({
                     <TableCell>
                       <div className="font-medium text-foreground">{c.exhibitor_company_name}</div>
                       <div className="mt-1 flex flex-wrap items-center gap-2">
-                        <span className="text-xs text-muted-foreground">{eventMap.get(c.event_id) ?? '—'}</span>
+                        {winePortal && c.exhibitor_legal_name && c.exhibitor_legal_name !== c.exhibitor_company_name ? (
+                          <span className="text-xs text-muted-foreground">{c.exhibitor_legal_name}</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">{eventMap.get(c.event_id) ?? '—'}</span>
+                        )}
                         {pill ? (
                           <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground">
                             {pill}
@@ -407,6 +425,14 @@ export function ContractsList({
                           : 'Vendor license'
                         : listPackageLabel(c)}
                     </TableCell>
+                    {winePortal ? (
+                      <TableCell className="text-sm text-muted-foreground">
+                        <div>{c.signer_1_name ?? '—'}</div>
+                        {c.signer_1_email ? (
+                          <div className="max-w-[12rem] truncate text-xs">{c.signer_1_email}</div>
+                        ) : null}
+                      </TableCell>
+                    ) : null}
                     <TableCell className="text-right font-semibold tabular-nums">{formatCurrency(c.grand_total_cents)}</TableCell>
                     {!winePortal ? (
                       <TableCell>{c.sales_rep_name ?? c.sales_rep_email ?? '—'}</TableCell>

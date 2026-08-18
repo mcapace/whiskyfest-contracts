@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getSheetsClient } from '@/lib/sheets-tracker';
 import { formatRosterWineDisplay } from '@/lib/exhibitor-roster-columns';
+import { normalizeSheetContractId, rosterRowMatchesContract } from '@/lib/nywe-roster-identity';
 import {
   billingFieldsFromRosterRow,
   resolveContractStreetFromSheetCells,
@@ -70,6 +71,12 @@ export type ExhibitorRosterRow = {
   contractBillingZip: string | null;
   contractSignerCcName: string | null;
   contractSignerCcEmail: string | null;
+  /** Portal record names — shown when they differ from the sheet winery. */
+  portalCompanyName: string | null;
+  portalLegalName: string | null;
+  portalSignerName: string | null;
+  portalSignerEmail: string | null;
+  identityMismatch: boolean;
   /** Contract was recalled from DocuSign and returned to draft. */
   recalledToDraft: boolean;
   sheetStatus: string | null;
@@ -320,6 +327,81 @@ export async function recalledContractIds(eventId: string, contractIds: string[]
   return new Set((recalls ?? []).map((row) => row.contract_id as string));
 }
 
+function emptyContractHydration(): Pick<
+  ExhibitorRosterRow,
+  | 'contractId'
+  | 'contractStatus'
+  | 'contractGrandTotalCents'
+  | 'contractBillingLine1'
+  | 'contractBillingCity'
+  | 'contractBillingState'
+  | 'contractBillingZip'
+  | 'contractSignerCcName'
+  | 'contractSignerCcEmail'
+  | 'portalCompanyName'
+  | 'portalLegalName'
+  | 'portalSignerName'
+  | 'portalSignerEmail'
+  | 'identityMismatch'
+  | 'recalledToDraft'
+  | 'sheetStatus'
+  | 'sheetContractId'
+> {
+  return {
+    contractId: null,
+    contractStatus: null,
+    contractGrandTotalCents: null,
+    contractBillingLine1: null,
+    contractBillingCity: null,
+    contractBillingState: null,
+    contractBillingZip: null,
+    contractSignerCcName: null,
+    contractSignerCcEmail: null,
+    portalCompanyName: null,
+    portalLegalName: null,
+    portalSignerName: null,
+    portalSignerEmail: null,
+    identityMismatch: false,
+    recalledToDraft: false,
+    sheetStatus: null,
+    sheetContractId: null,
+  };
+}
+
+function hydrateRowFromContract(
+  row: Pick<ExhibitorRosterRow, 'wineryName' | 'billingCompany' | 'sheetContractId'>,
+  contract: ContractWithTotals,
+  recalledToDraft: boolean,
+): ReturnType<typeof emptyContractHydration> {
+  const identityMismatch = !rosterRowMatchesContract(row, contract);
+  return {
+    contractId: contract.id,
+    contractStatus: contract.status,
+    contractGrandTotalCents: contract.grand_total_cents ?? null,
+    contractBillingLine1: contract.billing_address_line1 ?? null,
+    contractBillingCity: contract.billing_city ?? null,
+    contractBillingState: contract.billing_state ?? null,
+    contractBillingZip: contract.billing_zip ?? null,
+    contractSignerCcName: contract.signer_cc_name ?? null,
+    contractSignerCcEmail: contract.signer_cc_email ?? null,
+    portalCompanyName: contract.exhibitor_company_name ?? null,
+    portalLegalName: contract.exhibitor_legal_name ?? null,
+    portalSignerName: contract.signer_1_name ?? null,
+    portalSignerEmail: contract.signer_1_email ?? null,
+    identityMismatch,
+    recalledToDraft,
+    sheetStatus: rosterStatusLabel(contract.status, { recalled: recalledToDraft }),
+    sheetContractId: contract.id,
+  };
+}
+
+const UNSIGNED_ROSTER_STATUSES: ContractStatus[] = [
+  'draft',
+  'ready_for_review',
+  'pending_events_review',
+  'approved',
+];
+
 /** Merge live contract status onto cached roster rows (Sheets data can be cached; license status cannot). */
 export async function hydrateRosterRowsWithContracts(
   eventId: string,
@@ -331,7 +413,7 @@ export async function hydrateRosterRowsWithContracts(
   const { data: linkedContracts, error: linkedError } = await supabase
     .from('contracts_with_totals')
     .select(
-      'id, status, updated_at, grand_total_cents, billing_address_line1, billing_city, billing_state, billing_zip, signer_cc_name, signer_cc_email, source_sheet_id, source_sheet_tab, source_row_number',
+      'id, status, updated_at, grand_total_cents, billing_address_line1, billing_city, billing_state, billing_zip, signer_cc_name, signer_cc_email, signer_1_name, signer_1_email, exhibitor_company_name, exhibitor_legal_name, sent_at, source_sheet_id, source_sheet_tab, source_row_number',
     )
     .eq('event_id', eventId)
     .not('source_sheet_id', 'is', null);
@@ -341,8 +423,10 @@ export async function hydrateRosterRowsWithContracts(
     return rows;
   }
 
+  const contracts = (linkedContracts ?? []) as ContractWithTotals[];
+  const contractById = new Map(contracts.map((c) => [c.id.toLowerCase(), c]));
   const contractByRowKey = new Map<string, ContractWithTotals>();
-  for (const contract of (linkedContracts ?? []) as ContractWithTotals[]) {
+  for (const contract of contracts) {
     if (!contract.source_sheet_id || !contract.source_sheet_tab || !contract.source_row_number) continue;
     contractByRowKey.set(
       rosterRowKey(contract.source_sheet_id, contract.source_sheet_tab, contract.source_row_number),
@@ -352,46 +436,28 @@ export async function hydrateRosterRowsWithContracts(
 
   const recalledIds = await recalledContractIds(
     eventId,
-    [...contractByRowKey.values()].filter((c) => c.status === 'draft' && !c.sent_at).map((c) => c.id),
+    contracts.filter((c) => c.status === 'draft' && !c.sent_at).map((c) => c.id),
   );
 
   return rows.map((row) => {
-    const contract = contractByRowKey.get(row.rowKey) ?? null;
+    const sheetId = normalizeSheetContractId(row.sheetContractId);
+    const byId = sheetId ? contractById.get(sheetId) ?? null : null;
+    const byRow = contractByRowKey.get(row.rowKey) ?? null;
+    const contract =
+      byId ?? (byRow && UNSIGNED_ROSTER_STATUSES.includes(byRow.status) ? byRow : null);
     if (!contract) {
       return {
         ...row,
-        contractId: null,
-        contractStatus: null,
-        contractGrandTotalCents: null,
-        contractBillingLine1: null,
-        contractBillingCity: null,
-        contractBillingState: null,
-        contractBillingZip: null,
-        contractSignerCcName: null,
-        contractSignerCcEmail: null,
-        recalledToDraft: false,
-        sheetStatus: null,
-        sheetContractId: null,
+        ...emptyContractHydration(),
+        sheetStatus: row.sheetStatus,
+        sheetContractId: row.sheetContractId,
       };
     }
 
     const recalledToDraft = recalledIds.has(contract.id);
-    const statusLabel = rosterStatusLabel(contract.status, { recalled: recalledToDraft });
-
     return {
       ...row,
-      contractId: contract.id,
-      contractStatus: contract.status,
-      contractGrandTotalCents: contract.grand_total_cents ?? null,
-      contractBillingLine1: contract.billing_address_line1 ?? null,
-      contractBillingCity: contract.billing_city ?? null,
-      contractBillingState: contract.billing_state ?? null,
-      contractBillingZip: contract.billing_zip ?? null,
-      contractSignerCcName: contract.signer_cc_name ?? null,
-      contractSignerCcEmail: contract.signer_cc_email ?? null,
-      recalledToDraft,
-      sheetStatus: statusLabel,
-      sheetContractId: contract.id,
+      ...hydrateRowFromContract(row, contract, recalledToDraft),
       sheetLastUpdated: contract.updated_at ?? row.sheetLastUpdated,
     };
   });
@@ -570,8 +636,10 @@ export async function fetchExhibitorRoster(event: Event): Promise<{
     .eq('event_id', event.id)
     .not('source_sheet_id', 'is', null);
 
+  const contractById = new Map<string, ContractWithTotals>();
   const contractByRowKey = new Map<string, ContractWithTotals>();
   for (const contract of (linkedContracts ?? []) as ContractWithTotals[]) {
+    contractById.set(contract.id.toLowerCase(), contract);
     if (!contract.source_sheet_id || !contract.source_sheet_tab || !contract.source_row_number) continue;
     contractByRowKey.set(
       rosterRowKey(contract.source_sheet_id, contract.source_sheet_tab, contract.source_row_number),
@@ -598,13 +666,19 @@ export async function fetchExhibitorRoster(event: Event): Promise<{
         included += 1;
         const rowNumber = index + 2;
         const rowKey = rosterRowKey(config.spreadsheet_id, config.tab, rowNumber);
-        const contract = contractByRowKey.get(rowKey) ?? null;
+        const sheetContractId = cell(row, statusStart + 1) || null;
+        const sheetId = normalizeSheetContractId(sheetContractId);
+        const byId = sheetId ? contractById.get(sheetId) ?? null : null;
+        const byRow = contractByRowKey.get(rowKey) ?? null;
+        const contract =
+          byId ??
+          (byRow && UNSIGNED_ROSTER_STATUSES.includes(byRow.status) ? byRow : null);
         const signer = resolveSigner(row, map);
         const billingFirst = cell(row, map.billingFirst);
         const billingLast = cell(row, map.billingLast);
         const primaryFirst = cell(row, map.primaryFirst);
         const primaryLast = cell(row, map.primaryLast);
-        rows.push({
+        const baseRow = {
           rowKey,
           listKey: config.key,
           listLabel: config.label,
@@ -631,20 +705,18 @@ export async function fetchExhibitorRoster(event: Event): Promise<{
           wineName: cell(row, map.wineName),
           vintage: cell(row, map.vintage),
           participation: map.participation >= 0 ? cell(row, map.participation) : '',
-          contractId: contract?.id ?? null,
-          contractStatus: contract?.status ?? null,
-          contractGrandTotalCents: contract?.grand_total_cents ?? null,
-          contractBillingLine1: contract?.billing_address_line1 ?? null,
-          contractBillingCity: contract?.billing_city ?? null,
-          contractBillingState: contract?.billing_state ?? null,
-          contractBillingZip: contract?.billing_zip ?? null,
-          contractSignerCcName: contract?.signer_cc_name ?? null,
-          contractSignerCcEmail: contract?.signer_cc_email ?? null,
           recalledToDraft: false,
           sheetStatus: cell(row, statusStart) || null,
-          sheetContractId: cell(row, statusStart + 1) || null,
+          sheetContractId,
           sheetLastUpdated: cell(row, statusStart + 2) || null,
           sheetFields: buildSheetFields(headers, row),
+        };
+        rows.push({
+          ...baseRow,
+          ...(contract
+            ? hydrateRowFromContract(baseRow, contract, false)
+            : { ...emptyContractHydration(), sheetStatus: baseRow.sheetStatus }),
+          sheetContractId,
         });
       });
 

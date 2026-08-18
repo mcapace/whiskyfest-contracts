@@ -14,6 +14,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { NyweSusannahDashboard } from '@/components/wine-spectator/nywe-susannah-dashboard';
 import { NyweMetricsGrid } from '@/components/wine-spectator/nywe-metrics-grid';
 import { NywePipelinePanel } from '@/components/wine-spectator/nywe-pipeline-panel';
+import { NyweHomeSearch } from '@/components/wine-spectator/nywe-home-search';
 import { NyweQuickNav } from '@/components/wine-spectator/nywe-quick-nav';
 import { buildNyweDashboardMetrics, getNywePipelineData } from '@/lib/nywe-dashboard-metrics';
 import { scheduleNyweBackgroundDocuSignSync } from '@/lib/nywe-background-docusign-sync';
@@ -27,6 +28,16 @@ function countByStatus(contracts: ContractWithTotals[], statuses: string[]): num
 }
 
 const RECENT_SENT_DAYS = 14;
+
+function queueItem(c: ContractWithTotals) {
+  return {
+    id: c.id,
+    exhibitorCompanyName: c.exhibitor_company_name,
+    legalName: c.exhibitor_legal_name,
+    signerName: c.signer_1_name,
+    grandTotalCents: c.grand_total_cents,
+  };
+}
 
 export default async function WineSpectatorDashboardPage() {
   const session = await auth();
@@ -65,6 +76,13 @@ export default async function WineSpectatorDashboardPage() {
     session?.user?.email?.split('@')[0] ??
     'there';
 
+  const reviewQueue = activeScoped
+    .filter((c) => c.status === 'pending_events_review')
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  const waitingQueue = activeScoped
+    .filter((c) => c.status === 'sent')
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+
   const sendBlocked = primaryEvent?.client_send_enabled === false;
 
   return (
@@ -77,6 +95,7 @@ export default async function WineSpectatorDashboardPage() {
         completionLabel={`${formatCurrency(totalValueCents)} total pipeline · ${metrics.completionPct}% executed`}
         greetingHeadline={`${word}, ${first}`}
         greetingSubtitle={primaryEvent?.name ?? 'New York Wine Experience'}
+        compact
       />
 
       {sendBlocked ? (
@@ -86,27 +105,42 @@ export default async function WineSpectatorDashboardPage() {
         </div>
       ) : null}
 
-      <NyweMetricsGrid metrics={metrics} />
+      <NyweHomeSearch
+        contracts={activeScoped.map((c) => ({
+          id: c.id,
+          exhibitor_company_name: c.exhibitor_company_name,
+          exhibitor_legal_name: c.exhibitor_legal_name,
+          signer_1_name: c.signer_1_name,
+          signer_1_email: c.signer_1_email,
+          brands_poured: c.brands_poured,
+          status: c.status,
+          order_type: c.order_type,
+        }))}
+      />
 
-      <NyweQuickNav />
-
-      <NywePipelinePanel data={pipeline} />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="font-display text-2xl font-medium text-foreground">Work from here</h2>
+          <p className="text-sm text-muted-foreground">Roster, licenses, and sponsorships</p>
+        </div>
+        <NyweQuickNav />
+      </div>
 
       <NyweSusannahDashboard
-          stuck={stuckForAccounting.map((c) => ({
-            id: c.id,
-            exhibitorCompanyName: c.exhibitor_company_name,
-            grandTotalCents: c.grand_total_cents,
-          }))}
+          stuck={stuckForAccounting.map((c) => queueItem(c))}
           recentlySent={recentlySent.map((c) => ({
-            id: c.id,
-            exhibitorCompanyName: c.exhibitor_company_name,
-            grandTotalCents: c.grand_total_cents,
+            ...queueItem(c),
             executedAt: c.executed_at,
           }))}
+          reviewQueue={reviewQueue.map(queueItem)}
+          waitingQueue={waitingQueue.map(queueItem)}
           reviewCount={reviewCount}
           waitingOnWineryCount={waitingOnWineryCount}
         />
+
+      <NyweMetricsGrid metrics={metrics} compact />
+
+      <NywePipelinePanel data={pipeline} />
 
       <Card className="overflow-hidden border-fest-600/15" data-tour="dashboard-contracts-table">
         <div className="flex items-center justify-between border-b border-fest-600/10 px-6 py-4">
@@ -131,7 +165,14 @@ export default async function WineSpectatorDashboardPage() {
                     className="block px-4 py-4 transition-colors hover:bg-muted/40"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <p className="min-w-0 font-medium leading-snug">{c.exhibitor_company_name}</p>
+                      <div className="min-w-0">
+                        <p className="font-medium leading-snug">{c.exhibitor_company_name}</p>
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                          {[c.exhibitor_legal_name, c.signer_1_name, c.order_type === 'sponsorship_only' ? 'Sponsorship' : 'Vendor license']
+                            .filter((v) => v && v !== c.exhibitor_company_name)
+                            .join(' · ')}
+                        </p>
+                      </div>
                       <span className="font-mono text-sm font-semibold tabular-nums">{formatCurrency(c.grand_total_cents)}</span>
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -146,8 +187,10 @@ export default async function WineSpectatorDashboardPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Winery</TableHead>
+                      <TableHead>Signer</TableHead>
+                      <TableHead>Deal</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="text-right">License fee</TableHead>
+                      <TableHead className="text-right">Fee</TableHead>
                       <TableHead className="text-right">Updated</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -158,6 +201,13 @@ export default async function WineSpectatorDashboardPage() {
                           <Link href={`/wine-spectator/contracts/${c.id}`} className="block font-medium hover:text-accent-brand">
                             {c.exhibitor_company_name}
                           </Link>
+                          {c.exhibitor_legal_name && c.exhibitor_legal_name !== c.exhibitor_company_name ? (
+                            <p className="mt-0.5 truncate text-xs text-muted-foreground">{c.exhibitor_legal_name}</p>
+                          ) : null}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{c.signer_1_name ?? '—'}</TableCell>
+                        <TableCell className="text-sm">
+                          {c.order_type === 'sponsorship_only' ? 'Sponsorship' : 'Vendor license'}
                         </TableCell>
                         <TableCell>
                           <StatusBadge status={c.status} />

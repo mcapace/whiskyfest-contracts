@@ -11,19 +11,33 @@ import { RelativeTime } from '@/components/ui/relative-time';
 export type NyweStuckLicense = {
   id: string;
   exhibitorCompanyName: string;
+  legalName?: string | null;
+  signerName?: string | null;
   grandTotalCents: number;
 };
 
 export type NyweSentLicense = {
   id: string;
   exhibitorCompanyName: string;
+  legalName?: string | null;
+  signerName?: string | null;
   grandTotalCents: number;
   executedAt: string | null;
+};
+
+type QueueItem = {
+  id: string;
+  exhibitorCompanyName: string;
+  legalName?: string | null;
+  signerName?: string | null;
+  grandTotalCents: number;
 };
 
 type Props = {
   stuck: NyweStuckLicense[];
   recentlySent: NyweSentLicense[];
+  reviewQueue: QueueItem[];
+  waitingQueue: QueueItem[];
   reviewCount: number;
   waitingOnWineryCount: number;
 };
@@ -60,18 +74,20 @@ function QueueRow({
 export function NyweSusannahDashboard({
   stuck,
   recentlySent,
+  reviewQueue,
+  waitingQueue,
   reviewCount,
   waitingOnWineryCount,
 }: Props) {
   const hasQueue = reviewCount > 0 || stuck.length > 0 || waitingOnWineryCount > 0;
 
   return (
-    <Card className="h-full border-fest-600/15">
+    <Card className="border-fest-600/15">
       <CardHeader className="pb-4">
-        <CardTitle className="font-serif text-lg font-semibold">Your action queue</CardTitle>
-        <p className="text-sm text-muted-foreground">What needs attention right now</p>
+        <CardTitle className="font-serif text-xl font-semibold">Action queue</CardTitle>
+        <p className="text-sm text-muted-foreground">Review, waiting on winery, and signed but not yet released</p>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5">
         {!hasQueue ? (
           <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/80 p-4">
             <p className="flex items-center gap-2 text-sm font-medium text-emerald-950">
@@ -85,13 +101,46 @@ export function NyweSusannahDashboard({
         ) : null}
 
         {reviewCount > 0 ? (
-          <section className="rounded-xl border border-sky-200 bg-sky-50/80 p-4">
-            <p className="text-sm font-medium text-sky-950">
-              {reviewCount} contract{reviewCount === 1 ? '' : 's'} awaiting approval
+          <section className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-medium text-sky-950">
+                {reviewCount} awaiting approval
+              </p>
+              <Button asChild size="sm" variant="outline" className="h-8">
+                <Link href="/wine-spectator/contracts?status=pending_events_review">Review all</Link>
+              </Button>
+            </div>
+            <ul className="space-y-2">
+              {reviewQueue.slice(0, 6).map((row) => (
+                <QueueRow
+                  key={row.id}
+                  title={row.exhibitorCompanyName}
+                  subtitle={[row.legalName, row.signerName].filter(Boolean).join(' · ') || 'Needs review'}
+                  href={`/wine-spectator/contracts/${row.id}`}
+                  amount={row.grandTotalCents}
+                />
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        {waitingOnWineryCount > 0 ? (
+          <section className="space-y-2">
+            <p className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <Send className="h-4 w-4 shrink-0" aria-hidden />
+              {waitingOnWineryCount} waiting on winery
             </p>
-            <Button asChild size="sm" className="mt-3">
-              <Link href="/wine-spectator/contracts?status=pending_events_review">Review now</Link>
-            </Button>
+            <ul className="space-y-2">
+              {waitingQueue.slice(0, 6).map((row) => (
+                <QueueRow
+                  key={row.id}
+                  title={row.exhibitorCompanyName}
+                  subtitle={[row.legalName, row.signerName].filter(Boolean).join(' · ') || 'Sent for signature'}
+                  href={`/wine-spectator/contracts/${row.id}`}
+                  amount={row.grandTotalCents}
+                />
+              ))}
+            </ul>
           </section>
         ) : null}
 
@@ -99,35 +148,20 @@ export function NyweSusannahDashboard({
           <section>
             <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-800">
               <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
-              Processing to accounting ({stuck.length})
-            </p>
-            <p className="mb-2 text-xs text-muted-foreground">
-              These signed licenses are finishing automatically — no action needed.
+              Signed, not yet released ({stuck.length})
             </p>
             <ul className="space-y-2">
-              {stuck.map((row) => (
-                <li
+              {stuck.slice(0, 8).map((row) => (
+                <QueueRow
                   key={row.id}
-                  className="flex flex-col gap-2 rounded-lg border border-amber-200/80 bg-amber-50/50 p-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div>
-                    <p className="text-sm font-medium">{row.exhibitorCompanyName}</p>
-                    <p className="text-xs text-muted-foreground">{formatCurrency(row.grandTotalCents)}</p>
-                  </div>
-                  <Link href={`/wine-spectator/contracts/${row.id}`} className="text-xs font-medium text-accent-brand hover:underline">
-                    Open
-                  </Link>
-                </li>
+                  title={row.exhibitorCompanyName}
+                  subtitle={[row.legalName, row.signerName].filter(Boolean).join(' · ') || 'Finishing automatically'}
+                  href={`/wine-spectator/contracts/${row.id}`}
+                  amount={row.grandTotalCents}
+                />
               ))}
             </ul>
           </section>
-        ) : null}
-
-        {waitingOnWineryCount > 0 ? (
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Send className="h-4 w-4 shrink-0" aria-hidden />
-            {waitingOnWineryCount} license{waitingOnWineryCount === 1 ? '' : 's'} waiting on winery signature in DocuSign
-          </p>
         ) : null}
 
         {recentlySent.length > 0 ? (

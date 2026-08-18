@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { LucideIcon } from 'lucide-react';
-import { Columns3, Loader2, RefreshCw, Send, FilePlus2, ListFilter, CircleDashed, Clock, CheckCircle2, Mail, BadgeCheck, PenLine, Search, X, Ban } from 'lucide-react';
+import { Columns3, Loader2, RefreshCw, Send, FilePlus2, ListFilter, CircleDashed, Clock, CheckCircle2, Mail, BadgeCheck, PenLine, Search, X, Ban, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -76,6 +76,11 @@ type RosterRow = {
   contractBillingZip: string | null;
   contractSignerCcName: string | null;
   contractSignerCcEmail: string | null;
+  portalCompanyName?: string | null;
+  portalLegalName?: string | null;
+  portalSignerName?: string | null;
+  portalSignerEmail?: string | null;
+  identityMismatch?: boolean;
   recalledToDraft: boolean;
   sheetStatus: string | null;
   sheetLastUpdated: string | null;
@@ -121,6 +126,7 @@ const FILTERS = [
   { key: 'countersign', label: 'Ready to countersign', icon: PenLine },
   { key: 'done', label: 'Signed / executed', icon: BadgeCheck },
   { key: 'voided', label: 'Voided / recalled', icon: Ban },
+  { key: 'mismatch', label: 'Name mismatch', icon: AlertTriangle },
 ] as const;
 
 function matchesFilter(row: RosterRow, filter: string): boolean {
@@ -146,6 +152,8 @@ function matchesFilter(row: RosterRow, filter: string): boolean {
       return Boolean(
         status && ['voided', 'cancelled', 'declined'].includes(status),
       ) || row.recalledToDraft;
+    case 'mismatch':
+      return Boolean(row.identityMismatch);
     default:
       return true;
   }
@@ -155,6 +163,10 @@ function matchesSearch(row: RosterRow, query: string): boolean {
   if (!query) return true;
   const haystack = [
     row.wineryName,
+    row.portalCompanyName,
+    row.portalLegalName,
+    row.portalSignerName,
+    row.portalSignerEmail,
     row.signerName,
     row.signerEmail,
     row.wineName,
@@ -192,7 +204,24 @@ function CellText({ value, className }: { value: string; className?: string }) {
 function renderUiCell(row: RosterRow, columnId: string) {
   switch (columnId) {
     case 'winery':
-      return <CellText value={row.wineryName} className="font-medium" />;
+      return (
+        <div className="min-w-0 space-y-0.5">
+          <CellText value={row.wineryName} className="font-medium" />
+          {row.portalLegalName && row.portalLegalName.trim() !== row.wineryName.trim() ? (
+            <span className="block max-w-[16rem] truncate text-xs text-muted-foreground" title={row.portalLegalName}>
+              Legal: {row.portalLegalName}
+            </span>
+          ) : null}
+          {row.identityMismatch && row.portalCompanyName ? (
+            <span
+              className="block max-w-[16rem] truncate text-xs font-medium text-amber-800"
+              title={`Portal record: ${row.portalCompanyName}`}
+            >
+              Portal: {row.portalCompanyName}
+            </span>
+          ) : null}
+        </div>
+      );
     case 'list': {
       const ListIcon = rosterListIcon(row.listKey);
       return (
@@ -207,10 +236,13 @@ function renderUiCell(row: RosterRow, columnId: string) {
     case 'signer':
       return (
         <div className="min-w-0">
-          <CellText value={row.signerName} />
-          {row.signerEmail ? (
-            <span className="block max-w-[16rem] truncate text-xs text-muted-foreground" title={row.signerEmail}>
-              {row.signerEmail}
+          <CellText value={row.portalSignerName?.trim() || row.signerName} />
+          {(row.portalSignerEmail || row.signerEmail) ? (
+            <span
+              className="block max-w-[16rem] truncate text-xs text-muted-foreground"
+              title={row.portalSignerEmail || row.signerEmail}
+            >
+              {row.portalSignerEmail || row.signerEmail}
             </span>
           ) : null}
         </div>
@@ -345,6 +377,9 @@ function licenseStatusFilterClass(filterKey: string, active: boolean, count: num
   }
   if (filterKey === 'voided' && count > 0) {
     return 'border-danger-base/25 bg-danger-bg text-danger-base hover:bg-danger-bg/90';
+  }
+  if (filterKey === 'mismatch' && count > 0) {
+    return 'border-amber-300/80 bg-amber-50 text-amber-950 hover:bg-amber-100';
   }
   return 'border-border/70 bg-background text-foreground hover:bg-muted/50';
 }
@@ -764,7 +799,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search winery, signer, billing…"
+                placeholder="Search winery, legal name, signer, brand…"
                 className="h-9 border-border/70 bg-muted/20 pl-9 pr-9 text-sm shadow-none focus-visible:bg-background"
                 aria-label="Search exhibitors"
               />
@@ -782,7 +817,8 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
           </div>
 
           <div className="space-y-2 border-t border-border/50 pt-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Exhibitor list</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">List</p>
+            <p className="text-xs text-muted-foreground">Returning, new exhibitors, and champagne / sparkling</p>
             <div className="flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <RosterListFilterPill
                 active={listFilter === 'all'}
@@ -792,7 +828,6 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
                 listKey="all"
                 className={rosterListFilterClass('all', listFilter === 'all')}
                 onClick={() => setListFilter('all')}
-                compact
               />
               {sheetTabs.map((sheet) => {
                 const Icon = rosterListIcon(sheet.key);
@@ -807,7 +842,6 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
                     listKey={sheet.key}
                     className={rosterListFilterClass(sheet.key, active)}
                     onClick={() => setListFilter(sheet.key)}
-                    compact
                   />
                 );
               })}
@@ -962,7 +996,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
                 <TableCell className={ROSTER_STICKY_RIGHT_BODY}>
                   {row.contractId ? (
                     <Link href={`/wine-spectator/contracts/${row.contractId}`} className="text-sm font-medium text-accent-brand hover:underline">
-                      Open
+                      Open contract
                     </Link>
                   ) : (
                     <button

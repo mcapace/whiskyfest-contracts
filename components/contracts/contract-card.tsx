@@ -51,6 +51,18 @@ export function ContractCard({
         <h3 className="font-display text-2xl font-medium leading-tight text-oak-800">{contract.exhibitor_company_name}</h3>
         <StatusBadge status={contract.status} />
       </div>
+      {vendorLicense ? (
+        <p className="mt-1 text-sm text-ink-600">
+          {[
+            contract.exhibitor_legal_name && contract.exhibitor_legal_name !== contract.exhibitor_company_name
+              ? contract.exhibitor_legal_name
+              : null,
+            contract.signer_1_name,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </p>
+      ) : null}
       {brands.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {brands.map((brand) => (
@@ -68,7 +80,11 @@ export function ContractCard({
         <div>
           <p className="text-[11px] uppercase tracking-wide text-ink-500">Package</p>
           <p className="font-sans text-sm font-semibold leading-snug text-oak-800">
-            {vendorLicense ? 'Vendor license' : listPackageLabel(contract)}
+            {vendorLicense
+              ? contract.order_type === 'sponsorship_only'
+                ? 'Sponsorship only'
+                : 'Vendor license'
+              : listPackageLabel(contract)}
           </p>
         </div>
       </div>

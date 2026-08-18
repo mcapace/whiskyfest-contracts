@@ -22,12 +22,6 @@ export default async function WineSpectatorContractsPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-3xl font-medium text-foreground">Wine Spectator licenses</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          New York Wine Experience vendor agreements — separate from WhiskyFest contracts.
-        </p>
-      </div>
       <ContractsList
         contracts={contracts}
         events={events}
