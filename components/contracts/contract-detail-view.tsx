@@ -351,6 +351,10 @@ export function ContractDetailView({
                 clientSendEnabled={clientSendEnabled}
                 portalBasePath={portalBasePath}
                 importedAt={contract.imported_at}
+                nyweBoothQr={nyweLicense && contract.order_type !== 'sponsorship_only'}
+                exhibitorWebsiteUrl={contract.exhibitor_website_url}
+                rebrandlyShortUrl={contract.rebrandly_short_url}
+                qrClicks={contract.qr_clicks ?? 0}
                 reviseInitial={{
                   signerName: contract.signer_1_name ?? '',
                   signerEmail: contract.signer_1_email ?? '',
@@ -436,6 +440,25 @@ export function ContractDetailView({
                   </div>
                   <Detail label="Legal Name" value={contract.exhibitor_legal_name} />
                   <Detail label="Display Name" value={contract.exhibitor_company_name} />
+                  {nyweLicense ? (
+                    <Detail
+                      label="Winery website"
+                      value={
+                        contract.exhibitor_website_url ? (
+                          <a
+                            href={contract.exhibitor_website_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-accent-brand hover:underline"
+                          >
+                            {contract.exhibitor_website_url.replace(/^https?:\/\//, '')}
+                          </a>
+                        ) : (
+                          <span className="text-amber-800">Needed for booth QR</span>
+                        )
+                      }
+                    />
+                  ) : null}
                   {!packageFeeEvent && boothBrands.length > 0 ? (
                     <section aria-labelledby="brands-expressions-heading">
                       <h3

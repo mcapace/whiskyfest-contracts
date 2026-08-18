@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { syncExhibitorRosterMaster } from '@/lib/exhibitor-roster-sync-job';
+import { refreshNyweQrClicks } from '@/lib/nywe-booth-qr';
+import { getActiveWineSpectatorEvent } from '@/lib/wine-spectator-event';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -14,6 +16,14 @@ export async function GET(request: Request) {
   }
 
   const outcome = await syncExhibitorRosterMaster();
+  const event = await getActiveWineSpectatorEvent();
+  let qrClicksUpdated = 0;
+  if (event?.id) {
+    qrClicksUpdated = await refreshNyweQrClicks(event.id).catch((err) => {
+      console.warn('[cron/nywe-roster-sync] QR click refresh failed', err instanceof Error ? err.message : err);
+      return 0;
+    });
+  }
 
   if (outcome.status === 'error') {
     console.error('[cron/nywe-roster-sync]', outcome.error);
@@ -21,7 +31,7 @@ export async function GET(request: Request) {
   }
 
   if (outcome.status === 'skipped') {
-    return NextResponse.json({ status: 'skipped', reason: outcome.reason });
+    return NextResponse.json({ status: 'skipped', reason: outcome.reason, qrClicksUpdated });
   }
 
   revalidatePath('/wine-spectator');
@@ -37,5 +47,6 @@ export async function GET(request: Request) {
     rowCount: outcome.rowCount,
     writebackCount: outcome.writebackCount,
     contractsUpdated: outcome.contractsUpdated,
+    qrClicksUpdated,
   });
 }

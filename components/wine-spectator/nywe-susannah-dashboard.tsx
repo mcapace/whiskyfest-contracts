@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, AlertTriangle, Send } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Send, QrCode } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
@@ -33,11 +33,21 @@ type QueueItem = {
   grandTotalCents: number;
 };
 
+type QrScanRow = {
+  id: string;
+  exhibitorCompanyName: string;
+  shortUrl: string | null;
+  clicks: number;
+  lastClickAt: string | null;
+};
+
 type Props = {
   stuck: NyweStuckLicense[];
   recentlySent: NyweSentLicense[];
   reviewQueue: QueueItem[];
   waitingQueue: QueueItem[];
+  missingWebsite: QueueItem[];
+  qrScans: QrScanRow[];
   reviewCount: number;
   waitingOnWineryCount: number;
 };
@@ -76,16 +86,19 @@ export function NyweSusannahDashboard({
   recentlySent,
   reviewQueue,
   waitingQueue,
+  missingWebsite,
+  qrScans,
   reviewCount,
   waitingOnWineryCount,
 }: Props) {
-  const hasQueue = reviewCount > 0 || stuck.length > 0 || waitingOnWineryCount > 0;
+  const hasQueue =
+    reviewCount > 0 || stuck.length > 0 || waitingOnWineryCount > 0 || missingWebsite.length > 0;
 
   return (
     <Card className="border-fest-600/15">
       <CardHeader className="pb-4">
         <CardTitle className="font-serif text-xl font-semibold">Action queue</CardTitle>
-        <p className="text-sm text-muted-foreground">Review, waiting on winery, and signed but not yet released</p>
+        <p className="text-sm text-muted-foreground">Review, waiting on winery, booth QR websites, and signed but not yet released</p>
       </CardHeader>
       <CardContent className="space-y-5">
         {!hasQueue ? (
@@ -144,6 +157,27 @@ export function NyweSusannahDashboard({
           </section>
         ) : null}
 
+        {missingWebsite.length > 0 ? (
+          <section className="space-y-2">
+            <p className="flex items-center gap-2 text-sm font-medium text-amber-950">
+              <QrCode className="h-4 w-4 shrink-0" aria-hidden />
+              {missingWebsite.length} need a website for booth QR
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Executed licenses with no winery URL — add one on the contract before printing signs.
+            </p>
+            <ul className="space-y-2">
+              {missingWebsite.slice(0, 12).map((row) => (
+                <QueueRow
+                  key={row.id}
+                  title={row.exhibitorCompanyName}
+                  subtitle="Missing website URL"
+                  href={`/wine-spectator/contracts/${row.id}`}
+                />
+              ))}
+            </ul>
+          </section>
+        ) : null}
         {stuck.length > 0 ? (
           <section>
             <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-800">
@@ -158,6 +192,35 @@ export function NyweSusannahDashboard({
                   subtitle={[row.legalName, row.signerName].filter(Boolean).join(' · ') || 'Finishing automatically'}
                   href={`/wine-spectator/contracts/${row.id}`}
                   amount={row.grandTotalCents}
+                />
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        {qrScans.length > 0 ? (
+          <section>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Booth QR scans
+            </p>
+            <ul className="space-y-2">
+              {qrScans.slice(0, 8).map((row) => (
+                <QueueRow
+                  key={row.id}
+                  title={row.exhibitorCompanyName}
+                  subtitle={
+                    <>
+                      {row.clicks} scan{row.clicks === 1 ? '' : 's'}
+                      {row.lastClickAt ? (
+                        <>
+                          {' · last '}
+                          <RelativeTime iso={row.lastClickAt} />
+                        </>
+                      ) : null}
+                      {row.shortUrl ? ` · ${row.shortUrl.replace(/^https?:\/\//, '')}` : null}
+                    </>
+                  }
+                  href={`/wine-spectator/contracts/${row.id}`}
                 />
               ))}
             </ul>

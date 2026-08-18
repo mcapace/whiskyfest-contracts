@@ -8,6 +8,8 @@ import { resolveContractStreetFromSheetCells } from '@/lib/exhibitor-roster-bill
 import { formatRosterWineDisplay } from '@/lib/exhibitor-roster-columns';
 import { eventTemplateProfile } from '@/lib/contract-template-profile';
 import { normalizeSheetContractId, rosterRowMatchesContract, sheetRowBelongsToContract } from '@/lib/nywe-roster-identity';
+import { normalizeWineryWebsiteUrl } from '@/lib/winery-website';
+import { updateRebrandlyDestination } from '@/lib/rebrandly';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getSheetsClient } from '@/lib/sheets-tracker';
@@ -78,6 +80,11 @@ export function contractPatchFromExhibitorRosterRow(
     billing_contact_name: row.billingContactName.trim() || null,
     billing_contact_email: row.billingEmail.trim() || null,
   };
+
+  const website = normalizeWineryWebsiteUrl(row.wineryWebsite);
+  if (website) {
+    patch.exhibitor_website_url = website;
+  }
 
   const resolved = resolveContractStreetFromSheetCells(row.billingStreet, row.wineryAddress);
   if (resolved) {
@@ -159,6 +166,10 @@ function patchFromPayload(
     exhibitor_company_name: payload.exhibitor_company_name,
     brands_poured: payload.brands_poured,
   };
+
+  if (payload.exhibitor_website_url) {
+    patch.exhibitor_website_url = payload.exhibitor_website_url;
+  }
 
   if (payload.billing) {
     Object.assign(patch, payload.billing);
@@ -266,7 +277,7 @@ export async function syncLinkedContractsFromRosterRows(
     const needsRelink = rowMoved;
     if ((!patch || !patchChanged(contract, patch)) && !needsRelink) continue;
 
-    const update = {
+    const update: Record<string, string | number | boolean | null> = {
       ...(patch ?? {}),
       ...(needsRelink
         ? {
@@ -281,6 +292,19 @@ export async function syncLinkedContractsFromRosterRows(
     if (error) {
       console.error('[syncLinkedContractsFromRosterRows]', contract.id, error.message);
       continue;
+    }
+    const nextWebsite =
+      typeof update.exhibitor_website_url === 'string' ? update.exhibitor_website_url : null;
+    if (contract.rebrandly_link_id && nextWebsite && nextWebsite !== contract.exhibitor_website_url) {
+      try {
+        await updateRebrandlyDestination(contract.rebrandly_link_id, nextWebsite);
+      } catch (err) {
+        console.warn(
+          '[syncLinkedContractsFromRosterRows] Rebrandly destination update failed',
+          contract.id,
+          err instanceof Error ? err.message : err,
+        );
+      }
     }
     updated += 1;
     revalidateContractPaths(contract.id);

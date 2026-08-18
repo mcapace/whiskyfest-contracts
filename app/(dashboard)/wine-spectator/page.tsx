@@ -18,6 +18,7 @@ import { NyweHomeSearch } from '@/components/wine-spectator/nywe-home-search';
 import { NyweQuickNav } from '@/components/wine-spectator/nywe-quick-nav';
 import { buildNyweDashboardMetrics, getNywePipelineData } from '@/lib/nywe-dashboard-metrics';
 import { scheduleNyweBackgroundDocuSignSync } from '@/lib/nywe-background-docusign-sync';
+import { refreshNyweQrClicks } from '@/lib/nywe-booth-qr';
 import { DashboardLiveRefresh } from '@/components/dashboard/dashboard-live-refresh';
 import type { ContractWithTotals } from '@/types/db';
 
@@ -83,6 +84,25 @@ export default async function WineSpectatorDashboardPage() {
     .filter((c) => c.status === 'sent')
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
 
+  if (primaryEvent?.id) {
+    await refreshNyweQrClicks(primaryEvent.id).catch((err) => {
+      console.warn('[nywe] QR click refresh skipped', err instanceof Error ? err.message : err);
+    });
+  }
+
+  const missingWebsite = activeScoped
+    .filter(
+      (c) =>
+        c.status === 'executed' &&
+        c.order_type !== 'sponsorship_only' &&
+        !c.exhibitor_website_url?.trim(),
+    )
+    .sort((a, b) => a.exhibitor_company_name.localeCompare(b.exhibitor_company_name));
+
+  const qrScans = activeScoped
+    .filter((c) => c.status === 'executed' && Boolean(c.rebrandly_short_url))
+    .sort((a, b) => (b.qr_clicks ?? 0) - (a.qr_clicks ?? 0));
+
   const sendBlocked = primaryEvent?.client_send_enabled === false;
 
   return (
@@ -134,6 +154,14 @@ export default async function WineSpectatorDashboardPage() {
           }))}
           reviewQueue={reviewQueue.map(queueItem)}
           waitingQueue={waitingQueue.map(queueItem)}
+          missingWebsite={missingWebsite.map(queueItem)}
+          qrScans={qrScans.map((c) => ({
+            id: c.id,
+            exhibitorCompanyName: c.exhibitor_company_name,
+            shortUrl: c.rebrandly_short_url,
+            clicks: c.qr_clicks ?? 0,
+            lastClickAt: c.qr_last_click_at,
+          }))}
           reviewCount={reviewCount}
           waitingOnWineryCount={waitingOnWineryCount}
         />

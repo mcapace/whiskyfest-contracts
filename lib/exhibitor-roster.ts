@@ -10,6 +10,7 @@ import {
 } from '@/lib/exhibitor-roster-billing';
 import type { NyweBillingFields } from '@/lib/nywe-billing';
 import { nyweLicenseFeeCents } from '@/lib/nywe-pricing';
+import { normalizeWineryWebsiteUrl } from '@/lib/winery-website';
 import {
   hasWithdrawnRosterParticipation,
   isActiveRosterParticipation,
@@ -43,6 +44,7 @@ export type ExhibitorRosterRow = {
   rowNumber: number;
   wineryName: string;
   wineryAddress: string;
+  wineryWebsite: string;
   signerName: string;
   signerEmail: string;
   billingCompany: string;
@@ -104,6 +106,7 @@ type ColumnMap = {
   billingCountry: number;
   billingZip: number;
   wineryStreet: number;
+  wineryWebsite: number;
   contractRepFirst: number;
   contractRepLast: number;
   contractRepEmail: number;
@@ -131,6 +134,7 @@ const STANDARD_COLUMNS: ColumnMap = {
   billingCountry: 28,
   billingZip: 29,
   wineryStreet: 6,
+  wineryWebsite: 7,
   contractRepFirst: 30,
   contractRepLast: 31,
   contractRepEmail: 33,
@@ -158,6 +162,7 @@ const NEW_COLUMNS: ColumnMap = {
   billingCountry: 27,
   billingZip: 28,
   wineryStreet: 6,
+  wineryWebsite: 7,
   contractRepFirst: 29,
   contractRepLast: 30,
   contractRepEmail: 32,
@@ -244,6 +249,7 @@ export function buildColumnMapFromHeaders(headers: string[], listKey: string): C
     billingCompany: pick('billingCompany', 'BILLING COMPANY NAME'),
     billingStreet: pick('billingStreet', 'BILLING STREET ADDRESS/ P.O BOX #', 'BILLING STREET ADDRESS'),
     wineryStreet: pick('wineryStreet', 'STREET ADDRESS OF WINERY *', 'STREET ADDRESS OF WINERY'),
+    wineryWebsite: pick('wineryWebsite', 'WINERY WEBSITE URL *', 'WINERY WEBSITE URL'),
     billingCity: (() => {
       const street = pick('billingStreet', 'BILLING STREET ADDRESS/ P.O BOX #', 'BILLING STREET ADDRESS');
       const afterStreet = headerIndexAfter(headers, street, 'CITY');
@@ -533,6 +539,7 @@ export function buildContractPayloadFromRosterRow(
   billing: NyweBillingFields | null;
   event_contact_name: string | null;
   event_contact_email: string | null;
+  exhibitor_website_url: string | null;
 } {
   const map = headers?.length ? buildColumnMapFromHeaders(headers, listKey) : columnMapForList(listKey);
   const winery = cell(row, map.wineryName);
@@ -556,6 +563,7 @@ export function buildContractPayloadFromRosterRow(
     billing: billingFieldsFromRosterRow(row, map),
     event_contact_name: [primaryFirst, primaryLast].filter(Boolean).join(' ').trim() || null,
     event_contact_email: primaryEmail || null,
+    exhibitor_website_url: normalizeWineryWebsiteUrl(cell(row, map.wineryWebsite)),
   };
 }
 
@@ -593,6 +601,7 @@ export function buildContractPayloadFromExhibitorRosterRow(
     billing: billingFields,
     event_contact_name: row.primaryContactName.trim() || null,
     event_contact_email: row.primaryContactEmail.trim() || null,
+    exhibitor_website_url: normalizeWineryWebsiteUrl(row.wineryWebsite),
   };
 }
 
@@ -687,6 +696,7 @@ export async function fetchExhibitorRoster(event: Event): Promise<{
           rowNumber,
           wineryName: cell(row, map.wineryName),
           wineryAddress: cell(row, map.wineryStreet),
+          wineryWebsite: cell(row, map.wineryWebsite),
           signerName: signer.name,
           signerEmail: signer.email,
           billingCompany: cell(row, map.billingCompany),

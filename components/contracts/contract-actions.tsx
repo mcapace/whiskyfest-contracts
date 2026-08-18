@@ -37,6 +37,7 @@ import {
 } from '@/components/contract/contract-actions-sidebar';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { NyweBoothQrActions } from '@/components/wine-spectator/nywe-booth-qr-actions';
 import { CONTRACT_ACTION_HELP } from '@/lib/contract-action-help-text';
 import { defaultPersonalNudgeMessage } from '@/lib/contract-personal-nudge-copy';
 import {
@@ -120,6 +121,11 @@ interface Props {
   autoReleaseToAccounting?: boolean;
   /** Initial field values for revise-and-send wizard. */
   reviseInitial?: ContractReviseInitialValues;
+  /** NYWE executed vendor license — booth-sign QR. */
+  nyweBoothQr?: boolean;
+  exhibitorWebsiteUrl?: string | null;
+  rebrandlyShortUrl?: string | null;
+  qrClicks?: number;
 }
 
 export function ContractActions({
@@ -160,6 +166,10 @@ export function ContractActions({
   importedAt = null,
   autoReleaseToAccounting = false,
   reviseInitial,
+  nyweBoothQr = false,
+  exhibitorWebsiteUrl = null,
+  rebrandlyShortUrl = null,
+  qrClicks = 0,
 }: Props) {
   const contractEditHref = `${portalBasePath}/contracts/${contractId}/edit`;
   const legacyImport = Boolean(importedAt?.trim());
@@ -419,7 +429,7 @@ export function ContractActions({
     if (canEditVoided) return true;
     if (canRedraftCancelled) return true;
     if (legacyImport && (signedPdfHref || canEditImported || canVoidImported)) return true;
-    if (status === 'executed' && (signedPdfHref || canVoidExecuted)) return true;
+    if (status === 'executed' && (signedPdfHref || canVoidExecuted || nyweBoothQr)) return true;
     if (status === 'error' && isAdmin) return true;
     return false;
   }, [
@@ -438,6 +448,7 @@ export function ContractActions({
     canVoidExecuted,
     canCancelSigned,
     signedPdfHref,
+    nyweBoothQr,
   ]);
 
   const btnPrimary = contractActionBtnPrimary;
@@ -830,6 +841,16 @@ export function ContractActions({
               </Button>
             </ActionWithHelp>
           )}
+
+          {nyweBoothQr && status === 'executed' ? (
+            <NyweBoothQrActions
+              contractId={contractId}
+              exhibitorName={exhibitorName}
+              websiteUrl={exhibitorWebsiteUrl}
+              shortUrl={rebrandlyShortUrl}
+              clicks={qrClicks}
+            />
+          ) : null}
 
           {canVoidExecuted && (
             <ActionWithHelp helpText={CONTRACT_ACTION_HELP.voidExecutedContract}>

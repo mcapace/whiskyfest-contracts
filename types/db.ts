@@ -173,6 +173,13 @@ export interface Contract {
   source_sheet_id: string | null;
   source_sheet_tab: string | null;
   source_row_number: number | null;
+  /** NYWE winery website — booth QR destination. */
+  exhibitor_website_url: string | null;
+  rebrandly_link_id: string | null;
+  rebrandly_short_url: string | null;
+  qr_clicks: number;
+  qr_last_click_at: string | null;
+  qr_clicks_synced_at: string | null;
 }
 
 export interface ContractLineItem {

@@ -152,6 +152,7 @@ export async function createContractsFromRosterRows(options: {
           created_by: options.actorEmail,
           status: 'draft',
           ...(payload.billing ?? {}),
+          exhibitor_website_url: payload.exhibitor_website_url,
           source_sheet_id: parsed.spreadsheetId,
           source_sheet_tab: parsed.tab,
           source_row_number: parsed.rowNumber,
