@@ -123,16 +123,9 @@ export async function ContractDetailPage({
     }
   }
 
-  const rosterIdentityLocked =
-    contract.status === 'sent' ||
-    contract.status === 'partially_signed' ||
-    contract.status === 'signed' ||
-    contract.status === 'executed';
-
   if (
     eventRow &&
     isNyweVendorEvent(eventRow) &&
-    !rosterIdentityLocked &&
     contract.source_sheet_id &&
     contract.source_sheet_tab &&
     contract.source_row_number

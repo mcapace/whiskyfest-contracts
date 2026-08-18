@@ -71,11 +71,6 @@ export function contractPatchFromExhibitorRosterRow(
     return null;
   }
 
-  // Sent / executed contracts keep the names and PDF they were signed under.
-  if (SIGNER_LOCKED_STATUSES.includes(contract.status)) {
-    return null;
-  }
-
   const patch: Record<string, string | null | boolean> = {
     exhibitor_legal_name: billingCompany,
     exhibitor_company_name: winery || billingCompany,
@@ -95,10 +90,16 @@ export function contractPatchFromExhibitorRosterRow(
     patch.billing_same_as_corporate = resolved.usedWineryStreet;
   }
 
-  patch.signer_1_name = row.signerName.trim() || null;
-  patch.signer_1_email = row.signerEmail.trim() || null;
-  patch.event_contact_name = row.primaryContactName.trim() || null;
-  patch.event_contact_email = row.primaryContactEmail.trim() || null;
+  // Spreadsheet is the identity source. Signer stays locked once a DocuSign envelope is out.
+  if (!SIGNER_LOCKED_STATUSES.includes(contract.status)) {
+    patch.signer_1_name = row.signerName.trim() || null;
+    patch.signer_1_email = row.signerEmail.trim() || null;
+    patch.event_contact_name = row.primaryContactName.trim() || null;
+    patch.event_contact_email = row.primaryContactEmail.trim() || null;
+  } else {
+    patch.event_contact_name = row.primaryContactName.trim() || null;
+    patch.event_contact_email = row.primaryContactEmail.trim() || null;
+  }
 
   return patch;
 }
@@ -153,10 +154,6 @@ function patchFromPayload(
     return null;
   }
 
-  if (SIGNER_LOCKED_STATUSES.includes(contract.status)) {
-    return null;
-  }
-
   const patch: Record<string, string | null | boolean> = {
     exhibitor_legal_name: payload.exhibitor_legal_name,
     exhibitor_company_name: payload.exhibitor_company_name,
@@ -167,10 +164,13 @@ function patchFromPayload(
     Object.assign(patch, payload.billing);
   }
 
-  patch.signer_1_name = payload.signer_1_name;
-  patch.signer_1_email = payload.signer_1_email;
   patch.event_contact_name = payload.event_contact_name;
   patch.event_contact_email = payload.event_contact_email;
+
+  if (!SIGNER_LOCKED_STATUSES.includes(contract.status)) {
+    patch.signer_1_name = payload.signer_1_name;
+    patch.signer_1_email = payload.signer_1_email;
+  }
 
   return patch;
 }
