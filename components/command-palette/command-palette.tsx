@@ -13,6 +13,7 @@ import {
   Home,
   LayoutDashboard,
   Plus,
+  QrCode,
   Search,
   Sun,
   Upload,
@@ -492,6 +493,19 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
               <div>
                 <p className="font-medium">Exhibitor list</p>
                 <p className="text-xs text-muted-foreground">NYWE roster</p>
+              </div>
+            </Command.Item>
+            )}
+            {nywePortal && wineAccess && (
+            <Command.Item
+              value="booth qr codes scans nywe"
+              onSelect={() => go('/qr')}
+              className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm data-[selected=true]:border-l-2 data-[selected=true]:border-accent-brand data-[selected=true]:bg-accent/40"
+            >
+              <QrCode className="h-4 w-4 shrink-0 opacity-70" />
+              <div>
+                <p className="font-medium">Booth QR</p>
+                <p className="text-xs text-muted-foreground">Print files and scan report</p>
               </div>
             </Command.Item>
             )}

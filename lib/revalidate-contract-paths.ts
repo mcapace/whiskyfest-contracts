@@ -11,6 +11,7 @@ export function revalidateContractPaths(contractId: string) {
     revalidatePath('/wine-spectator/contracts');
     revalidatePath('/wine-spectator');
     revalidatePath('/wine-spectator/roster');
+    revalidatePath('/wine-spectator/qr');
   } catch {
     // Scripts and background jobs run outside a Next.js request — skip cache invalidation.
   }

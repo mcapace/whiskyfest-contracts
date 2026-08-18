@@ -81,7 +81,7 @@ export function isBigSmokePortalPath(pathname: string, host?: string | null): bo
 }
 
 export function isNyweCleanPublicPath(pathname: string): boolean {
-  if (pathname === '/' || pathname === '/roster') return true;
+  if (pathname === '/' || pathname === '/roster' || pathname === '/qr') return true;
   if (pathname === '/contracts' || pathname.startsWith('/contracts/')) return true;
   if (pathname === '/accounting' || pathname.startsWith('/accounting/')) return true;
   return false;
@@ -102,6 +102,7 @@ export function nyweInternalPath(pathname: string): string | null {
 
   if (pathname === '/') return '/wine-spectator';
   if (pathname === '/roster') return '/wine-spectator/roster';
+  if (pathname === '/qr') return '/wine-spectator/qr';
   if (pathname === '/contracts') return '/wine-spectator/contracts';
   if (pathname.startsWith('/contracts/')) return `/wine-spectator${pathname}`;
   if (pathname === '/accounting') return '/accounting/nywe';
@@ -217,6 +218,7 @@ export function isWhiskyfestOnlyPath(pathname: string): boolean {
 /** Paths that only exist on the NYWE hostname (block on WhiskyFest / Big Smoke domains). */
 export function isNyweOnlyPath(pathname: string): boolean {
   if (pathname === '/roster' || pathname.startsWith('/roster/')) return true;
+  if (pathname === '/qr' || pathname.startsWith('/qr/')) return true;
   if (pathname === '/wine-spectator' || pathname.startsWith('/wine-spectator/')) return true;
   if (pathname === '/accounting/nywe' || pathname.startsWith('/accounting/nywe/')) return true;
   return false;

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { List, Plus, Users } from 'lucide-react';
+import { QrCode, List, Plus, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export function NyweQuickNav() {
@@ -9,6 +9,12 @@ export function NyweQuickNav() {
         <Link href="/wine-spectator/roster">
           <Users className="h-3.5 w-3.5" />
           Exhibitor roster
+        </Link>
+      </Button>
+      <Button asChild size="sm" variant="outline" className="h-9">
+        <Link href="/wine-spectator/qr">
+          <QrCode className="h-3.5 w-3.5" />
+          Booth QR
         </Link>
       </Button>
       <Button asChild size="sm" variant="outline" className="h-9">

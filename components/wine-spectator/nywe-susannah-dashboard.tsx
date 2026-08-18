@@ -7,8 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
 import { RelativeTime } from '@/components/ui/relative-time';
-import { NyweBoothQrBookButton } from '@/components/wine-spectator/nywe-booth-qr-book-button';
-import { NyweBoothQrRowDownload } from '@/components/wine-spectator/nywe-booth-qr-row-download';
 
 export type NyweStuckLicense = {
   id: string;
@@ -34,16 +32,6 @@ type QueueItem = {
   legalName?: string | null;
   signerName?: string | null;
   grandTotalCents: number;
-  websiteUrl?: string | null;
-};
-
-type QrScanRow = {
-  id: string;
-  exhibitorCompanyName: string;
-  shortUrl: string | null;
-  clicks: number;
-  lastClickAt: string | null;
-  websiteUrl?: string | null;
 };
 
 type Props = {
@@ -51,14 +39,9 @@ type Props = {
   recentlySent: NyweSentLicense[];
   reviewQueue: QueueItem[];
   waitingQueue: QueueItem[];
-  missingWebsite: QueueItem[];
-  qrScans: QrScanRow[];
   reviewCount: number;
   waitingOnWineryCount: number;
-  executedBoothCount: number;
-  qrReadyCount: number;
-  qrGeneratedCount: number;
-  eventYear: number;
+  missingQrCount: number;
 };
 
 function QueueRow({
@@ -66,13 +49,11 @@ function QueueRow({
   subtitle,
   href,
   amount,
-  qr,
 }: {
   title: string;
   subtitle: ReactNode;
   href: string;
   amount?: number;
-  qr?: { contractId: string; exhibitorName: string; websiteUrl: string | null };
 }) {
   return (
     <li className="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/20 px-3 py-2.5">
@@ -83,14 +64,6 @@ function QueueRow({
       <div className="flex shrink-0 items-center justify-end gap-3">
         {typeof amount === 'number' ? (
           <span className="text-sm tabular-nums text-muted-foreground">{formatCurrency(amount)}</span>
-        ) : null}
-        {qr ? (
-          <NyweBoothQrRowDownload
-            contractId={qr.contractId}
-            exhibitorName={qr.exhibitorName}
-            websiteUrl={qr.websiteUrl}
-            missingHref={href}
-          />
         ) : null}
         <Link href={href} className="text-xs font-medium text-accent-brand hover:underline">
           Open
@@ -105,24 +78,18 @@ export function NyweSusannahDashboard({
   recentlySent,
   reviewQueue,
   waitingQueue,
-  missingWebsite,
-  qrScans,
   reviewCount,
   waitingOnWineryCount,
-  executedBoothCount,
-  qrReadyCount,
-  qrGeneratedCount,
-  eventYear,
+  missingQrCount,
 }: Props) {
-  const hasQueue =
-    reviewCount > 0 || stuck.length > 0 || waitingOnWineryCount > 0 || missingWebsite.length > 0;
+  const hasQueue = reviewCount > 0 || stuck.length > 0 || waitingOnWineryCount > 0;
 
   return (
     <Card className="border-fest-600/15">
       <CardHeader className="pb-4">
         <CardTitle className="font-serif text-xl font-semibold">Action queue</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Review, waiting on winery, booth QRs for executed licenses, and signed but not yet released
+          Review, waiting on winery, and signed but not yet released
         </p>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -182,93 +149,29 @@ export function NyweSusannahDashboard({
           </section>
         ) : null}
 
-        <section className="space-y-3 rounded-xl border border-fest-600/15 bg-muted/20 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-            <p className="flex min-w-0 items-center gap-2 text-sm font-medium">
+        {missingQrCount > 0 ? (
+          <Link
+            href="/wine-spectator/qr"
+            className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950 hover:bg-amber-50"
+          >
+            <span className="flex items-center gap-2 font-medium">
               <QrCode className="h-4 w-4 shrink-0" aria-hidden />
-              Booth QR codes
-            </p>
-            <NyweBoothQrBookButton
-              readyCount={qrReadyCount}
-              eventYear={eventYear}
-            />
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Built from executed vendor licenses only (not drafts, not sponsorships).
-          </p>
-          <p className="text-sm">
-            <span className="font-medium tabular-nums">{executedBoothCount}</span>
-            {' '}executed
-            {' · '}
-            <span className="font-medium tabular-nums">{qrReadyCount}</span>
-            {' '}ready to print
-            {' · '}
-            <span className="font-medium tabular-nums">{qrGeneratedCount}</span>
-            {' '}short link{qrGeneratedCount === 1 ? '' : 's'} created
-            {missingWebsite.length > 0 ? (
-              <>
-                {' · '}
-                <span className="font-medium tabular-nums text-amber-900">{missingWebsite.length}</span>
-                {' '}need a website
-              </>
-            ) : null}
-          </p>
-
-          {missingWebsite.length > 0 ? (
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-amber-950">Add a winery URL before printing these signs</p>
-              <ul className="space-y-2">
-                {missingWebsite.slice(0, 12).map((row) => (
-                  <QueueRow
-                    key={row.id}
-                    title={row.exhibitorCompanyName}
-                    subtitle="Missing website URL"
-                    href={`/wine-spectator/contracts/${row.id}`}
-                    qr={{
-                      contractId: row.id,
-                      exhibitorName: row.exhibitorCompanyName,
-                      websiteUrl: row.websiteUrl ?? null,
-                    }}
-                  />
-                ))}
-              </ul>
-            </div>
-          ) : null}
-
-          {qrScans.length > 0 ? (
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Scans
-              </p>
-              <ul className="space-y-2">
-                {qrScans.slice(0, 8).map((row) => (
-                  <QueueRow
-                    key={row.id}
-                    title={row.exhibitorCompanyName}
-                    subtitle={
-                      <>
-                        {row.clicks} scan{row.clicks === 1 ? '' : 's'}
-                        {row.lastClickAt ? (
-                          <>
-                            {' · last '}
-                            <RelativeTime iso={row.lastClickAt} />
-                          </>
-                        ) : null}
-                        {row.shortUrl ? ` · ${row.shortUrl.replace(/^https?:\/\//, '')}` : null}
-                      </>
-                    }
-                    href={`/wine-spectator/contracts/${row.id}`}
-                    qr={{
-                      contractId: row.id,
-                      exhibitorName: row.exhibitorCompanyName,
-                      websiteUrl: row.websiteUrl ?? null,
-                    }}
-                  />
-                ))}
-              </ul>
-            </div>
-          ) : null}
-        </section>
+              {missingQrCount} executed license{missingQrCount === 1 ? '' : 's'} need a website for booth QR
+            </span>
+            <span className="shrink-0 text-xs font-medium">Open QR tab →</span>
+          </Link>
+        ) : (
+          <Link
+            href="/wine-spectator/qr"
+            className="flex items-center justify-between gap-3 rounded-xl border border-fest-600/15 bg-muted/20 px-4 py-3 text-sm hover:bg-muted/40"
+          >
+            <span className="flex items-center gap-2 font-medium">
+              <QrCode className="h-4 w-4 shrink-0" aria-hidden />
+              Booth QR codes and scan report
+            </span>
+            <span className="shrink-0 text-xs font-medium text-accent-brand">Open →</span>
+          </Link>
+        )}
 
         {stuck.length > 0 ? (
           <section>
@@ -311,15 +214,6 @@ export function NyweSusannahDashboard({
                   }
                   href={`/wine-spectator/contracts/${row.id}`}
                   amount={row.grandTotalCents}
-                  qr={
-                    row.websiteUrl
-                      ? {
-                          contractId: row.id,
-                          exhibitorName: row.exhibitorCompanyName,
-                          websiteUrl: row.websiteUrl,
-                        }
-                      : undefined
-                  }
                 />
               ))}
             </ul>

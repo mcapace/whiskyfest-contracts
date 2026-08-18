@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import type { LucideIcon } from 'lucide-react';
 import {
+  QrCode,
   FileText,
   LayoutDashboard,
   Plus,
@@ -126,6 +127,7 @@ const whiskyfestNav: SidebarNavItem[] = [
 const wineSpectatorNav: SidebarNavItem[] = [
   { href: '/wine-spectator', label: 'Home', icon: LayoutDashboard },
   { href: '/wine-spectator/roster', label: 'Exhibitor list', icon: Users },
+  { href: '/wine-spectator/qr', label: 'Booth QR', icon: QrCode },
   { href: '/wine-spectator/contracts', label: 'All contracts', icon: FileText },
   { href: '/settings', label: 'Settings', icon: Settings },
   { href: '/events', label: 'Events', icon: CalendarDays, adminOnly: true, wineSpectatorAdminOk: true },
@@ -171,6 +173,8 @@ function portalNavLinkActive(pathname: string, href: string): boolean {
   if (href === '/wine-spectator' || href === '/big-smoke') equivalents.add('/');
   if (href === '/roster') equivalents.add('/wine-spectator/roster');
   if (href === '/wine-spectator/roster') equivalents.add('/roster');
+  if (href === '/qr') equivalents.add('/wine-spectator/qr');
+  if (href === '/wine-spectator/qr') equivalents.add('/qr');
   if (href === '/contracts') {
     equivalents.add('/wine-spectator/contracts');
     equivalents.add('/big-smoke/contracts');

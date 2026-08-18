@@ -94,24 +94,7 @@ export default async function WineSpectatorDashboardPage() {
   const executedBoothQr = primaryEvent?.id
     ? await listNyweExecutedBoothQrContracts(primaryEvent.id)
     : [];
-
-  const missingWebsite = executedBoothQr
-    .filter((c) => !c.exhibitor_website_url?.trim())
-    .map((c) => ({
-      id: c.id,
-      exhibitorCompanyName: c.exhibitor_company_name,
-      legalName: null as string | null,
-      signerName: null as string | null,
-      grandTotalCents: 0,
-      websiteUrl: c.exhibitor_website_url,
-    }));
-
-  const qrReadyCount = executedBoothQr.filter((c) => Boolean(c.exhibitor_website_url?.trim())).length;
-  const qrGeneratedCount = executedBoothQr.filter((c) => Boolean(c.rebrandly_short_url)).length;
-
-  const qrScans = executedBoothQr
-    .filter((c) => Boolean(c.rebrandly_short_url))
-    .sort((a, b) => (b.qr_clicks ?? 0) - (a.qr_clicks ?? 0));
+  const missingQrCount = executedBoothQr.filter((c) => !c.exhibitor_website_url?.trim()).length;
 
   const sendBlocked = primaryEvent?.client_send_enabled === false;
 
@@ -163,25 +146,12 @@ export default async function WineSpectatorDashboardPage() {
             .map((c) => ({
             ...queueItem(c),
             executedAt: c.executed_at,
-            websiteUrl: c.exhibitor_website_url,
           }))}
           reviewQueue={reviewQueue.map(queueItem)}
           waitingQueue={waitingQueue.map(queueItem)}
-          missingWebsite={missingWebsite}
-          qrScans={qrScans.map((c) => ({
-            id: c.id,
-            exhibitorCompanyName: c.exhibitor_company_name,
-            shortUrl: c.rebrandly_short_url,
-            clicks: c.qr_clicks ?? 0,
-            lastClickAt: c.qr_last_click_at,
-            websiteUrl: c.exhibitor_website_url,
-          }))}
           reviewCount={reviewCount}
           waitingOnWineryCount={waitingOnWineryCount}
-          executedBoothCount={executedBoothQr.length}
-          qrReadyCount={qrReadyCount}
-          qrGeneratedCount={qrGeneratedCount}
-          eventYear={primaryEvent?.year ?? new Date().getFullYear()}
+          missingQrCount={missingQrCount}
         />
 
       <NyweMetricsGrid metrics={metrics} compact />
