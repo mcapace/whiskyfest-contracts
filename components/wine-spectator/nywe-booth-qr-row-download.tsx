@@ -48,11 +48,13 @@ export function NyweBoothQrRowDownload({
   exhibitorName,
   websiteUrl,
   missingHref,
+  compact = false,
 }: {
   contractId: string;
   exhibitorName: string;
   websiteUrl: string | null | undefined;
   missingHref?: string;
+  compact?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
@@ -70,33 +72,35 @@ export function NyweBoothQrRowDownload({
   }
 
   if (!hasUrl) {
+    const label = compact ? 'URL' : 'Need URL';
     return missingHref ? (
       <Link
         href={missingHref}
-        className="text-xs font-medium text-amber-900 hover:underline"
+        className="shrink-0 text-xs font-medium text-amber-900 hover:underline"
+        title="Add a winery website before printing the booth QR"
         onClick={(e) => e.stopPropagation()}
       >
-        Need URL
+        {label}
       </Link>
     ) : (
-      <span className="text-xs text-muted-foreground">Need URL</span>
+      <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
     );
   }
 
   return (
-    <div className="flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
+    <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="h-8 gap-1.5 px-2 text-xs"
+            className={compact ? 'h-8 w-8 px-0' : 'h-8 gap-1.5 px-2 text-xs'}
             disabled={pending}
             aria-label={`Download booth QR for ${exhibitorName}`}
           >
             {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <QrCode className="h-3.5 w-3.5" aria-hidden />}
-            QR
+            {compact ? null : 'QR'}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
@@ -110,7 +114,9 @@ export function NyweBoothQrRowDownload({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      {message ? <p className="max-w-[10rem] text-right text-[11px] text-destructive">{message}</p> : null}
+      {message && !compact ? (
+        <p className="absolute right-0 top-full z-10 mt-1 max-w-[10rem] text-right text-[11px] text-destructive">{message}</p>
+      ) : null}
     </div>
   );
 }

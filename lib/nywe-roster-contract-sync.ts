@@ -8,7 +8,7 @@ import { resolveContractStreetFromSheetCells } from '@/lib/exhibitor-roster-bill
 import { formatRosterWineDisplay } from '@/lib/exhibitor-roster-columns';
 import { eventTemplateProfile } from '@/lib/contract-template-profile';
 import { normalizeSheetContractId, rosterRowMatchesContract, sheetRowBelongsToContract } from '@/lib/nywe-roster-identity';
-import { normalizeWineryWebsiteUrl } from '@/lib/winery-website';
+import { rosterWineryWebsiteUrl } from '@/lib/winery-website';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getSheetsClient } from '@/lib/sheets-tracker';
@@ -80,7 +80,7 @@ export function contractPatchFromExhibitorRosterRow(
     billing_contact_email: row.billingEmail.trim() || null,
   };
 
-  const website = normalizeWineryWebsiteUrl(row.wineryWebsite);
+  const website = rosterWineryWebsiteUrl(row);
   if (website) {
     patch.exhibitor_website_url = website;
   }

@@ -42,6 +42,7 @@ import { NyweBulkSendWizard, type NyweBulkSendRow } from '@/components/wine-spec
 import { rosterAddressMissing, rosterAddressPreview } from '@/lib/exhibitor-roster-display';
 import { ROSTER_CREATE_BATCH_MAX } from '@/lib/exhibitor-roster-constants';
 import { nyweContractReadyForClientSend } from '@/lib/nywe-client-send-eligibility';
+import { rosterWineryWebsiteUrl } from '@/lib/winery-website';
 import { NyweBoothQrRowDownload } from '@/components/wine-spectator/nywe-booth-qr-row-download';
 import type { ContractStatus } from '@/types/db';
 
@@ -60,6 +61,7 @@ type RosterRow = {
   billingState: string;
   wineryAddress: string;
   wineryWebsite?: string;
+  contractWebsiteUrl?: string | null;
   primaryContactName: string;
   primaryContactEmail: string;
   primaryPhone: string;
@@ -185,13 +187,13 @@ function matchesSearch(row: RosterRow, query: string): boolean {
 }
 
 const ROSTER_STICKY_LEFT_HEAD =
-  'sticky left-0 z-20 w-12 min-w-[3rem] border-r border-border/50 bg-white shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)]';
+  'sticky left-0 z-10 w-12 min-w-[3rem] border-r border-border/50 bg-white shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)]';
 const ROSTER_STICKY_LEFT_BODY =
-  'sticky left-0 z-20 w-12 min-w-[3rem] border-r border-border/50 bg-white shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] group-hover:bg-accent/40';
+  'sticky left-0 z-10 w-12 min-w-[3rem] border-r border-border/50 bg-white shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] group-hover:bg-accent/40';
 const ROSTER_STICKY_RIGHT_HEAD =
-  'sticky right-0 z-20 min-w-[6.5rem] w-[6.5rem] border-l border-border/50 bg-white pl-3 text-right shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)]';
+  'sticky right-0 z-10 min-w-[11rem] w-[11rem] overflow-hidden border-l border-border/50 bg-white pl-3 text-right shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)]';
 const ROSTER_STICKY_RIGHT_BODY =
-  'sticky right-0 z-20 min-w-[6.5rem] w-[6.5rem] border-l border-border/50 bg-white pl-3 text-right shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)] group-hover:bg-accent/40';
+  'sticky right-0 z-10 min-w-[11rem] w-[11rem] overflow-hidden border-l border-border/50 bg-white pl-3 text-right shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)] group-hover:bg-accent/40';
 
 function CellText({ value, className }: { value: string; className?: string }) {
   if (!value) return <span className="text-muted-foreground">—</span>;
@@ -923,7 +925,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
         </p>
       ) : null}
 
-      <div className="min-w-0 overflow-x-auto rounded-2xl border border-border/60 bg-white shadow-sm">
+      <div className="relative isolate min-w-0 overflow-x-auto rounded-2xl border border-border/60 bg-white shadow-sm">
         <Table
           wrapperClassName="overflow-visible min-w-full"
           className={cn(columnMode === 'all' ? 'min-w-max text-xs' : 'min-w-max w-full')}
@@ -996,17 +998,18 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
                     ))}
                 <TableCell className={ROSTER_STICKY_RIGHT_BODY}>
                   {row.contractId ? (
-                    <div className="flex flex-col items-end gap-2">
+                    <div className="flex items-center justify-end gap-2 whitespace-nowrap">
                       {row.contractStatus === 'executed' ? (
                         <NyweBoothQrRowDownload
+                          compact
                           contractId={row.contractId}
                           exhibitorName={row.portalCompanyName || row.wineryName}
-                          websiteUrl={row.wineryWebsite ?? null}
+                          websiteUrl={rosterWineryWebsiteUrl(row)}
                           missingHref={`/wine-spectator/contracts/${row.contractId}`}
                         />
                       ) : null}
                       <Link href={`/wine-spectator/contracts/${row.contractId}`} className="text-sm font-medium text-accent-brand hover:underline">
-                        Open contract
+                        Open
                       </Link>
                     </div>
                   ) : (

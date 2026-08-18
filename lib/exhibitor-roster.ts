@@ -78,6 +78,8 @@ export type ExhibitorRosterRow = {
   portalLegalName: string | null;
   portalSignerName: string | null;
   portalSignerEmail: string | null;
+  /** Winery website stored on the linked license (booth QR source of truth). */
+  contractWebsiteUrl: string | null;
   identityMismatch: boolean;
   /** Contract was recalled from DocuSign and returned to draft. */
   recalledToDraft: boolean;
@@ -249,7 +251,17 @@ export function buildColumnMapFromHeaders(headers: string[], listKey: string): C
     billingCompany: pick('billingCompany', 'BILLING COMPANY NAME'),
     billingStreet: pick('billingStreet', 'BILLING STREET ADDRESS/ P.O BOX #', 'BILLING STREET ADDRESS'),
     wineryStreet: pick('wineryStreet', 'STREET ADDRESS OF WINERY *', 'STREET ADDRESS OF WINERY'),
-    wineryWebsite: pick('wineryWebsite', 'WINERY WEBSITE URL *', 'WINERY WEBSITE URL'),
+    wineryWebsite: (() => {
+      const named = headerIndex(
+        headers,
+        'WINERY WEBSITE URL *',
+        'WINERY WEBSITE URL',
+        'WINERY WEBSITE',
+      );
+      if (named >= 0) return named;
+      const contains = headers.findIndex((h) => /winery/i.test(h) && /website/i.test(h));
+      return contains >= 0 ? contains : -1;
+    })(),
     billingCity: (() => {
       const street = pick('billingStreet', 'BILLING STREET ADDRESS/ P.O BOX #', 'BILLING STREET ADDRESS');
       const afterStreet = headerIndexAfter(headers, street, 'CITY');
@@ -348,6 +360,7 @@ function emptyContractHydration(): Pick<
   | 'portalLegalName'
   | 'portalSignerName'
   | 'portalSignerEmail'
+  | 'contractWebsiteUrl'
   | 'identityMismatch'
   | 'recalledToDraft'
   | 'sheetStatus'
@@ -367,6 +380,7 @@ function emptyContractHydration(): Pick<
     portalLegalName: null,
     portalSignerName: null,
     portalSignerEmail: null,
+    contractWebsiteUrl: null,
     identityMismatch: false,
     recalledToDraft: false,
     sheetStatus: null,
@@ -394,6 +408,7 @@ function hydrateRowFromContract(
     portalLegalName: contract.exhibitor_legal_name ?? null,
     portalSignerName: contract.signer_1_name ?? null,
     portalSignerEmail: contract.signer_1_email ?? null,
+    contractWebsiteUrl: contract.exhibitor_website_url ?? null,
     identityMismatch,
     recalledToDraft,
     sheetStatus: rosterStatusLabel(contract.status, { recalled: recalledToDraft }),
@@ -419,7 +434,7 @@ export async function hydrateRosterRowsWithContracts(
   const { data: linkedContracts, error: linkedError } = await supabase
     .from('contracts_with_totals')
     .select(
-      'id, status, updated_at, grand_total_cents, billing_address_line1, billing_city, billing_state, billing_zip, signer_cc_name, signer_cc_email, signer_1_name, signer_1_email, exhibitor_company_name, exhibitor_legal_name, sent_at, source_sheet_id, source_sheet_tab, source_row_number',
+      'id, status, updated_at, grand_total_cents, billing_address_line1, billing_city, billing_state, billing_zip, signer_cc_name, signer_cc_email, signer_1_name, signer_1_email, exhibitor_company_name, exhibitor_legal_name, exhibitor_website_url, sent_at, source_sheet_id, source_sheet_tab, source_row_number',
     )
     .eq('event_id', eventId)
     .not('source_sheet_id', 'is', null);
@@ -609,12 +624,19 @@ export { rosterRowHasContractAddress, ROSTER_MISSING_ADDRESS_MESSAGE } from '@/l
 
 async function readSheetTab(config: ExhibitorRosterSheetConfig): Promise<string[][]> {
   const sheets = getSheetsClient();
-  const res = await sheets.spreadsheets.values.get({
+  const res = await sheets.spreadsheets.get({
     spreadsheetId: config.spreadsheet_id,
-    range: tabRange(config.tab, 'A1:AZ1000'),
-    valueRenderOption: 'FORMATTED_VALUE',
+    ranges: [tabRange(config.tab, 'A1:AZ1000')],
+    fields: 'sheets.data.rowData.values(formattedValue,hyperlink)',
   });
-  return (res.data.values ?? []) as string[][];
+  const rowData = res.data.sheets?.[0]?.data?.[0]?.rowData ?? [];
+  return rowData.map((row) =>
+    (row.values ?? []).map((entry) => {
+      const hyperlink = typeof entry.hyperlink === 'string' ? entry.hyperlink.trim() : '';
+      const formatted = entry.formattedValue != null ? String(entry.formattedValue).trim() : '';
+      return hyperlink || formatted;
+    }),
+  );
 }
 
 function sleep(ms: number): Promise<void> {
