@@ -8,8 +8,10 @@ import {
   type RebrandlyQrFormat,
 } from '@/lib/rebrandly';
 import { nywePortalOrigin } from '@/lib/portal-host';
-import { normalizeWineryWebsiteUrl } from '@/lib/winery-website';
+import { normalizeWineryWebsiteUrl, rosterWineryWebsiteUrl } from '@/lib/winery-website';
 import { isNyweVendorOnlyEvent } from '@/lib/nywe-pricing';
+import { rosterStaleFromEventCache } from '@/lib/exhibitor-roster-sync-job';
+import { normalizeSheetContractId } from '@/lib/nywe-roster-identity';
 import type { Contract, Event } from '@/types/db';
 
 const CLICK_REFRESH_MAX = 40;
@@ -285,4 +287,53 @@ export async function refreshNyweQrClicks(eventId: string): Promise<number> {
     }
   }
   return updated;
+}
+
+const LINK_CREATE_BATCH = 30;
+
+/** Copy winery websites from the cached NYWE roster onto executed licenses that are missing one. */
+export async function backfillNyweWebsitesFromRoster(event: Event): Promise<number> {
+  const cached = rosterStaleFromEventCache(event);
+  if (!cached) return 0;
+  const contracts = await listNyweExecutedBoothQrContracts(event.id);
+  const byId = new Map(contracts.map((row) => [row.id.toLowerCase(), row]));
+  let updated = 0;
+  for (const row of cached.rows) {
+    const id = normalizeSheetContractId(row.contractId) || normalizeSheetContractId(row.sheetContractId);
+    if (!id) continue;
+    const contract = byId.get(id);
+    if (!contract || normalizeWineryWebsiteUrl(contract.exhibitor_website_url)) continue;
+    const url = rosterWineryWebsiteUrl(row);
+    if (!url) continue;
+    await persistLink(contract.id, { exhibitor_website_url: url });
+    contract.exhibitor_website_url = url;
+    updated += 1;
+  }
+  return updated;
+}
+
+/** Create winespectator.live short links for executed licenses that have a website but no Rebrandly URL yet. */
+export async function ensureMissingNyweBoothQrLinks(
+  eventId: string,
+  eventYear: number,
+  limit = LINK_CREATE_BATCH,
+): Promise<{ created: number; remaining: number; errors: string[] }> {
+  const contracts = await listNyweExecutedBoothQrContracts(eventId);
+  const missing = contracts.filter(
+    (row) => normalizeWineryWebsiteUrl(row.exhibitor_website_url) && !row.rebrandly_short_url?.trim(),
+  );
+  const batch = missing.slice(0, limit);
+  let created = 0;
+  const errors: string[] = [];
+  for (const contract of batch) {
+    try {
+      await ensureNyweBoothQrLink(contract, eventYear);
+      created += 1;
+    } catch (err) {
+      errors.push(
+        `${contract.exhibitor_company_name}: ${err instanceof Error ? err.message : 'could not create short link'}`,
+      );
+    }
+  }
+  return { created, remaining: Math.max(0, missing.length - created), errors };
 }

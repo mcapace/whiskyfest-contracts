@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { MousePointerClick, QrCode, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -38,8 +39,55 @@ export function NyweBoothQrWorkspace({
   eventYear: number;
   rows: NyweBoothQrPageRow[];
 }) {
-  const [filter, setFilter] = useState<FilterKey>('all');
+  const [filter, setFilter] = useState<FilterKey>(() =>
+    rows.some((row) => !row.websiteUrl) ? 'missing' : 'all',
+  );
   const [query, setQuery] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [generateNote, setGenerateNote] = useState<string | null>(null);
+  const router = useRouter();
+
+  const needsLinks = rows.some((row) => Boolean(row.websiteUrl) && !row.shortUrl);
+
+  useEffect(() => {
+    if (!needsLinks) return;
+    let cancelled = false;
+    async function createMissingLinks() {
+      setGenerating(true);
+      setGenerateNote('Creating winespectator.live short links…');
+      try {
+        for (let i = 0; i < 12; i += 1) {
+          const res = await fetch('/api/wine-spectator/booth-qr-links', { method: 'POST' });
+          const json = (await res.json().catch(() => ({}))) as {
+            remaining?: number;
+            created?: number;
+            websitesUpdated?: number;
+            error?: string;
+            errors?: string[];
+          };
+          if (!res.ok) {
+            setGenerateNote(json.error ?? 'Could not create short links.');
+            break;
+          }
+          if (cancelled) return;
+          const remaining = json.remaining ?? 0;
+          setGenerateNote(
+            remaining > 0
+              ? `Creating winespectator.live short links… ${remaining} left`
+              : 'Short links updated.',
+          );
+          if (remaining <= 0) break;
+        }
+        if (!cancelled) router.refresh();
+      } finally {
+        if (!cancelled) setGenerating(false);
+      }
+    }
+    void createMissingLinks();
+    return () => {
+      cancelled = true;
+    };
+  }, [needsLinks, router]);
 
   const executedCount = rows.length;
   const readyCount = rows.filter((row) => Boolean(row.websiteUrl)).length;
@@ -50,24 +98,33 @@ export function NyweBoothQrWorkspace({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return rows.filter((row) => {
+    const next = rows.filter((row) => {
       if (filter === 'missing' && row.websiteUrl) return false;
       if (filter === 'ready' && !row.websiteUrl) return false;
       if (filter === 'scans' && row.clicks <= 0) return false;
       if (q && !row.exhibitorCompanyName.toLowerCase().includes(q)) return false;
       return true;
     });
+    return [...next].sort((a, b) => {
+      const aMissing = a.websiteUrl ? 0 : 1;
+      const bMissing = b.websiteUrl ? 0 : 1;
+      if (aMissing !== bMissing) return bMissing - aMissing;
+      return a.exhibitorCompanyName.localeCompare(b.exhibitorCompanyName);
+    });
   }, [rows, filter, query]);
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-4 border-b border-fest-600/10 pb-6 lg:flex-row lg:items-end lg:justify-between">
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="wf-label-caps text-[0.65rem] text-fest-800">Booth signs</p>
           <h1 className="mt-1 font-display text-3xl font-medium tracking-tight text-foreground">QR codes</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            {eventName} — download print files and track scans for executed vendor licenses.
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            {eventName} — print files and scan tracking for executed vendor&nbsp;licenses.
           </p>
+          {generating || generateNote ? (
+            <p className="mt-2 text-xs text-muted-foreground">{generateNote}</p>
+          ) : null}
         </div>
         <NyweBoothQrBookButton readyCount={readyCount} eventYear={eventYear} />
       </div>
@@ -116,7 +173,7 @@ export function NyweBoothQrWorkspace({
             />
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {FILTERS.map((item) => (
+          {FILTERS.map((item) => (
               <button
                 key={item.key}
                 type="button"
@@ -124,11 +181,16 @@ export function NyweBoothQrWorkspace({
                 className={cn(
                   'h-9 rounded-md border px-3 text-xs font-medium',
                   filter === item.key
-                    ? 'border-fest-700 bg-fest-50 text-fest-900'
-                    : 'border-border/70 bg-background text-muted-foreground hover:text-foreground',
+                    ? item.key === 'missing'
+                      ? 'border-amber-700 bg-amber-100 text-amber-950'
+                      : 'border-fest-700 bg-fest-50 text-fest-900'
+                    : item.key === 'missing' && missingCount > 0
+                      ? 'border-amber-300 bg-amber-50 text-amber-950 hover:bg-amber-100'
+                      : 'border-border/70 bg-background text-muted-foreground hover:text-foreground',
                 )}
               >
                 {item.label}
+                {item.key === 'missing' ? ` (${missingCount})` : null}
               </button>
             ))}
           </div>
@@ -154,8 +216,13 @@ export function NyweBoothQrWorkspace({
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((row) => (
-                  <TableRow key={row.id}>
+                filtered.map((row) => {
+                  const missing = !row.websiteUrl;
+                  return (
+                  <TableRow
+                    key={row.id}
+                    className={missing ? 'bg-amber-50/90 hover:bg-amber-100/80' : undefined}
+                  >
                     <TableCell>
                       <Link
                         href={`/wine-spectator/contracts/${row.id}`}
@@ -163,6 +230,9 @@ export function NyweBoothQrWorkspace({
                       >
                         {row.exhibitorCompanyName}
                       </Link>
+                      {missing ? (
+                        <p className="mt-0.5 text-[11px] font-medium text-amber-900">Missing website</p>
+                      ) : null}
                     </TableCell>
                     <TableCell className="max-w-[14rem] truncate text-xs text-muted-foreground">
                       {row.websiteUrl ? (
@@ -170,7 +240,7 @@ export function NyweBoothQrWorkspace({
                           {row.websiteUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}
                         </a>
                       ) : (
-                        '—'
+                        <span className="font-medium text-amber-900">Need URL</span>
                       )}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
@@ -189,7 +259,8 @@ export function NyweBoothQrWorkspace({
                       />
                     </TableCell>
                   </TableRow>
-                ))
+                  );
+                })
               )}
             </TableBody>
           </Table>
