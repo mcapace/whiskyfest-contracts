@@ -129,6 +129,22 @@ export function NyweBoothQrWorkspace({
         <NyweBoothQrBookButton readyCount={readyCount} eventYear={eventYear} />
       </div>
 
+      <div className="rounded-xl border border-fest-600/15 bg-muted/20 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
+        <p className="font-medium text-foreground">How to use booth QRs</p>
+        <ol className="mt-2 list-decimal space-y-1 pl-5">
+          <li>We print a Wine Spectator QR for each executed vendor license. Do not use a QR the winery designed.</li>
+          <li>
+            The destination comes from the exhibitor sheet website, or paste a URL on the contract (UTM tags are fine).
+          </li>
+          <li>Amber rows still need a website. Open the contract, save the URL, then download PNG or SVG.</li>
+          <li>
+            <strong className="font-medium text-foreground">Download QR book</strong> builds a PDF plus PNG/SVG files for
+            every license that has a website.
+          </li>
+          <li>Scan counts on this page are from our winespectator.live short links. Sheet URLs refresh throughout the day.</li>
+        </ol>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <DashboardStatCard
           icon={QrCode}
