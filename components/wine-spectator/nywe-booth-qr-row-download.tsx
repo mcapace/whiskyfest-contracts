@@ -141,20 +141,7 @@ export function NyweBoothQrRowDownload({
   }
 
   return (
-    <div className="relative flex shrink-0 items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-      {!compact ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-8 px-2 text-xs"
-          onClick={openPreview}
-          disabled={pending}
-        >
-          {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Eye className="h-3.5 w-3.5" aria-hidden />}
-          Preview
-        </Button>
-      ) : null}
+    <div className="relative flex shrink-0 items-center justify-end" onClick={(e) => e.stopPropagation()}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -163,19 +150,17 @@ export function NyweBoothQrRowDownload({
             size="sm"
             className={compact ? 'h-8 w-8 px-0' : 'h-8 gap-1.5 px-2 text-xs'}
             disabled={pending}
-            aria-label={`Download booth QR for ${exhibitorName}`}
+            aria-label={`Booth QR for ${exhibitorName}`}
           >
             {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <QrCode className="h-3.5 w-3.5" aria-hidden />}
             {compact ? null : 'QR'}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-          {compact ? (
-            <DropdownMenuItem disabled={pending} onSelect={() => openPreview()}>
-              <Eye className="mr-2 h-3.5 w-3.5" aria-hidden />
-              Preview
-            </DropdownMenuItem>
-          ) : null}
+          <DropdownMenuItem disabled={pending} onSelect={() => openPreview()}>
+            <Eye className="mr-2 h-3.5 w-3.5" aria-hidden />
+            Preview
+          </DropdownMenuItem>
           <DropdownMenuItem disabled={pending} onSelect={() => download('png')}>
             <Download className="mr-2 h-3.5 w-3.5" aria-hidden />
             Download PNG

@@ -159,8 +159,8 @@ export function NyweBoothQrWorkspace({
             </ul>
           </li>
           <li>
-            <strong className="font-medium text-foreground">Preview</strong> shows the QR on screen so you can scan it
-            before printing. Then download PNG or SVG.
+            Click the QR icon, then <strong className="font-medium text-foreground">Preview</strong> to scan it on
+            screen before printing, or download PNG or SVG.
           </li>
           <li>
             <strong className="font-medium text-foreground">Download QR book</strong> builds a PDF plus PNG/SVG files for
