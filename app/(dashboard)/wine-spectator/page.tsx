@@ -16,9 +16,10 @@ import { NyweMetricsGrid } from '@/components/wine-spectator/nywe-metrics-grid';
 import { NywePipelinePanel } from '@/components/wine-spectator/nywe-pipeline-panel';
 import { NyweHomeSearch } from '@/components/wine-spectator/nywe-home-search';
 import { NyweQuickNav } from '@/components/wine-spectator/nywe-quick-nav';
+import { NyweBoothQrRowDownload } from '@/components/wine-spectator/nywe-booth-qr-row-download';
 import { buildNyweDashboardMetrics, getNywePipelineData } from '@/lib/nywe-dashboard-metrics';
 import { scheduleNyweBackgroundDocuSignSync } from '@/lib/nywe-background-docusign-sync';
-import { refreshNyweQrClicks } from '@/lib/nywe-booth-qr';
+import { listNyweExecutedBoothQrContracts, refreshNyweQrClicks } from '@/lib/nywe-booth-qr';
 import { DashboardLiveRefresh } from '@/components/dashboard/dashboard-live-refresh';
 import type { ContractWithTotals } from '@/types/db';
 
@@ -90,17 +91,26 @@ export default async function WineSpectatorDashboardPage() {
     });
   }
 
-  const missingWebsite = activeScoped
-    .filter(
-      (c) =>
-        c.status === 'executed' &&
-        c.order_type !== 'sponsorship_only' &&
-        !c.exhibitor_website_url?.trim(),
-    )
-    .sort((a, b) => a.exhibitor_company_name.localeCompare(b.exhibitor_company_name));
+  const executedBoothQr = primaryEvent?.id
+    ? await listNyweExecutedBoothQrContracts(primaryEvent.id)
+    : [];
 
-  const qrScans = activeScoped
-    .filter((c) => c.status === 'executed' && Boolean(c.rebrandly_short_url))
+  const missingWebsite = executedBoothQr
+    .filter((c) => !c.exhibitor_website_url?.trim())
+    .map((c) => ({
+      id: c.id,
+      exhibitorCompanyName: c.exhibitor_company_name,
+      legalName: null as string | null,
+      signerName: null as string | null,
+      grandTotalCents: 0,
+      websiteUrl: c.exhibitor_website_url,
+    }));
+
+  const qrReadyCount = executedBoothQr.filter((c) => Boolean(c.exhibitor_website_url?.trim())).length;
+  const qrGeneratedCount = executedBoothQr.filter((c) => Boolean(c.rebrandly_short_url)).length;
+
+  const qrScans = executedBoothQr
+    .filter((c) => Boolean(c.rebrandly_short_url))
     .sort((a, b) => (b.qr_clicks ?? 0) - (a.qr_clicks ?? 0));
 
   const sendBlocked = primaryEvent?.client_send_enabled === false;
@@ -148,22 +158,30 @@ export default async function WineSpectatorDashboardPage() {
 
       <NyweSusannahDashboard
           stuck={stuckForAccounting.map((c) => queueItem(c))}
-          recentlySent={recentlySent.map((c) => ({
+          recentlySent={recentlySent
+            .filter((c) => c.order_type !== 'sponsorship_only')
+            .map((c) => ({
             ...queueItem(c),
             executedAt: c.executed_at,
+            websiteUrl: c.exhibitor_website_url,
           }))}
           reviewQueue={reviewQueue.map(queueItem)}
           waitingQueue={waitingQueue.map(queueItem)}
-          missingWebsite={missingWebsite.map(queueItem)}
+          missingWebsite={missingWebsite}
           qrScans={qrScans.map((c) => ({
             id: c.id,
             exhibitorCompanyName: c.exhibitor_company_name,
             shortUrl: c.rebrandly_short_url,
             clicks: c.qr_clicks ?? 0,
             lastClickAt: c.qr_last_click_at,
+            websiteUrl: c.exhibitor_website_url,
           }))}
           reviewCount={reviewCount}
           waitingOnWineryCount={waitingOnWineryCount}
+          executedBoothCount={executedBoothQr.length}
+          qrReadyCount={qrReadyCount}
+          qrGeneratedCount={qrGeneratedCount}
+          eventYear={primaryEvent?.year ?? new Date().getFullYear()}
         />
 
       <NyweMetricsGrid metrics={metrics} compact />
@@ -187,27 +205,35 @@ export default async function WineSpectatorDashboardPage() {
             <>
               <div className="divide-y divide-border/50 md:hidden">
                 {recent.map((c) => (
-                  <Link
-                    key={c.id}
-                    href={`/wine-spectator/contracts/${c.id}`}
-                    className="block px-4 py-4 transition-colors hover:bg-muted/40"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="font-medium leading-snug">{c.exhibitor_company_name}</p>
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                          {[c.exhibitor_legal_name, c.signer_1_name, c.order_type === 'sponsorship_only' ? 'Sponsorship' : 'Vendor license']
-                            .filter((v) => v && v !== c.exhibitor_company_name)
-                            .join(' · ')}
-                        </p>
+                  <div key={c.id} className="px-4 py-4">
+                    <Link href={`/wine-spectator/contracts/${c.id}`} className="block transition-colors hover:text-accent-brand">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-medium leading-snug">{c.exhibitor_company_name}</p>
+                          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                            {[c.exhibitor_legal_name, c.signer_1_name, c.order_type === 'sponsorship_only' ? 'Sponsorship' : 'Vendor license']
+                              .filter((v) => v && v !== c.exhibitor_company_name)
+                              .join(' · ')}
+                          </p>
+                        </div>
+                        <span className="font-mono text-sm font-semibold tabular-nums">{formatCurrency(c.grand_total_cents)}</span>
                       </div>
-                      <span className="font-mono text-sm font-semibold tabular-nums">{formatCurrency(c.grand_total_cents)}</span>
-                    </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <StatusBadge status={c.status} />
-                      <RelativeTime iso={c.updated_at} className="text-xs text-muted-foreground" />
-                    </div>
-                  </Link>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <StatusBadge status={c.status} />
+                        <RelativeTime iso={c.updated_at} className="text-xs text-muted-foreground" />
+                      </div>
+                    </Link>
+                    {c.status === 'executed' && c.order_type !== 'sponsorship_only' ? (
+                      <div className="mt-3">
+                        <NyweBoothQrRowDownload
+                          contractId={c.id}
+                          exhibitorName={c.exhibitor_company_name}
+                          websiteUrl={c.exhibitor_website_url}
+                          missingHref={`/wine-spectator/contracts/${c.id}`}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
                 ))}
               </div>
               <div className="hidden md:block">
@@ -218,6 +244,7 @@ export default async function WineSpectatorDashboardPage() {
                       <TableHead>Signer</TableHead>
                       <TableHead>Deal</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="text-right">QR</TableHead>
                       <TableHead className="text-right">Fee</TableHead>
                       <TableHead className="text-right">Updated</TableHead>
                     </TableRow>
@@ -239,6 +266,18 @@ export default async function WineSpectatorDashboardPage() {
                         </TableCell>
                         <TableCell>
                           <StatusBadge status={c.status} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {c.status === 'executed' && c.order_type !== 'sponsorship_only' ? (
+                            <NyweBoothQrRowDownload
+                              contractId={c.id}
+                              exhibitorName={c.exhibitor_company_name}
+                              websiteUrl={c.exhibitor_website_url}
+                              missingHref={`/wine-spectator/contracts/${c.id}`}
+                            />
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right font-mono tabular-nums">{formatCurrency(c.grand_total_cents)}</TableCell>
                         <TableCell className="text-right text-xs text-muted-foreground">

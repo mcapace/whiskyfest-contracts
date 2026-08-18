@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/contracts/status-badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { RelativeTime } from '@/components/ui/relative-time';
 import { subscribeToAppContractEvents } from '@/lib/realtime-client';
 import {
@@ -42,7 +42,7 @@ import { NyweBulkSendWizard, type NyweBulkSendRow } from '@/components/wine-spec
 import { rosterAddressMissing, rosterAddressPreview } from '@/lib/exhibitor-roster-display';
 import { ROSTER_CREATE_BATCH_MAX } from '@/lib/exhibitor-roster-constants';
 import { nyweContractReadyForClientSend } from '@/lib/nywe-client-send-eligibility';
-import { formatCurrency } from '@/lib/utils';
+import { NyweBoothQrRowDownload } from '@/components/wine-spectator/nywe-booth-qr-row-download';
 import type { ContractStatus } from '@/types/db';
 
 type RosterRow = {
@@ -59,6 +59,7 @@ type RosterRow = {
   billingCity: string;
   billingState: string;
   wineryAddress: string;
+  wineryWebsite?: string;
   primaryContactName: string;
   primaryContactEmail: string;
   primaryPhone: string;
@@ -995,9 +996,19 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
                     ))}
                 <TableCell className={ROSTER_STICKY_RIGHT_BODY}>
                   {row.contractId ? (
-                    <Link href={`/wine-spectator/contracts/${row.contractId}`} className="text-sm font-medium text-accent-brand hover:underline">
-                      Open contract
-                    </Link>
+                    <div className="flex flex-col items-end gap-2">
+                      {row.contractStatus === 'executed' ? (
+                        <NyweBoothQrRowDownload
+                          contractId={row.contractId}
+                          exhibitorName={row.portalCompanyName || row.wineryName}
+                          websiteUrl={row.wineryWebsite ?? null}
+                          missingHref={`/wine-spectator/contracts/${row.contractId}`}
+                        />
+                      ) : null}
+                      <Link href={`/wine-spectator/contracts/${row.contractId}`} className="text-sm font-medium text-accent-brand hover:underline">
+                        Open contract
+                      </Link>
+                    </div>
                   ) : (
                     <button
                       type="button"

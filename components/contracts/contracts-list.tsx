@@ -25,6 +25,7 @@ import { SavedViewsDropdown, type ContractViewFilters } from '@/components/contr
 import { categorizeContractBrands } from '@/lib/brand-category';
 import { subscribeToAppContractEvents } from '@/lib/realtime-client';
 import { CONTRACT_DEAL_KINDS, dealKindFromContract, dealKindLabel, listPackageLabel } from '@/lib/contract-deal-kind';
+import { NyweBoothQrRowDownload, downloadNyweBoothQrFile } from '@/components/wine-spectator/nywe-booth-qr-row-download';
 import type { BoothBrandRowsByContract } from '@/lib/sponsors';
 import type { ContractWithTotals, Event } from '@/types/db';
 
@@ -119,6 +120,7 @@ export function ContractsList({
   const eventMap = useMemo(() => new Map(events.map((e) => [e.id, e.name])), [events]);
   const contractHref = (id: string) => `${portalBasePath}/contracts/${id}`;
   const newContractHref = `${portalBasePath}/contracts/new`;
+  const nyweQr = portalBasePath === '/wine-spectator';
 
   useEffect(() => {
     setSearchInput(filters.search);
@@ -380,6 +382,7 @@ export function ContractsList({
                 <TableHead className="text-right">Total</TableHead>
                 {!winePortal ? <TableHead>Sales Rep</TableHead> : null}
                 <TableHead className="text-right">Last Activity</TableHead>
+                {nyweQr ? <TableHead className="text-right">QR</TableHead> : null}
                 <TableHead className="w-12 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -440,6 +443,20 @@ export function ContractsList({
                     <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
                       <RelativeTime iso={c.updated_at} />
                     </TableCell>
+                    {nyweQr ? (
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        {c.status === 'executed' && c.order_type !== 'sponsorship_only' ? (
+                          <NyweBoothQrRowDownload
+                            contractId={c.id}
+                            exhibitorName={c.exhibitor_company_name}
+                            websiteUrl={c.exhibitor_website_url}
+                            missingHref={contractHref(c.id)}
+                          />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    ) : null}
                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -459,6 +476,24 @@ export function ContractsList({
                           <DropdownMenuItem onSelect={() => window.open(contractHref(c.id), '_blank')}>
                             Open in new tab
                           </DropdownMenuItem>
+                          {nyweQr && c.status === 'executed' && c.order_type !== 'sponsorship_only' && c.exhibitor_website_url?.trim() ? (
+                            <>
+                              <DropdownMenuItem
+                                onSelect={() => {
+                                  void downloadNyweBoothQrFile(c.id, c.exhibitor_company_name, 'png').catch(() => undefined);
+                                }}
+                              >
+                                Download QR PNG
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={() => {
+                                  void downloadNyweBoothQrFile(c.id, c.exhibitor_company_name, 'svg').catch(() => undefined);
+                                }}
+                              >
+                                Download QR SVG
+                              </DropdownMenuItem>
+                            </>
+                          ) : null}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

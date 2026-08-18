@@ -81,7 +81,7 @@ export const CONTRACT_ACTION_HELP = {
     'Opens the fully executed contract PDF in a new tab.',
 
   downloadBoothQr:
-    'Downloads a print-ready QR for the booth sign. Guests scan a Wine Spectator short link; Rebrandly counts the visit and sends them to the winery website. The short URL does not change after the first download.',
+    'Downloads a print-ready QR (PNG or SVG) for the booth sign. The code encodes a winespectator.live short link; Rebrandly counts the scan and guests are sent to the winery website. The short URL does not change after the first download.',
 
   viewErrorDetails:
     'Shows technical details stored when send or PDF generation failed.',

@@ -1,4 +1,4 @@
-/** Normalize a roster/staff-entered winery website for Rebrandly destinations. */
+/** Normalize a roster/staff-entered winery website (booth QR redirect target). */
 export function normalizeWineryWebsiteUrl(raw: string | null | undefined): string | null {
   let value = (raw ?? '').trim();
   if (!value) return null;

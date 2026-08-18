@@ -246,6 +246,7 @@ export default auth((req) => {
 
     if (
       nyweHost &&
+      !isPublic &&
       !admin &&
       !canAccessWineSpectator({
         role: u.role,
@@ -261,6 +262,7 @@ export default auth((req) => {
 
     if (
       bigSmokeHost &&
+      !isPublic &&
       !admin &&
       !canAccessBigSmoke({
         role: u.role,

@@ -4,8 +4,9 @@ import { assertContractAccess } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { isNyweVendorOnlyEvent } from '@/lib/nywe-pricing';
 import {
-  ensureNyweBoothQrLink,
+  downloadNyweBoothQr,
   nyweBoothQrEligible,
+  parseBoothQrFormat,
   saveNyweWebsiteUrl,
 } from '@/lib/nywe-booth-qr';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
@@ -17,7 +18,8 @@ export const maxDuration = 30;
 function errorStatus(err: unknown): number {
   const message = err instanceof Error ? err.message : '';
   if (/not set/i.test(message)) return 503;
-  if (/valid winery website|before printing/i.test(message)) return 400;
+  if (/valid winery website|before printing|format must be/i.test(message)) return 400;
+  if (/must use /i.test(message)) return 502;
   return 500;
 }
 
@@ -53,7 +55,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
 }
 
-export async function POST(_req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
   const gate = await assertContractAccess(session, params.id);
   if (!gate.ok) return gate.response;
@@ -73,14 +75,16 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   }
 
   try {
-    const { png, filename, shortUrl } = await ensureNyweBoothQrLink(
+    const format = parseBoothQrFormat(new URL(req.url).searchParams.get('format'));
+    const { body, filename, contentType, shortUrl } = await downloadNyweBoothQr(
       gate.contract as Contract,
       event?.year ?? new Date().getFullYear(),
+      format,
     );
     revalidateContractPaths(params.id);
-    return new NextResponse(new Uint8Array(png), {
+    return new NextResponse(new Uint8Array(body), {
       headers: {
-        'Content-Type': 'image/png',
+        'Content-Type': contentType,
         'Content-Disposition': `attachment; filename="${filename.replace(/"/g, '')}"`,
         'X-Rebrandly-Short-Url': shortUrl,
       },

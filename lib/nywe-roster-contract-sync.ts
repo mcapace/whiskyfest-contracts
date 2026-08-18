@@ -9,7 +9,6 @@ import { formatRosterWineDisplay } from '@/lib/exhibitor-roster-columns';
 import { eventTemplateProfile } from '@/lib/contract-template-profile';
 import { normalizeSheetContractId, rosterRowMatchesContract, sheetRowBelongsToContract } from '@/lib/nywe-roster-identity';
 import { normalizeWineryWebsiteUrl } from '@/lib/winery-website';
-import { updateRebrandlyDestination } from '@/lib/rebrandly';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getSheetsClient } from '@/lib/sheets-tracker';
@@ -292,19 +291,6 @@ export async function syncLinkedContractsFromRosterRows(
     if (error) {
       console.error('[syncLinkedContractsFromRosterRows]', contract.id, error.message);
       continue;
-    }
-    const nextWebsite =
-      typeof update.exhibitor_website_url === 'string' ? update.exhibitor_website_url : null;
-    if (contract.rebrandly_link_id && nextWebsite && nextWebsite !== contract.exhibitor_website_url) {
-      try {
-        await updateRebrandlyDestination(contract.rebrandly_link_id, nextWebsite);
-      } catch (err) {
-        console.warn(
-          '[syncLinkedContractsFromRosterRows] Rebrandly destination update failed',
-          contract.id,
-          err instanceof Error ? err.message : err,
-        );
-      }
     }
     updated += 1;
     revalidateContractPaths(contract.id);

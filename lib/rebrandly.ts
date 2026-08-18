@@ -17,12 +17,27 @@ function apiKey(): string {
   return key;
 }
 
-function domainPayload(): RebrandlyDomain | undefined {
+function domainPayload(): RebrandlyDomain {
+  const fullName = rebrandlyBrandedDomain();
   const id = process.env['REBRANDLY_DOMAIN_ID']?.trim();
-  const fullName = process.env['REBRANDLY_DOMAIN']?.trim();
-  if (id) return { id };
-  if (fullName) return { fullName };
-  return undefined;
+  return id ? { id, fullName } : { fullName };
+}
+
+/** Branded host encoded in every NYWE booth QR (never rebrand.ly). */
+export function rebrandlyBrandedDomain(): string {
+  return process.env['REBRANDLY_DOMAIN']?.trim() || 'winespectator.live';
+}
+
+export function assertRebrandlyBrandedShortUrl(shortUrl: string): string {
+  const trimmed = shortUrl.trim().replace(/\/$/, '');
+  const host = trimmed.replace(/^https?:\/\//i, '').split('/')[0]?.toLowerCase() ?? '';
+  const expected = rebrandlyBrandedDomain().toLowerCase();
+  if (host !== expected) {
+    throw new Error(
+      `Booth QR must use ${expected} (got ${host || trimmed}). Check REBRANDLY_DOMAIN and REBRANDLY_DOMAIN_ID.`,
+    );
+  }
+  return trimmed;
 }
 
 function workspaceHeaders(): Record<string, string> {
@@ -68,14 +83,13 @@ export async function createRebrandlyLink(input: {
   slashtag: string;
   title: string;
 }): Promise<RebrandlyLink> {
-  const domain = domainPayload();
   return rebrandlyFetch<RebrandlyLink>('/links', {
     method: 'POST',
     body: JSON.stringify({
       destination: input.destination,
       slashtag: input.slashtag,
       title: input.title.slice(0, 255),
-      ...(domain ? { domain } : {}),
+      domain: domainPayload(),
     }),
   });
 }
@@ -91,15 +105,19 @@ export async function getRebrandlyLink(linkId: string): Promise<RebrandlyLink> {
   return rebrandlyFetch<RebrandlyLink>(`/links/${encodeURIComponent(linkId)}`);
 }
 
-export function rebrandlyQrPngUrl(shortUrl: string): string {
-  const hostPath = shortUrl.replace(/^https?:\/\//i, '').replace(/\/$/, '');
+export type RebrandlyQrFormat = 'png' | 'svg';
+
+export function rebrandlyQrImageUrl(shortUrl: string, format: RebrandlyQrFormat): string {
+  const branded = assertRebrandlyBrandedShortUrl(shortUrl);
+  const hostPath = branded.replace(/^https?:\/\//i, '');
+  if (format === 'svg') return `https://${hostPath}.qr?type=svg`;
   return `https://${hostPath}.qr?size=1024`;
 }
 
-export async function downloadRebrandlyQrPng(shortUrl: string): Promise<Buffer> {
-  const res = await fetch(rebrandlyQrPngUrl(shortUrl), { cache: 'no-store' });
+export async function downloadRebrandlyQr(shortUrl: string, format: RebrandlyQrFormat): Promise<Buffer> {
+  const res = await fetch(rebrandlyQrImageUrl(shortUrl, format), { cache: 'no-store' });
   if (!res.ok) {
-    throw new Error(`Could not download QR image (${res.status}).`);
+    throw new Error(`Could not download QR ${format.toUpperCase()} (${res.status}).`);
   }
   return Buffer.from(await res.arrayBuffer());
 }

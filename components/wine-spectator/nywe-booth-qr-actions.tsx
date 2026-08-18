@@ -12,12 +12,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CONTRACT_ACTION_HELP } from '@/lib/contract-action-help-text';
-
-function filenameFromHeader(header: string | null, fallback: string): string {
-  if (!header) return fallback;
-  const match = header.match(/filename="([^"]+)"/i) ?? header.match(/filename=([^;]+)/i);
-  return match?.[1]?.trim() || fallback;
-}
+import type { RebrandlyQrFormat } from '@/lib/rebrandly';
+import { downloadNyweBoothQrFile } from '@/components/wine-spectator/nywe-booth-qr-row-download';
 
 export function NyweBoothQrActions({
   contractId,
@@ -34,6 +30,7 @@ export function NyweBoothQrActions({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [pendingFormat, setPendingFormat] = useState<RebrandlyQrFormat | null>(null);
   const [draftUrl, setDraftUrl] = useState(websiteUrl ?? '');
   const [message, setMessage] = useState<string | null>(null);
   const hasUrl = Boolean(websiteUrl?.trim());
@@ -55,43 +52,52 @@ export function NyweBoothQrActions({
     });
   }
 
-  function downloadQr() {
+  function downloadQr(format: RebrandlyQrFormat) {
     setMessage(null);
+    setPendingFormat(format);
     startTransition(async () => {
-      const res = await fetch(`/api/contracts/${contractId}/booth-qr`, { method: 'POST' });
-      if (!res.ok) {
-        const json = (await res.json().catch(() => ({}))) as { error?: string };
-        setMessage(json.error ?? 'Could not download booth QR.');
-        return;
+      try {
+        await downloadNyweBoothQrFile(contractId, exhibitorName, format);
+        router.refresh();
+      } catch (err) {
+        setMessage(err instanceof Error ? err.message : 'Could not download booth QR.');
+      } finally {
+        setPendingFormat(null);
       }
-      const blob = await res.blob();
-      const href = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = href;
-      a.download = filenameFromHeader(
-        res.headers.get('Content-Disposition'),
-        `${exhibitorName} NYWE booth QR.png`,
-      );
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(href);
-      router.refresh();
     });
   }
 
   return (
     <div className="space-y-2">
       {hasUrl ? (
-        <ActionWithHelp helpText={CONTRACT_ACTION_HELP.downloadBoothQr}>
-          <Button className={contractActionBtnPrimary} onClick={downloadQr} disabled={pending}>
-            <ContractActionButtonLabel
-              icon={pending ? Loader2 : Download}
-              label="Download booth QR"
-              spinning={pending}
-            />
-          </Button>
-        </ActionWithHelp>
+        <div className="space-y-1.5">
+          <ActionWithHelp helpText={CONTRACT_ACTION_HELP.downloadBoothQr}>
+            <Button
+              className={contractActionBtnPrimary}
+              onClick={() => downloadQr('png')}
+              disabled={pending}
+            >
+              <ContractActionButtonLabel
+                icon={pendingFormat === 'png' ? Loader2 : Download}
+                label="Download PNG"
+                spinning={pendingFormat === 'png'}
+              />
+            </Button>
+          </ActionWithHelp>
+          <ActionWithHelp helpText={CONTRACT_ACTION_HELP.downloadBoothQr}>
+            <Button
+              className={contractActionBtnSecondary}
+              onClick={() => downloadQr('svg')}
+              disabled={pending}
+            >
+              <ContractActionButtonLabel
+                icon={pendingFormat === 'svg' ? Loader2 : Download}
+                label="Download SVG"
+                spinning={pendingFormat === 'svg'}
+              />
+            </Button>
+          </ActionWithHelp>
+        </div>
       ) : (
         <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50/80 p-3">
           <p className="text-sm font-medium text-amber-950">Add a winery website before printing the booth QR.</p>
