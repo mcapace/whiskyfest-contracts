@@ -74,8 +74,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       }
     } else {
       const contractRepId = contract.sales_rep_id;
-      const ownsRep =
-        Boolean(contractRepId) && actor.accessibleSalesRepIds.includes(contractRepId);
+      const ownsRep = contractRepId != null && actor.accessibleSalesRepIds.includes(contractRepId);
       const createdDraft = contract.created_by?.trim().toLowerCase() === actor.email.toLowerCase();
       if (!actor.isAdmin && !actor.canViewAllSales && !ownsRep && !createdDraft) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
