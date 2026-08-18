@@ -9,7 +9,7 @@ export function normalizeRosterIdentity(value: string | null | undefined): strin
     .toLowerCase()
     .replace(/&/g, ' and ')
     .replace(/[^a-z0-9]+/g, ' ')
-    .replace(/\b(the|winery|estate|vineyards?|cellars?|family|wines?|spirits?|ltd|llc|inc|sa|srl|spa)\b/g, ' ')
+    .replace(/\b(ltd|llc|inc|sa|srl|spa|soc|agricola)\b/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -19,12 +19,15 @@ export function rosterIdentitiesMatch(a: string | null | undefined, b: string | 
   const right = normalizeRosterIdentity(b);
   if (!left || !right) return false;
   if (left === right) return true;
-  if (left.includes(right) || right.includes(left)) return true;
+  const shorter = left.length <= right.length ? left : right;
+  const longer = left.length <= right.length ? right : left;
+  if (shorter.length >= 8 && longer.includes(shorter)) return true;
   const leftTokens = left.split(' ').filter((w) => w.length > 2);
-  const rightSet = new Set(right.split(' ').filter((w) => w.length > 2));
-  if (leftTokens.length === 0 || rightSet.size === 0) return false;
+  const rightTokens = right.split(' ').filter((w) => w.length > 2);
+  if (leftTokens.length < 2 || rightTokens.length < 2) return false;
+  const rightSet = new Set(rightTokens);
   const hits = leftTokens.filter((w) => rightSet.has(w)).length;
-  return hits >= Math.min(2, leftTokens.length, rightSet.size);
+  return hits >= 2;
 }
 
 /** True when the Google Sheet row is still the same winery as this contract. */
