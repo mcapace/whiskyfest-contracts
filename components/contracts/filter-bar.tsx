@@ -21,7 +21,7 @@ function FilterSelect({
 }) {
   return (
     <label className="flex min-w-0 items-center gap-2">
-      <span className="shrink-0 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="shrink-0 whitespace-nowrap text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger className="h-9 w-[10.5rem] bg-background shadow-none" aria-label={label}>
           <SelectValue placeholder="All" />

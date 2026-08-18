@@ -112,6 +112,11 @@
   color: hsl(var(--muted-foreground));
 }
 
+.nywe-subhead {
+  text-wrap: pretty;
+  line-height: 1.375;
+}
+
 .wf-display-serif {
   font-family: var(--font-serif), ui-serif, Georgia, serif;
   font-weight: 500;

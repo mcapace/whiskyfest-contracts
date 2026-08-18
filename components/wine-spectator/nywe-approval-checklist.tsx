@@ -47,7 +47,7 @@ export function NyweApprovalChecklist({ pendingReview, inProgress, approvedCount
                 ? `${inProgress.length} still need a PDF submitted`
                 : `${approvedCount} approved — ready for bulk send`}
           </h3>
-          <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+          <p className="mt-1 max-w-xl nywe-subhead text-sm text-muted-foreground">
             Open each contract, scroll the PDF, confirm the address and $14,000 fee, then click{' '}
             <strong>Approve Contract</strong>. Bulk send only includes approved contracts.
           </p>

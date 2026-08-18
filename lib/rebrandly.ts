@@ -107,11 +107,11 @@ export async function getRebrandlyLink(linkId: string): Promise<RebrandlyLink> {
 
 export type RebrandlyQrFormat = 'png' | 'svg';
 
-export function rebrandlyQrImageUrl(shortUrl: string, format: RebrandlyQrFormat): string {
+export function rebrandlyQrImageUrl(shortUrl: string, format: RebrandlyQrFormat, size = 1024): string {
   const branded = assertRebrandlyBrandedShortUrl(shortUrl);
   const hostPath = branded.replace(/^https?:\/\//i, '');
   if (format === 'svg') return `https://${hostPath}.qr?type=svg`;
-  return `https://${hostPath}.qr?size=1024`;
+  return `https://${hostPath}.qr?size=${size}`;
 }
 
 export async function downloadRebrandlyQr(shortUrl: string, format: RebrandlyQrFormat): Promise<Buffer> {

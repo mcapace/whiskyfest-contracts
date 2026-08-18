@@ -679,8 +679,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
 
       {data.stale && data.fetchError && !data.rateLimited ? (
         <div className="rounded-md border border-amber-300/80 bg-amber-50/95 p-4 text-sm text-amber-950">
-          Could not refresh from Google Sheets ({data.fetchError}). Showing the last synced list from{' '}
-          <RelativeTime iso={data.syncedAt} />. Use &quot;Refresh from sheets&quot; to try again.
+          {data.fetchError} Showing the last synced list from <RelativeTime iso={data.syncedAt} />.
         </div>
       ) : null}
 
@@ -821,7 +820,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
 
           <div className="space-y-2 border-t border-border/50 pt-4">
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">List</p>
-            <p className="text-xs text-muted-foreground">Returning, new exhibitors, and champagne / sparkling</p>
+            <p className="text-xs text-muted-foreground">Returning, new, and champagne /&nbsp;sparkling</p>
             <div className="flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <RosterListFilterPill
                 active={listFilter === 'all'}

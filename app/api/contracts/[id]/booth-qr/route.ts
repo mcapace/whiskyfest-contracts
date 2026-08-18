@@ -5,10 +5,12 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { isNyweVendorOnlyEvent } from '@/lib/nywe-pricing';
 import {
   downloadNyweBoothQr,
+  ensureNyweBoothQrLink,
   nyweBoothQrEligible,
   parseBoothQrFormat,
   saveNyweWebsiteUrl,
 } from '@/lib/nywe-booth-qr';
+import { rebrandlyQrImageUrl } from '@/lib/rebrandly';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import type { Contract, Event } from '@/types/db';
 
@@ -21,6 +23,43 @@ function errorStatus(err: unknown): number {
   if (/valid winery website|before printing|format must be/i.test(message)) return 400;
   if (/must use /i.test(message)) return 502;
   return 500;
+}
+
+export async function GET(_req: Request, { params }: { params: { id: string } }) {
+  const session = await auth();
+  const gate = await assertContractAccess(session, params.id);
+  if (!gate.ok) return gate.response;
+
+  const supabase = getSupabaseAdmin();
+  const { data: event } = await supabase
+    .from('events')
+    .select('year, contract_template_profile')
+    .eq('id', gate.contract.event_id)
+    .maybeSingle<Pick<Event, 'year' | 'contract_template_profile'>>();
+
+  if (!isNyweVendorOnlyEvent(event)) {
+    return NextResponse.json({ error: 'Booth QR codes are only for Wine Spectator licenses.' }, { status: 400 });
+  }
+  if (!nyweBoothQrEligible(gate.contract)) {
+    return NextResponse.json({ error: 'Booth QR is available after the vendor license is executed.' }, { status: 409 });
+  }
+
+  try {
+    const { shortUrl } = await ensureNyweBoothQrLink(
+      gate.contract as Contract,
+      event?.year ?? new Date().getFullYear(),
+    );
+    return NextResponse.json({
+      shortUrl,
+      previewUrl: rebrandlyQrImageUrl(shortUrl, 'png', 512),
+      websiteUrl: gate.contract.exhibitor_website_url,
+    });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Could not load booth QR preview.' },
+      { status: errorStatus(err) },
+    );
+  }
 }
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {

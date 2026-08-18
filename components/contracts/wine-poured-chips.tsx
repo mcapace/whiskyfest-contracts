@@ -14,7 +14,7 @@ export function WinePouredChips({
   if (!parsed.wine && parsed.vintage) {
     return (
       <div className={cn('mt-1.5 flex min-w-0 items-center', className)}>
-        <span className="shrink-0 rounded-md bg-fest-50 px-1.5 py-0.5 font-mono text-[10px] font-medium tabular-nums text-fest-800">
+        <span className="shrink-0 whitespace-nowrap rounded-md bg-fest-50 px-1.5 py-0.5 font-mono text-[10px] font-medium leading-none tabular-nums text-fest-800">
           {parsed.vintage}
         </span>
       </div>
@@ -24,13 +24,13 @@ export function WinePouredChips({
   return (
     <div className={cn('mt-1.5 flex min-w-0 max-w-[18rem] items-center gap-1.5', className)}>
       <span
-        className="min-w-0 truncate rounded-md bg-muted/70 px-1.5 py-0.5 text-[11px] leading-snug text-muted-foreground"
+        className="min-w-0 truncate whitespace-nowrap rounded-md bg-muted/70 px-1.5 py-0.5 text-[11px] leading-none text-muted-foreground"
         title={full}
       >
         {parsed.wine}
       </span>
       {parsed.vintage ? (
-        <span className="shrink-0 rounded-md bg-fest-50 px-1.5 py-0.5 font-mono text-[10px] font-medium tabular-nums text-fest-800">
+        <span className="shrink-0 whitespace-nowrap rounded-md bg-fest-50 px-1.5 py-0.5 font-mono text-[10px] font-medium leading-none tabular-nums text-fest-800">
           {parsed.vintage}
         </span>
       ) : null}

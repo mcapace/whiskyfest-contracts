@@ -54,8 +54,8 @@ export function NyweBoothQrBookButton({
         {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <BookOpen className="h-3.5 w-3.5" aria-hidden />}
         {pending ? 'Building QR book…' : 'Download QR book'}
       </Button>
-      <p className="max-w-[11.5rem] text-right text-[11px] leading-snug text-muted-foreground">
-        PDF, PNG, and SVG
+      <p className="whitespace-nowrap text-right text-[11px] leading-none text-muted-foreground">
+        PDF · PNG · SVG
       </p>
       {message ? <p className="max-w-[11.5rem] text-right text-xs text-destructive">{message}</p> : null}
     </div>

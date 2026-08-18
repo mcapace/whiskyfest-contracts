@@ -101,7 +101,7 @@ export function WineSpectatorHero({
             )}
             <p
               className={cn(
-                'max-w-2xl font-display text-parchment-200/95',
+                'text-pretty font-display text-parchment-200/95',
                 compact ? 'mt-2 text-base sm:text-lg' : 'mt-3 text-lg sm:text-xl',
               )}
             >

@@ -43,7 +43,7 @@ export function DashboardStatCard({
         <div className="min-w-0 flex-1">
           <p className="wf-label-caps text-[0.65rem]">{label}</p>
           <p className="mt-1.5 font-serif text-2xl font-semibold tabular-nums tracking-tight">{value}</p>
-          <p className="mt-1 break-words text-xs text-muted-foreground">{sub}</p>
+          <p className="mt-1 text-pretty text-xs leading-snug text-muted-foreground">{sub}</p>
         </div>
       </CardContent>
     </Card>

@@ -85,7 +85,7 @@ export function NyweRosterWorkflowGuide({
               <li
                 key={step.id}
                 className={cn(
-                  'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm',
+                  'inline-flex items-center gap-2 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm',
                   status === 'current' && 'border-fest-300 bg-fest-50 text-fest-950',
                   status === 'done' && 'border-emerald-200 bg-emerald-50/80 text-emerald-900',
                   status === 'upcoming' && 'border-border/60 bg-muted/30 text-muted-foreground',

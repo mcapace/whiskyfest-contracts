@@ -134,7 +134,7 @@ export default async function WineSpectatorDashboardPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-display text-2xl font-medium text-foreground">Work from here</h2>
-          <p className="text-sm text-muted-foreground">Roster, licenses, and sponsorships</p>
+          <p className="nywe-subhead text-sm text-muted-foreground">Roster, licenses, and sponsorships</p>
         </div>
         <NyweQuickNav />
       </div>
@@ -162,7 +162,9 @@ export default async function WineSpectatorDashboardPage() {
         <div className="flex items-center justify-between border-b border-fest-600/10 px-6 py-4">
           <div>
             <h2 className="font-serif text-lg font-semibold">Recent contracts</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">Latest updates across all exhibitor contracts</p>
+            <p className="mt-0.5 text-pretty text-xs leading-snug text-muted-foreground">
+              Latest updates across exhibitor&nbsp;contracts
+            </p>
           </div>
           <Button variant="ghost" size="sm" asChild>
             <Link href="/wine-spectator/contracts">View all →</Link>

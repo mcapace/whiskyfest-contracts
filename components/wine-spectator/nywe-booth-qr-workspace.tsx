@@ -10,6 +10,7 @@ import { DashboardStatCard } from '@/components/dashboard/stat-card';
 import { RelativeTime } from '@/components/ui/relative-time';
 import { NyweBoothQrBookButton } from '@/components/wine-spectator/nywe-booth-qr-book-button';
 import { NyweBoothQrRowDownload } from '@/components/wine-spectator/nywe-booth-qr-row-download';
+import { NyweBoothQrUrlEditor } from '@/components/wine-spectator/nywe-booth-qr-url-editor';
 import { cn } from '@/lib/utils';
 
 export type NyweBoothQrPageRow = {
@@ -39,25 +40,33 @@ export function NyweBoothQrWorkspace({
   eventYear: number;
   rows: NyweBoothQrPageRow[];
 }) {
-  const [filter, setFilter] = useState<FilterKey>(() =>
-    rows.some((row) => !row.websiteUrl) ? 'missing' : 'all',
-  );
+  const [filter, setFilter] = useState<FilterKey>('all');
   const [query, setQuery] = useState('');
   const [generating, setGenerating] = useState(false);
   const [generateNote, setGenerateNote] = useState<string | null>(null);
   const router = useRouter();
 
   const needsLinks = rows.some((row) => Boolean(row.websiteUrl) && !row.shortUrl);
+  const needsWebsites = rows.some((row) => !row.websiteUrl);
+  const needsSync = needsLinks || needsWebsites;
 
   useEffect(() => {
-    if (!needsLinks) return;
+    if (!needsSync) return;
     let cancelled = false;
     async function createMissingLinks() {
       setGenerating(true);
-      setGenerateNote('Creating winespectator.live short links…');
+      setGenerateNote(
+        needsWebsites
+          ? 'Checking the exhibitor sheet for new websites…'
+          : 'Creating winespectator.live short links…',
+      );
       try {
         for (let i = 0; i < 12; i += 1) {
-          const res = await fetch('/api/wine-spectator/booth-qr-links', { method: 'POST' });
+          const res = await fetch('/api/wine-spectator/booth-qr-links', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ syncSheet: i === 0 && needsWebsites }),
+          });
           const json = (await res.json().catch(() => ({}))) as {
             remaining?: number;
             created?: number;
@@ -66,16 +75,21 @@ export function NyweBoothQrWorkspace({
             errors?: string[];
           };
           if (!res.ok) {
-            setGenerateNote(json.error ?? 'Could not create short links.');
+            setGenerateNote(json.error ?? 'Could not refresh websites or short links.');
             break;
           }
           if (cancelled) return;
+          if ((json.websitesUpdated ?? 0) > 0) {
+            setGenerateNote(
+              `Picked up ${json.websitesUpdated} website${json.websitesUpdated === 1 ? '' : 's'} from the sheet…`,
+            );
+          }
           const remaining = json.remaining ?? 0;
-          setGenerateNote(
-            remaining > 0
-              ? `Creating winespectator.live short links… ${remaining} left`
-              : 'Short links updated.',
-          );
+          if (remaining > 0) {
+            setGenerateNote(`Creating winespectator.live short links… ${remaining} left`);
+          } else if ((json.created ?? 0) > 0 || (json.websitesUpdated ?? 0) > 0) {
+            setGenerateNote('Websites and short links updated.');
+          }
           if (remaining <= 0) break;
         }
         if (!cancelled) router.refresh();
@@ -87,7 +101,7 @@ export function NyweBoothQrWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [needsLinks, router]);
+  }, [needsSync, needsWebsites, router]);
 
   const executedCount = rows.length;
   const readyCount = rows.filter((row) => Boolean(row.websiteUrl)).length;
@@ -105,12 +119,9 @@ export function NyweBoothQrWorkspace({
       if (q && !row.exhibitorCompanyName.toLowerCase().includes(q)) return false;
       return true;
     });
-    return [...next].sort((a, b) => {
-      const aMissing = a.websiteUrl ? 0 : 1;
-      const bMissing = b.websiteUrl ? 0 : 1;
-      if (aMissing !== bMissing) return bMissing - aMissing;
-      return a.exhibitorCompanyName.localeCompare(b.exhibitorCompanyName);
-    });
+    return [...next].sort((a, b) =>
+      a.exhibitorCompanyName.localeCompare(b.exhibitorCompanyName, undefined, { sensitivity: 'base' }),
+    );
   }, [rows, filter, query]);
 
   return (
@@ -119,7 +130,7 @@ export function NyweBoothQrWorkspace({
         <div className="min-w-0 flex-1">
           <p className="wf-label-caps text-[0.65rem] text-fest-800">Booth signs</p>
           <h1 className="mt-1 font-display text-3xl font-medium tracking-tight text-foreground">QR codes</h1>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          <p className="mt-2 nywe-subhead text-sm text-muted-foreground">
             {eventName} — print files and scan tracking for executed vendor&nbsp;licenses.
           </p>
           {generating || generateNote ? (
@@ -129,19 +140,33 @@ export function NyweBoothQrWorkspace({
         <NyweBoothQrBookButton readyCount={readyCount} eventYear={eventYear} />
       </div>
 
-      <div className="rounded-xl border border-fest-600/15 bg-muted/20 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
+      <div className="rounded-xl border border-fest-600/15 bg-muted/20 px-4 py-3 text-sm leading-snug text-muted-foreground">
         <p className="font-medium text-foreground">How to use booth QRs</p>
         <ol className="mt-2 list-decimal space-y-1 pl-5">
           <li>We print a Wine Spectator QR for each executed vendor license. Do not use a QR the winery designed.</li>
           <li>
-            The destination comes from the exhibitor sheet website, or paste a URL on the contract (UTM tags are fine).
+            The QR always goes through our <span className="whitespace-nowrap">winespectator.live</span> short link. The
+            winery can give a URL with UTM tags; we cannot accept a QR file they created.
           </li>
-          <li>Amber rows still need a website. Open the contract, save the URL, then download PNG or SVG.</li>
+          <li>
+            To add or change a destination URL (UTMs included):
+            <ul className="mt-1 list-disc space-y-0.5 pl-5">
+              <li>Paste it in the Website column on this page and click Save — the row switches to Download.</li>
+              <li>
+                Or update <strong className="font-medium text-foreground">WINERY WEBSITE URL</strong> on the exhibitor
+                sheet. This page checks the sheet when you open it.
+              </li>
+            </ul>
+          </li>
+          <li>
+            <strong className="font-medium text-foreground">Preview</strong> shows the QR on screen so you can scan it
+            before printing. Then download PNG or SVG.
+          </li>
           <li>
             <strong className="font-medium text-foreground">Download QR book</strong> builds a PDF plus PNG/SVG files for
             every license that has a website.
           </li>
-          <li>Scan counts on this page are from our winespectator.live short links. Sheet URLs refresh throughout the day.</li>
+          <li>Scan counts on this page are from our winespectator.live short links.</li>
         </ol>
       </div>
 
@@ -195,7 +220,7 @@ export function NyweBoothQrWorkspace({
                 type="button"
                 onClick={() => setFilter(item.key)}
                 className={cn(
-                  'h-9 rounded-md border px-3 text-xs font-medium',
+                  'h-9 whitespace-nowrap rounded-md border px-3 text-xs font-medium',
                   filter === item.key
                     ? item.key === 'missing'
                       ? 'border-amber-700 bg-amber-100 text-amber-950'
@@ -250,14 +275,8 @@ export function NyweBoothQrWorkspace({
                         <p className="mt-0.5 text-[11px] font-medium text-amber-900">Missing website</p>
                       ) : null}
                     </TableCell>
-                    <TableCell className="max-w-[14rem] truncate text-xs text-muted-foreground">
-                      {row.websiteUrl ? (
-                        <a href={row.websiteUrl} target="_blank" rel="noreferrer" className="hover:underline">
-                          {row.websiteUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}
-                        </a>
-                      ) : (
-                        <span className="font-medium text-amber-900">Need URL</span>
-                      )}
+                    <TableCell className="align-top">
+                      <NyweBoothQrUrlEditor contractId={row.id} websiteUrl={row.websiteUrl} />
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {row.shortUrl ? row.shortUrl.replace(/^https?:\/\//, '') : '—'}
@@ -271,6 +290,7 @@ export function NyweBoothQrWorkspace({
                         contractId={row.id}
                         exhibitorName={row.exhibitorCompanyName}
                         websiteUrl={row.websiteUrl}
+                        shortUrl={row.shortUrl}
                         missingHref={`/wine-spectator/contracts/${row.id}`}
                       />
                     </TableCell>

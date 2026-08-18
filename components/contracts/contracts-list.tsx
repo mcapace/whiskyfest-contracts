@@ -269,8 +269,8 @@ export function ContractsList({
             <>
               <p className="wf-label-caps text-[0.65rem] text-fest-800">Wine Spectator</p>
               <h1 className="mt-1 font-display text-3xl font-medium tracking-tight text-foreground">Licenses</h1>
-              <p className="mt-2 font-sans text-sm text-muted-foreground">
-                {filtered.length} shown · {activeCount} active · {pipelineCount} in pipeline
+              <p className="mt-2 nywe-subhead font-sans text-sm text-muted-foreground">
+                {filtered.length} shown · {activeCount} active · {pipelineCount} in&nbsp;pipeline
               </p>
             </>
           ) : (

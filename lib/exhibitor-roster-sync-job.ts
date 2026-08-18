@@ -21,8 +21,8 @@ import { getActiveWineSpectatorEvent } from '@/lib/wine-spectator-event';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import type { ContractWithTotals, Event } from '@/types/db';
 
-/** Slightly longer than the 30-minute cron interval. */
-export const ROSTER_CACHE_MAX_AGE_MS = 35 * 60 * 1000;
+/** Longer than two missed 30-minute cron runs. */
+export const ROSTER_CACHE_MAX_AGE_MS = 2 * 60 * 60 * 1000;
 
 export type ExhibitorRosterPayload = {
   syncedAt: string;
@@ -207,8 +207,6 @@ export async function loadExhibitorRosterForPage(event: Event): Promise<LoadExhi
     return {
       roster: await withLiveContractStatus(event, stale),
       fromCache: true,
-      stale: true,
-      fetchError: 'Showing last synced roster. Use Refresh from sheets for the latest.',
     };
   }
 
@@ -261,8 +259,6 @@ export async function loadExhibitorRoster(
       return {
         roster: await withLiveContractStatus(activeEvent, stale),
         fromCache: true,
-        stale: true,
-        fetchError: 'Showing last synced roster. Use Refresh from sheets when you need the latest.',
       };
     }
   }

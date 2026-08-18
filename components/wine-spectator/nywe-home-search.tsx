@@ -96,8 +96,8 @@ export function NyweHomeSearch({ contracts }: { contracts: NyweSearchContract[] 
           )}
         </ul>
       ) : (
-        <p className="mt-2 text-xs text-muted-foreground">
-          Type at least two characters. Matches winery, legal/bill-to name, signer, and brands poured.
+        <p className="mt-2 nywe-subhead text-xs text-muted-foreground">
+          Type at least two characters. Matches winery, legal name, signer, and&nbsp;wine.
         </p>
       )}
     </section>

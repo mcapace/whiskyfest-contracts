@@ -59,7 +59,7 @@ function QueueRow({
     <li className="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/20 px-3 py-2.5">
       <div className="min-w-0">
         <p className="truncate text-sm font-medium">{title}</p>
-        <p className="text-xs text-muted-foreground">{subtitle}</p>
+        <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
       </div>
       <div className="flex shrink-0 items-center justify-end gap-3">
         {typeof amount === 'number' ? (
@@ -88,8 +88,8 @@ export function NyweSusannahDashboard({
     <Card className="border-fest-600/15">
       <CardHeader className="pb-4">
         <CardTitle className="font-serif text-xl font-semibold">Action queue</CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Review, waiting on winery, and signed but not yet released
+        <p className="nywe-subhead text-sm text-muted-foreground">
+          Review, waiting on winery, and signed but not yet&nbsp;released
         </p>
       </CardHeader>
       <CardContent className="space-y-5">

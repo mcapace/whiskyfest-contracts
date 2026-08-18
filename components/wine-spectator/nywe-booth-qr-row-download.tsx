@@ -2,8 +2,15 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
-import { Download, Loader2, QrCode } from 'lucide-react';
+import { Download, Eye, Loader2, QrCode } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +23,11 @@ function filenameFromHeader(header: string | null, fallback: string): string {
   if (!header) return fallback;
   const match = header.match(/filename="([^"]+)"/i) ?? header.match(/filename=([^;]+)/i);
   return match?.[1]?.trim() || fallback;
+}
+
+function previewUrlFromShort(shortUrl: string): string {
+  const hostPath = shortUrl.replace(/^https?:\/\//i, '').replace(/\/$/, '');
+  return `https://${hostPath}.qr?size=512`;
 }
 
 export async function downloadNyweBoothQrFile(
@@ -47,17 +59,23 @@ export function NyweBoothQrRowDownload({
   contractId,
   exhibitorName,
   websiteUrl,
+  shortUrl,
   missingHref,
   compact = false,
 }: {
   contractId: string;
   exhibitorName: string;
   websiteUrl: string | null | undefined;
+  shortUrl?: string | null;
   missingHref?: string;
   compact?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [preview, setPreview] = useState<{ shortUrl: string; previewUrl: string; websiteUrl: string | null } | null>(
+    null,
+  );
   const hasUrl = Boolean(websiteUrl?.trim());
 
   function download(format: RebrandlyQrFormat) {
@@ -67,6 +85,41 @@ export function NyweBoothQrRowDownload({
         await downloadNyweBoothQrFile(contractId, exhibitorName, format);
       } catch (err) {
         setMessage(err instanceof Error ? err.message : 'Could not download booth QR.');
+      }
+    });
+  }
+
+  function openPreview() {
+    setMessage(null);
+    startTransition(async () => {
+      try {
+        if (shortUrl?.trim()) {
+          setPreview({
+            shortUrl,
+            previewUrl: previewUrlFromShort(shortUrl),
+            websiteUrl: websiteUrl ?? null,
+          });
+          setPreviewOpen(true);
+          return;
+        }
+        const res = await fetch(`/api/contracts/${contractId}/booth-qr`);
+        const json = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          shortUrl?: string;
+          previewUrl?: string;
+          websiteUrl?: string | null;
+        };
+        if (!res.ok || !json.shortUrl || !json.previewUrl) {
+          throw new Error(json.error ?? 'Could not load QR preview.');
+        }
+        setPreview({
+          shortUrl: json.shortUrl,
+          previewUrl: json.previewUrl,
+          websiteUrl: json.websiteUrl ?? websiteUrl ?? null,
+        });
+        setPreviewOpen(true);
+      } catch (err) {
+        setMessage(err instanceof Error ? err.message : 'Could not load QR preview.');
       }
     });
   }
@@ -88,7 +141,20 @@ export function NyweBoothQrRowDownload({
   }
 
   return (
-    <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
+    <div className="relative flex shrink-0 items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+      {!compact ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 px-2 text-xs"
+          onClick={openPreview}
+          disabled={pending}
+        >
+          {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Eye className="h-3.5 w-3.5" aria-hidden />}
+          Preview
+        </Button>
+      ) : null}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -104,6 +170,12 @@ export function NyweBoothQrRowDownload({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+          {compact ? (
+            <DropdownMenuItem disabled={pending} onSelect={() => openPreview()}>
+              <Eye className="mr-2 h-3.5 w-3.5" aria-hidden />
+              Preview
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem disabled={pending} onSelect={() => download('png')}>
             <Download className="mr-2 h-3.5 w-3.5" aria-hidden />
             Download PNG
@@ -117,6 +189,43 @@ export function NyweBoothQrRowDownload({
       {message && !compact ? (
         <p className="absolute right-0 top-full z-10 mt-1 max-w-[10rem] text-right text-[11px] text-destructive">{message}</p>
       ) : null}
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{exhibitorName}</DialogTitle>
+            <DialogDescription>Scan this on your phone to test before printing.</DialogDescription>
+          </DialogHeader>
+          {preview ? (
+            <div className="space-y-3">
+              <div className="flex justify-center rounded-lg border border-border/60 bg-white p-4">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={preview.previewUrl}
+                  alt={`Booth QR for ${exhibitorName}`}
+                  className="h-64 w-64 bg-white"
+                />
+              </div>
+              <p className="break-all text-center text-xs font-medium">
+                {preview.shortUrl.replace(/^https?:\/\//, '')}
+              </p>
+              {preview.websiteUrl ? (
+                <p className="break-all text-center text-xs text-muted-foreground">
+                  Opens {preview.websiteUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                </p>
+              ) : null}
+              <div className="flex justify-center gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => download('png')}>
+                  Download PNG
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => download('svg')}>
+                  Download SVG
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

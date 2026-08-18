@@ -45,8 +45,8 @@ export function NyweRosterPageHeader({ eventName }: { eventName: string }) {
       <div>
         <p className="wf-label-caps text-[0.65rem] text-fest-800">Exhibitor workbench</p>
         <h1 className="mt-1 font-display text-3xl font-medium tracking-tight text-foreground">Roster</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          {eventName} — returning, new, and champagne lists. Open the contract from any row; sheet sorts no longer mix wineries.
+        <p className="mt-2 nywe-subhead text-sm text-muted-foreground">
+          {eventName} — returning, new, and champagne lists. Open any row to work the&nbsp;contract.
         </p>
       </div>
       <Button asChild variant="outline" size="sm" className="shrink-0">
