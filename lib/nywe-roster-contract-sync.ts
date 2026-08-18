@@ -7,6 +7,7 @@ import {
 import { resolveContractStreetFromSheetCells } from '@/lib/exhibitor-roster-billing';
 import { formatRosterWineDisplay } from '@/lib/exhibitor-roster-columns';
 import { eventTemplateProfile } from '@/lib/contract-template-profile';
+import { rosterRowMatchesContract } from '@/lib/nywe-roster-identity';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getSheetsClient } from '@/lib/sheets-tracker';
@@ -54,14 +55,27 @@ function patchChanged(
 
 export function contractPatchFromExhibitorRosterRow(
   row: ExhibitorRosterRow,
-  contract: Pick<ContractWithTotals, 'status'>,
+  contract: Pick<ContractWithTotals, 'status' | 'exhibitor_company_name' | 'exhibitor_legal_name'>,
 ): Record<string, string | null | boolean> | null {
   const winery = row.wineryName.trim();
   const billingCompany = row.billingCompany.trim() || winery;
   if (!winery && !billingCompany) return null;
 
-  // Identity / wine always sync from the sheet — including typo fixes — even when street
-  // is temporarily blank (previously a missing address skipped the entire patch).
+  // Row numbers drift when the Google Sheet is sorted. Do not copy another winery onto this contract.
+  if (!rosterRowMatchesContract(row, contract)) {
+    console.warn('[nywe-roster] skip patch — sheet row winery does not match contract', {
+      status: contract.status,
+      contractCompany: contract.exhibitor_company_name,
+      sheetWinery: row.wineryName,
+    });
+    return null;
+  }
+
+  // Sent / executed contracts keep the names and PDF they were signed under.
+  if (SIGNER_LOCKED_STATUSES.includes(contract.status)) {
+    return null;
+  }
+
   const patch: Record<string, string | null | boolean> = {
     exhibitor_legal_name: billingCompany,
     exhibitor_company_name: winery || billingCompany,
@@ -81,12 +95,10 @@ export function contractPatchFromExhibitorRosterRow(
     patch.billing_same_as_corporate = resolved.usedWineryStreet;
   }
 
-  if (!SIGNER_LOCKED_STATUSES.includes(contract.status)) {
-    patch.signer_1_name = row.signerName.trim() || null;
-    patch.signer_1_email = row.signerEmail.trim() || null;
-    patch.event_contact_name = row.primaryContactName.trim() || null;
-    patch.event_contact_email = row.primaryContactEmail.trim() || null;
-  }
+  patch.signer_1_name = row.signerName.trim() || null;
+  patch.signer_1_email = row.signerEmail.trim() || null;
+  patch.event_contact_name = row.primaryContactName.trim() || null;
+  patch.event_contact_email = row.primaryContactEmail.trim() || null;
 
   return patch;
 }
@@ -127,8 +139,24 @@ function patchFromPayload(
   const legal = normalize(payload.exhibitor_legal_name);
   if (!company && !legal) return null;
 
-  // Always carry winery / legal name + wine from the sheet so typo fixes propagate even
-  // when billing street is missing. Billing block is optional on refresh.
+  if (
+    !rosterRowMatchesContract(
+      { wineryName: payload.exhibitor_company_name, billingCompany: payload.exhibitor_legal_name },
+      contract,
+    )
+  ) {
+    console.warn('[nywe-roster] skip refresh — sheet row winery does not match contract', {
+      id: contract.id,
+      contractCompany: contract.exhibitor_company_name,
+      sheetWinery: payload.exhibitor_company_name,
+    });
+    return null;
+  }
+
+  if (SIGNER_LOCKED_STATUSES.includes(contract.status)) {
+    return null;
+  }
+
   const patch: Record<string, string | null | boolean> = {
     exhibitor_legal_name: payload.exhibitor_legal_name,
     exhibitor_company_name: payload.exhibitor_company_name,
@@ -139,12 +167,10 @@ function patchFromPayload(
     Object.assign(patch, payload.billing);
   }
 
-  if (!SIGNER_LOCKED_STATUSES.includes(contract.status)) {
-    patch.signer_1_name = payload.signer_1_name;
-    patch.signer_1_email = payload.signer_1_email;
-    patch.event_contact_name = payload.event_contact_name;
-    patch.event_contact_email = payload.event_contact_email;
-  }
+  patch.signer_1_name = payload.signer_1_name;
+  patch.signer_1_email = payload.signer_1_email;
+  patch.event_contact_name = payload.event_contact_name;
+  patch.event_contact_email = payload.event_contact_email;
 
   return patch;
 }

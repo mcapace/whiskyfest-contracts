@@ -106,7 +106,7 @@ async function writebackLinkedContracts(eventId: string): Promise<number> {
   const supabase = getSupabaseAdmin();
   const { data: contracts } = await supabase
     .from('contracts_with_totals')
-    .select('id, status, source_sheet_id, source_sheet_tab, source_row_number, updated_at, event_id, sent_at')
+    .select('id, status, source_sheet_id, source_sheet_tab, source_row_number, updated_at, event_id, sent_at, exhibitor_company_name, exhibitor_legal_name')
     .eq('event_id', eventId)
     .not('source_sheet_id', 'is', null);
 

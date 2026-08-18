@@ -25,7 +25,7 @@ export async function syncExhibitorRosterWritebackById(
   const supabase = getSupabaseAdmin();
   const { data } = await supabase
     .from('contracts_with_totals')
-    .select('id, status, source_sheet_id, source_sheet_tab, source_row_number, updated_at, event_id')
+    .select('id, status, source_sheet_id, source_sheet_tab, source_row_number, updated_at, event_id, exhibitor_company_name, exhibitor_legal_name')
     .eq('id', contractId)
     .maybeSingle<ContractWithTotals>();
   if (!data) return;

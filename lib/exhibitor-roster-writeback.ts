@@ -1,5 +1,6 @@
 import { getSheetsClient } from '@/lib/sheets-tracker';
 import { rosterStatusLabel } from '@/lib/exhibitor-roster';
+import { rosterIdentitiesMatch } from '@/lib/nywe-roster-identity';
 import { formatTimestamp } from '@/lib/utils';
 import type { ContractStatus, ContractWithTotals } from '@/types/db';
 import {
@@ -51,7 +52,8 @@ export async function writeExhibitorRosterStatusForContract(
   contract: Pick<
     ContractWithTotals,
     'id' | 'status' | 'source_sheet_id' | 'source_sheet_tab' | 'source_row_number' | 'updated_at'
-  >,
+  > &
+    Partial<Pick<ContractWithTotals, 'exhibitor_company_name' | 'exhibitor_legal_name'>>,
   options?: { trackerStatus?: ContractStatus; statusLabel?: string },
 ): Promise<void> {
   const spreadsheetId = contract.source_sheet_id?.trim();
@@ -69,6 +71,33 @@ export async function writeExhibitorRosterStatusForContract(
   const headers = ((headerRes.data.values?.[0] ?? []) as string[]).map((h) => String(h ?? '').trim());
   const licenseIdx = headers.findIndex((h) => h.toUpperCase() === ROSTER_STATUS_HEADER);
   const statusStart = licenseIdx >= 0 ? licenseIdx : headers.length;
+
+  const wineryIdx = headers.findIndex((h) => h.toUpperCase().includes('NAME OF PARTICIPATING WINERY'));
+  const billingIdx = headers.findIndex((h) => h.toUpperCase() === 'BILLING COMPANY NAME');
+  if (contract.exhibitor_company_name || contract.exhibitor_legal_name) {
+    const rowRes = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: tabRange(tab, `A${rowNumber}:AZ${rowNumber}`),
+      valueRenderOption: 'FORMATTED_VALUE',
+    });
+    const row = ((rowRes.data.values?.[0] ?? []) as string[]).map((v) => String(v ?? '').trim());
+    const sheetWinery = wineryIdx >= 0 ? row[wineryIdx] : row[2];
+    const sheetBilling = billingIdx >= 0 ? row[billingIdx] : '';
+    const matches =
+      rosterIdentitiesMatch(sheetWinery, contract.exhibitor_company_name) ||
+      rosterIdentitiesMatch(sheetWinery, contract.exhibitor_legal_name) ||
+      rosterIdentitiesMatch(sheetBilling, contract.exhibitor_company_name) ||
+      rosterIdentitiesMatch(sheetBilling, contract.exhibitor_legal_name);
+    if (!matches) {
+      console.warn('[nywe-roster] skip writeback — sheet row is a different winery', {
+        id: contract.id,
+        contractCompany: contract.exhibitor_company_name,
+        sheetWinery,
+        rowNumber,
+      });
+      return;
+    }
+  }
 
   await ensureStatusHeaders(spreadsheetId, tab, statusStart);
 
