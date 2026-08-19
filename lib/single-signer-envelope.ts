@@ -1,16 +1,14 @@
-import { isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
 import type { Event } from '@/types/db';
 
 /**
- * One DocuSign signer (exhibitor/winery). Shanken countersignature is pre-printed on the PDF.
- * WhiskyFest and Big Smoke use dual-signer DocuSign (Liz / Nicole / Tobi routing order 2) — not this path.
- * NYWE remains single-signer.
+ * All live products use dual-signer DocuSign: exhibitor (routing 1), then Shanken countersignature (routing 2).
+ * NYWE previously pre-printed `/s/ {signatory}` and skipped routing 2 — that left custom PDFs unsigned
+ * and legal copies without a Wine Spectator signature. Keep this helper so call sites stay explicit.
  */
 export function usesSingleSignerEnvelope(
-  event: Pick<Event, 'product_key' | 'workflow_profile'> | null | undefined,
+  _event?: Pick<Event, 'product_key' | 'workflow_profile'> | null,
 ): boolean {
-  if (!event) return false;
-  return isNyweEventsManagedEvent(event);
+  return false;
 }
 
 /** @deprecated Use usesSingleSignerEnvelope */

@@ -243,7 +243,7 @@ export interface SendEnvelopeParams {
   emailSubject: string;
   emailBlurb: string;
   signer1: { email: string; name: string };
-  /** Event-level Shanken countersigner recipient (routing order 2). Omit for single-signer NYWE envelopes. */
+  /** Event-level Shanken countersigner recipient (routing order 2). */
   countersigner?: { email: string; name: string } | null;
   /** Shared signing group — any member may countersign (WhiskyFest / Big Smoke). */
   countersignerSigningGroupId?: string | null;

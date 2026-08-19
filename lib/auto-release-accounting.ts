@@ -36,7 +36,7 @@ export function contractNeedsAutoReleaseToAccounting(
   return true;
 }
 
-/** After both parties sign (or NYWE single-signer completes), email accounting and mark executed. */
+/** After both parties sign, email accounting and mark executed. */
 export async function autoReleaseAfterFullySigned(options: {
   supabase: SupabaseClient;
   contractId: string;

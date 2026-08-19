@@ -6,6 +6,7 @@ import {
   applyEnvelopeFullySigned,
   applyExhibitorPartialSignature,
   isDocuSignEnvelopeFullySigned,
+  replaceExecutedSignedPdfFromEnvelope,
 } from '@/lib/docusign-envelope-sync';
 import { autoReleaseAfterFullySigned, contractNeedsAutoReleaseToAccounting } from '@/lib/auto-release-accounting';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
@@ -144,6 +145,15 @@ export async function POST(req: Request) {
     envelopeStatus === 'voided' ||
     envelopeStatus === 'declined'
   ) {
+    if (contract.status === 'executed') {
+      console.warn('DocuSign webhook: ignoring void/decline on executed contract', {
+        contractId: contract.id,
+        envelopeId,
+        envelopeStatus,
+        eventType,
+      });
+      return new NextResponse(null, { status: 200 });
+    }
     await supabase
       .from('contracts')
       .update({
@@ -177,6 +187,16 @@ export async function POST(req: Request) {
     envelopeStatus === 'completed';
   const recipientCompletedEvent =
     eventType.includes('recipient-completed') || eventType.includes('recipient_completed');
+
+  if (contract.status === 'executed' && (completedEvent || recipientCompletedEvent)) {
+    try {
+      await replaceExecutedSignedPdfFromEnvelope(supabase, contract, event ?? null, envelopeId);
+    } catch (err) {
+      console.error('DocuSign executed PDF refresh failed:', err);
+      return new NextResponse(null, { status: 500 });
+    }
+    return new NextResponse(null, { status: 200 });
+  }
 
   // --- Fully signed (envelope-completed OR countersigner recipient-completed when both parties are done) ---
   if (

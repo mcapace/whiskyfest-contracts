@@ -12,14 +12,16 @@ import { contractUsesOrderTable, isNyweEventsManagedEvent } from '@/lib/contract
 import { persistContractDraftPdf } from '@/lib/contract-pdf-storage';
 import { resolveContractTemplateDocId } from '@/lib/contract-template';
 import {
+  countersignCcValidation,
   countersignerRequiredForEvent,
-  docusignCountersignerForEvent,
+  resolveDocuSignCountersignDelivery,
+  toSendEnvelopeCountersignParams,
 } from '@/lib/docusign-envelope-recipients';
 import { requiresDiscountApproval } from '@/lib/contracts';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
 import { sendEnvelope } from '@/lib/docusign';
 import { shouldSkipExhibitorDataTabs } from '@/lib/exhibitor-docusign-fields';
-import { parseSignerCc, validateSignerCcDistinct, normalizeSignerCcEmail, normalizeSignerCcName } from '@/lib/docusign-signer-cc';
+import { parseSignerCc, normalizeSignerCcEmail, normalizeSignerCcName } from '@/lib/docusign-signer-cc';
 import { renderContractPdfFromTemplate } from '@/lib/google';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import { nyweLicenseAddressError } from '@/lib/nywe-billing';
@@ -108,17 +110,17 @@ export async function nyweClientSendContract(options: {
     return { ok: false, error: addressError, statusCode: 400 };
   }
 
-  const countersigner = docusignCountersignerForEvent(event);
-  if (countersignerRequiredForEvent(event) && !countersigner) {
+  const countersignDelivery = await resolveDocuSignCountersignDelivery(event);
+  if (countersignerRequiredForEvent(event) && !countersignDelivery) {
     return { ok: false, error: 'Event countersigner name and email are required.', statusCode: 500 };
   }
 
   const signerEmail = contract.signer_1_email.trim();
   const signerName = contract.signer_1_name.trim();
   const carbonCopy = parseSignerCc(contract);
-  const ccError = validateSignerCcDistinct({
+  const ccError = countersignCcValidation({
     signerEmail,
-    countersignerEmail: countersigner?.email ?? event.shanken_signatory_email?.trim() ?? '',
+    delivery: countersignDelivery,
     cc: carbonCopy,
   });
   if (ccError) {
@@ -183,7 +185,7 @@ export async function nyweClientSendContract(options: {
       emailSubject: contractDocuSignEmailSubject(contract.exhibitor_company_name, event),
       emailBlurb: contractDocuSignEmailBlurb(contract.exhibitor_company_name, event),
       signer1: { name: signerName, email: signerEmail },
-      countersigner,
+      ...toSendEnvelopeCountersignParams(countersignDelivery),
       carbonCopy,
       brandId: docusignBrandIdForEvent(event),
       replyTo: sendGridFromForEvent(event),
@@ -218,9 +220,19 @@ export async function nyweClientSendContract(options: {
         envelope_status: 'sent',
         exhibitor_signer: signerEmail,
         signer_cc_email: carbonCopy?.email ?? null,
-        countersigner_email: countersigner?.email ?? event.shanken_signatory_email,
-        countersigner_name: countersigner?.name ?? event.shanken_signatory_name,
-        single_signer_envelope: countersigner == null,
+        countersigner_email:
+          countersignDelivery?.mode === 'user'
+            ? countersignDelivery.email
+            : countersignDelivery?.mode === 'signing_group'
+              ? countersignDelivery.displayName
+              : event.shanken_signatory_email,
+        countersigner_name:
+          countersignDelivery?.mode === 'user'
+            ? countersignDelivery.name
+            : countersignDelivery?.mode === 'signing_group'
+              ? countersignDelivery.displayName
+              : event.shanken_signatory_name,
+        single_signer_envelope: countersignDelivery == null,
         bulk_send: true,
       },
     });

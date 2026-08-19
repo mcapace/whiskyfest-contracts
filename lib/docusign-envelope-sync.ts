@@ -50,8 +50,8 @@ export function isDocuSignEnvelopeFullySigned(
   signers: DocuSignSignerRow[],
   options?: {
     /**
-     * NYWE (and other single-signer products): exhibitor completion is enough even if a
-     * legacy routing-order-2 recipient is still pending in DocuSign.
+     * Legacy single-signer envelopes: exhibitor completion is enough even if a
+     * leftover routing-order-2 recipient is still pending in DocuSign.
      */
     exhibitorCompleteIsFull?: boolean;
   },
@@ -143,6 +143,74 @@ export async function applyExhibitorPartialSignature(
   return { updated: true };
 }
 
+/**
+ * Already executed (e.g. NYWE custom PDF missing WS signature): replace the stored
+ * signed PDF when a later countersign envelope completes. Do not re-release to AR.
+ */
+export async function replaceExecutedSignedPdfFromEnvelope(
+  supabase: SupabaseClient,
+  contract: ContractWithTotals,
+  event: Event | null,
+  envelopeId: string,
+  options?: { actorEmail?: string | null },
+): Promise<{ updated: boolean }> {
+  if (contract.status !== 'executed') return { updated: false };
+
+  const signers = await fetchEnvelopeSigners(envelopeId);
+  const r1 = routing1Signer(signers);
+  const countersigner =
+    extractCountersignerFromSigners(signers) ??
+    (r1?.email && (r1.status ?? '').toLowerCase().match(/completed|signed/)
+      ? {
+          email: r1.email.trim(),
+          name: (r1.name ?? r1.email).trim(),
+          signedDateTime: r1.signedDateTime ?? new Date().toISOString(),
+        }
+      : event
+        ? eventCountersignerIdentity(event, new Date().toISOString())
+        : null);
+
+  const pdfBytes = await downloadCompletedPdf(envelopeId);
+  const signedFolderId = signedFolderIdForEvent(event);
+  const fileBase = event
+    ? `${contractPdfBaseName(contract.exhibitor_company_name, event)} (SIGNED)`
+    : `${contract.exhibitor_company_name.replace(/[^\w\s-]/g, '')} — Contract (SIGNED)`;
+
+  const { fileId, webViewLink } = await uploadPdfBufferToFolder(pdfBytes, fileBase, signedFolderId);
+  const signedStoragePath = contractSignedPdfPath(contract.id);
+  await uploadContractPdfToStorage(signedStoragePath, pdfBytes);
+
+  await supabase
+    .from('contracts')
+    .update({
+      signed_pdf_drive_id: fileId,
+      signed_pdf_url: webViewLink,
+      pdf_storage_path: signedStoragePath,
+      countersigned_by_email: countersigner?.email ?? contract.countersigned_by_email,
+      countersigned_by_name: countersigner?.name ?? contract.countersigned_by_name,
+      countersigned_at: countersigner?.signedDateTime ?? contract.countersigned_at,
+    })
+    .eq('id', contract.id);
+
+  await insertContractAudit(supabase, {
+    contract_id: contract.id,
+    actor_email: options?.actorEmail ?? countersigner?.email ?? null,
+    action: 'countersigner_signed',
+    from_status: 'executed',
+    to_status: 'executed',
+    metadata: {
+      envelope_id: envelopeId,
+      source: 'executed_pdf_refresh',
+      countersigner_name: countersigner?.name ?? null,
+      countersigner_email: countersigner?.email ?? null,
+      signed_pdf_url: webViewLink,
+    },
+  });
+
+  revalidateContractPaths(contract.id);
+  return { updated: true };
+}
+
 /** Download signed PDF, store artifacts, set status signed. */
 export async function applyEnvelopeFullySigned(
   supabase: SupabaseClient,
@@ -152,7 +220,7 @@ export async function applyEnvelopeFullySigned(
   options?: { notify?: boolean; actorEmail?: string | null },
 ): Promise<{ updated: boolean }> {
   if (contract.status === 'executed') {
-    return { updated: false };
+    return replaceExecutedSignedPdfFromEnvelope(supabase, contract, event, envelopeId, options);
   }
 
   if (contract.status === 'signed') {
@@ -301,7 +369,6 @@ export async function applyEnvelopeFullySigned(
   if (options?.notify !== false) {
     const countersignerDisplayName =
       countersigner?.name?.trim() || event?.shanken_signatory_name?.trim() || 'Countersigner';
-    // NYWE: no countersign email — queue on Wine Spectator dashboard instead.
     if (!event || !isNyweEventsManagedEvent(event)) {
       void notifyContractFullySigned(contract, event, countersignerDisplayName).catch((err) =>
         console.error('[notifyContractFullySigned]', err),
@@ -354,6 +421,40 @@ export async function syncContractFromDocuSign(
       ok: true,
       changed: false,
       message: 'Contract is already fully signed in the app.',
+      status: contract.status,
+    };
+  }
+
+  if (contract.status === 'executed') {
+    const { status: envelopeStatus } = await fetchEnvelopeStatus(envelopeId);
+    const signers = await fetchEnvelopeSigners(envelopeId);
+    await touchDocuSignPoll(supabase, contract.id);
+    if (
+      isDocuSignEnvelopeFullySigned(envelopeStatus, signers, {
+        exhibitorCompleteIsFull: false,
+      })
+    ) {
+      const { updated } = await replaceExecutedSignedPdfFromEnvelope(
+        supabase,
+        contract,
+        event,
+        envelopeId,
+        { actorEmail },
+      );
+      if (updated) {
+        return {
+          ok: true,
+          changed: true,
+          fromStatus: 'executed',
+          toStatus: 'executed',
+          message: 'Replaced executed PDF with countersigned DocuSign copy.',
+        };
+      }
+    }
+    return {
+      ok: true,
+      changed: false,
+      message: `Contract is already ${contract.status}; nothing to sync.`,
       status: contract.status,
     };
   }
