@@ -5,12 +5,20 @@ export type BigSmokePackageKey =
   | 'cigar_ad_6plus_single'
   | 'cigar_ad_6plus_double'
   | 'cigar_non_ad_single'
+  | 'lux_ad_1_5_single'
+  | 'lux_non_ad_single'
   | 'drink_single';
 
 export type BigSmokePackage = {
   key: BigSmokePackageKey;
   /** Rate-sheet family */
-  category: 'cigar_advertiser_1_5' | 'cigar_advertiser_6plus' | 'cigar_non_advertiser' | 'drink';
+  category:
+    | 'cigar_advertiser_1_5'
+    | 'cigar_advertiser_6plus'
+    | 'cigar_non_advertiser'
+    | 'lux_advertiser_1_5'
+    | 'lux_non_advertiser'
+    | 'drink';
   categoryLabel: string;
   boothLabel: string;
   booth_count: number;
@@ -63,6 +71,22 @@ export const BIG_SMOKE_PACKAGES: readonly BigSmokePackage[] = [
     key: 'cigar_non_ad_single',
     category: 'cigar_non_advertiser',
     categoryLabel: 'Cigar Non-Advertiser',
+    boothLabel: 'Single Booth',
+    booth_count: 1,
+    fee_cents: 800_000,
+  },
+  {
+    key: 'lux_ad_1_5_single',
+    category: 'lux_advertiser_1_5',
+    categoryLabel: 'Lux Lifestyle Advertiser (1–5 page ad)',
+    boothLabel: 'Single Booth',
+    booth_count: 1,
+    fee_cents: 700_000,
+  },
+  {
+    key: 'lux_non_ad_single',
+    category: 'lux_non_advertiser',
+    categoryLabel: 'Lux Lifestyle Non-Advertiser',
     boothLabel: 'Single Booth',
     booth_count: 1,
     fee_cents: 800_000,
