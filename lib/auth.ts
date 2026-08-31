@@ -7,7 +7,7 @@ import { logImpersonationEnded, logImpersonationStarted } from '@/lib/impersonat
 import { ensureAccessRequestForUnknownUser } from '@/lib/access-requests';
 import { bigSmokePortalOrigin, nywePortalOrigin, whiskyfestPortalOrigin } from '@/lib/portal-host';
 import { canAccessBigSmoke, isBigSmokeAdmin } from '@/lib/big-smoke-access';
-import { canAccessWineSpectator, isWineSpectatorAdmin } from '@/lib/wine-spectator-access';
+import { canAccessWineSpectator, isWineSpectatorAdmin, isNyweQrOnlyUser } from '@/lib/wine-spectator-access';
 import type { UserRole } from '@/types/db';
 
 const IMPERSONATION_TTL_MS = 30 * 60 * 1000;
@@ -41,6 +41,7 @@ async function computeAccessFlagsForEmail(
   is_wine_spectator_admin: boolean;
   big_smoke_access: boolean;
   is_big_smoke_admin: boolean;
+  is_qr_only: boolean;
 }> {
   const { data: appUser } = await supabase
     .from('app_users')
@@ -61,6 +62,23 @@ async function computeAccessFlagsForEmail(
       is_wine_spectator_admin: false,
       big_smoke_access: false,
       is_big_smoke_admin: false,
+      is_qr_only: false,
+    };
+  }
+
+  const isQrOnly = isNyweQrOnlyUser(email);
+  if (isQrOnly) {
+    return {
+      role: 'viewer',
+      is_events_team: false,
+      is_accounting: false,
+      can_view_all_sales: false,
+      pipeline_access: false,
+      wine_spectator_access: true,
+      is_wine_spectator_admin: false,
+      big_smoke_access: false,
+      is_big_smoke_admin: false,
+      is_qr_only: true,
     };
   }
 
@@ -108,6 +126,7 @@ async function computeAccessFlagsForEmail(
       email,
     }),
     is_big_smoke_admin: isBigSmokeAdminFlag,
+    is_qr_only: false,
   };
 }
 
@@ -287,6 +306,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       token.is_wine_spectator_admin = flags.is_wine_spectator_admin;
       token.big_smoke_access = flags.big_smoke_access;
       token.is_big_smoke_admin = flags.is_big_smoke_admin;
+      token.is_qr_only = flags.is_qr_only;
       token.real_can_impersonate = realCanImpersonate;
 
       const tp = (realUser as { theme_preference?: string | null } | null)?.theme_preference;
@@ -337,6 +357,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.is_wine_spectator_admin = Boolean(token.is_wine_spectator_admin);
       session.user.big_smoke_access = Boolean(token.big_smoke_access);
       session.user.is_big_smoke_admin = Boolean(token.is_big_smoke_admin);
+      session.user.is_qr_only = Boolean(token.is_qr_only);
       session.user.can_impersonate = Boolean(token.real_can_impersonate);
       session.user.theme_preference =
         token.theme_preference === 'light' ||

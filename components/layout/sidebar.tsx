@@ -21,6 +21,7 @@ import {
   ClipboardList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { isNyweQrOnlyUser } from '@/lib/wine-spectator-access';
 import { canAccessParticipationReport } from '@/lib/participation-report-shared';
 import {
   isAccountingPath,
@@ -61,14 +62,39 @@ function AccountPermissionSummary({
   user,
 }: {
   user: {
+    email?: string | null;
     role?: string | null;
     pipelineAccess?: boolean;
     isAccounting?: boolean;
     isEventsTeam?: boolean;
     wineSpectatorAccess?: boolean;
     bigSmokeAccess?: boolean;
+    isQrOnly?: boolean;
   };
 }) {
+  const isQrOnly = Boolean(user.isQrOnly) || isNyweQrOnlyUser(user.email);
+  if (isQrOnly) {
+    return (
+      <div className="px-2 py-2.5">
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Your access</p>
+        <dl className="space-y-1.5">
+          <div className="flex justify-between gap-4 text-xs leading-snug">
+            <dt className="shrink-0 text-muted-foreground">Role</dt>
+            <dd className="min-w-0 text-right font-medium text-foreground">Creative / QR</dd>
+          </div>
+          <div className="flex justify-between gap-4 text-xs leading-snug">
+            <dt className="shrink-0 text-muted-foreground">Scope</dt>
+            <dd className="min-w-0 text-right font-medium text-foreground">Booth QR Only</dd>
+          </div>
+          <div className="flex justify-between gap-4 text-xs leading-snug">
+            <dt className="shrink-0 text-muted-foreground">NYWE</dt>
+            <dd className="min-w-0 text-right font-medium text-foreground">Yes</dd>
+          </div>
+        </dl>
+      </div>
+    );
+  }
+
   const pipeline = Boolean(user.pipelineAccess);
   const events = Boolean(user.isEventsTeam);
   const accounting = Boolean(user.isAccounting);
@@ -122,6 +148,10 @@ const whiskyfestNav: SidebarNavItem[] = [
   { href: '/sales-reps', label: 'Sales Reps', icon: UserRound, adminOnly: true },
   { href: '/events', label: 'Events', icon: CalendarDays, adminOnly: true },
   { href: '/users', label: 'Users', icon: Users, adminOnly: true },
+];
+
+const nyweQrOnlyNav: SidebarNavItem[] = [
+  { href: '/wine-spectator/qr', label: 'Booth QR', icon: QrCode },
 ];
 
 const wineSpectatorNav: SidebarNavItem[] = [
@@ -289,6 +319,7 @@ export function Sidebar({
     wineSpectatorAdmin?: boolean;
     bigSmokeAccess?: boolean;
     bigSmokeAdmin?: boolean;
+    isQrOnly?: boolean;
   };
   canImpersonate?: boolean;
   readOnlyImpersonation?: boolean;
@@ -296,12 +327,13 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const portalKind = usePortalKind();
-  const isAdmin = user.role === 'admin';
-  const showParticipationReport = canAccessParticipationReport(user.email);
-  const wineSpectatorAdmin = Boolean(user.wineSpectatorAdmin);
-  const bigSmokeAdmin = Boolean(user.bigSmokeAdmin);
-  const pipelineAccess = Boolean(user.pipelineAccess);
-  const isAccounting = Boolean(user.isAccounting);
+  const isQrOnly = Boolean(user.isQrOnly) || isNyweQrOnlyUser(user.email);
+  const isAdmin = !isQrOnly && user.role === 'admin';
+  const showParticipationReport = !isQrOnly && canAccessParticipationReport(user.email);
+  const wineSpectatorAdmin = !isQrOnly && Boolean(user.wineSpectatorAdmin);
+  const bigSmokeAdmin = !isQrOnly && Boolean(user.bigSmokeAdmin);
+  const pipelineAccess = !isQrOnly && Boolean(user.pipelineAccess);
+  const isAccounting = !isQrOnly && Boolean(user.isAccounting);
   const canAccounting = isAccounting || isAdmin;
   const accountingOnly = isAccounting && !pipelineAccess;
   const useAccountingOnlyNav = accountingOnly && !isAdmin;
@@ -314,7 +346,9 @@ export function Sidebar({
   const wineSpectatorPortal = isWineSpectatorPath(pathname) || nywePortal;
   const bigSmokeProductPortal = isBigSmokePath(pathname) || bigSmokePortal;
   const showAccountingChrome = accountingPortal && useAccountingOnlyNav;
-  const homeHref = accountingOnly
+  const homeHref = isQrOnly
+    ? nyweHref('/wine-spectator/qr', portalKind)
+    : accountingOnly
     ? isNyweAccountingPath(pathname, portalKind)
       ? nyweHref('/accounting/nywe', portalKind)
       : isBigSmokeAccountingPath(pathname, portalKind)
@@ -330,8 +364,9 @@ export function Sidebar({
     : bigSmokePortal
       ? bigSmokeAccountingNav
       : whiskyfestAccountingNav;
-  const rawNav =
-    useAccountingOnlyNav && accountingPortal
+  const rawNav = isQrOnly
+    ? nyweQrOnlyNav
+    : useAccountingOnlyNav && accountingPortal
       ? accountingNavItems
       : wineSpectatorPortal
         ? wineSpectatorNav

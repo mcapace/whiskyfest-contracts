@@ -28,7 +28,7 @@ import {
   whiskyfestPortalOrigin,
 } from '@/lib/portal-host';
 import { canAccessBigSmoke } from '@/lib/big-smoke-access';
-import { canAccessWineSpectator } from '@/lib/wine-spectator-access';
+import { canAccessWineSpectator, isNyweQrOnlyUser } from '@/lib/wine-spectator-access';
 import { portalFaviconPath } from '@/lib/portal-metadata';
 import { isPublicExhibitorPath } from '@/lib/public-routes';
 
@@ -39,6 +39,7 @@ type SessionUserFlags = {
   wine_spectator_access?: boolean;
   big_smoke_access?: boolean;
   is_big_smoke_admin?: boolean;
+  is_qr_only?: boolean;
   role?: string;
   email?: string;
 };
@@ -172,6 +173,28 @@ export default auth((req) => {
 
   if (req.auth?.user) {
     const u = req.auth.user as SessionUserFlags;
+    const isQrOnly = Boolean(u.is_qr_only) || isNyweQrOnlyUser(u.email);
+
+    if (isQrOnly) {
+      if (pathname.startsWith('/api/')) {
+        const qrApiOk =
+          pathname.startsWith('/api/auth') ||
+          pathname.startsWith('/api/wine-spectator/booth-qr') ||
+          (pathname.startsWith('/api/contracts/') && pathname.endsWith('/booth-qr'));
+        if (!qrApiOk) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+      } else if (!isPublic && !pathname.startsWith('/_next') && pathname !== '/favicon.ico') {
+        if (nyweHost) {
+          if (pathname !== '/qr' && pathname !== '/wine-spectator/qr') {
+            return applyPortalHeader(NextResponse.redirect(requestUrl(req, '/qr')), host);
+          }
+        } else {
+          return applyPortalHeader(NextResponse.redirect(`${nywePortalOrigin()}/qr`), host);
+        }
+      }
+    }
+
     const pipeline = Boolean(u.pipeline_access);
     const accounting = Boolean(u.is_accounting);
     const admin = u.role === 'admin';

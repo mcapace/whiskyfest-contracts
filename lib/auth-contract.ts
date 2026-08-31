@@ -6,6 +6,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
 import { getAccessibleSalesRepIds } from '@/lib/rep-access';
 import { getEffectiveUserEmail } from '@/lib/effective-user';
+import { isNyweQrOnlyUser } from '@/lib/wine-spectator-access';
 import type { Contract, ContractStatus, ContractWithTotals } from '@/types/db';
 
 export interface AppUserRow {
@@ -17,6 +18,7 @@ export interface AppUserRow {
   is_accounting: boolean;
   can_view_all_sales: boolean;
   is_wine_spectator_admin: boolean;
+  is_qr_only?: boolean;
 }
 
 /** Own sales_reps row id if any; union with accessibleSalesRepIds for scoped access. */
@@ -28,6 +30,7 @@ export interface ContractActorContext {
   isAccounting: boolean;
   canViewAllSales: boolean;
   isWineSpectatorAdmin: boolean;
+  isQrOnly: boolean;
   salesRepId: string | null;
   /** Own rep id plus any reps this user assists (unique). */
   accessibleSalesRepIds: string[];
@@ -64,12 +67,14 @@ export async function resolveContractActor(session: Session | null): Promise<
   const isAccounting = Boolean((appUser as { is_accounting?: boolean }).is_accounting);
   const isWineSpectatorAdmin = Boolean((appUser as { is_wine_spectator_admin?: boolean }).is_wine_spectator_admin) || isAdmin;
   const isBigSmokeAdmin = Boolean((appUser as { is_big_smoke_admin?: boolean }).is_big_smoke_admin) || isAdmin;
+  const isQrOnly = isNyweQrOnlyUser(email);
   const canViewAllSales =
-    isAdmin ||
-    isEventsTeam ||
-    isAccounting ||
-    isBigSmokeAdmin ||
-    Boolean((appUser as { can_view_all_sales?: boolean }).can_view_all_sales);
+    !isQrOnly &&
+    (isAdmin ||
+      isEventsTeam ||
+      isAccounting ||
+      isBigSmokeAdmin ||
+      Boolean((appUser as { can_view_all_sales?: boolean }).can_view_all_sales));
 
   let salesRepId: string | null = null;
   const { data: sr } = await supabase
@@ -81,9 +86,9 @@ export async function resolveContractActor(session: Session | null): Promise<
 
   salesRepId = sr?.id ?? null;
 
-  const accessibleSalesRepIds = await getAccessibleSalesRepIds(email, supabase);
+  const accessibleSalesRepIds = isQrOnly ? [] : await getAccessibleSalesRepIds(email, supabase);
 
-  if (!canViewAllSales && accessibleSalesRepIds.length === 0) {
+  if (!canViewAllSales && !isQrOnly && accessibleSalesRepIds.length === 0) {
     return jsonErr(403, 'Not a registered rep or assistant');
   }
 
@@ -94,12 +99,14 @@ export async function resolveContractActor(session: Session | null): Promise<
       appUser: {
         ...(appUser as object),
         is_events_team: isEventsTeam,
+        is_qr_only: isQrOnly,
       } as AppUserRow,
       isAdmin,
       isEventsTeam,
       isAccounting,
       canViewAllSales,
       isWineSpectatorAdmin,
+      isQrOnly,
       salesRepId,
       accessibleSalesRepIds,
     },
@@ -136,7 +143,7 @@ export async function assertContractAccess(
     return jsonErr(403, 'Forbidden');
   }
 
-  const mustOwn = !actor.canViewAllSales && !opts?.skipOwnership;
+  const mustOwn = !actor.canViewAllSales && !actor.isQrOnly && !opts?.skipOwnership;
   if (mustOwn) {
     const oid = c.sales_rep_id;
     if (!oid || !actor.accessibleSalesRepIds.includes(oid)) {
@@ -214,6 +221,7 @@ export interface PageContractActor {
   isAccounting: boolean;
   canViewAllSales: boolean;
   isWineSpectatorAdmin: boolean;
+  isQrOnly: boolean;
   salesRepId: string | null;
   accessibleSalesRepIds: string[];
   role: string;
@@ -236,12 +244,14 @@ export async function requireContractActorForPage(): Promise<PageContractActor> 
 
   if (!appUser?.is_active) redirect('/auth/login');
 
+  const isQrOnly = isNyweQrOnlyUser(email);
   const isAdmin = appUser.role === 'admin';
   const isEventsTeam = Boolean(appUser.is_events_team);
   const isAccounting = Boolean((appUser as { is_accounting?: boolean }).is_accounting);
   const isWineSpectatorAdmin = Boolean((appUser as { is_wine_spectator_admin?: boolean }).is_wine_spectator_admin) || isAdmin;
   const canViewAllSales =
-    isAdmin || isEventsTeam || isAccounting || Boolean((appUser as { can_view_all_sales?: boolean }).can_view_all_sales);
+    !isQrOnly &&
+    (isAdmin || isEventsTeam || isAccounting || Boolean((appUser as { can_view_all_sales?: boolean }).can_view_all_sales));
 
   let salesRepId: string | null = null;
   const { data: sr } = await supabase
@@ -253,9 +263,9 @@ export async function requireContractActorForPage(): Promise<PageContractActor> 
 
   salesRepId = sr?.id ?? null;
 
-  const accessibleSalesRepIds = await getAccessibleSalesRepIds(email, supabase);
+  const accessibleSalesRepIds = isQrOnly ? [] : await getAccessibleSalesRepIds(email, supabase);
 
-  if (!canViewAllSales && accessibleSalesRepIds.length === 0) {
+  if (!canViewAllSales && !isQrOnly && accessibleSalesRepIds.length === 0) {
     redirect('/auth/login');
   }
 
@@ -266,6 +276,7 @@ export async function requireContractActorForPage(): Promise<PageContractActor> 
     isAccounting,
     canViewAllSales,
     isWineSpectatorAdmin,
+    isQrOnly,
     salesRepId,
     accessibleSalesRepIds,
     role: appUser.role,
@@ -276,6 +287,7 @@ export async function getContractWithTotalsForViewer(
   contractId: string,
 ): Promise<{ actor: PageContractActor; contract: ContractWithTotals } | null> {
   const actor = await requireContractActorForPage();
+  if (actor.isQrOnly) return null;
   const supabase = getSupabaseAdmin();
 
   const row = await fetchContractWithTotalsById(supabase, contractId);

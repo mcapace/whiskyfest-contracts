@@ -1,7 +1,9 @@
+import { redirect } from 'next/navigation';
 import { loadExhibitorRosterForPage } from '@/lib/exhibitor-roster-sync-job';
 import { getActiveWineSpectatorEvent } from '@/lib/wine-spectator-event';
 import { scheduleNyweBackgroundDocuSignSync } from '@/lib/nywe-background-docusign-sync';
 import { requireContractActorForPage } from '@/lib/auth-contract';
+import { isNyweQrOnlyUser } from '@/lib/wine-spectator-access';
 import { buildNyweDashboardMetrics } from '@/lib/nywe-dashboard-metrics';
 import { getNyweEventContractsForMetrics } from '@/lib/nywe-event-contracts';
 import { ExhibitorRosterPanel } from '@/components/wine-spectator/exhibitor-roster-panel';
@@ -11,7 +13,10 @@ import { NyweRosterPageHeader } from '@/components/wine-spectator/nywe-quick-nav
 export const dynamic = 'force-dynamic';
 
 export default async function WineSpectatorRosterPage() {
-  await requireContractActorForPage();
+  const actor = await requireContractActorForPage();
+  if (actor.isQrOnly || isNyweQrOnlyUser(actor.email)) {
+    redirect('/wine-spectator/qr');
+  }
 
   const event = await getActiveWineSpectatorEvent();
   if (!event) {

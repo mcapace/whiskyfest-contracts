@@ -97,20 +97,21 @@ function CommandPaletteDialog({ open, onOpenChange }: { open: boolean; onOpenCha
   const [debouncedPaletteQuery, setDebouncedPaletteQuery] = useState('');
   const [cmdkInstance, setCmdkInstance] = useState(0);
 
-  const isAdmin = session?.user?.role === 'admin';
-  const isEventsTeam = Boolean(session?.user?.is_events_team);
-  const isAccounting = Boolean(session?.user?.is_accounting);
-  const canImpersonate = Boolean(session?.user?.can_impersonate);
+  const isQrOnly = Boolean(session?.user?.is_qr_only);
+  const isAdmin = !isQrOnly && session?.user?.role === 'admin';
+  const isEventsTeam = !isQrOnly && Boolean(session?.user?.is_events_team);
+  const isAccounting = !isQrOnly && Boolean(session?.user?.is_accounting);
+  const canImpersonate = !isQrOnly && Boolean(session?.user?.can_impersonate);
   const showAccounting = isAccounting || isAdmin;
-  const pipeline = Boolean(session?.user?.pipeline_access);
-  const wineAccess = Boolean(session?.user?.wine_spectator_access);
+  const pipeline = !isQrOnly && Boolean(session?.user?.pipeline_access);
+  const wineAccess = !isQrOnly && Boolean(session?.user?.wine_spectator_access);
   const portalKind = usePortalKind();
   const nywePortal = portalKind === 'nywe';
-  const canSearchContracts = nywePortal ? wineAccess || isAccounting || isAdmin : pipeline || isAccounting;
-  const canCreateContract = nywePortal
+  const canSearchContracts = !isQrOnly && (nywePortal ? wineAccess || isAccounting || isAdmin : pipeline || isAccounting);
+  const canCreateContract = !isQrOnly && (nywePortal
     ? isAdmin || isEventsTeam || wineAccess
-    : isAdmin || isEventsTeam || session?.user?.role === 'sales' || session?.user?.role === 'sales_rep';
-  const canGenerateReport = isAdmin || isEventsTeam || isAccounting;
+    : isAdmin || isEventsTeam || session?.user?.role === 'sales' || session?.user?.role === 'sales_rep');
+  const canGenerateReport = !isQrOnly && (isAdmin || isEventsTeam || isAccounting);
 
   function contractDetailPath(id: string) {
     return nywePortal ? `/contracts/${id}` : `/contracts/${id}`;

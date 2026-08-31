@@ -20,6 +20,8 @@ declare module 'next-auth' {
       is_big_smoke_admin?: boolean;
       /** Real login user — true only for users allowed to use "View as…". */
       can_impersonate?: boolean;
+      /** Restricted user with access limited exclusively to NYWE executed booth QR codes. */
+      is_qr_only?: boolean;
       /** Persisted UI theme; null/undefined = system. */
       theme_preference?: 'light' | 'dark' | 'system' | null;
       tour_completed_at?: string | null;
@@ -51,6 +53,7 @@ declare module 'next-auth/jwt' {
     big_smoke_access?: boolean;
     is_big_smoke_admin?: boolean;
     real_can_impersonate?: boolean;
+    is_qr_only?: boolean;
     impersonation_target_email?: string | null;
     impersonation_target_name?: string | null;
     impersonation_started_at?: number | null;

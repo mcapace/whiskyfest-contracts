@@ -3,11 +3,20 @@ export type WineSpectatorAccessUser = {
   is_events_team?: boolean;
   is_accounting?: boolean;
   is_wine_spectator_admin?: boolean;
+  is_qr_only?: boolean;
   email?: string | null;
 };
 
 /** Explicit allowlist in addition to admin / events team (legacy fallback). */
 const WINE_SPECTATOR_ALLOWED_EMAILS = new Set(['snolan@mshanken.com']);
+
+/** Dedicated creative / QR-only allowlist (limited to executed booth QR codes). */
+export const NYWE_QR_ONLY_ALLOWED_EMAILS = new Set(['lgeorge@mshanken.com']);
+
+export function isNyweQrOnlyUser(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return NYWE_QR_ONLY_ALLOWED_EMAILS.has(email.trim().toLowerCase());
+}
 
 /** Full app admin or Wine Spectator portal admin (NYWE). */
 export function isWineSpectatorAdmin(user: WineSpectatorAccessUser | null | undefined): boolean {
@@ -18,7 +27,7 @@ export function isWineSpectatorAdmin(user: WineSpectatorAccessUser | null | unde
 
 /**
  * Wine Spectator / NYWE portal access:
- * admins, events team, AR (`is_accounting`), portal admins, and legacy allowlist.
+ * admins, events team, AR (`is_accounting`), portal admins, QR-only users, and legacy allowlist.
  * Accounting users get AR on both WhiskyFest and NYWE dashboards.
  */
 export function canAccessWineSpectator(user: WineSpectatorAccessUser | null | undefined): boolean {
@@ -26,7 +35,9 @@ export function canAccessWineSpectator(user: WineSpectatorAccessUser | null | un
   if (isWineSpectatorAdmin(user)) return true;
   if (user.is_events_team) return true;
   if (user.is_accounting) return true;
+  if (user.is_qr_only) return true;
   const email = user.email?.trim().toLowerCase();
+  if (email && isNyweQrOnlyUser(email)) return true;
   return Boolean(email && WINE_SPECTATOR_ALLOWED_EMAILS.has(email));
 }
 

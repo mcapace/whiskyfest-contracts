@@ -1,6 +1,8 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { requireContractActorForPage } from '@/lib/auth-contract';
+import { isNyweQrOnlyUser } from '@/lib/wine-spectator-access';
 import { formatCurrency } from '@/lib/utils';
 import { RelativeTime } from '@/components/ui/relative-time';
 import { greetingHour, greetingWord } from '@/lib/dashboard-greeting';
@@ -44,6 +46,9 @@ function queueItem(c: ContractWithTotals) {
 export default async function WineSpectatorDashboardPage() {
   const session = await auth();
   const actor = await requireContractActorForPage();
+  if (actor.isQrOnly || isNyweQrOnlyUser(actor.email)) {
+    redirect('/wine-spectator/qr');
+  }
   scheduleNyweBackgroundDocuSignSync();
   const { contracts: allScoped, events } = await getDashboardData(actor, PRODUCT_WINE_SPECTATOR);
 

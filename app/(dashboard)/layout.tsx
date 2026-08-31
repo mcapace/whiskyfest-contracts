@@ -75,6 +75,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               wineSpectatorAdmin: Boolean(session.user.is_wine_spectator_admin),
               bigSmokeAccess,
               bigSmokeAdmin: Boolean(session.user.is_big_smoke_admin),
+              isQrOnly: Boolean(session.user.is_qr_only),
             }}
             canImpersonate={Boolean(session.user.can_impersonate)}
             readOnlyImpersonation={readOnly}
