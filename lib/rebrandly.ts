@@ -105,7 +105,23 @@ export async function getRebrandlyLink(linkId: string): Promise<RebrandlyLink> {
   return rebrandlyFetch<RebrandlyLink>(`/links/${encodeURIComponent(linkId)}`);
 }
 
+import QRCode from 'qrcode';
+
 export type RebrandlyQrFormat = 'png' | 'svg';
+
+export async function generateQrBuffer(shortUrl: string, format: RebrandlyQrFormat, size = 1024): Promise<Buffer> {
+  const fullUrl = shortUrl.startsWith('http') ? shortUrl : `https://${shortUrl}`;
+  if (format === 'svg') {
+    const svg = await QRCode.toString(fullUrl, { type: 'svg', margin: 2 });
+    return Buffer.from(svg, 'utf-8');
+  }
+  return QRCode.toBuffer(fullUrl, { type: 'png', width: size, margin: 2 });
+}
+
+export async function generateQrDataUrl(shortUrl: string, size = 512): Promise<string> {
+  const fullUrl = shortUrl.startsWith('http') ? shortUrl : `https://${shortUrl}`;
+  return QRCode.toDataURL(fullUrl, { width: size, margin: 2 });
+}
 
 export function rebrandlyQrImageUrl(shortUrl: string, format: RebrandlyQrFormat, size = 1024): string {
   const branded = assertRebrandlyBrandedShortUrl(shortUrl);
@@ -114,10 +130,6 @@ export function rebrandlyQrImageUrl(shortUrl: string, format: RebrandlyQrFormat,
   return `https://${hostPath}.qr?size=${size}`;
 }
 
-export async function downloadRebrandlyQr(shortUrl: string, format: RebrandlyQrFormat): Promise<Buffer> {
-  const res = await fetch(rebrandlyQrImageUrl(shortUrl, format), { cache: 'no-store' });
-  if (!res.ok) {
-    throw new Error(`Could not download QR ${format.toUpperCase()} (${res.status}).`);
-  }
-  return Buffer.from(await res.arrayBuffer());
+export async function downloadRebrandlyQr(shortUrl: string, format: RebrandlyQrFormat, size = 1024): Promise<Buffer> {
+  return generateQrBuffer(shortUrl, format, size);
 }

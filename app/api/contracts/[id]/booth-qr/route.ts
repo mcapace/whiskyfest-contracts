@@ -10,7 +10,7 @@ import {
   parseBoothQrFormat,
   saveNyweWebsiteUrl,
 } from '@/lib/nywe-booth-qr';
-import { rebrandlyQrImageUrl } from '@/lib/rebrandly';
+import { generateQrDataUrl } from '@/lib/rebrandly';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import type { Contract, Event } from '@/types/db';
 
@@ -49,9 +49,10 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       gate.contract as Contract,
       event?.year ?? new Date().getFullYear(),
     );
+    const previewUrl = await generateQrDataUrl(shortUrl, 512);
     return NextResponse.json({
       shortUrl,
-      previewUrl: rebrandlyQrImageUrl(shortUrl, 'png', 512),
+      previewUrl,
       websiteUrl: gate.contract.exhibitor_website_url,
     });
   } catch (err) {

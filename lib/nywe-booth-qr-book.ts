@@ -6,7 +6,7 @@ import {
   listNyweExecutedBoothQrContracts,
   type NyweBoothQrContractRow,
 } from '@/lib/nywe-booth-qr';
-import { downloadRebrandlyQr } from '@/lib/rebrandly';
+import { generateQrBuffer } from '@/lib/rebrandly';
 import { normalizeWineryWebsiteUrl } from '@/lib/winery-website';
 
 const PAGE_WIDTH = 612;
@@ -115,16 +115,11 @@ export async function buildNyweBoothQrBook(input: {
   for (const contract of ready) {
     try {
       const { shortUrl } = await ensureNyweBoothQrLink(contract, input.eventYear);
-      const pngBody = await downloadRebrandlyQr(shortUrl, 'png');
-      let svgBody: Buffer | null = null;
-      try {
-        svgBody = await downloadRebrandlyQr(shortUrl, 'svg');
-      } catch {
-        svgBody = null;
-      }
+      const pngBody = await generateQrBuffer(shortUrl, 'png', 512);
+      const svgBody = await generateQrBuffer(shortUrl, 'svg');
       const stem = safeFileStem(contract.exhibitor_company_name);
       zip.file(`png/${stem} NYWE booth QR.png`, pngBody);
-      if (svgBody) zip.file(`svg/${stem} NYWE booth QR.svg`, svgBody);
+      zip.file(`svg/${stem} NYWE booth QR.svg`, svgBody);
 
       const page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
       const image = await pdf.embedPng(pngBody);
@@ -187,7 +182,7 @@ export async function buildNyweBoothQrBook(input: {
   zip.file(`${input.eventName.replace(/[^\w]+/g, ' ').trim() || 'NYWE'} ${input.eventYear} booth QR book.pdf`, pdfBytes);
 
   const zipBuffer = Buffer.from(
-    await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }),
+    await zip.generateAsync({ type: 'nodebuffer', compression: 'STORE' }),
   );
   return {
     zip: zipBuffer,

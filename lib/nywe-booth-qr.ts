@@ -174,11 +174,17 @@ export function parseBoothQrFormat(raw: string | null | undefined): RebrandlyQrF
 export async function ensureNyweBoothQrLink(
   contract: NyweBoothQrContractRow,
   eventYear: number,
+  options?: { forceSync?: boolean },
 ): Promise<{ shortUrl: string }> {
   const website = normalizeWineryWebsiteUrl(contract.exhibitor_website_url);
   if (!website) {
     throw new Error('Add a winery website before printing the booth QR.');
   }
+
+  if (!options?.forceSync && contract.rebrandly_short_url?.trim()) {
+    return { shortUrl: assertRebrandlyBrandedShortUrl(contract.rebrandly_short_url) };
+  }
+
   const destination = nyweBoothQrTrackingUrl(contract.id);
 
   let linkId = contract.rebrandly_link_id?.trim() || null;

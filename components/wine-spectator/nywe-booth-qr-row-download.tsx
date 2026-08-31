@@ -25,11 +25,6 @@ function filenameFromHeader(header: string | null, fallback: string): string {
   return match?.[1]?.trim() || fallback;
 }
 
-function previewUrlFromShort(shortUrl: string): string {
-  const hostPath = shortUrl.replace(/^https?:\/\//i, '').replace(/\/$/, '');
-  return `https://${hostPath}.qr?size=512`;
-}
-
 export async function downloadNyweBoothQrFile(
   contractId: string,
   exhibitorName: string,
@@ -93,15 +88,6 @@ export function NyweBoothQrRowDownload({
     setMessage(null);
     startTransition(async () => {
       try {
-        if (shortUrl?.trim()) {
-          setPreview({
-            shortUrl,
-            previewUrl: previewUrlFromShort(shortUrl),
-            websiteUrl: websiteUrl ?? null,
-          });
-          setPreviewOpen(true);
-          return;
-        }
         const res = await fetch(`/api/contracts/${contractId}/booth-qr`);
         const json = (await res.json().catch(() => ({}))) as {
           error?: string;
