@@ -33,6 +33,8 @@ export default async function NyweBoothQrPage() {
         exhibitorCompanyName: c.exhibitor_company_name,
         websiteUrl: c.exhibitor_website_url,
         shortUrl: c.rebrandly_short_url,
+        artCode: c.art_code,
+        boothNumber: c.booth_number,
         clicks: c.qr_clicks ?? 0,
         lastClickAt: c.qr_last_click_at,
       }))}

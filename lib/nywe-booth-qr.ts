@@ -7,6 +7,7 @@ import {
   updateRebrandlyDestination,
   type RebrandlyQrFormat,
 } from '@/lib/rebrandly';
+import { nyweBoothQrDownloadFilename } from '@/lib/nywe-art-codes';
 import { nywePortalOrigin } from '@/lib/portal-host';
 import { normalizeWineryWebsiteUrl, rosterWineryWebsiteUrl } from '@/lib/winery-website';
 import { isNyweVendorOnlyEvent } from '@/lib/nywe-pricing';
@@ -29,10 +30,12 @@ export type NyweBoothQrContractRow = Pick<
   | 'rebrandly_short_url'
   | 'qr_clicks'
   | 'qr_last_click_at'
+  | 'art_code'
+  | 'booth_number'
 >;
 
 const BOOTH_QR_CONTRACT_COLUMNS =
-  'id, event_id, status, order_type, exhibitor_company_name, exhibitor_website_url, rebrandly_link_id, rebrandly_short_url, qr_clicks, qr_last_click_at';
+  'id, event_id, status, order_type, exhibitor_company_name, exhibitor_website_url, rebrandly_link_id, rebrandly_short_url, qr_clicks, qr_last_click_at, art_code, booth_number';
 
 export function nyweBoothQrEligible(
   contract: Pick<Contract, 'status' | 'order_type'>,
@@ -132,9 +135,15 @@ export function boothQrSlashtag(wineryName: string, year: number, attempt = 0): 
   return `${prefix}${base}${suffix}`.slice(0, 40);
 }
 
-function downloadFilename(wineryName: string, format: RebrandlyQrFormat): string {
-  const safe = wineryName.replace(/[^\w]+/g, ' ').trim() || 'Winery';
-  return `${safe} NYWE booth QR.${format}`;
+function downloadFilename(
+  contract: Pick<NyweBoothQrContractRow, 'exhibitor_company_name' | 'art_code'>,
+  format: RebrandlyQrFormat,
+): string {
+  return nyweBoothQrDownloadFilename({
+    artCode: contract.art_code,
+    wineryName: contract.exhibitor_company_name,
+    format,
+  });
 }
 
 async function persistLink(
@@ -247,7 +256,7 @@ export async function downloadNyweBoothQr(
   return {
     body,
     shortUrl,
-    filename: downloadFilename(contract.exhibitor_company_name, format),
+    filename: downloadFilename(contract, format),
     contentType: format === 'svg' ? 'image/svg+xml' : 'image/png',
   };
 }

@@ -18,6 +18,8 @@ export type NyweBoothQrPageRow = {
   exhibitorCompanyName: string;
   websiteUrl: string | null;
   shortUrl: string | null;
+  artCode: string | null;
+  boothNumber: string | null;
   clicks: number;
   lastClickAt: string | null;
 };
@@ -116,12 +118,19 @@ export function NyweBoothQrWorkspace({
       if (filter === 'missing' && row.websiteUrl) return false;
       if (filter === 'ready' && !row.websiteUrl) return false;
       if (filter === 'scans' && row.clicks <= 0) return false;
-      if (q && !row.exhibitorCompanyName.toLowerCase().includes(q)) return false;
+      if (q) {
+        const hay = `${row.exhibitorCompanyName} ${row.artCode ?? ''} ${row.boothNumber ?? ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
       return true;
     });
-    return [...next].sort((a, b) =>
-      a.exhibitorCompanyName.localeCompare(b.exhibitorCompanyName, undefined, { sensitivity: 'base' }),
-    );
+    return [...next].sort((a, b) => {
+      const aArt = Number.parseInt(a.artCode ?? '', 10);
+      const bArt = Number.parseInt(b.artCode ?? '', 10);
+      if (Number.isFinite(aArt) && Number.isFinite(bArt) && aArt !== bArt) return aArt - bArt;
+      if (Number.isFinite(aArt) !== Number.isFinite(bArt)) return Number.isFinite(aArt) ? -1 : 1;
+      return a.exhibitorCompanyName.localeCompare(b.exhibitorCompanyName, undefined, { sensitivity: 'base' });
+    });
   }, [rows, filter, query]);
 
   return (
@@ -163,8 +172,8 @@ export function NyweBoothQrWorkspace({
             screen before printing, or download PNG or SVG.
           </li>
           <li>
-            <strong className="font-medium text-foreground">Download QR book</strong> builds a PDF plus PNG/SVG files for
-            every license that has a website.
+            <strong className="font-medium text-foreground">Download QR book</strong> builds a PDF plus PNG/SVG files
+            named by art code for print processing.
           </li>
           <li>Scan counts on this page are from our winespectator.live short links.</li>
         </ol>
@@ -208,7 +217,7 @@ export function NyweBoothQrWorkspace({
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search winery"
+              placeholder="Search winery, art code, or booth"
               className="h-9 border-border/70 bg-background pl-8 shadow-none"
               aria-label="Search booth QR wineries"
             />
@@ -241,6 +250,8 @@ export function NyweBoothQrWorkspace({
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Art code</TableHead>
+                <TableHead>Booth</TableHead>
                 <TableHead>Winery</TableHead>
                 <TableHead>Website</TableHead>
                 <TableHead>Short link</TableHead>
@@ -252,7 +263,7 @@ export function NyweBoothQrWorkspace({
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
                     No executed licenses match this view.
                   </TableCell>
                 </TableRow>
@@ -264,6 +275,12 @@ export function NyweBoothQrWorkspace({
                     key={row.id}
                     className={missing ? 'bg-amber-50/90 hover:bg-amber-100/80' : undefined}
                   >
+                    <TableCell className="font-mono tabular-nums text-sm">
+                      {row.artCode ?? '—'}
+                    </TableCell>
+                    <TableCell className="font-mono tabular-nums text-sm text-muted-foreground">
+                      {row.boothNumber ?? '—'}
+                    </TableCell>
                     <TableCell>
                       <Link
                         href={`/wine-spectator/contracts/${row.id}`}
@@ -289,6 +306,7 @@ export function NyweBoothQrWorkspace({
                       <NyweBoothQrRowDownload
                         contractId={row.id}
                         exhibitorName={row.exhibitorCompanyName}
+                        artCode={row.artCode}
                         websiteUrl={row.websiteUrl}
                         shortUrl={row.shortUrl}
                         missingHref={`/wine-spectator/contracts/${row.id}`}

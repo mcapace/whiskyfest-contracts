@@ -180,6 +180,10 @@ export interface Contract {
   qr_clicks: number;
   qr_last_click_at: string | null;
   qr_clicks_synced_at: string | null;
+  /** NYWE print art code for booth QR file naming. */
+  art_code: string | null;
+  /** NYWE tasting booth number from the TOC / art-code sheet. */
+  booth_number: string | null;
 }
 
 export interface ContractLineItem {

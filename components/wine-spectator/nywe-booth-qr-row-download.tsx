@@ -29,6 +29,7 @@ export async function downloadNyweBoothQrFile(
   contractId: string,
   exhibitorName: string,
   format: RebrandlyQrFormat,
+  artCode?: string | null,
 ): Promise<void> {
   const res = await fetch(`/api/contracts/${contractId}/booth-qr?format=${format}`, { method: 'POST' });
   if (!res.ok) {
@@ -39,10 +40,10 @@ export async function downloadNyweBoothQrFile(
   const href = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = href;
-  a.download = filenameFromHeader(
-    res.headers.get('Content-Disposition'),
-    `${exhibitorName} NYWE booth QR.${format}`,
-  );
+  const fallback = artCode?.trim()
+    ? `${artCode.trim()}.${format}`
+    : `${exhibitorName} NYWE booth QR.${format}`;
+  a.download = filenameFromHeader(res.headers.get('Content-Disposition'), fallback);
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -55,6 +56,7 @@ export function NyweBoothQrRowDownload({
   exhibitorName,
   websiteUrl,
   shortUrl,
+  artCode,
   missingHref,
   compact = false,
 }: {
@@ -62,6 +64,7 @@ export function NyweBoothQrRowDownload({
   exhibitorName: string;
   websiteUrl: string | null | undefined;
   shortUrl?: string | null;
+  artCode?: string | null;
   missingHref?: string;
   compact?: boolean;
 }) {
@@ -77,7 +80,7 @@ export function NyweBoothQrRowDownload({
     setMessage(null);
     startTransition(async () => {
       try {
-        await downloadNyweBoothQrFile(contractId, exhibitorName, format);
+        await downloadNyweBoothQrFile(contractId, exhibitorName, format, artCode);
       } catch (err) {
         setMessage(err instanceof Error ? err.message : 'Could not download booth QR.');
       }
