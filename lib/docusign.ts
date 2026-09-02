@@ -258,14 +258,22 @@ export interface SendEnvelopeParams {
   replyTo?: { email: string; name: string } | null;
   /** NYWE licenses with roster billing merged into PDF — skip empty exhibitor fill tabs. */
   skipExhibitorDataTabs?: boolean;
+  /**
+   * Where routing-order-1 Sign/Date tabs anchor.
+   * Use `countersigner` when the exhibitor already signed on an uploaded PDF and only
+   * Shanken needs to countersign (single-recipient envelope on \\s2\\ / \\d2\\).
+   */
+  signer1TabAnchors?: 'exhibitor' | 'countersigner';
 }
 
 export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelopeId: string }> {
   const { accessToken, accountId, restApiBase } = await getDocuSignSession();
 
-  const signHere1 = anchorOnly(DOCUSIGN_ANCHORS.sig1);
-  const date1 = anchorOnly(DOCUSIGN_ANCHORS.date1);
-  const exhibitorTabs = params.skipExhibitorDataTabs ? {} : buildExhibitorDataTextTabs();
+  const useCountersignerAnchors = params.signer1TabAnchors === 'countersigner';
+  const signHere1 = anchorOnly(useCountersignerAnchors ? DOCUSIGN_ANCHORS.sig2 : DOCUSIGN_ANCHORS.sig1);
+  const date1 = anchorOnly(useCountersignerAnchors ? DOCUSIGN_ANCHORS.date2 : DOCUSIGN_ANCHORS.date1);
+  const exhibitorTabs =
+    params.skipExhibitorDataTabs || useCountersignerAnchors ? {} : buildExhibitorDataTextTabs();
 
   const signers: Record<string, unknown>[] = [
     {
@@ -273,6 +281,7 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
       name: params.signer1.name,
       recipientId: '1',
       routingOrder: '1',
+      ...(useCountersignerAnchors ? { roleName: 'Countersigner' } : {}),
       tabs: {
         signHereTabs: [signHere1],
         dateSignedTabs: [date1],
@@ -283,7 +292,9 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
 
   const countersigner = params.countersigner;
   const signingGroupId = params.countersignerSigningGroupId?.trim();
-  if (signingGroupId) {
+  if (useCountersignerAnchors) {
+    // Exhibitor signature already on the PDF — do not add a second recipient.
+  } else if (signingGroupId) {
     const signHere2 = anchorOnly(DOCUSIGN_ANCHORS.sig2);
     const date2 = anchorOnly(DOCUSIGN_ANCHORS.date2);
     signers.push({
