@@ -3,7 +3,10 @@ import { auth } from '@/lib/auth';
 import { assertContractAccess } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { renderContractPdfFromTemplate } from '@/lib/google';
-import { persistContractDraftPdf } from '@/lib/contract-pdf-storage';
+import {
+  downloadContractPdfFromStorage,
+  persistContractDraftPdf,
+} from '@/lib/contract-pdf-storage';
 import { formatDocuSignErrorForUser, isDocuSignRateLimitError, sendEnvelope } from '@/lib/docusign';
 import { fetchContractBoothBrandsOrdered } from '@/lib/contract-booth-brands';
 import { fetchContractLineItemsOrdered } from '@/lib/contract-line-items';
@@ -121,25 +124,32 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   if (ccError) {
     return NextResponse.json({ error: ccError }, { status: 400 });
   }
-  const safeCompany = contract.exhibitor_company_name.replace(/[^\w\s-]/g, '');
   const templateDocId = resolveContractTemplateDocId(contract, event);
   const usesOrderTable = contractUsesOrderTable(event, contract);
+  const useUploadedRevision =
+    Boolean(contract.revision_use_uploaded_pdf) && Boolean(contract.revision_upload_path?.trim());
 
   try {
-    const lineItems = await fetchContractLineItemsOrdered(supabase, contract.id);
-    const boothBrands = await fetchContractBoothBrandsOrdered(supabase, contract.id);
-    const mergeMap = buildContractMergeMap(contract, event, 'docusign', boothBrands);
-    const fileName = `${contractPdfBaseName(contract.exhibitor_company_name, event)} (DocuSign)`;
+    let pdfBytes: Buffer;
+    if (useUploadedRevision) {
+      // Client-redlined / revision PDF already includes negotiated terms — do not re-merge template.
+      pdfBytes = await downloadContractPdfFromStorage(contract.revision_upload_path!.trim());
+    } else {
+      const lineItems = await fetchContractLineItemsOrdered(supabase, contract.id);
+      const boothBrands = await fetchContractBoothBrandsOrdered(supabase, contract.id);
+      const mergeMap = buildContractMergeMap(contract, event, 'docusign', boothBrands);
+      const fileName = `${contractPdfBaseName(contract.exhibitor_company_name, event)} (DocuSign)`;
 
-    const pdfBytes = await renderContractPdfFromTemplate(
-      templateDocId,
-      mergeMap,
-      fileName,
-      usesOrderTable ? lineItems : undefined,
-      {
-        includeBoothRow: usesOrderTable && !isSponsorshipOnlyOrder(contract),
-      },
-    );
+      pdfBytes = await renderContractPdfFromTemplate(
+        templateDocId,
+        mergeMap,
+        fileName,
+        usesOrderTable ? lineItems : undefined,
+        {
+          includeBoothRow: usesOrderTable && !isSponsorshipOnlyOrder(contract),
+        },
+      );
+    }
     const { draftStoragePath, drafted_at } = await persistContractDraftPdf(contract.id, pdfBytes);
 
     const pdfBase64 = pdfBytes.toString('base64');
@@ -154,7 +164,9 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       carbonCopy,
       brandId: docusignBrandIdForEvent(event),
       replyTo: sendGridFromForEvent(event),
-      skipExhibitorDataTabs: shouldSkipExhibitorDataTabs(event, contract),
+      // Uploaded revision PDFs already contain filled address/legal text — skip overlay tabs.
+      skipExhibitorDataTabs:
+        useUploadedRevision || shouldSkipExhibitorDataTabs(event, contract),
     });
 
     await supabase
