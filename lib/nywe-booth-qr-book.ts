@@ -7,7 +7,7 @@ import {
   listNyweExecutedBoothQrContracts,
   type NyweBoothQrContractRow,
 } from '@/lib/nywe-booth-qr';
-import { generateQrBuffer } from '@/lib/rebrandly';
+import { generateQrBuffer, NYWE_BOOTH_QR_PRINT_PX } from '@/lib/rebrandly';
 import { normalizeWineryWebsiteUrl } from '@/lib/winery-website';
 
 const PAGE_WIDTH = 612;
@@ -157,7 +157,7 @@ export async function buildNyweBoothQrBook(input: {
   for (const contract of ready) {
     try {
       const { shortUrl } = await ensureNyweBoothQrLink(contract, input.eventYear);
-      const pngBody = await generateQrBuffer(shortUrl, 'png', 512);
+      const pngBody = await generateQrBuffer(shortUrl, 'png', NYWE_BOOTH_QR_PRINT_PX);
       const svgBody = await generateQrBuffer(shortUrl, 'svg');
       const stem = nyweBoothQrFileStem({
         artCode: contract.art_code,

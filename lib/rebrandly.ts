@@ -109,18 +109,35 @@ import QRCode from 'qrcode';
 
 export type RebrandlyQrFormat = 'png' | 'svg';
 
-export async function generateQrBuffer(shortUrl: string, format: RebrandlyQrFormat, size = 1024): Promise<Buffer> {
+/** Print-ready booth QR canvas (matches NYWE sign template). */
+export const NYWE_BOOTH_QR_PRINT_PX = 900;
+
+/** Quiet-zone modules — ~8.6% margin at 900px, matching 2025 print assets. */
+export const NYWE_BOOTH_QR_MARGIN = 3;
+
+export const NYWE_BOOTH_QR_PREVIEW_PX = 512;
+
+export async function generateQrBuffer(
+  shortUrl: string,
+  format: RebrandlyQrFormat,
+  size = NYWE_BOOTH_QR_PRINT_PX,
+  margin = NYWE_BOOTH_QR_MARGIN,
+): Promise<Buffer> {
   const fullUrl = shortUrl.startsWith('http') ? shortUrl : `https://${shortUrl}`;
   if (format === 'svg') {
-    const svg = await QRCode.toString(fullUrl, { type: 'svg', margin: 2 });
+    const svg = await QRCode.toString(fullUrl, { type: 'svg', margin });
     return Buffer.from(svg, 'utf-8');
   }
-  return QRCode.toBuffer(fullUrl, { type: 'png', width: size, margin: 2 });
+  return QRCode.toBuffer(fullUrl, { type: 'png', width: size, margin });
 }
 
-export async function generateQrDataUrl(shortUrl: string, size = 512): Promise<string> {
+export async function generateQrDataUrl(
+  shortUrl: string,
+  size = NYWE_BOOTH_QR_PREVIEW_PX,
+  margin = NYWE_BOOTH_QR_MARGIN,
+): Promise<string> {
   const fullUrl = shortUrl.startsWith('http') ? shortUrl : `https://${shortUrl}`;
-  return QRCode.toDataURL(fullUrl, { width: size, margin: 2 });
+  return QRCode.toDataURL(fullUrl, { width: size, margin });
 }
 
 export function rebrandlyQrImageUrl(shortUrl: string, format: RebrandlyQrFormat, size = 1024): string {
@@ -130,6 +147,10 @@ export function rebrandlyQrImageUrl(shortUrl: string, format: RebrandlyQrFormat,
   return `https://${hostPath}.qr?size=${size}`;
 }
 
-export async function downloadRebrandlyQr(shortUrl: string, format: RebrandlyQrFormat, size = 1024): Promise<Buffer> {
+export async function downloadRebrandlyQr(
+  shortUrl: string,
+  format: RebrandlyQrFormat,
+  size = NYWE_BOOTH_QR_PRINT_PX,
+): Promise<Buffer> {
   return generateQrBuffer(shortUrl, format, size);
 }
