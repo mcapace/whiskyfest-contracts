@@ -1,12 +1,46 @@
 import sgMail from '@sendgrid/mail';
 import {
   appBaseUrlForProduct,
+  isBigSmokeProduct,
   sendGridFromForEvent,
   workspaceLabelForEvent,
   type EventEmailContext,
 } from '@/lib/product-email';
 import { productKeyFromEvent } from '@/lib/product-portal';
 import { exhibitorSigningAccentHex } from '@/lib/exhibitor-signing-portal';
+
+/** Prefer a SendGrid-verified mailbox when the product From domain is not authenticated. */
+function sendGridFromAddressForNudge(event: EventEmailContext | null | undefined): {
+  email: string;
+  name: string;
+} {
+  const productFrom = sendGridFromForEvent(event);
+  if (!isBigSmokeProduct(productKeyFromEvent(event))) {
+    return productFrom;
+  }
+  // Same pattern as accounting handoff: cigaraficionado.com is not authenticated on
+  // SendGrid, so Mail Send returns 403 Forbidden for bigsmokecontracts@...
+  const verified =
+    process.env['ACCOUNTING_FROM_EMAIL']?.trim() ||
+    process.env['WHISKYFEST_FROM_EMAIL']?.trim() ||
+    productFrom.email;
+  return { email: verified, name: productFrom.name };
+}
+
+function formatSendGridError(err: unknown): string {
+  if (!err || typeof err !== 'object') return err instanceof Error ? err.message : String(err);
+  const anyErr = err as {
+    message?: string;
+    code?: number | string;
+    response?: { statusCode?: number; body?: { errors?: Array<{ message?: string }> } };
+  };
+  const status = anyErr.response?.statusCode ?? anyErr.code;
+  const details = anyErr.response?.body?.errors?.map((e) => e.message).filter(Boolean).join('; ');
+  if (details) {
+    return status ? `SendGrid ${status}: ${details}` : `SendGrid: ${details}`;
+  }
+  return anyErr.message || String(err);
+}
 
 function eventLabelForEmail(event: { name: string; year?: number }): string {
   const name = event.name.trim();
@@ -48,7 +82,7 @@ export async function sendPersonalContractNudgeEmail(p: PersonalNudgeEmailParams
 
   sgMail.setApiKey(apiKey);
 
-  const from = sendGridFromForEvent(p.event);
+  const from = sendGridFromAddressForNudge(p.event);
   const workspaceLabel = workspaceLabelForEvent(p.event);
   const signingUrl = p.signingUrl.trim();
   const eventLabel = eventLabelForEmail(p.event);
@@ -91,19 +125,23 @@ export async function sendPersonalContractNudgeEmail(p: PersonalNudgeEmailParams
       ? [{ email: ccEmail, name: p.internalCcName?.trim() || ccEmail }]
       : undefined;
 
-  await sgMail.send({
-    from: { email: from.email, name: p.senderName.trim() || from.name },
-    replyTo: { email: p.senderEmail.trim(), name: p.senderName.trim() || p.senderEmail.trim() },
-    to: [{ email: p.signerEmail.trim(), name: p.signerName?.trim() || p.signerEmail.trim() }],
-    cc,
-    subject,
-    text,
-    html,
-    trackingSettings: {
-      clickTracking: { enable: false, enableText: false },
-      openTracking: { enable: false },
-    },
-  });
+  try {
+    await sgMail.send({
+      from: { email: from.email, name: p.senderName.trim() || from.name },
+      replyTo: { email: p.senderEmail.trim(), name: p.senderName.trim() || p.senderEmail.trim() },
+      to: [{ email: p.signerEmail.trim(), name: p.signerName?.trim() || p.signerEmail.trim() }],
+      cc,
+      subject,
+      text,
+      html,
+      trackingSettings: {
+        clickTracking: { enable: false, enableText: false },
+        openTracking: { enable: false },
+      },
+    });
+  } catch (err) {
+    throw new Error(formatSendGridError(err));
+  }
 }
 
 export function personalNudgeReturnUrl(
