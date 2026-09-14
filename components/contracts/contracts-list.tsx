@@ -26,6 +26,7 @@ import { categorizeContractBrands } from '@/lib/brand-category';
 import { subscribeToAppContractEvents } from '@/lib/realtime-client';
 import { CONTRACT_DEAL_KINDS, dealKindFromContract, dealKindLabel, listPackageLabel } from '@/lib/contract-deal-kind';
 import { NyweBoothQrRowDownload, downloadNyweBoothQrFile } from '@/components/wine-spectator/nywe-booth-qr-row-download';
+import { NyweDocuSignRefreshButton } from '@/components/wine-spectator/nywe-docusign-refresh-button';
 import { WinePouredChips } from '@/components/contracts/wine-poured-chips';
 import type { BoothBrandRowsByContract } from '@/lib/sponsors';
 import type { ContractWithTotals, Event } from '@/types/db';
@@ -283,6 +284,7 @@ export function ContractsList({
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {winePortal ? <NyweDocuSignRefreshButton className="mr-1" /> : null}
           <SavedViewsDropdown onApply={setFilters} customSaved={customViews} />
           <Button variant="outline" onClick={saveCurrentView}>
             Save view
