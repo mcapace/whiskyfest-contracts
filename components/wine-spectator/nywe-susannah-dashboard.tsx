@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
 import { RelativeTime } from '@/components/ui/relative-time';
+import { NyweDocuSignRefreshButton } from '@/components/wine-spectator/nywe-docusign-refresh-button';
 
 export type NyweStuckLicense = {
   id: string;
@@ -87,10 +88,15 @@ export function NyweSusannahDashboard({
   return (
     <Card className="border-fest-600/15">
       <CardHeader className="pb-4">
-        <CardTitle className="font-serif text-xl font-semibold">Action queue</CardTitle>
-        <p className="nywe-subhead text-sm text-muted-foreground">
-          Review, waiting on winery, and signed but not yet&nbsp;released
-        </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle className="font-serif text-xl font-semibold">Action queue</CardTitle>
+            <p className="nywe-subhead text-sm text-muted-foreground">
+              Review, waiting on winery, and signed but not yet&nbsp;released
+            </p>
+          </div>
+          <NyweDocuSignRefreshButton className="shrink-0" />
+        </div>
       </CardHeader>
       <CardContent className="space-y-5">
         {!hasQueue ? (
