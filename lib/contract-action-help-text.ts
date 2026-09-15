@@ -10,10 +10,10 @@ export const CONTRACT_ACTION_HELP = {
   cancel: 'Use when the deal is off. Terminates the contract entirely.',
 
   sendReminder:
-    'Ask DocuSign to email the same recipients already on this envelope again. Does not change who signs — if the contact changed, use Resend with Changes instead.',
+    'Email the unsigned signer a secure portal link to review and sign the same DocuSign agreement (works even when DocuSign mail is blocked). Does not change who signs — if the contact changed, use Resend with Changes instead. When the exhibitor has already signed, re-notifies DocuSign recipients (countersign queue).',
 
   sendPersonalNudge:
-    'Send a personal follow-up to the unsigned signer with a secure link to sign the same original DocuSign agreement (bulk or individual send). Does not void or resend the envelope. Optionally CC a colleague.',
+    'Send a custom follow-up to the unsigned signer with the same secure signing link, plus an optional CC. Use when you need a personal message; otherwise prefer Send Reminder.',
 
   syncFromDocusign:
     'Pull the latest signature status from DocuSign and update this contract if a webhook was missed (exhibitor signed or fully executed).',
