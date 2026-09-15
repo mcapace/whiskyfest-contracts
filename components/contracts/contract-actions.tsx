@@ -905,25 +905,10 @@ export function ContractActions({
           )}
           {hasDocuSignSecondary && (
             <ContractActionsSidebarGroup label="DocuSign">
-              {canPersonalNudge && (
-                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.sendPersonalNudge} className="w-full">
-                  <Button
-                    className={btnPrimary}
-                    onClick={openPersonalNudgeDialog}
-                    disabled={busy}
-                  >
-                    <ContractActionButtonLabel
-                      icon={Mail}
-                      label="Send personal note"
-                      spinning={pending && action === 'personal-nudge'}
-                    />
-                  </Button>
-                </ActionWithHelp>
-              )}
               {canReminder && (
                 <ActionWithHelp helpText={CONTRACT_ACTION_HELP.sendReminder} className="w-full">
                   <Button
-                    className={canPersonalNudge ? btnSecondary : btnPrimary}
+                    className={btnPrimary}
                     onClick={() => runAction('send-reminder', 'reminder')}
                     disabled={busy}
                   >
@@ -931,6 +916,21 @@ export function ContractActions({
                       icon={Mail}
                       label="Send Reminder"
                       spinning={pending && action === 'reminder'}
+                    />
+                  </Button>
+                </ActionWithHelp>
+              )}
+              {canPersonalNudge && (
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.sendPersonalNudge} className="w-full">
+                  <Button
+                    className={canReminder ? btnSecondary : btnPrimary}
+                    onClick={openPersonalNudgeDialog}
+                    disabled={busy}
+                  >
+                    <ContractActionButtonLabel
+                      icon={Mail}
+                      label="Send personal note"
+                      spinning={pending && action === 'personal-nudge'}
                     />
                   </Button>
                 </ActionWithHelp>
@@ -1151,7 +1151,7 @@ export function ContractActions({
             <DialogTitle>Resend with Changes</DialogTitle>
             <DialogDescription>
               Voids the current DocuSign envelope and sends a new one to the signer below. Use this when the
-              signing contact changed — Send Reminder only re-notifies whoever is already on the old envelope.
+              signing contact changed — Send Reminder emails a portal link to whoever is already on the old envelope.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -1499,7 +1499,8 @@ function StatusLine({
         <>
           {' '}
           · Open <span className="font-medium text-foreground">Actions</span> →{' '}
-          <span className="font-medium text-foreground">Send personal note</span> for a custom follow-up
+          <span className="font-medium text-foreground">Send Reminder</span> for a signing link, or{' '}
+          <span className="font-medium text-foreground">Send personal note</span> for a custom message
         </>
       ) : null;
     if (!isAdmin && !isEventsTeam) {

@@ -2,104 +2,89 @@
 
 ## Quick Answer
 
-**Use "Send personal note"** instead of "Send Reminder" when exhibitors say they can't find where to sign.
+**Use "Send Reminder"** first — it emails a secure portal link to review and sign the same agreement.
+
+Use **"Send personal note"** when you need a custom message or want to CC a colleague.
 
 ---
 
 ## Why This Happens
 
-Based on Mike's email, when exhibitors say "nowhere to sign," it's usually:
+When exhibitors say "nowhere to sign," it's usually:
 
 1. **They're stuck on page 1** - Need to click yellow "Start", then "Next" to page 2, then look mid-left for "Sign Here"
 2. **Wrong person opened it** - e.g., CC recipient (like Jennifer at Kobrand) gets view-only; only the actual signer (like Ellie) can sign
 3. **Forwarded DocuSign link** - Often breaks or opens as view-only
+4. **DocuSign email blocked** - Some company filters block DocuSign; the portal reminder link still works
 
 ---
 
 ## What Each Button Does
 
-### ❌ "Send Reminder" (Don't Use for This)
-- Just re-sends DocuSign's standard email
-- Goes to the same people already on the envelope
-- **Does NOT help** if they're confused about where to sign
-- **Does NOT change** who can sign
+### ✅ "Send Reminder" (Default — use this)
 
-**When to use:** Only if they genuinely forgot and need the same DocuSign email again.
+**One click.** Emails the signer a branded message with a **Review and sign agreement** button.
+
+- Opens the **same** DocuSign envelope (not a new contract)
+- Works even when DocuSign’s own emails are blocked
+- Includes short instructions (Start → page 2 → Sign Here)
+- Does **not** change who can sign
+
+**When to use:** They forgot, didn’t get DocuSign mail, or say there’s nowhere to sign.
 
 ---
 
-### ✅ "Send personal note" (Use This!)
-**This is what Tobi should use!**
+### ✅ "Send personal note" (Custom message)
 
-**What it does:**
-- Sends a **custom email from you** (not generic DocuSign)
-- Includes your personal message
-- Gives them a **special signing link** that works even if they can't find DocuSign emails
-- Includes **clear instructions** on exactly how to sign
-- Can CC a colleague
+Same signing link as Reminder, plus:
 
-**The email automatically includes:**
-> "This link opens the same agreement we originally sent you — not a new contract. Click the button below, then press 'Continue to sign' on the next page to open DocuSign. In DocuSign, click Start if prompted; your signature is on page 2 (use Next if you do not see it). No Shanken login is required. This works even if your company email blocks messages from DocuSign."
+- Your own written message
+- Optional CC to a colleague
 
-**Perfect for:**
-- "I can't find where to sign" issues ✅
-- "I didn't get the DocuSign email" ✅
-- Need to explain something specific ✅
-- Want to add personal touch ✅
+**When to use:** You want a personal touch or need to explain something specific.
+
+---
+
+## How to Use "Send Reminder"
+
+1. **Open the contract** in the portal (e.g. bigsmokecontracts.cigaraficionado.com, nywecontracts.winespectator.com, or wacontracts.whiskyadvocate.com)
+
+2. **Click "Send Reminder"** in Actions
+
+3. The signer gets an email with **Review and sign agreement** — they click it, then **Continue to sign** on the landing page to open DocuSign
 
 ---
 
 ## How to Use "Send personal note"
 
-1. **Open the contract** in the portal (bigsmokecontracts.cigaraficionado.com)
+1. Open the contract → **Send personal note**
 
-2. **Click "Send personal note"** button
+2. Write your message (optional CC)
 
-3. **Write your message**, for example:
-   ```
-   Hi [Name],
+3. Click **Send**
 
-   I wanted to personally reach out about your Big Smoke Las Vegas agreement. 
-   I know the DocuSign emails can be confusing sometimes.
+The email automatically includes:
 
-   Click the button below for a direct link to sign. Once you're in DocuSign:
-   - Click the yellow "Start" button
-   - Click "Next" to go to page 2
-   - Look for the "Sign Here" box on the mid-left of the page
-   - That's it!
-
-   Let me know if you have any questions.
-
-   Best,
-   Tobi
-   ```
-
-4. **Optional:** Add a CC email if you want someone else to see it
-
-5. **Click "Send"**
+> "This link opens the same agreement we originally sent you — not a new contract. Click the button below, then press 'Continue to sign' on the next page to open DocuSign. In DocuSign, click Start if prompted; your signature is on page 2 (use Next if you do not see it). No Shanken login is required. This works even if your company email blocks messages from DocuSign."
 
 ---
 
-## Sample Message for Tobi
-
-For exhibitors saying "nowhere to sign":
+## Sample Message for Personal Note
 
 ```
 Hi [Exhibitor Name],
 
-Thanks for reaching out about the signing issue. I'm sending you a direct 
-link to sign your Big Smoke Las Vegas agreement.
+Thanks for reaching out about the signing issue. I'm sending you a direct
+link to sign your agreement.
 
-The "Sign Here" box is on page 2 of the DocuSign document. Here's exactly 
-how to find it:
+The "Sign Here" box is on page 2 of the DocuSign document:
 
-1. Click the button in this email to open DocuSign
+1. Click the button in this email
 2. Click the yellow "Start" button
 3. Click "Next" to go to page 2
 4. Look for the "Sign Here" box on the mid-left of the page
 
-The system may also guide you through with yellow highlights. Let me know if 
-you still can't find it and I'll walk you through it!
+Let me know if you still can't find it and I'll walk you through it!
 
 Best,
 Tobi
@@ -109,23 +94,19 @@ Tobi
 
 ## Technical Details (For Reference)
 
-**From the code:**
-- "Send Reminder" just calls DocuSign API to resend their standard email
-- "Send personal note" sends a custom SendGrid email with:
-  - Your personal message
-  - Clear signing instructions (automatically added)
-  - Special signing link that bypasses common issues
-  - Optional CC to colleague
+- **Send Reminder** (`sent`): SendGrid email with portal `/sign?c=…&t=…` link → DocuSign recipient view
+- **Send Reminder** (`partially_signed`): DocuSign native resend (countersigners)
+- **Send personal note**: Same portal link + custom body + optional CC
 
-**Location in portal:** Contract actions area (same place as Send Reminder button)
+**Location in portal:** Contract Actions (DocuSign group)
 
 ---
 
 ## Summary for Tobi
 
-**When exhibitors say "nowhere to sign":**
+**When exhibitors haven’t signed or say "nowhere to sign":**
 
-❌ **Don't use:** Send Reminder (doesn't help)  
-✅ **Use:** Send personal note (solves the problem)
+✅ **Use:** Send Reminder (default)  
+✅ **Or:** Send personal note (custom message / CC)
 
-**The personal note email automatically includes the instructions they need!**
+Both include a proper signing link that opens the live envelope.

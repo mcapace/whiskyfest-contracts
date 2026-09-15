@@ -42,7 +42,10 @@ All endpoints are implemented as Next.js route handlers under `app/api`.
 - **Side effects**: adjusts data and re-sends envelope flow
 
 ### `POST /api/contracts/[id]/send-reminder`
-- **Permissions**: staff with send control
+- **Permissions**: admin / events team
+- **`sent`**: emails the exhibitor a branded portal signing link (`/sign?c=…&t=…`) via SendGrid for the same DocuSign envelope (WhiskyFest / NYWE / Big Smoke hosts). Does not re-fire DocuSign’s native email.
+- **`partially_signed`**: asks DocuSign to resend notifications on the existing envelope (countersign queue).
+- **Audit**: `docusign_send_reminder` with `channel: portal_signing_link | docusign_resend`
 
 ### `POST /api/contracts/[id]/recall`
 - **Permissions**: staff with send control
