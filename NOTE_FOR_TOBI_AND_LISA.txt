@@ -1,0 +1,92 @@
+NYWE QR Codes - Updated with Official URLs
+
+Hi Tobi & Lisa,
+
+All QR code URLs have been updated with the official URLs provided by Susannah and deployed to production.
+
+--------------------------------------------------------------------------------
+DOWNLOAD THE CORRECTED QR BOOK:
+--------------------------------------------------------------------------------
+
+Go to: nywecontracts.winespectator.com/qr
+
+1. Log in with your Wine Spectator admin credentials
+2. Click "Download QR book" button
+3. Get ZIP file with PDF and PNG/SVG files for each winery
+
+--------------------------------------------------------------------------------
+STATUS: 10 OUT OF 11 QR CODES WORKING
+--------------------------------------------------------------------------------
+
+1. Adriano Ramos Pinto → https://www.ramospinto.pt/en/
+2. Merum Priorati → http://merumpriorati.com/en/
+3. Col d'Orcia → https://coldorcia.it/en/home
+4. Ca'Marcanda → https://wilsondaniels.com/wine/ca-marcanda/camarcanda-bolgheri-dop/
+5. GAJA → https://wilsondaniels.com/winery/gaja/
+6. Pieve Santa Restituta → https://wilsondaniels.com/winery/pieve-santa-restituta/
+7. Beronia → Site completely down (awaiting working URL)
+8. Brancaia → https://brancaia.com/en/
+9. CVNE → https://cvne.com/en/
+10. Paolo Scavino → https://www.skurnik.com/producer/paolo-scavino/
+11. Tensley → https://tensleywines.com/
+
+--------------------------------------------------------------------------------
+KEY UPDATES FROM SUSANNAH:
+--------------------------------------------------------------------------------
+
+Wilson Daniels Importer Pages:
+Ca'Marcanda, GAJA, and Pieve Santa Restituta now use Wilson Daniels importer 
+pages. These are professional, always working, and have full producer information.
+
+English Language Versions:
+All winery sites now use /en/ URLs for better US customer experience.
+
+Beronia Status:
+Susannah confirmed their site is completely down ("really and truly cooked"). 
+QR code will need to be updated once a working URL is available.
+
+--------------------------------------------------------------------------------
+HOW TO USE:
+--------------------------------------------------------------------------------
+
+1. Download the new QR book from the portal (link above)
+2. Test a few QR codes by scanning with your phone
+3. All should redirect smoothly to the correct pages
+4. Print/distribute the corrected QR book as needed
+
+Important: The old QR book has the incorrect URLs. Make sure to download the 
+new version.
+
+--------------------------------------------------------------------------------
+WHAT WAS FIXED:
+--------------------------------------------------------------------------------
+
+- All typos corrected (www, → www., trura → tura, .com → .it)
+- Wilson Daniels importer pages for Gaja estates
+- English versions of winery sites
+- Skurnik importer page for Paolo Scavino
+- Correct URLs without SSL errors
+
+--------------------------------------------------------------------------------
+BERONIA NOTE:
+--------------------------------------------------------------------------------
+
+Beronia's website is completely down (confirmed by Susannah). Once they have 
+a working site or importer page URL, we can update the QR code. For now, 
+10 out of 11 QR codes are working.
+
+--------------------------------------------------------------------------------
+DEPLOYMENT:
+--------------------------------------------------------------------------------
+
+Deployed: September 16, 2026, 4:08 PM UTC
+Status: Live in production
+All URLs from Susannah applied to database and application code
+QR book ready to download now
+
+--------------------------------------------------------------------------------
+
+The corrected QR book is ready to download from the portal.
+
+Best,
+Mike
