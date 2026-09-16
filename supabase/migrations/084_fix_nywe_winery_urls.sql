@@ -1,78 +1,94 @@
 -- Fix typos in NYWE winery website URLs for QR codes
 -- Based on Tobi's feedback about QR code destinations in the tasting book
 
--- Fix typo: www, → www. (Adriano Ramos Pinto)
-UPDATE public.contracts
-SET exhibitor_website_url = 'https://www.ramospinto.pt/'
-WHERE exhibitor_website_url LIKE '%www,%'
-  OR exhibitor_website_url LIKE '%ramospinto%'
-  AND exhibitor_website_url LIKE '%www,%';
+-- Fix NYWE winery URLs per Susannah Nolan (Sept 16, 2026)
 
--- Fix typo: trura → tura (Merum Priorati / Pere Ventura)
+-- Adriano Ramos Pinto - English version
 UPDATE public.contracts
-SET exhibitor_website_url = 'https://www.pereventura.com/'
-WHERE exhibitor_website_url LIKE '%ventrura%'
-  OR exhibitor_website_url LIKE '%pereventrura%';
-
--- Fix typo: .com → .it (Col d'Orcia)
-UPDATE public.contracts
-SET exhibitor_website_url = 'https://www.coldorcia.it/'
-WHERE exhibitor_website_url LIKE '%coldorcia.com%';
-
--- Fix: www.beronia.com → beronia.com (without www, times out with www)
-UPDATE public.contracts
-SET exhibitor_website_url = 'https://beronia.com/'
-WHERE exhibitor_website_url LIKE '%www.beronia.com%';
-
--- Fix: Brancaia URL (stale/bad URL)
-UPDATE public.contracts
-SET exhibitor_website_url = 'https://brancaia.com/'
-WHERE (exhibitor_company_name ILIKE '%Brancaia%' OR exhibitor_company_name ILIKE '%Brancaia%')
+SET exhibitor_website_url = 'https://www.ramospinto.pt/en/'
+WHERE (exhibitor_company_name ILIKE '%Ramos Pinto%' OR exhibitor_company_name ILIKE '%Adriano Ramos%')
   AND (exhibitor_website_url IS NULL 
-    OR exhibitor_website_url LIKE '%brancaia.it%'
-    OR exhibitor_website_url = '');
+    OR exhibitor_website_url = ''
+    OR exhibitor_website_url LIKE '%ramospinto%');
 
--- Fix: CVNE URL (bad/stale URL)
+-- Merum Priorati - English version (was Pere Ventura typo)
 UPDATE public.contracts
-SET exhibitor_website_url = 'https://www.cvne.com/'
-WHERE (exhibitor_company_name ILIKE '%CVNE%' OR exhibitor_company_name ILIKE '%Compañía Vinícola%')
-  AND (exhibitor_website_url IS NULL OR exhibitor_website_url = '');
+SET exhibitor_website_url = 'http://merumpriorati.com/en/'
+WHERE (exhibitor_company_name ILIKE '%Merum%' OR exhibitor_company_name ILIKE '%Priorati%')
+  AND (exhibitor_website_url IS NULL 
+    OR exhibitor_website_url = ''
+    OR exhibitor_website_url LIKE '%ventrura%'
+    OR exhibitor_website_url LIKE '%pereventura%'
+    OR exhibitor_website_url LIKE '%merum%');
 
--- Fix: Tensley URL (www.tensleywines.com SSL fails, use without www)
+-- Col d'Orcia - English version (.it not .com)
+UPDATE public.contracts
+SET exhibitor_website_url = 'https://coldorcia.it/en/home'
+WHERE (exhibitor_company_name ILIKE '%Col%Orcia%' OR exhibitor_company_name ILIKE '%Coldorcia%')
+  AND (exhibitor_website_url IS NULL 
+    OR exhibitor_website_url = ''
+    OR exhibitor_website_url LIKE '%coldorcia%');
+
+-- Brancaia - English version
+UPDATE public.contracts
+SET exhibitor_website_url = 'https://brancaia.com/en/'
+WHERE exhibitor_company_name ILIKE '%Brancaia%'
+  AND (exhibitor_website_url IS NULL 
+    OR exhibitor_website_url = ''
+    OR exhibitor_website_url LIKE '%brancaia%');
+
+-- CVNE - English version
+UPDATE public.contracts
+SET exhibitor_website_url = 'https://cvne.com/en/'
+WHERE (exhibitor_company_name ILIKE '%CVNE%' OR exhibitor_company_name ILIKE '%Compañía Vinícola%')
+  AND (exhibitor_website_url IS NULL 
+    OR exhibitor_website_url = ''
+    OR exhibitor_website_url LIKE '%cvne%');
+
+-- Tensley - no www
 UPDATE public.contracts
 SET exhibitor_website_url = 'https://tensleywines.com/'
-WHERE exhibitor_website_url LIKE '%www.tensleywines.com%';
+WHERE exhibitor_company_name ILIKE '%Tensley%'
+  AND (exhibitor_website_url IS NULL 
+    OR exhibitor_website_url = ''
+    OR exhibitor_website_url LIKE '%tensleywines%');
 
--- Fix: Ca'Marcanda (HTTPS cert broken, use HTTP)
+-- Ca'Marcanda - Wilson Daniels importer page
 UPDATE public.contracts
-SET exhibitor_website_url = 'http://www.camarcanda.com/'
+SET exhibitor_website_url = 'https://wilsondaniels.com/wine/ca-marcanda/camarcanda-bolgheri-dop/'
 WHERE (exhibitor_company_name ILIKE '%Ca''Marcanda%' OR exhibitor_company_name ILIKE '%Camarcanda%')
   AND (exhibitor_website_url IS NULL 
-    OR exhibitor_website_url LIKE '%https://www.camarcanda%'
-    OR exhibitor_website_url = '');
+    OR exhibitor_website_url = ''
+    OR exhibitor_website_url LIKE '%camarcanda%');
 
--- Fix: GAJA (main site)
+-- GAJA - Wilson Daniels importer page
 UPDATE public.contracts
-SET exhibitor_website_url = 'https://www.gaja.com/'
+SET exhibitor_website_url = 'https://wilsondaniels.com/winery/gaja/'
 WHERE exhibitor_company_name ILIKE '%GAJA%'
   AND exhibitor_company_name NOT ILIKE '%Ca''Marcanda%'
   AND exhibitor_company_name NOT ILIKE '%Pieve%'
   AND (exhibitor_website_url IS NULL 
     OR exhibitor_website_url = ''
-    OR exhibitor_website_url NOT LIKE '%gaja.com%');
+    OR exhibitor_website_url LIKE '%gaja%');
 
--- Fix: Pieve Santa Restituta (HTTPS cert broken, use HTTP)
+-- Pieve Santa Restituta - Wilson Daniels importer page
 UPDATE public.contracts
-SET exhibitor_website_url = 'http://www.pievesantarestituta.com/'
+SET exhibitor_website_url = 'https://wilsondaniels.com/winery/pieve-santa-restituta/'
 WHERE (exhibitor_company_name ILIKE '%Pieve Santa Restituta%' OR exhibitor_company_name ILIKE '%Pieve%Restituta%')
   AND (exhibitor_website_url IS NULL 
-    OR exhibitor_website_url LIKE '%https://www.pievesantarestituta%'
-    OR exhibitor_website_url = '');
+    OR exhibitor_website_url = ''
+    OR exhibitor_website_url LIKE '%pieve%');
 
--- Fix: Paolo Scavino - use Skurnik importer page (winery site has broken TLS)
+-- Paolo Scavino - Skurnik importer page (winery site has broken TLS)
 UPDATE public.contracts
 SET exhibitor_website_url = 'https://www.skurnik.com/producer/paolo-scavino/'
 WHERE (exhibitor_company_name ILIKE '%Paolo Scavino%' OR exhibitor_company_name ILIKE '%Scavino%')
   AND (exhibitor_website_url IS NULL 
     OR exhibitor_website_url = ''
-    OR exhibitor_website_url LIKE '%paoloscavino%');
+    OR exhibitor_website_url LIKE '%scavino%');
+
+-- Beronia - site is completely down, set to NULL so it can be updated when available
+UPDATE public.contracts
+SET exhibitor_website_url = NULL
+WHERE exhibitor_company_name ILIKE '%Beronia%'
+  AND (exhibitor_website_url LIKE '%beronia%');
