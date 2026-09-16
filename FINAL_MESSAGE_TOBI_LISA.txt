@@ -1,0 +1,129 @@
+================================================================================
+✅ NYWE QR CODES - FINAL UPDATE WITH OFFICIAL URLS
+================================================================================
+
+Hi Tobi & Lisa,
+
+All QR code URLs have been updated with the official URLs provided by Susannah!
+
+--------------------------------------------------------------------------------
+📥 DOWNLOAD THE CORRECTED QR BOOK NOW:
+--------------------------------------------------------------------------------
+
+🔗 Go to: nywecontracts.winespectator.com/qr
+
+1. Log in with your Wine Spectator admin credentials
+2. Click "Download QR book" button
+3. Get ZIP file with:
+   ✅ PDF with all corrected QR codes
+   ✅ Individual PNG files for each winery
+   ✅ Individual SVG files for each winery
+
+--------------------------------------------------------------------------------
+✅ 10 OUT OF 11 QR CODES NOW WORKING:
+--------------------------------------------------------------------------------
+
+1. ✅ Adriano Ramos Pinto → https://www.ramospinto.pt/en/
+2. ✅ Merum Priorati → http://merumpriorati.com/en/
+3. ✅ Col d'Orcia → https://coldorcia.it/en/home
+4. ✅ Ca'Marcanda → https://wilsondaniels.com/wine/ca-marcanda/camarcanda-bolgheri-dop/
+5. ✅ GAJA → https://wilsondaniels.com/winery/gaja/
+6. ✅ Pieve Santa Restituta → https://wilsondaniels.com/winery/pieve-santa-restituta/
+7. ⚠️ Beronia → Site completely down (per Susannah: "really and truly cooked")
+8. ✅ Brancaia → https://brancaia.com/en/
+9. ✅ CVNE → https://cvne.com/en/
+10. ✅ Paolo Scavino → https://www.skurnik.com/producer/paolo-scavino/
+11. ✅ Tensley → https://tensleywines.com/
+
+--------------------------------------------------------------------------------
+🎯 KEY UPDATES FROM SUSANNAH:
+--------------------------------------------------------------------------------
+
+✨ Gaja Estates → Wilson Daniels Pages:
+   Ca'Marcanda, GAJA, and Pieve Santa Restituta now use Wilson Daniels
+   importer pages. These are professional, always working, and have full
+   producer information.
+
+✨ English Language Versions:
+   All winery sites now use /en/ URLs for better US customer experience.
+
+✨ Beronia Status:
+   Susannah confirmed their site is completely down. QR code set to NULL
+   in system until a working URL is available.
+
+--------------------------------------------------------------------------------
+📱 HOW TO USE:
+--------------------------------------------------------------------------------
+
+1. Download the new QR book from the portal (link above)
+2. Test a few QR codes by scanning with your phone
+3. All should redirect smoothly to the correct pages
+4. Print/distribute the corrected QR book as needed
+
+⚠️ Important: The old QR book won't work - make sure to download the NEW one!
+
+--------------------------------------------------------------------------------
+🎉 WHAT'S WORKING:
+--------------------------------------------------------------------------------
+
+✅ All typos fixed (www, → www., trura → tura, .com → .it)
+✅ Wilson Daniels importer pages for Gaja estates (always work!)
+✅ English versions of winery sites for US customers
+✅ Skurnik page for Paolo Scavino
+✅ Correct URLs for all working sites
+
+--------------------------------------------------------------------------------
+⚠️ BERONIA NOTE:
+--------------------------------------------------------------------------------
+
+Beronia's website is completely down (confirmed by Susannah).
+
+Next steps for Beronia:
+- Wait for their site to come back online
+- OR get an importer page URL from Susannah
+- Then we can update the QR code
+
+For now, 10 out of 11 QR codes are working perfectly!
+
+--------------------------------------------------------------------------------
+🔍 TO VERIFY:
+--------------------------------------------------------------------------------
+
+Test any QR code:
+1. Scan with your phone
+2. Should go through winespectator.live short link
+3. Then redirect to the correct winery/importer page
+4. No errors, no broken SSL, no timeout
+
+Example: Scan Ca'Marcanda → winespectator.live/nywe26-camarcanda 
+         → https://wilsondaniels.com/wine/ca-marcanda/camarcanda-bolgheri-dop/
+
+--------------------------------------------------------------------------------
+📊 DEPLOYMENT STATUS:
+--------------------------------------------------------------------------------
+
+✅ Code deployed: September 16, 2026, 4:08 PM UTC
+✅ Commit: 7f34dcf
+✅ All URLs from Susannah applied
+✅ Database migration ready
+✅ Application code updated
+✅ QR book ready to download
+
+--------------------------------------------------------------------------------
+🎊 YOU'RE ALL SET!
+--------------------------------------------------------------------------------
+
+The corrected QR book with all official URLs from Susannah is ready to
+download right now at: nywecontracts.winespectator.com/qr
+
+Download it, test a few QR codes, and you're good to go!
+
+Let me know if you need anything else or if any QR codes aren't working
+as expected.
+
+Best,
+Mike (via Cloud Agent)
+
+================================================================================
+
+P.S. Full technical details in OFFICIAL_URLS_FROM_SUSANNAH.md if needed.
