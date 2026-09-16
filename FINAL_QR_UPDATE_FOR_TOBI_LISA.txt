@@ -1,0 +1,65 @@
+================================================================================
+FINAL UPDATE: All 11 NYWE QR Code Issues Fixed ✅
+================================================================================
+
+Hi Tobi & Lisa,
+
+Great news - ALL 11 QR code issues are now completely fixed, including Paolo Scavino!
+
+--------------------------------------------------------------------------------
+📥 DOWNLOAD UPDATED QR BOOK NOW:
+--------------------------------------------------------------------------------
+
+Go to: nywecontracts.winespectator.com/qr
+→ Log in
+→ Click "Download QR book"
+→ Get ZIP with corrected PDF + PNG/SVG files
+
+--------------------------------------------------------------------------------
+✅ ALL 11 FIXES COMPLETE:
+--------------------------------------------------------------------------------
+
+1. ✅ Adriano Ramos Pinto → https://www.ramospinto.pt/ (typo fixed: www, → www.)
+2. ✅ Merum Priorati → https://www.pereventura.com/ (typo fixed: trura → tura)
+3. ✅ Col d'Orcia → https://www.coldorcia.it/ (typo fixed: .com → .it)
+4. ✅ GAJA → https://www.gaja.com/ (correct main site)
+5. ✅ Ca'Marcanda → http://www.camarcanda.com/ (Gaja estate, HTTP)
+6. ✅ Pieve Santa Restituta → http://www.pievesantarestituta.com/ (Gaja estate, HTTP)
+7. ✅ Beronia → https://beronia.com/ (removed www)
+8. ✅ Brancaia → https://brancaia.com/ (fixed domain)
+9. ✅ CVNE → https://www.cvne.com/ (fixed URL)
+10. ✅ Tensley → https://tensleywines.com/ (removed www for SSL)
+11. ✅ Paolo Scavino → https://www.skurnik.com/producer/paolo-scavino/ (Skurnik importer page)
+
+--------------------------------------------------------------------------------
+🎯 WHAT TO DO:
+--------------------------------------------------------------------------------
+
+1. Download the new QR book from the portal (link above)
+2. Test by scanning a few QR codes - they should all work now
+3. Print/distribute as needed
+
+The old QR book won't work - make sure to use the newly downloaded one!
+
+--------------------------------------------------------------------------------
+📝 PAOLO SCAVINO NOTE:
+--------------------------------------------------------------------------------
+
+Paolo Scavino's winery website has broken SSL, so we're using their official
+US importer (Skurnik) page instead. This gives customers full producer info
+and is the best alternative since their direct site isn't working.
+
+--------------------------------------------------------------------------------
+🎉 STATUS: DEPLOYED TO PRODUCTION
+--------------------------------------------------------------------------------
+
+Deployed: September 16, 2026, 4:06 PM UTC
+Commits: 95813c6, 4c5c516
+All changes live now
+
+You're all set to download and use the corrected QR book!
+
+Best,
+Mike (via Cloud Agent)
+
+================================================================================
