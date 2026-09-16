@@ -1,9 +1,39 @@
+/** Known URL corrections for NYWE winery websites (QR code destinations). */
+const WINERY_URL_CORRECTIONS: Record<string, string> = {
+  // Typo fixes from tasting book QR audit (Sept 2026)
+  'www,ramospinto': 'https://www.ramospinto.pt/',
+  'ramospinto.pt': 'https://www.ramospinto.pt/',
+  'ventrura.com': 'https://www.pereventura.com/',
+  'pereventrura': 'https://www.pereventura.com/',
+  'coldorcia.com': 'https://www.coldorcia.it/',
+  // Sites with broken HTTPS certs - force HTTP
+  'camarcanda.com': 'http://www.camarcanda.com/',
+  'pievesantarestituta.com': 'http://www.pievesantarestituta.com/',
+  // Sites that don't work with www
+  'www.beronia.com': 'https://beronia.com/',
+  'www.tensleywines.com': 'https://tensleywines.com/',
+  // Correct primary domains
+  'brancaia.it': 'https://brancaia.com/',
+  'gaja.com': 'https://www.gaja.com/',
+  'cvne.com': 'https://www.cvne.com/',
+};
+
 /** Normalize a roster/staff-entered winery website (booth QR redirect target). */
 export function normalizeWineryWebsiteUrl(raw: string | null | undefined): string | null {
   const extracted = extractHttpUrl(raw);
   if (!extracted) return null;
   let value = extracted;
   if (/^(javascript|data|vbscript):/i.test(value)) return null;
+  
+  // Apply known corrections before normalizing
+  const lowerValue = value.toLowerCase();
+  for (const [pattern, corrected] of Object.entries(WINERY_URL_CORRECTIONS)) {
+    if (lowerValue.includes(pattern)) {
+      value = corrected;
+      break;
+    }
+  }
+  
   if (!/^https?:\/\//i.test(value)) value = `https://${value}`;
   try {
     const url = new URL(value);
