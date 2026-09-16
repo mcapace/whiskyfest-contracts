@@ -14,8 +14,7 @@ Good news! All the NYWE tasting book QR code issues that Tobi reported have been
 **All 11 winery URL problems are fixed:**
 - ✅ Typos corrected (Adriano Ramos Pinto, Merum Priorati, Col d'Orcia)
 - ✅ Wrong winery links fixed (GAJA, Ca'Marcanda, Pieve Santa Restituta)
-- ✅ Blocked URLs working (Beronia, Brancaia, CVNE, Tensley)
-- ⚠️ Paolo Scavino: their website has technical issues on their end - no working URL available right now
+- ✅ Blocked URLs working (Beronia, Brancaia, CVNE, Tensley, Paolo Scavino)
 
 ## 📥 How to Download the Updated QR Book
 
@@ -56,9 +55,7 @@ Good news! All the NYWE tasting book QR code issues that Tobi reported have been
 | Brancaia | Bad/stale URL | Now works: https://brancaia.com/ |
 | CVNE | Bad/stale URL | Now works: https://www.cvne.com/ |
 | Tensley | SSL error with www | Now works: https://tensleywines.com/ (no www) |
-
-### Special Case - Paolo Scavino:
-Their website is under maintenance with broken TLS. There's no working URL available right now. You may want to check with them directly for their current website status.
+| Paolo Scavino | Winery site has broken TLS | Now uses Skurnik importer page: https://www.skurnik.com/producer/paolo-scavino/ |
 
 ## 🧪 How to Test
 
@@ -101,11 +98,6 @@ If you're also managing the exhibitor roster in Google Sheets, you should update
 - Find the winery in the list
 - Check the "Short link" column
 - Click to preview the destination
-
-**For Paolo Scavino:**
-- Their website has technical issues on their end
-- May need to contact them directly for a working URL
-- Once they provide one, we can update it in the system
 
 ## 🎉 You're All Set!
 

@@ -31,7 +31,7 @@ All 11 winery URL issues from Tobi's tasting book QR audit have been corrected:
 | **Brancaia** | Bad URL | `https://brancaia.com/` |
 | **CVNE** | Bad URL | `https://www.cvne.com/` |
 | **Tensley** | SSL handshake fails with www | `https://tensleywines.com/` (no www) |
-| **Paolo Scavino** | TLS broken / site maintenance | *(no fix available - site issues)* |
+| **Paolo Scavino** | TLS broken / site maintenance | `https://www.skurnik.com/producer/paolo-scavino/` (importer page) |
 
 ---
 
@@ -140,9 +140,9 @@ These use **HTTP** instead of HTTPS because their SSL certificates are broken (c
 **This is intentional** - using HTTP works, HTTPS fails.
 
 ### Paolo Scavino
-Site has maintenance issues and broken TLS. No working URL available currently. 
+Winery site (paoloscavino.com) has broken TLS. Using their Skurnik importer page instead: https://www.skurnik.com/producer/paolo-scavino/
 
-**Action needed**: Check with Paolo Scavino for their correct current URL.
+**This works perfectly** - Skurnik is their US importer with full producer info.
 
 ---
 
