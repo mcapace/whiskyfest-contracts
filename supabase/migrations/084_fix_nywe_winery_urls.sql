@@ -69,4 +69,10 @@ WHERE (exhibitor_company_name ILIKE '%Pieve Santa Restituta%' OR exhibitor_compa
     OR exhibitor_website_url LIKE '%https://www.pievesantarestituta%'
     OR exhibitor_website_url = '');
 
--- Note: Paolo Scavino site has broken TLS - no good URL available, leaving as-is
+-- Fix: Paolo Scavino - use Skurnik importer page (winery site has broken TLS)
+UPDATE public.contracts
+SET exhibitor_website_url = 'https://www.skurnik.com/producer/paolo-scavino/'
+WHERE (exhibitor_company_name ILIKE '%Paolo Scavino%' OR exhibitor_company_name ILIKE '%Scavino%')
+  AND (exhibitor_website_url IS NULL 
+    OR exhibitor_website_url = ''
+    OR exhibitor_website_url LIKE '%paoloscavino%');

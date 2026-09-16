@@ -16,6 +16,8 @@ const WINERY_URL_CORRECTIONS: Record<string, string> = {
   'brancaia.it': 'https://brancaia.com/',
   'gaja.com': 'https://www.gaja.com/',
   'cvne.com': 'https://www.cvne.com/',
+  // Use importer page when winery site unavailable
+  'paoloscavino': 'https://www.skurnik.com/producer/paolo-scavino/',
 };
 
 /** Normalize a roster/staff-entered winery website (booth QR redirect target). */
