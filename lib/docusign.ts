@@ -3,6 +3,16 @@ import { buildExhibitorDataTextTabs } from '@/lib/exhibitor-docusign-fields';
 import { DOCUSIGN_ANCHORS } from '@/lib/merge-map';
 import { isWhiskyfestBigSmokeCountersignerEmail, WF_BS_COUNTERSIGN_GROUP_LABEL } from '@/lib/wf-bslv-countersigner';
 
+/**
+ * DocuSign clientUserId for the exhibitor (routing order 1). Marks the recipient as
+ * "embedded" so EnvelopeViews:createRecipient returns a real signing session for them.
+ * Without it DocuSign hands back the *sender's* read-only envelope view (no Sign Here tabs).
+ * Unique per envelope only, so a constant is fine.
+ */
+export const EXHIBITOR_CLIENT_USER_ID = 'exhibitor';
+/** Keep DocuSign's own signing emails for embedded recipients (remote + embedded signing). */
+const EMBEDDED_RECIPIENT_START_URL = 'SIGN_AT_DOCUSIGN';
+
 function requireEnv(name: string): string {
   const v = process.env[name]?.trim();
   if (!v) throw new Error(`Missing ${name} env var`);
@@ -281,7 +291,12 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
       name: params.signer1.name,
       recipientId: '1',
       routingOrder: '1',
-      ...(useCountersignerAnchors ? { roleName: 'Countersigner' } : {}),
+      ...(useCountersignerAnchors
+        ? { roleName: 'Countersigner' }
+        : {
+            clientUserId: EXHIBITOR_CLIENT_USER_ID,
+            embeddedRecipientStartURL: EMBEDDED_RECIPIENT_START_URL,
+          }),
       tabs: {
         signHereTabs: [signHere1],
         dateSignedTabs: [date1],
@@ -397,6 +412,8 @@ export interface DocuSignSignerRow {
   status?: string;
   signedDateTime?: string;
   recipientId?: string;
+  /** Set when the recipient is embedded (required to open a signing session via recipient view). */
+  clientUserId?: string;
 }
 
 export async function fetchRecipientSignHereTabCount(
@@ -512,7 +529,61 @@ export async function fetchEnvelopeSigners(
       (typeof s['signedDateTime'] === 'string' ? s['signedDateTime'] : undefined) ??
       (typeof s['SignedDateTime'] === 'string' ? (s['SignedDateTime'] as string) : undefined),
     recipientId: s['recipientId'] != null ? String(s['recipientId']) : undefined,
+    clientUserId: typeof s['clientUserId'] === 'string' && s['clientUserId'].trim() ? s['clientUserId'].trim() : undefined,
   }));
+}
+
+/**
+ * Envelopes sent before the exhibitor was marked embedded have no clientUserId, so a
+ * recipient view opens as the sender in view-only mode. Correct the in-process recipient
+ * in place (same recipientId, email and name — DocuSign does not re-notify for this change)
+ * and return the clientUserId to use for the signing view.
+ */
+export async function ensureExhibitorEmbeddedRecipient(
+  envelopeId: string,
+  recipient: { recipientId: string; email: string; name: string; clientUserId?: string },
+  options?: { bypassRateLimitGuard?: boolean },
+): Promise<string> {
+  const existing = recipient.clientUserId?.trim();
+  if (existing) return existing;
+
+  maybeAssertDocuSignApiAvailable(options?.bypassRateLimitGuard);
+  const { accessToken, accountId, restApiBase } = await getDocuSignSession();
+  const url = `${restApiBase}/v2.1/accounts/${encodeURIComponent(accountId)}/envelopes/${encodeURIComponent(envelopeId)}/recipients`;
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      signers: [
+        {
+          recipientId: recipient.recipientId,
+          email: recipient.email,
+          name: recipient.name,
+          clientUserId: EXHIBITOR_CLIENT_USER_ID,
+          embeddedRecipientStartURL: EMBEDDED_RECIPIENT_START_URL,
+        },
+      ],
+    }),
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    markDocuSignRateLimitedFromResponse(res.status, text);
+    throw new Error(`DocuSign updateRecipients ${res.status}: ${text}`);
+  }
+  const data = JSON.parse(text) as {
+    recipientUpdateResults?: { recipientId?: string; errorDetails?: { errorCode?: string; message?: string } }[];
+  };
+  const failed = (data.recipientUpdateResults ?? []).find((r) => r.errorDetails?.errorCode && r.errorDetails.errorCode !== 'SUCCESS');
+  if (failed) {
+    throw new Error(
+      `DocuSign updateRecipients: ${failed.errorDetails?.errorCode ?? 'ERROR'} ${failed.errorDetails?.message ?? ''}`.trim(),
+    );
+  }
+  return EXHIBITOR_CLIENT_USER_ID;
 }
 
 /** Identify the Shanken countersigner (routing order 2) once they have signed. */
@@ -637,6 +708,8 @@ export async function createExhibitorSigningViewUrl(options: {
   bypassRateLimitGuard?: boolean;
   /** DocuSign recipient-view auth — default none first (token-gated links); email as fallback. */
   authenticationMethods?: readonly ('none' | 'email')[];
+  /** Embedded recipient id (see EXHIBITOR_CLIENT_USER_ID). Required for a real signing session. */
+  clientUserId?: string;
 }): Promise<string> {
   if (!options.bypassRateLimitGuard) {
     assertDocuSignApiAvailable();
@@ -645,11 +718,13 @@ export async function createExhibitorSigningViewUrl(options: {
   const recipientId = options.recipientId?.trim() || '1';
   const email = options.signerEmail.trim();
   const userName = options.signerName.trim() || email;
+  const clientUserId = options.clientUserId?.trim();
   const baseBody = {
     email,
     userName,
     recipientId,
     returnUrl: options.returnUrl,
+    ...(clientUserId ? { clientUserId } : {}),
   };
 
   const authMethods = options.authenticationMethods ?? (['none', 'email'] as const);
@@ -690,7 +765,7 @@ function signerCompletedStatus(status: string | undefined): boolean {
 }
 
 export type ExhibitorSigningGateResult =
-  | { action: 'open_signing'; recipientId: string; signerEmail: string; signerName: string }
+  | { action: 'open_signing'; recipientId: string; signerEmail: string; signerName: string; clientUserId: string }
   | { action: 'already_signed' }
   | { action: 'envelope_voided' }
   | { action: 'envelope_declined' }
@@ -738,11 +813,25 @@ export async function resolveExhibitorSigningGate(
     return { action: 'no_signature_fields' };
   }
 
+  const signerEmailOnEnvelope = exhibitor.email.trim();
+  const signerName = exhibitor.name?.trim() || signerEmailOnEnvelope;
+  const clientUserId = await ensureExhibitorEmbeddedRecipient(
+    envelopeId,
+    {
+      recipientId: exhibitor.recipientId,
+      email: signerEmailOnEnvelope,
+      name: signerName,
+      clientUserId: exhibitor.clientUserId,
+    },
+    { bypassRateLimitGuard: bypass },
+  );
+
   return {
     action: 'open_signing',
     recipientId: exhibitor.recipientId,
-    signerEmail: exhibitor.email.trim(),
-    signerName: exhibitor.name?.trim() || exhibitor.email.trim(),
+    signerEmail: signerEmailOnEnvelope,
+    signerName,
+    clientUserId,
   };
 }
 

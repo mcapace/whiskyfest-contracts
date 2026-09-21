@@ -120,6 +120,7 @@ export async function handleExhibitorDocuSignSignRedirect(
       signerName: gate.signerName,
       returnUrl: personalNudgeReturnUrl(event, trimmedId),
       recipientId: gate.recipientId,
+      clientUserId: gate.clientUserId,
       bypassRateLimitGuard: true,
     });
 
