@@ -99,10 +99,16 @@ export async function POST(req: Request) {
   const rawBody = await req.text();
   const secret = process.env['DOCUSIGN_CONNECT_HMAC_SECRET']?.trim();
   if (secret) {
-    const sig =
-      req.headers.get('x-docusign-signature-1') ??
-      req.headers.get('X-DocuSign-Signature-1');
-    if (!verifyHmac(rawBody, sig, secret)) {
+    // Connect sends one X-DocuSign-Signature-N header per active HMAC key; after a key
+    // rotation ours may not be #1. Accept the body if any header verifies.
+    const signatures: string[] = [];
+    req.headers.forEach((value, name) => {
+      if (/^x-docusign-signature-\d+$/i.test(name)) signatures.push(value);
+    });
+    if (!signatures.some((sig) => verifyHmac(rawBody, sig, secret))) {
+      console.warn('[docusign-webhook] HMAC verification failed', {
+        signatureHeaders: signatures.length,
+      });
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
   }

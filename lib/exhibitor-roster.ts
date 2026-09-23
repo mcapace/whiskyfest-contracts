@@ -643,7 +643,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function statusColumnStart(headers: string[]): number {
+export function statusColumnStart(headers: string[]): number {
   const licenseIdx = headers.findIndex((h) => String(h).trim().toUpperCase() === ROSTER_STATUS_HEADER);
   if (licenseIdx >= 0) return licenseIdx;
   return headers.length;

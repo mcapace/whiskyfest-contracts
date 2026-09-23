@@ -9,6 +9,7 @@ import { syncNyweCountersignaturesFromDocuSign } from '@/lib/nywe-sync-exhibitor
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
 function emptyExhibitorSync(): ExhibitorDocuSignSyncResult {
@@ -87,8 +88,11 @@ async function repairSignedWithExecutedAt(): Promise<number> {
   return data?.length ?? 0;
 }
 
-/** Reconcile DocuSign signatures and auto-release signed contracts (WhiskyFest + NYWE + Big Smoke). */
-export async function POST(req: Request) {
+/**
+ * Reconcile DocuSign signatures and auto-release signed contracts (WhiskyFest + NYWE + Big Smoke).
+ * Vercel Cron invokes with GET — a POST-only handler returned 405 on every scheduled run.
+ */
+export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization');
   const cronSecret = process.env['CRON_SECRET'];
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
@@ -130,4 +134,8 @@ export async function POST(req: Request) {
     }
     return NextResponse.json({ error: 'Reconcile failed' }, { status: 500 });
   }
+}
+
+export async function POST(req: Request) {
+  return GET(req);
 }

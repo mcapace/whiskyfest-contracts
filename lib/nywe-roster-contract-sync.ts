@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   buildContractPayloadFromRosterRow,
   rosterRowKey,
+  statusColumnStart,
   type ExhibitorRosterRow,
 } from '@/lib/exhibitor-roster';
 import { resolveContractStreetFromSheetCells } from '@/lib/exhibitor-roster-billing';
@@ -135,7 +136,10 @@ async function loadRosterPayloadForContract(
 
   const headers = ((headerRes.data.values?.[0] ?? []) as string[]).map((h) => String(h ?? '').trim());
   const row = ((rowRes.data.values?.[0] ?? []) as string[]).map((v) => String(v ?? '').trim());
-  return buildContractPayloadFromRosterRow(row, listKey, event, headers);
+  const payload = buildContractPayloadFromRosterRow(row, listKey, event, headers);
+  if (!payload) return null;
+  const sheetContractId = normalizeSheetContractId(row[statusColumnStart(headers) + 1]);
+  return { ...payload, sheetContractId };
 }
 
 function patchFromPayload(
@@ -208,6 +212,17 @@ export async function refreshContractFromLinkedRoster(
   const payload = await loadRosterPayloadForContract(contract, event);
   if (!payload) {
     return { updated: false, skipped: 'load_failed', contract };
+  }
+
+  // Row numbers shift when the sheet is sorted. If the row carries another contract's ID,
+  // it is a different winery even when names fuzzy-match (e.g. Gallo brands share billing).
+  if (payload.sheetContractId && payload.sheetContractId !== contract.id.toLowerCase()) {
+    console.warn('[nywe-roster] skip refresh — sheet row belongs to another contract', {
+      id: contract.id,
+      sheetContractId: payload.sheetContractId,
+      rowNumber: contract.source_row_number,
+    });
+    return { updated: false, skipped: 'row_linked_to_other_contract', contract };
   }
 
   const patch = patchFromPayload(contract, payload);
