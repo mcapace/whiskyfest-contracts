@@ -4,6 +4,7 @@ import { getAgreementDatePartsInDisplayZone } from '@/lib/datetime';
 import { formatEventDateForDisplayOrMerge } from '@/lib/event-schedule';
 import { usesSingleSignerEnvelope } from '@/lib/single-signer-envelope';
 import { nyweBillingMergeTokens, nyweExhibitorAddressMergeTokens } from '@/lib/nywe-billing';
+import { exhibitorCompanyMergeValue, formatCoveredWineriesList, parseCoveredWineries } from '@/lib/nywe-combined-contract';
 import type { ContractWithTotals, Event } from '@/types/db';
 import type { MergePlaceholderMode } from '@/lib/merge-map';
 
@@ -56,7 +57,8 @@ export function buildNyweVendorMergeMap(
     '{{agreement_month}}': agreement.monthName,
     '{{agreement_year}}': agreement.year,
     '{{exhibitor_legal_name}}': contract.exhibitor_legal_name,
-    '{{exhibitor_company_name}}': contract.exhibitor_company_name,
+    '{{exhibitor_company_name}}': exhibitorCompanyMergeValue(contract),
+    '{{covered_wineries}}': formatCoveredWineriesList(parseCoveredWineries(contract.covered_wineries)),
     '{{license_fee}}': moneyNoDollar(licenseFeeCents),
     '{{license_fee_balance}}': moneyNoDollar(licenseFeeCents),
     '{{booth_count}}': String(contract.booth_count),

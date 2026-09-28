@@ -22,7 +22,9 @@ import type { Contract, ContractStatus, Event } from '@/types/db';
 import { isLegacyImportedContract } from '@/lib/legacy-import';
 import { billingFieldsFromOptionalBody } from '@/lib/nywe-billing';
 import { refreshNyweBillingFromRosterForContract } from '@/lib/nywe-roster-billing-sync';
-import { applyNyweLicensePricingIfNeeded, isNyweVendorOnlyEvent, isPackageFeeEvent, signerTitleForContract } from '@/lib/nywe-pricing';
+import { applyNyweLicensePricingIfNeeded, isNyweVendorOnlyEvent, isPackageFeeEvent, nyweLicenseFeeCents, signerTitleForContract } from '@/lib/nywe-pricing';
+import { galloWriteFromNames } from '@/lib/nywe-combined-contract';
+import { combineGalloContractsForEvent } from '@/lib/nywe-combine-gallo-contracts';
 import { pricingFromBigSmokeInput, resolveBigSmokeStoredBoothRate } from '@/lib/big-smoke-pricing';
 import { eventTemplateProfile } from '@/lib/contract-template-profile';
 import {
@@ -132,18 +134,29 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             package_key: p.package_key,
           })
         : null;
-    const nywePricing = applyNyweLicensePricingIfNeeded(
-      patchEvent,
-      {
-        booth_count: bigSmokePricing?.booth_count ?? p.booth_count,
-        booth_rate_cents: noChargeRequested
-          ? 0
-          : bigSmokePricing
-            ? resolveBigSmokeStoredBoothRate(bigSmokePricing, incomingBoothRate)
-            : incomingBoothRate,
-      },
-      { orderType: p.order_type },
-    );
+    const galloFields =
+      nyweOnly && !sponsorshipOnly && !noChargeRequested
+        ? galloWriteFromNames({
+            legalName: p.exhibitor_legal_name,
+            companyName: p.exhibitor_company_name,
+            covered: p.covered_wineries,
+            feeCents: nyweLicenseFeeCents(patchEvent),
+          })
+        : null;
+    const nywePricing = galloFields
+      ? { booth_count: galloFields.booth_count, booth_rate_cents: galloFields.booth_rate_cents }
+      : applyNyweLicensePricingIfNeeded(
+          patchEvent,
+          {
+            booth_count: bigSmokePricing?.booth_count ?? p.booth_count,
+            booth_rate_cents: noChargeRequested
+              ? 0
+              : bigSmokePricing
+                ? resolveBigSmokeStoredBoothRate(bigSmokePricing, incomingBoothRate)
+                : incomingBoothRate,
+          },
+          { orderType: p.order_type },
+        );
     const boothRateChanged = nywePricing.booth_rate_cents !== contract.booth_rate_cents;
     const savedLineItems = nyweOnly && !sponsorshipOnly ? [] : (p.line_items ?? []);
     const nextPackageKey = bigSmokePricing?.package_key ?? null;
@@ -183,16 +196,19 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       .from('contracts')
       .update({
         event_id: p.event_id,
-        exhibitor_legal_name: p.exhibitor_legal_name,
-        exhibitor_company_name: p.exhibitor_company_name,
+        exhibitor_legal_name: galloFields?.exhibitor_legal_name ?? p.exhibitor_legal_name,
+        exhibitor_company_name: galloFields?.exhibitor_company_name ?? p.exhibitor_company_name,
         order_type: p.order_type ?? 'booth',
         brands_poured: sponsorshipOnly
           ? sponsorBrandFromBody(p)
-          : nyweOnly
-            ? (p.brands_poured?.trim() || p.exhibitor_company_name.trim() || null)
-            : isBigSmoke
-              ? p.exhibitor_company_name.trim() || null
-              : null,
+          : galloFields
+            ? galloFields.brands_poured
+            : nyweOnly
+              ? (p.brands_poured?.trim() || p.exhibitor_company_name.trim() || null)
+              : isBigSmoke
+                ? p.exhibitor_company_name.trim() || null
+                : null,
+        covered_wineries: galloFields?.covered_wineries ?? null,
         package_key: nextPackageKey,
         package_selections: noChargeRequested || sponsorshipOnly ? null : nextPackageSelections,
         booth_count: nywePricing.booth_count,
@@ -275,6 +291,15 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       shouldResetDiscountApproval: shouldResetDiscountApproval && !noChargeRequested,
       editor: { email: actor.email, name: actor.appUser?.name },
     });
+
+    if (galloFields) {
+      await combineGalloContractsForEvent({
+        supabase,
+        event: patchEvent,
+        actorEmail: actor.email,
+        preferContractId: params.id,
+      });
+    }
 
     revalidateContractPaths(params.id);
 

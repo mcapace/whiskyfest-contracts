@@ -3,6 +3,7 @@ import { getContractWithTotalsForViewer } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { isLegacyImportedContract } from '@/lib/legacy-import';
 import { NewContractForm } from '@/components/contracts/new-contract-form';
+import { parseCoveredWineries } from '@/lib/nywe-combined-contract';
 import { dealKindFromContract } from '@/lib/contract-deal-kind';
 import type { ContractLineItem, Event } from '@/types/db';
 import { actorCanUseNoChargeBooth, actorCanUseBigSmokeNoCharge, getStephenSenatoreRepId, noChargeMustAssignStephenRep } from '@/lib/no-charge-booth';
@@ -113,6 +114,7 @@ export async function EditDraftContractPage({
           billing_state: c.billing_state ?? '',
           billing_zip: c.billing_zip ?? '',
           billing_country: c.billing_country ?? '',
+          covered_wineries: parseCoveredWineries(c.covered_wineries),
         }}
         initialDealKind={dealKindFromContract(c)}
         initialBoothBrands={

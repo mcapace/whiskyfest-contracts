@@ -9,6 +9,16 @@ import { formatRosterWineDisplay } from '@/lib/exhibitor-roster-columns';
 import { eventTemplateProfile } from '@/lib/contract-template-profile';
 import { normalizeSheetContractId, rosterRowMatchesContract, sheetRowBelongsToContract } from '@/lib/nywe-roster-identity';
 import { rosterWineryWebsiteUrl } from '@/lib/winery-website';
+import { isNyweVendorOnlyEvent, nyweLicenseFeeCents } from '@/lib/nywe-pricing';
+import {
+  applyRosterRowsToCombinedContract,
+  canMergeNyweContract,
+  coveredWinerySourceKeys,
+  galloContractFieldsFromWineries,
+  isCombinedGalloContract,
+  wineriesFromContract,
+} from '@/lib/nywe-combined-contract';
+import { combineGalloContractsForEvent } from '@/lib/nywe-combine-gallo-contracts';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getSheetsClient } from '@/lib/sheets-tracker';
@@ -43,12 +53,12 @@ function normalize(value: string | null | undefined): string {
 
 function patchChanged(
   contract: ContractWithTotals,
-  patch: Record<string, string | null | boolean>,
+  patch: Record<string, unknown>,
 ): boolean {
   for (const [key, value] of Object.entries(patch)) {
     const current = contract[key as keyof ContractWithTotals];
-    const left = normalize(typeof current === 'string' ? current : current == null ? '' : String(current));
-    const right = normalize(typeof value === 'string' ? value : value == null ? '' : String(value));
+    const left = current != null && typeof current === 'object' ? JSON.stringify(current) : normalize(current == null ? '' : String(current));
+    const right = value != null && typeof value === 'object' ? JSON.stringify(value) : normalize(value == null ? '' : String(value));
     if (left !== right) return true;
   }
   return false;
@@ -56,7 +66,7 @@ function patchChanged(
 
 export function contractPatchFromExhibitorRosterRow(
   row: ExhibitorRosterRow,
-  contract: Pick<ContractWithTotals, 'id' | 'status' | 'exhibitor_company_name' | 'exhibitor_legal_name'>,
+  contract: Pick<ContractWithTotals, 'id' | 'status' | 'exhibitor_company_name' | 'exhibitor_legal_name' | 'covered_wineries'>,
 ): Record<string, string | null | boolean> | null {
   const winery = row.wineryName.trim();
   const billingCompany = row.billingCompany.trim() || winery;
@@ -72,13 +82,16 @@ export function contractPatchFromExhibitorRosterRow(
     return null;
   }
 
+  const combined = isCombinedGalloContract(contract);
   const patch: Record<string, string | null | boolean> = {
-    exhibitor_legal_name: billingCompany,
-    exhibitor_company_name: winery || billingCompany,
-    brands_poured: formatRosterWineDisplay(row.wineName, row.vintage) || null,
-    billing_contact_name: row.billingContactName.trim() || null,
-    billing_contact_email: row.billingEmail.trim() || null,
+    exhibitor_legal_name: combined ? (contract.exhibitor_legal_name ?? billingCompany) : billingCompany,
+    exhibitor_company_name: combined ? (contract.exhibitor_company_name ?? billingCompany) : winery || billingCompany,
   };
+  if (!combined) {
+    patch.brands_poured = formatRosterWineDisplay(row.wineName, row.vintage) || null;
+  }
+  patch.billing_contact_name = row.billingContactName.trim() || null;
+  patch.billing_contact_email = row.billingEmail.trim() || null;
 
   const website = rosterWineryWebsiteUrl(row);
   if (website) {
@@ -141,7 +154,7 @@ async function loadRosterPayloadForContract(
 function patchFromPayload(
   contract: ContractWithTotals,
   payload: NonNullable<Awaited<ReturnType<typeof loadRosterPayloadForContract>>>,
-): Record<string, string | null | boolean> | null {
+): Record<string, unknown> | null {
   const company = normalize(payload.exhibitor_company_name);
   const legal = normalize(payload.exhibitor_legal_name);
   if (!company && !legal) return null;
@@ -160,11 +173,48 @@ function patchFromPayload(
     return null;
   }
 
-  const patch: Record<string, string | null | boolean> = {
-    exhibitor_legal_name: payload.exhibitor_legal_name,
-    exhibitor_company_name: payload.exhibitor_company_name,
-    brands_poured: payload.brands_poured,
-  };
+  const combined = isCombinedGalloContract(contract);
+  const nextWineries = combined
+    ? applyRosterRowsToCombinedContract(
+        wineriesFromContract(contract),
+        [
+          {
+            wineryName: payload.exhibitor_company_name,
+            billingCompany: payload.exhibitor_legal_name,
+            wineDisplay: payload.brands_poured,
+            websiteUrl: payload.exhibitor_website_url,
+            source_sheet_id: contract.source_sheet_id ?? '',
+            source_sheet_tab: contract.source_sheet_tab ?? '',
+            source_row_number: contract.source_row_number ?? 0,
+          },
+        ],
+        { locked: !canMergeNyweContract(contract) },
+      )
+    : null;
+  const galloFields =
+    nextWineries && nextWineries.length > 0
+      ? galloContractFieldsFromWineries({
+          legalName: contract.exhibitor_legal_name,
+          companyName: contract.exhibitor_company_name,
+          wineries: nextWineries,
+          feeCents: contract.booth_rate_cents || 0,
+        })
+      : null;
+  const patch: Record<string, unknown> = galloFields
+    ? {
+        exhibitor_legal_name: galloFields.exhibitor_legal_name,
+        exhibitor_company_name: galloFields.exhibitor_company_name,
+        brands_poured: galloFields.brands_poured,
+        covered_wineries: galloFields.covered_wineries,
+        ...(canMergeNyweContract(contract)
+          ? { booth_count: galloFields.booth_count, booth_rate_cents: galloFields.booth_rate_cents }
+          : {}),
+      }
+    : {
+        exhibitor_legal_name: payload.exhibitor_legal_name,
+        exhibitor_company_name: payload.exhibitor_company_name,
+        brands_poured: payload.brands_poured,
+      };
 
   if (payload.exhibitor_website_url) {
     patch.exhibitor_website_url = payload.exhibitor_website_url;
@@ -239,6 +289,22 @@ export async function syncLinkedContractsFromRosterRows(
   rows: ExhibitorRosterRow[],
 ): Promise<number> {
   const supabase = getSupabaseAdmin();
+  const { data: eventRow } = await supabase
+    .from('events')
+    .select('id, booth_rate_cents, contract_template_profile')
+    .eq('id', eventId)
+    .maybeSingle<{ id: string; booth_rate_cents: number; contract_template_profile: string | null }>();
+  const event = eventRow
+    ? { ...eventRow, contract_template_profile: eventRow.contract_template_profile ?? 'whiskyfest' }
+    : null;
+  if (event && isNyweVendorOnlyEvent(event)) {
+    await combineGalloContractsForEvent({
+      supabase,
+      event,
+      actorEmail: 'nywe-roster-sync',
+    });
+  }
+
   const { data: contracts } = await supabase
     .from('contracts_with_totals')
     .select('*')
@@ -255,6 +321,59 @@ export async function syncLinkedContractsFromRosterRows(
   let updated = 0;
 
   for (const contract of (contracts ?? []) as ContractWithTotals[]) {
+    if (isCombinedGalloContract(contract)) {
+      const covered = wineriesFromContract(contract);
+      const keys = new Set(coveredWinerySourceKeys(covered));
+      if (contract.source_sheet_id && contract.source_sheet_tab && contract.source_row_number) {
+        keys.add(rosterRowKey(contract.source_sheet_id, contract.source_sheet_tab, contract.source_row_number));
+      }
+      const matched = rows.filter(
+        (row) =>
+          keys.has(row.rowKey) || normalizeSheetContractId(row.sheetContractId) === contract.id.toLowerCase(),
+      );
+      if (matched.length === 0) continue;
+      const locked = !canMergeNyweContract(contract);
+      const nextWineries = applyRosterRowsToCombinedContract(
+        covered,
+        matched.map((row) => ({
+          wineryName: row.wineryName,
+          billingCompany: row.billingCompany,
+          wineDisplay: formatRosterWineDisplay(row.wineName, row.vintage) || null,
+          websiteUrl: rosterWineryWebsiteUrl(row),
+          source_sheet_id: row.spreadsheetId,
+          source_sheet_tab: row.tab,
+          source_row_number: row.rowNumber,
+        })),
+        { locked },
+      );
+      const fields = galloContractFieldsFromWineries({
+        legalName: contract.exhibitor_legal_name,
+        companyName: contract.exhibitor_company_name,
+        wineries: nextWineries,
+        feeCents: event ? nyweLicenseFeeCents(event) : contract.booth_rate_cents,
+      });
+      const identity = contractPatchFromExhibitorRosterRow(matched[0]!, contract);
+      const update: Record<string, unknown> = {
+        ...(identity ?? {}),
+        exhibitor_legal_name: fields.exhibitor_legal_name,
+        exhibitor_company_name: fields.exhibitor_company_name,
+        brands_poured: fields.brands_poured,
+        covered_wineries: fields.covered_wineries,
+        ...(locked
+          ? {}
+          : { booth_count: fields.booth_count, booth_rate_cents: fields.booth_rate_cents }),
+      };
+      if (!patchChanged(contract, update)) continue;
+      const { error } = await supabase.from('contracts').update(update).eq('id', contract.id);
+      if (error) {
+        console.error('[syncLinkedContractsFromRosterRows]', contract.id, error.message);
+        continue;
+      }
+      updated += 1;
+      revalidateContractPaths(contract.id);
+      continue;
+    }
+
     const byId = rowByContractId.get(contract.id.toLowerCase()) ?? null;
     const byRow =
       contract.source_sheet_id && contract.source_sheet_tab && contract.source_row_number
