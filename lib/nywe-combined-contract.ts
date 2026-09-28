@@ -49,6 +49,10 @@ const GALLO_BILLING_KEYS = new Set([
 const GALLO_BRAND_KEYS = new Set([
   'louis m martini',
   'louis martini',
+  'louis m martini winery',
+  'louis martini winery',
+  'l m martini',
+  'lm martini',
   'massican',
   'pahlmeyer',
   'rombauer',
@@ -79,8 +83,14 @@ export function isGalloBrandWinery(name: string | null | undefined): boolean {
   const key = normalizeNyweBillingKey(name);
   if (!key) return false;
   if (GALLO_BRAND_KEYS.has(key)) return true;
-  if (/^louis m? ?martini\b/.test(key)) return true;
+  // Louis M. Martini / Louis M Martini / Louis Martini — all Gallo brands.
+  if (/^l(?:ouis)?\s*m(?:artini)?\b/.test(key) && key.includes('martini')) return true;
+  if (/^louis\s+m\.?\s*martini\b/.test(key)) return true;
+  if (/^louis\s+martini\b/.test(key)) return true;
   if (/^rombauer\b/.test(key)) return true;
+  if (/^massican\b/.test(key)) return true;
+  if (/^pahlmeyer\b/.test(key)) return true;
+  if (/^jermann\b/.test(key)) return true;
   return false;
 }
 

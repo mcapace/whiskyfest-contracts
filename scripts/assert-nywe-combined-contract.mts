@@ -26,6 +26,8 @@ assert(isGalloBillingCompany('ej gallo'), 'ej gallo is the billing parent');
 assert(!isGalloBillingCompany('Louis M. Martini'), 'a Gallo brand is not the billing parent');
 assert(!isGalloBillingCompany('Jermann'), 'Jermann is not the billing parent');
 assert(isGalloBrandWinery('Louis M. Martini'), 'Louis M. Martini is a Gallo brand');
+assert(isGalloBrandWinery('Louis M Martini'), 'Louis M Martini without the period is a Gallo brand');
+assert(isGalloBrandWinery('Louis Martini'), 'Louis Martini is a Gallo brand');
 assert(isGalloBrandWinery('Jermann'), 'Jermann is a Gallo brand');
 assert(
   contractQualifiesForGalloCombine({
