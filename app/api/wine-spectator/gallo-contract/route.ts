@@ -6,7 +6,12 @@ import { getActiveWineSpectatorEvent } from '@/lib/wine-spectator-event';
 import { combineGalloContractsForEvent } from '@/lib/nywe-combine-gallo-contracts';
 import { voidSentGalloContractsForEvent } from '@/lib/nywe-void-sent-gallo';
 import { loadGalloDashboardSummary } from '@/lib/nywe-gallo-dashboard';
+import {
+  emptyCoveredWinery,
+  NYWE_EXPECTED_GALLO_BRANDS,
+} from '@/lib/nywe-combined-contract';
 import { isNyweVendorOnlyEvent, nyweLicenseFeeCents } from '@/lib/nywe-pricing';
+import { PRODUCT_WINE_SPECTATOR } from '@/lib/product-portal';
 import type { Event } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
@@ -60,13 +65,22 @@ export async function POST(req: Request) {
   let voidedIds: string[] = [];
   let additionalWineries: Awaited<ReturnType<typeof voidSentGalloContractsForEvent>>['wineries'] = [];
   if (voidSent) {
+    const { data: nyweEvents } = await supabase
+      .from('events')
+      .select('id')
+      .eq('product_key', PRODUCT_WINE_SPECTATOR);
     const voided = await voidSentGalloContractsForEvent({
       supabase,
       event,
       actorEmail: gate.actor.email,
+      extraEventIds: (nyweEvents ?? []).map((row) => row.id as string),
     });
     voidedIds = voided.voidedIds;
-    additionalWineries = voided.wineries;
+    additionalWineries = [
+      ...voided.wineries,
+      // Always land Louis M. Martini and the other known brands on the combined order.
+      ...NYWE_EXPECTED_GALLO_BRANDS.map((name) => emptyCoveredWinery(name)),
+    ];
     if (voided.errors.length > 0 && voided.voidedIds.length === 0) {
       return NextResponse.json(
         {

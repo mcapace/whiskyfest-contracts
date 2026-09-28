@@ -128,7 +128,7 @@ const sentAndOpen = summarizeGalloForDashboard(
 );
 assert(sentAndOpen?.needsVoid === true, 'sent Gallo licenses need a void-and-combine action');
 assert(sentAndOpen?.wineryNames.includes('Louis M. Martini') === true, 'a sent Gallo winery is included after void');
-assert(sentAndOpen?.wineryNames.length === 3, 'sent and unsent wineries are offered for the combined order');
+assert(sentAndOpen?.wineryNames.length === 5, 'known Gallo brands fill out to the full five-winery order');
 assert(sentAndOpen?.sent.length === 1, 'dashboard lists the sent license to void');
 
 const allSent = summarizeGalloForDashboard(
@@ -142,8 +142,43 @@ const allSent = summarizeGalloForDashboard(
   1_400_000,
 );
 assert(allSent?.needsVoid === true, 'all-sent Gallo licenses still show the combine card');
-assert(allSent?.wineryNames.length === 4, 'four sent Gallo wineries become one $56,000 order after void');
-assert(allSent?.totalCents === 5_600_000, 'void-and-combine total is winery count × $14,000');
+assert(allSent?.wineryNames.includes('Louis M. Martini') === true, 'Louis M. Martini stays on the Gallo order');
+assert(allSent?.wineryNames.length === 5, 'known Gallo brands fill out to five wineries including Jermann');
+assert(allSent?.totalCents === 7_000_000, 'void-and-combine total is 5 × $14,000');
+
+const fourWithoutMartini = summarizeGalloForDashboard(
+  [
+    galloDraft('sent-massican', 'Massican', { status: 'sent', sent_at: '2026-09-01T00:00:00Z' }),
+    galloDraft('sent-pahlmeyer', 'Pahlmeyer', { status: 'sent', sent_at: '2026-09-01T00:00:00Z' }),
+    galloDraft('sent-rombauer', 'Rombauer', { status: 'sent', sent_at: '2026-09-01T00:00:00Z' }),
+    galloDraft('sent-jermann', 'Jermann', { status: 'sent', sent_at: '2026-09-01T00:00:00Z' }),
+  ],
+  eventId,
+  1_400_000,
+);
+assert(
+  fourWithoutMartini?.wineryNames.includes('Louis M. Martini') === true,
+  'Louis M. Martini is added when the other four Gallo brands are present',
+);
+assert(fourWithoutMartini?.wineryNames.length === 5, 'dashboard lists all five Gallo wineries');
+
+const executedMartini = summarizeGalloForDashboard(
+  [
+    galloDraft('exec-martini', 'Louis M. Martini', {
+      status: 'executed',
+      sent_at: '2026-09-01T00:00:00Z',
+      docusign_envelope_id: 'env-1',
+    }),
+    galloDraft('sent-massican', 'Massican', { status: 'sent', sent_at: '2026-09-01T00:00:00Z' }),
+    galloDraft('sent-pahlmeyer', 'Pahlmeyer', { status: 'sent', sent_at: '2026-09-01T00:00:00Z' }),
+    galloDraft('sent-rombauer', 'Rombauer', { status: 'sent', sent_at: '2026-09-01T00:00:00Z' }),
+    galloDraft('sent-jermann', 'Jermann', { status: 'sent', sent_at: '2026-09-01T00:00:00Z' }),
+  ],
+  eventId,
+  1_400_000,
+);
+assert(executedMartini?.wineryNames.includes('Louis M. Martini') === true, 'executed Louis M. Martini still counts');
+assert(executedMartini?.needsVoid === true, 'executed Louis M. Martini can be voided into the combined order');
 
 assert(
   summarizeGalloForDashboard([galloDraft('only', 'Jermann')], eventId, 1_400_000) == null,

@@ -19,24 +19,23 @@ export type VoidSentGalloResult = {
 };
 
 /**
- * Void DocuSign envelopes for individual Gallo licenses that were already sent,
+ * Void DocuSign envelopes for individual Gallo licenses (sent or executed),
  * so those wineries can be folded into one combined order.
- * Executed contracts are left alone.
  */
 export async function voidSentGalloContractsForEvent(options: {
   supabase: SupabaseClient;
   event: Pick<Event, 'id'>;
   actorEmail: string;
   reason?: string;
+  /** Also void Gallo licenses on these NYWE event ids (Martini may sit on another event row). */
+  extraEventIds?: string[];
 }): Promise<VoidSentGalloResult> {
   const reason =
     options.reason?.trim() ||
     'Replacing separate Gallo winery licenses with one combined NYWE contract';
 
-  const { data, error } = await options.supabase
-    .from('contracts')
-    .select('*')
-    .eq('event_id', options.event.id);
+  const eventIds = [...new Set([options.event.id, ...(options.extraEventIds ?? [])])];
+  const { data, error } = await options.supabase.from('contracts').select('*').in('event_id', eventIds);
   if (error) {
     console.error('[voidSentGalloContractsForEvent]', error.message);
     return { voidedIds: [], wineries: [], errors: [] };
@@ -45,7 +44,6 @@ export async function voidSentGalloContractsForEvent(options: {
   const targets = ((data ?? []) as Contract[]).filter(
     (contract) =>
       !CLOSED_STATUSES.has(contract.status) &&
-      contract.status !== 'executed' &&
       contractQualifiesForGalloCombine(contract) &&
       canVoidNyweGalloContractForCombine(contract),
   );

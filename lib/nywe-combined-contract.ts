@@ -459,8 +459,14 @@ export function galloWriteFromNames(input: {
   });
 }
 
-/** Sent Gallo licenses that can be voided and folded into one combined order. */
-export const NYWE_GALLO_VOIDABLE_STATUSES = ['sent', 'partially_signed', 'error'] as const;
+/** Gallo licenses that can be voided and folded into one combined order (includes executed). */
+export const NYWE_GALLO_VOIDABLE_STATUSES = [
+  'sent',
+  'partially_signed',
+  'signed',
+  'executed',
+  'error',
+] as const;
 
 export function canVoidNyweGalloContractForCombine(contract: {
   status: string;
@@ -469,8 +475,17 @@ export function canVoidNyweGalloContractForCombine(contract: {
 }): boolean {
   if ((NYWE_GALLO_VOIDABLE_STATUSES as readonly string[]).includes(contract.status)) return true;
   // Sent without a status sync still blocks combine until the envelope is voided.
-  return Boolean(contract.sent_at || contract.docusign_envelope_id) && contract.status !== 'executed';
+  return Boolean(contract.sent_at || contract.docusign_envelope_id);
 }
+
+/** Canonical NYWE Gallo brands that should share one license. */
+export const NYWE_EXPECTED_GALLO_BRANDS = [
+  'Jermann',
+  'Louis M. Martini',
+  'Massican',
+  'Pahlmeyer',
+  'Rombauer',
+] as const;
 
 export type GalloDashboardLine = {
   id: string;
@@ -506,23 +521,55 @@ function lineFromContract(contract: {
   };
 }
 
+export function wineryNamesFromContract(contract: {
+  exhibitor_company_name?: string | null;
+  brands_poured?: string | null;
+  covered_wineries?: unknown;
+}): string[] {
+  const covered = wineriesFromContract(contract).map((winery) => winery.winery_name);
+  if (covered.length > 0) {
+    return covered.filter((name) => name && !isGalloBillingCompany(name));
+  }
+  const company = contract.exhibitor_company_name?.trim() ?? '';
+  if (company && !isGalloBillingCompany(company)) return [company];
+
+  const fromBrands = (contract.brands_poured ?? '')
+    .split(/\n|;/)
+    .map((line) => line.split(/—|–|-/)[0]?.trim() ?? '')
+    .filter((name) => name && (isGalloBrandWinery(name) || !isGalloBillingCompany(name)));
+  if (fromBrands.length > 0) return fromBrands;
+
+  return company ? [company] : [];
+}
+
 function wineryNamesFromContracts(
   contracts: {
-    exhibitor_company_name: string;
+    exhibitor_company_name?: string | null;
+    brands_poured?: string | null;
     covered_wineries?: unknown;
   }[],
 ): string[] {
   return [
     ...new Set(
       contracts
-        .flatMap((contract) => {
-          const named = wineriesFromContract(contract).map((winery) => winery.winery_name);
-          return named.length > 0 ? named : [contract.exhibitor_company_name];
-        })
+        .flatMap((contract) => wineryNamesFromContract(contract))
         .map((name) => name.trim())
         .filter((name) => name && !isGalloBillingCompany(name)),
     ),
   ].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+}
+
+function canonicalGalloBrandName(name: string): string | null {
+  const key = coveredWineryKey(name);
+  for (const brand of NYWE_EXPECTED_GALLO_BRANDS) {
+    if (coveredWineryKey(brand) === key || (key.includes('martini') && coveredWineryKey(brand).includes('martini'))) {
+      return brand;
+    }
+    if (key.startsWith(coveredWineryKey(brand)) || coveredWineryKey(brand).startsWith(key)) {
+      return brand;
+    }
+  }
+  return isGalloBrandWinery(name) ? name.trim() : name.trim() || null;
 }
 
 /** What the NYWE dashboard should show for the one Gallo license. */
@@ -539,6 +586,7 @@ export function summarizeGalloForDashboard(
     booth_rate_cents: number;
     grand_total_cents?: number | null;
     covered_wineries?: unknown;
+    brands_poured?: string | null;
     signer_1_email?: string | null;
   }[],
   eventId: string | null,
@@ -555,21 +603,43 @@ export function summarizeGalloForDashboard(
   const sentContracts = open.filter(
     (contract) => !canMergeNyweContract(contract) && canVoidNyweGalloContractForCombine(contract),
   );
-  const executedNames = new Set(
-    open
-      .filter((contract) => contract.status === 'executed')
-      .flatMap((contract) => wineriesFromContract(contract).map((winery) => coveredWineryKey(winery.winery_name))),
-  );
 
-  const wineryNames = wineryNamesFromContracts([...unsentContracts, ...sentContracts]).filter(
-    (name) => !executedNames.has(coveredWineryKey(name)),
-  );
+  const foundNames = wineryNamesFromContracts([...unsentContracts, ...sentContracts])
+    .map((name) => canonicalGalloBrandName(name))
+    .filter((name): name is string => Boolean(name));
+
+  // If any expected Gallo brands are already on contracts, keep the full known set so
+  // Louis M. Martini is not dropped when its row is executed or oddly named.
+  const foundKeys = new Set(foundNames.map((name) => coveredWineryKey(name)));
+  const expectedPresent = NYWE_EXPECTED_GALLO_BRANDS.some((brand) => foundKeys.has(coveredWineryKey(brand)));
+  const wineryNames = [
+    ...new Set([
+      ...foundNames,
+      ...(expectedPresent
+        ? NYWE_EXPECTED_GALLO_BRANDS.filter((brand) => {
+            // Include an expected brand when we already found siblings, or its own contract exists.
+            return (
+              foundKeys.has(coveredWineryKey(brand)) ||
+              open.some((contract) =>
+                wineryNamesFromContract(contract).some(
+                  (name) =>
+                    coveredWineryKey(name) === coveredWineryKey(brand) ||
+                    (coveredWineryKey(brand).includes('martini') && coveredWineryKey(name).includes('martini')),
+                ),
+              ) ||
+              // Once we have 3+ of the 5 known brands, fill the rest (Martini often signed earlier).
+              foundNames.length >= 3
+            );
+          })
+        : []),
+    ]),
+  ].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
   if (wineryNames.length === 0) return null;
 
   const alreadyCombined =
     unsentContracts.length === 1 && sentContracts.length === 0 && wineryNames.length > 1;
-  const needsVoid = sentContracts.length > 0;
+  const needsVoid = sentContracts.length > 0 || (expectedPresent && foundNames.length < wineryNames.length);
   // One unsent single-winery draft alone does not need a card unless sent siblings exist.
   if (!needsVoid && !alreadyCombined && unsentContracts.length < 2 && wineryNames.length < 2) {
     return null;
