@@ -113,11 +113,24 @@ const sentAndOpen = summarizeGalloForDashboard(
   eventId,
   1_400_000,
 );
-assert(
-  sentAndOpen != null && !sentAndOpen.wineryNames.includes('Louis M. Martini'),
-  'a sent Gallo winery is left off the new total',
+assert(sentAndOpen?.needsVoid === true, 'sent Gallo licenses need a void-and-combine action');
+assert(sentAndOpen?.wineryNames.includes('Louis M. Martini') === true, 'a sent Gallo winery is included after void');
+assert(sentAndOpen?.wineryNames.length === 3, 'sent and unsent wineries are offered for the combined order');
+assert(sentAndOpen?.sent.length === 1, 'dashboard lists the sent license to void');
+
+const allSent = summarizeGalloForDashboard(
+  [
+    galloDraft('sent-martini', 'Louis M. Martini', { status: 'sent', sent_at: '2026-09-01T00:00:00Z' }),
+    galloDraft('sent-massican', 'Massican', { status: 'sent', sent_at: '2026-09-01T00:00:00Z' }),
+    galloDraft('sent-pahlmeyer', 'Pahlmeyer', { status: 'sent', sent_at: '2026-09-01T00:00:00Z' }),
+    galloDraft('sent-rombauer', 'Rombauer', { status: 'sent', sent_at: '2026-09-01T00:00:00Z' }),
+  ],
+  eventId,
+  1_400_000,
 );
-assert(sentAndOpen?.wineryNames.length === 2, 'only unsent wineries are offered for the new contract');
+assert(allSent?.needsVoid === true, 'all-sent Gallo licenses still show the combine card');
+assert(allSent?.wineryNames.length === 4, 'four sent Gallo wineries become one $56,000 order after void');
+assert(allSent?.totalCents === 5_600_000, 'void-and-combine total is winery count × $14,000');
 
 assert(
   summarizeGalloForDashboard([galloDraft('only', 'Jermann')], eventId, 1_400_000) == null,

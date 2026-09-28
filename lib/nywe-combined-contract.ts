@@ -419,6 +419,19 @@ export function galloWriteFromNames(input: {
   });
 }
 
+/** Sent Gallo licenses that can be voided and folded into one combined order. */
+export const NYWE_GALLO_VOIDABLE_STATUSES = ['sent', 'partially_signed', 'error'] as const;
+
+export function canVoidNyweGalloContractForCombine(contract: {
+  status: string;
+  sent_at?: string | null;
+  docusign_envelope_id?: string | null;
+}): boolean {
+  if ((NYWE_GALLO_VOIDABLE_STATUSES as readonly string[]).includes(contract.status)) return true;
+  // Sent without a status sync still blocks combine until the envelope is voided.
+  return Boolean(contract.sent_at || contract.docusign_envelope_id) && contract.status !== 'executed';
+}
+
 export type GalloDashboardLine = {
   id: string;
   wineryName: string;
@@ -428,12 +441,49 @@ export type GalloDashboardLine = {
 
 export type GalloDashboardSummary = {
   unsent: GalloDashboardLine[];
+  sent: GalloDashboardLine[];
+  needsVoid: boolean;
   alreadyCombined: boolean;
   combinedContractId: string | null;
   wineryNames: string[];
   totalCents: number;
   feeCents: number;
 };
+
+function lineFromContract(contract: {
+  id: string;
+  exhibitor_company_name: string;
+  status: string;
+  booth_count: number;
+  booth_rate_cents: number;
+  grand_total_cents?: number | null;
+}): GalloDashboardLine {
+  return {
+    id: contract.id,
+    wineryName: contract.exhibitor_company_name,
+    status: contract.status,
+    totalCents: contract.grand_total_cents ?? contract.booth_count * contract.booth_rate_cents,
+  };
+}
+
+function wineryNamesFromContracts(
+  contracts: {
+    exhibitor_company_name: string;
+    covered_wineries?: unknown;
+  }[],
+): string[] {
+  return [
+    ...new Set(
+      contracts
+        .flatMap((contract) => {
+          const named = wineriesFromContract(contract).map((winery) => winery.winery_name);
+          return named.length > 0 ? named : [contract.exhibitor_company_name];
+        })
+        .map((name) => name.trim())
+        .filter((name) => name && !isGalloBillingCompany(name)),
+    ),
+  ].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+}
 
 /** What the NYWE dashboard should show for the one Gallo license. */
 export function summarizeGalloForDashboard(
@@ -461,41 +511,38 @@ export function summarizeGalloForDashboard(
       contractQualifiesForGalloCombine(contract),
   );
   const unsentContracts = open.filter((contract) => canMergeNyweContract(contract));
-  const lockedNames = new Set(
+  const sentContracts = open.filter(
+    (contract) => !canMergeNyweContract(contract) && canVoidNyweGalloContractForCombine(contract),
+  );
+  const executedNames = new Set(
     open
-      .filter((contract) => !canMergeNyweContract(contract))
+      .filter((contract) => contract.status === 'executed')
       .flatMap((contract) => wineriesFromContract(contract).map((winery) => coveredWineryKey(winery.winery_name))),
   );
-  const wineryNames = [
-    ...new Set(
-      unsentContracts
-        .flatMap((contract) => {
-          const named = wineriesFromContract(contract).map((winery) => winery.winery_name);
-          return named.length > 0 ? named : [contract.exhibitor_company_name];
-        })
-        .map((name) => name.trim())
-        .filter((name) => name && !isGalloBillingCompany(name) && !lockedNames.has(coveredWineryKey(name))),
-    ),
-  ].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
-  if (unsentContracts.length === 0 || wineryNames.length === 0) return null;
-  if (unsentContracts.length === 1 && wineryNames.length < 2) return null;
+  const wineryNames = wineryNamesFromContracts([...unsentContracts, ...sentContracts]).filter(
+    (name) => !executedNames.has(coveredWineryKey(name)),
+  );
 
-  const alreadyCombined = unsentContracts.length === 1 && wineryNames.length > 1;
+  if (wineryNames.length === 0) return null;
+
+  const alreadyCombined =
+    unsentContracts.length === 1 && sentContracts.length === 0 && wineryNames.length > 1;
+  const needsVoid = sentContracts.length > 0;
+  // One unsent single-winery draft alone does not need a card unless sent siblings exist.
+  if (!needsVoid && !alreadyCombined && unsentContracts.length < 2 && wineryNames.length < 2) {
+    return null;
+  }
+
   const combined = alreadyCombined ? unsentContracts[0]! : null;
   const totalCents = alreadyCombined
     ? (combined?.grand_total_cents ?? wineryNames.length * feeCents)
     : wineryNames.length * feeCents;
 
   return {
-    unsent: unsentContracts
-      .map((contract) => ({
-        id: contract.id,
-        wineryName: contract.exhibitor_company_name,
-        status: contract.status,
-        totalCents: contract.grand_total_cents ?? contract.booth_count * contract.booth_rate_cents,
-      }))
-      .sort((a, b) => a.wineryName.localeCompare(b.wineryName, undefined, { sensitivity: 'base' })),
+    unsent: unsentContracts.map(lineFromContract).sort((a, b) => a.wineryName.localeCompare(b.wineryName, undefined, { sensitivity: 'base' })),
+    sent: sentContracts.map(lineFromContract).sort((a, b) => a.wineryName.localeCompare(b.wineryName, undefined, { sensitivity: 'base' })),
+    needsVoid,
     alreadyCombined,
     combinedContractId: combined?.id ?? null,
     wineryNames,
