@@ -61,6 +61,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   return NextResponse.json({
     ok: true,
+    absorbed: result.absorbed === true,
     envelope_id: result.envelopeId,
     exhibitor_signer_email: result.exhibitorSignerEmail,
   });

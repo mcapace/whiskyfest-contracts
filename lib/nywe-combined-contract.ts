@@ -351,6 +351,91 @@ export function galloWriteFromNames(input: {
   });
 }
 
+export type GalloDashboardLine = {
+  id: string;
+  wineryName: string;
+  status: string;
+  totalCents: number;
+};
+
+export type GalloDashboardSummary = {
+  unsent: GalloDashboardLine[];
+  alreadyCombined: boolean;
+  combinedContractId: string | null;
+  wineryNames: string[];
+  totalCents: number;
+  feeCents: number;
+};
+
+/** What the NYWE dashboard should show for the one Gallo license. */
+export function summarizeGalloForDashboard(
+  contracts: {
+    id: string;
+    event_id: string;
+    status: string;
+    sent_at?: string | null;
+    docusign_envelope_id?: string | null;
+    exhibitor_company_name: string;
+    exhibitor_legal_name: string;
+    booth_count: number;
+    booth_rate_cents: number;
+    grand_total_cents?: number | null;
+    covered_wineries?: unknown;
+  }[],
+  eventId: string,
+  feeCents: number,
+): GalloDashboardSummary | null {
+  const open = contracts.filter(
+    (contract) =>
+      contract.event_id === eventId &&
+      contract.status !== 'cancelled' &&
+      contract.status !== 'voided' &&
+      contractQualifiesForGalloCombine(contract),
+  );
+  const unsentContracts = open.filter((contract) => canMergeNyweContract(contract));
+  const lockedNames = new Set(
+    open
+      .filter((contract) => !canMergeNyweContract(contract))
+      .flatMap((contract) => wineriesFromContract(contract).map((winery) => coveredWineryKey(winery.winery_name))),
+  );
+  const wineryNames = [
+    ...new Set(
+      unsentContracts
+        .flatMap((contract) => {
+          const named = wineriesFromContract(contract).map((winery) => winery.winery_name);
+          return named.length > 0 ? named : [contract.exhibitor_company_name];
+        })
+        .map((name) => name.trim())
+        .filter((name) => name && !isGalloBillingCompany(name) && !lockedNames.has(coveredWineryKey(name))),
+    ),
+  ].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+
+  if (unsentContracts.length === 0 || wineryNames.length === 0) return null;
+  if (unsentContracts.length === 1 && wineryNames.length < 2) return null;
+
+  const alreadyCombined = unsentContracts.length === 1 && wineryNames.length > 1;
+  const combined = alreadyCombined ? unsentContracts[0]! : null;
+  const totalCents = alreadyCombined
+    ? (combined?.grand_total_cents ?? wineryNames.length * feeCents)
+    : wineryNames.length * feeCents;
+
+  return {
+    unsent: unsentContracts
+      .map((contract) => ({
+        id: contract.id,
+        wineryName: contract.exhibitor_company_name,
+        status: contract.status,
+        totalCents: contract.grand_total_cents ?? contract.booth_count * contract.booth_rate_cents,
+      }))
+      .sort((a, b) => a.wineryName.localeCompare(b.wineryName, undefined, { sensitivity: 'base' })),
+    alreadyCombined,
+    combinedContractId: combined?.id ?? null,
+    wineryNames,
+    totalCents,
+    feeCents,
+  };
+}
+
 export function exhibitorCompanyMergeValue(contract: {
   exhibitor_company_name: string;
   covered_wineries?: unknown;

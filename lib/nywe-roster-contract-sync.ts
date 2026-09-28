@@ -154,6 +154,7 @@ async function loadRosterPayloadForContract(
 function patchFromPayload(
   contract: ContractWithTotals,
   payload: NonNullable<Awaited<ReturnType<typeof loadRosterPayloadForContract>>>,
+  feeCents: number,
 ): Record<string, unknown> | null {
   const company = normalize(payload.exhibitor_company_name);
   const legal = normalize(payload.exhibitor_legal_name);
@@ -197,7 +198,7 @@ function patchFromPayload(
           legalName: contract.exhibitor_legal_name,
           companyName: contract.exhibitor_company_name,
           wineries: nextWineries,
-          feeCents: contract.booth_rate_cents || 0,
+          feeCents: feeCents || contract.booth_rate_cents || 0,
         })
       : null;
   const patch: Record<string, unknown> = galloFields
@@ -260,7 +261,7 @@ export async function refreshContractFromLinkedRoster(
     return { updated: false, skipped: 'load_failed', contract };
   }
 
-  const patch = patchFromPayload(contract, payload);
+  const patch = patchFromPayload(contract, payload, nyweLicenseFeeCents(event));
   if (!patch) {
     return { updated: false, skipped: 'missing_billing_address', contract };
   }
