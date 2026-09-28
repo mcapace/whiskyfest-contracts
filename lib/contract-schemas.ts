@@ -72,6 +72,32 @@ export const newContractBodySchema = z
     no_charge_booth: z.boolean().optional().default(false),
     /** Participation report pending/new-business row to hard-link after create. */
     pipeline_target_id: z.string().uuid().optional().nullable(),
+    /**
+     * NYWE Gallo license: one entry per winery. The contract total is
+     * winery count × the NYWE license fee.
+     */
+    covered_wineries: z
+      .array(
+        z.object({
+          winery_name: z.string().min(1).max(300),
+          website_url: z.string().max(500).nullable().optional(),
+          wine_display: z.string().max(500).nullable().optional(),
+          source_rows: z
+            .array(
+              z.object({
+                source_sheet_id: z.string().min(1).max(200),
+                source_sheet_tab: z.string().min(1).max(200),
+                source_row_number: z.number().int().min(2),
+              }),
+            )
+            .max(20)
+            .optional()
+            .default([]),
+        }),
+      )
+      .max(40)
+      .optional()
+      .nullable(),
   })
   .superRefine((data, ctx) => {
     const ccEmail = data.signer_cc_email?.trim();

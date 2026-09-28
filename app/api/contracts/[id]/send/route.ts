@@ -25,6 +25,8 @@ import {
 } from '@/lib/docusign-envelope-recipients';
 import { shouldSkipExhibitorDataTabs } from '@/lib/exhibitor-docusign-fields';
 import { nyweLicenseAddressError } from '@/lib/nywe-billing';
+import { contractQualifiesForGalloCombine } from '@/lib/nywe-combined-contract';
+import { combineGalloContractsForEvent } from '@/lib/nywe-combine-gallo-contracts';
 import { refreshNyweBillingFromRosterForContract } from '@/lib/nywe-roster-billing-sync';
 import { resolveContractTemplateDocId } from '@/lib/contract-template';
 import { isSponsorshipOnlyOrder } from '@/lib/contract-order-type';
@@ -56,6 +58,26 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
   const { data: event } = await supabase.from('events').select('*').eq('id', contract.event_id).single<Event>();
   if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+
+  if (contractQualifiesForGalloCombine(contract)) {
+    await combineGalloContractsForEvent({
+      supabase,
+      event,
+      actorEmail: access.actor.email,
+      preferContractId: contract.id,
+    });
+    const reloaded = await fetchContractWithTotalsById(supabase, contract.id);
+    if (!reloaded) {
+      return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
+    }
+    if (reloaded.status === 'cancelled') {
+      return NextResponse.json(
+        { error: reloaded.cancelled_reason ?? 'This license was combined into the Gallo contract. Send that contract.' },
+        { status: 409 },
+      );
+    }
+    contract = reloaded;
+  }
 
   contract = await refreshNyweBillingFromRosterForContract(supabase, contract, event);
 

@@ -10,6 +10,13 @@ import {
 } from '@/lib/exhibitor-roster';
 import { rosterStaleFromEventCache } from '@/lib/exhibitor-roster-sync-job';
 import { contractHasNyweLicenseAddress } from '@/lib/nywe-billing';
+import { isNyweVendorOnlyEvent } from '@/lib/nywe-pricing';
+import {
+  emptyCoveredWinery,
+  isGalloBillingCompany,
+} from '@/lib/nywe-combined-contract';
+import { combineGalloContractsForEvent } from '@/lib/nywe-combine-gallo-contracts';
+import type { NyweCoveredWinery } from '@/lib/nywe-combined-contract';
 import { getSheetsClient } from '@/lib/sheets-tracker';
 import type { Contract, ContractWithTotals, Event } from '@/types/db';
 
@@ -98,6 +105,27 @@ export async function createContractsFromRosterRows(options: {
   const skipped: { rowKey: string; reason: string }[] = [];
   const errors: { rowKey: string; reason: string }[] = [];
   const pendingWritebacks: ContractWithTotals[] = [];
+  const galloRows: {
+    rowKey: string;
+    winery: NyweCoveredWinery;
+    seed: {
+      signer_1_name: string | null;
+      signer_1_email: string | null;
+      event_contact_name: string | null;
+      event_contact_email: string | null;
+      billing: NonNullable<Awaited<ReturnType<typeof resolveCreatePayload>>>['billing'];
+    };
+  }[] = [];
+
+  let galloRowKeys = new Set<string>();
+  if (isNyweVendorOnlyEvent(options.event)) {
+    const existingGallo = await combineGalloContractsForEvent({
+      supabase,
+      event: options.event,
+      actorEmail: options.actorEmail,
+    });
+    galloRowKeys = new Set(existingGallo.coveredRowKeys);
+  }
 
   for (const item of options.items) {
     const rowKey = item.rowKey;
@@ -107,13 +135,18 @@ export async function createContractsFromRosterRows(options: {
       continue;
     }
 
-    const { data: existing } = await supabase
+    if (galloRowKeys.has(rowKey)) {
+      skipped.push({ rowKey, reason: 'Already on the Gallo contract' });
+      continue;
+    }
+
+    const { data: existingRows } = await supabase
       .from('contracts')
-      .select('id')
+      .select('id, status')
       .eq('source_sheet_id', parsed.spreadsheetId)
       .eq('source_sheet_tab', parsed.tab)
-      .eq('source_row_number', parsed.rowNumber)
-      .maybeSingle();
+      .eq('source_row_number', parsed.rowNumber);
+    const existing = (existingRows ?? []).find((row) => row.status !== 'cancelled' && row.status !== 'voided');
 
     if (existing?.id) {
       skipped.push({ rowKey, reason: 'License already exists' });
@@ -132,6 +165,31 @@ export async function createContractsFromRosterRows(options: {
       }
       if (!payload.billing || !contractHasNyweLicenseAddress(payload.billing)) {
         errors.push({ rowKey, reason: ROSTER_MISSING_ADDRESS_MESSAGE });
+        continue;
+      }
+
+      if (isGalloBillingCompany(payload.exhibitor_legal_name) || isGalloBillingCompany(payload.exhibitor_company_name)) {
+        const winery = emptyCoveredWinery(payload.exhibitor_company_name);
+        winery.website_url = payload.exhibitor_website_url;
+        winery.wine_display = payload.brands_poured;
+        winery.source_rows = [
+          {
+            source_sheet_id: parsed.spreadsheetId,
+            source_sheet_tab: parsed.tab,
+            source_row_number: parsed.rowNumber,
+          },
+        ];
+        galloRows.push({
+          rowKey,
+          winery,
+          seed: {
+            signer_1_name: payload.signer_1_name,
+            signer_1_email: payload.signer_1_email,
+            event_contact_name: payload.event_contact_name,
+            event_contact_email: payload.event_contact_email,
+            billing: payload.billing,
+          },
+        });
         continue;
       }
 
@@ -194,6 +252,38 @@ export async function createContractsFromRosterRows(options: {
           ? 'Google Sheets quota exceeded — wait 2 minutes and try again, or create in smaller batches.'
           : message,
       });
+    }
+  }
+
+  if (galloRows.length > 0) {
+    const first = galloRows[0]!;
+    const combined = await combineGalloContractsForEvent({
+      supabase,
+      event: options.event,
+      actorEmail: options.actorEmail,
+      additionalWineries: galloRows.map((row) => row.winery),
+      seed: {
+        signer_1_name: first.seed.signer_1_name,
+        signer_1_email: first.seed.signer_1_email,
+        event_contact_name: first.seed.event_contact_name,
+        event_contact_email: first.seed.event_contact_email,
+        billing: first.seed.billing,
+      },
+    });
+    const locked = new Set(combined.skippedLockedWineries.map((name) => name.toLowerCase()));
+    for (const row of galloRows) {
+      if (locked.has(row.winery.winery_name.trim().toLowerCase())) {
+        skipped.push({
+          rowKey: row.rowKey,
+          reason: `${row.winery.winery_name} is already on a Gallo contract that was sent for signature`,
+        });
+        continue;
+      }
+      if (!combined.contractId) {
+        errors.push({ rowKey: row.rowKey, reason: 'Could not add this winery to the Gallo contract' });
+        continue;
+      }
+      created.push({ rowKey: row.rowKey, contractId: combined.contractId });
     }
   }
 
