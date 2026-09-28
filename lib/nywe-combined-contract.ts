@@ -45,6 +45,17 @@ const GALLO_BILLING_KEYS = new Set([
   'e and j gallo winery llc',
 ]);
 
+/** Known Gallo brand names on the NYWE roster — qualify even when legal name is the winery. */
+const GALLO_BRAND_KEYS = new Set([
+  'louis m martini',
+  'louis martini',
+  'massican',
+  'pahlmeyer',
+  'rombauer',
+  'rombauer vineyards',
+  'jermann',
+]);
+
 export function normalizeNyweBillingKey(name: string | null | undefined): string {
   return (name ?? '')
     .toLowerCase()
@@ -62,6 +73,20 @@ export function isGalloBillingCompany(name: string | null | undefined): boolean 
   if (/^e and j gallo\b/.test(key)) return true;
   if (/^ej gallo\b/.test(key)) return true;
   return false;
+}
+
+export function isGalloBrandWinery(name: string | null | undefined): boolean {
+  const key = normalizeNyweBillingKey(name);
+  if (!key) return false;
+  if (GALLO_BRAND_KEYS.has(key)) return true;
+  if (/^louis m? ?martini\b/.test(key)) return true;
+  if (/^rombauer\b/.test(key)) return true;
+  return false;
+}
+
+export function isGalloSignerEmail(email: string | null | undefined): boolean {
+  const value = email?.trim().toLowerCase() ?? '';
+  return value.endsWith('@ejgallo.com') || value.endsWith('@gallo.com');
 }
 
 export function coveredWineryKey(name: string | null | undefined): string {
@@ -229,12 +254,17 @@ export function wineriesFromContract(contract: {
 export function contractQualifiesForGalloCombine(contract: {
   exhibitor_legal_name?: string | null;
   exhibitor_company_name?: string | null;
+  signer_1_email?: string | null;
   covered_wineries?: unknown;
 }): boolean {
   if (isGalloBillingCompany(contract.exhibitor_legal_name)) return true;
   if (isGalloBillingCompany(contract.exhibitor_company_name)) return true;
-  return parseCoveredWineries(contract.covered_wineries).length > 0 &&
-    isGalloBillingCompany(contract.exhibitor_legal_name);
+  if (isGalloBrandWinery(contract.exhibitor_company_name)) return true;
+  if (isGalloBrandWinery(contract.exhibitor_legal_name)) return true;
+  if (isGalloSignerEmail(contract.signer_1_email)) return true;
+  const covered = parseCoveredWineries(contract.covered_wineries);
+  if (covered.some((winery) => isGalloBrandWinery(winery.winery_name))) return true;
+  return covered.length > 0 && isGalloBillingCompany(contract.exhibitor_legal_name);
 }
 
 export function isCombinedGalloContract(contract: {
@@ -285,7 +315,7 @@ export function galloContractFieldsFromWineries(input: {
   const pricing = nyweCombinedLicensePricing(input.feeCents, count);
   const legalName = input.legalName.trim();
   return {
-    exhibitor_legal_name: isGalloBillingCompany(legalName) ? legalName : legalName || 'GALLO',
+    exhibitor_legal_name: isGalloBillingCompany(legalName) ? legalName : 'GALLO',
     exhibitor_company_name:
       wineries.length > 1 ? NYWE_GALLO_CONTRACT_NAME : (wineries[0]?.winery_name || input.companyName.trim() || NYWE_GALLO_CONTRACT_NAME),
     brands_poured: brandsPouredFromCoveredWineries(wineries) || input.companyName.trim() || null,
@@ -499,13 +529,14 @@ export function summarizeGalloForDashboard(
     booth_rate_cents: number;
     grand_total_cents?: number | null;
     covered_wineries?: unknown;
+    signer_1_email?: string | null;
   }[],
-  eventId: string,
+  eventId: string | null,
   feeCents: number,
 ): GalloDashboardSummary | null {
   const open = contracts.filter(
     (contract) =>
-      contract.event_id === eventId &&
+      (eventId == null || contract.event_id === eventId) &&
       contract.status !== 'cancelled' &&
       contract.status !== 'voided' &&
       contractQualifiesForGalloCombine(contract),

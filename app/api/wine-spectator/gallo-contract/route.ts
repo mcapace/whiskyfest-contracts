@@ -5,12 +5,26 @@ import { requireWineSpectatorActor } from '@/lib/wine-spectator-api-auth';
 import { getActiveWineSpectatorEvent } from '@/lib/wine-spectator-event';
 import { combineGalloContractsForEvent } from '@/lib/nywe-combine-gallo-contracts';
 import { voidSentGalloContractsForEvent } from '@/lib/nywe-void-sent-gallo';
+import { loadGalloDashboardSummary } from '@/lib/nywe-gallo-dashboard';
 import { isNyweVendorOnlyEvent, nyweLicenseFeeCents } from '@/lib/nywe-pricing';
 import type { Event } from '@/types/db';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 120;
+
+/** Dashboard card: load Gallo licenses directly from the database. */
+export async function GET(req: Request) {
+  const gate = await requireWineSpectatorActor();
+  if (!gate.ok) return gate.response;
+
+  const preferredEventId = new URL(req.url).searchParams.get('eventId');
+  const payload = await loadGalloDashboardSummary(preferredEventId);
+  if (!payload) {
+    return NextResponse.json({ summary: null });
+  }
+  return NextResponse.json(payload);
+}
 
 /** Fold Gallo winery licenses into one NYWE contract, optionally voiding sent envelopes first. */
 export async function POST(req: Request) {
@@ -30,9 +44,11 @@ export async function POST(req: Request) {
   }
 
   const supabase = getSupabaseAdmin();
+  const dashboard = await loadGalloDashboardSummary(requestedId);
   let event: Event | null = null;
-  if (requestedId) {
-    const { data } = await supabase.from('events').select('*').eq('id', requestedId).maybeSingle<Event>();
+  const eventId = dashboard?.eventId ?? requestedId;
+  if (eventId) {
+    const { data } = await supabase.from('events').select('*').eq('id', eventId).maybeSingle<Event>();
     event = data;
   } else {
     event = await getActiveWineSpectatorEvent();

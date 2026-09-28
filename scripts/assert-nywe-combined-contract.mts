@@ -8,7 +8,9 @@ import {
   dedupeCoveredWineries,
   emptyCoveredWinery,
   galloContractFieldsFromWineries,
+  contractQualifiesForGalloCombine,
   isGalloBillingCompany,
+  isGalloBrandWinery,
   nyweCombinedLicensePricing,
   summarizeGalloForDashboard,
   wineriesFromContract,
@@ -23,6 +25,15 @@ assert(isGalloBillingCompany('E. & J. Gallo Winery'), 'E. & J. Gallo Winery is t
 assert(isGalloBillingCompany('ej gallo'), 'ej gallo is the billing parent');
 assert(!isGalloBillingCompany('Louis M. Martini'), 'a Gallo brand is not the billing parent');
 assert(!isGalloBillingCompany('Jermann'), 'Jermann is not the billing parent');
+assert(isGalloBrandWinery('Louis M. Martini'), 'Louis M. Martini is a Gallo brand');
+assert(isGalloBrandWinery('Jermann'), 'Jermann is a Gallo brand');
+assert(
+  contractQualifiesForGalloCombine({
+    exhibitor_company_name: 'Massican',
+    exhibitor_legal_name: 'Massican',
+  }),
+  'a Gallo brand qualifies even without GALLO legal name',
+);
 
 const martini = emptyCoveredWinery('Louis M. Martini');
 martini.wine_display = '2019 Cabernet';
