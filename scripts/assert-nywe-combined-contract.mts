@@ -3,6 +3,7 @@
  *   npx tsx scripts/assert-nywe-combined-contract.mts
  */
 import {
+  blankGalloPartyPatch,
   brandsPouredFromCoveredWineries,
   dedupeCoveredWineries,
   emptyCoveredWinery,
@@ -122,5 +123,21 @@ assert(
   summarizeGalloForDashboard([galloDraft('only', 'Jermann')], eventId, 1_400_000) == null,
   'one unsent Gallo winery does not need a combine card',
 );
+
+const keptSigner = blankGalloPartyPatch(
+  { signer_1_name: 'Someone Else', signer_1_email: 'else@ejgallo.com' },
+  [],
+);
+assert(keptSigner.signer_1_name == null && keptSigner.signer_1_email == null, 'an existing signer is left in place');
+assert(keptSigner.billing_address_line1 === '600 Yosemite Blvd', 'a blank address is filled from the Gallo order');
+assert(keptSigner.billing_contact_email === 'emma.bovberg@ejgallo.com', 'billing contact is filled when blank');
+
+const siblingWins = blankGalloPartyPatch(
+  {},
+  [{ signer_1_name: 'Roster Signer', signer_1_email: 'roster@ejgallo.com', billing_address_line1: '1 Vine St' }],
+);
+assert(siblingWins.signer_1_email === 'roster@ejgallo.com', 'a sibling draft supplies the signer');
+assert(siblingWins.billing_address_line1 === '1 Vine St', 'a sibling street beats the Modesto default');
+assert(siblingWins.billing_city === 'Modesto', 'city still falls back when the sibling has none');
 
 console.log('nywe combined contract assertions passed');

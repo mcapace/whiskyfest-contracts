@@ -26,11 +26,7 @@ export function NyweGalloCombineCard({
   const summary = summarizeGalloForDashboard(contracts, eventId, event.booth_rate_cents ?? 1_400_000);
   if (!summary) return null;
 
-  const href = summary.combinedContractId
-    ? `${portalBasePath}/contracts/${summary.combinedContractId}`
-    : null;
-
-  function createCombinedContract() {
+  function openReadyOrder() {
     setError(null);
     startTransition(async () => {
       const res = await fetch('/api/wine-spectator/gallo-contract', {
@@ -40,7 +36,7 @@ export function NyweGalloCombineCard({
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || typeof json.contractId !== 'string') {
-        setError(typeof json.error === 'string' ? json.error : 'Could not create the Gallo contract.');
+        setError(typeof json.error === 'string' ? json.error : 'Could not prepare the Gallo order.');
         return;
       }
       router.push(`${portalBasePath}/contracts/${json.contractId}`);
@@ -54,26 +50,17 @@ export function NyweGalloCombineCard({
         <div className="min-w-0">
           <p className="text-sm font-semibold text-foreground">Gallo — one contract</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            {summary.alreadyCombined
-              ? `${summary.wineryNames.length} wineries are already on one license.`
-              : `${summary.unsent.length} separate licenses can be combined into one.`}{' '}
-            Total {formatCurrency(summary.totalCents)} ({summary.wineryNames.length} ×{' '}
-            {formatCurrency(summary.feeCents)}).
+            One order for {summary.wineryNames.length} wineries, total {formatCurrency(summary.totalCents)}. Open it
+            and click Send via DocuSign.
           </p>
           <p className="mt-2 text-sm text-foreground">{summary.wineryNames.join(' · ')}</p>
           {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
-          {summary.alreadyCombined && href ? (
-            <Button size="sm" onClick={() => router.push(href)}>
-              Open to send
-            </Button>
-          ) : (
-            <Button size="sm" onClick={createCombinedContract} disabled={pending}>
-              {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-              Create one Gallo contract
-            </Button>
-          )}
+          <Button size="sm" onClick={openReadyOrder} disabled={pending}>
+            {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+            Open to send
+          </Button>
         </div>
       </div>
     </div>

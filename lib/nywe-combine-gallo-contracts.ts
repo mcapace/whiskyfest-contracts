@@ -7,6 +7,7 @@ import {
   canMergeNyweContract,
   contractQualifiesForGalloCombine,
   coveredWineryKey,
+  blankGalloPartyPatch,
   coveredWinerySourceKeys,
   galloContractFieldsFromWineries,
   NYWE_GALLO_CONTRACT_NAME,
@@ -43,6 +44,37 @@ function withoutLockedWineries(wineries: NyweCoveredWinery[], locked: Set<string
   return wineries.filter((winery) => !locked.has(coveredWineryKey(winery.winery_name)));
 }
 
+function seedParty(seed: {
+  signer_1_name?: string | null;
+  signer_1_email?: string | null;
+  event_contact_name?: string | null;
+  event_contact_email?: string | null;
+  billing?: NyweBillingFields | null;
+} | undefined): Contract | null {
+  if (!seed) return null;
+  return {
+    signer_1_name: seed.signer_1_name ?? null,
+    signer_1_email: seed.signer_1_email ?? null,
+    event_contact_name: seed.event_contact_name ?? null,
+    event_contact_email: seed.event_contact_email ?? null,
+    ...(seed.billing ?? {}),
+  } as Contract;
+}
+
+function readyToSendPatch(contract: Pick<Contract, 'status' | 'events_approved_at' | 'approved_at' | 'events_submitted_at'>, actorEmail: string) {
+  if (!canMergeNyweContract(contract)) return {};
+  if (contract.status === 'approved' && contract.events_approved_at) return {};
+  const now = new Date().toISOString();
+  return {
+    status: 'approved' as const,
+    approved_at: contract.approved_at ?? now,
+    events_submitted_at: contract.events_submitted_at ?? now,
+    events_approved_at: now,
+    events_approved_by: actorEmail,
+    events_approval_reason: 'Combined Gallo license, ready to send',
+  };
+}
+
 /**
  * Fold unsent NYWE Gallo contracts for one event into a single license.
  * The total is the license fee times the number of distinct wineries.
@@ -62,6 +94,8 @@ export async function combineGalloContractsForEvent(options: {
     event_contact_email?: string | null;
     billing?: NyweBillingFields | null;
   };
+  /** Dashboard prepare: approve the finished order so Send via DocuSign is the next click. */
+  prepareToSend?: boolean;
 }): Promise<CombineGalloContractsResult> {
   const empty: CombineGalloContractsResult = {
     contractId: null,
@@ -102,6 +136,7 @@ export async function combineGalloContractsForEvent(options: {
 
   if (wineries.length === 0) return { ...empty, skippedLockedWineries };
 
+  const partyDonors = [seedParty(options.seed), ...mergeable].filter((row): row is Contract => row != null);
   const nothingNew =
     (options.additionalWineries ?? []).length === 0 && (options.additionalRosterRows ?? []).length === 0;
   if (mergeable.length === 1 && nothingNew) {
@@ -117,6 +152,24 @@ export async function combineGalloContractsForEvent(options: {
       only.booth_count === Math.max(1, existing.length) &&
       (existing.length <= 1 || only.exhibitor_company_name === NYWE_GALLO_CONTRACT_NAME);
     if (sameNames && priced) {
+      const party = blankGalloPartyPatch(only, partyDonors);
+      const approval = options.prepareToSend ? readyToSendPatch(only, options.actorEmail) : {};
+      const finish = { ...party, ...approval };
+      if (Object.keys(finish).length > 0) {
+        const { error: finishError } = await options.supabase.from('contracts').update(finish).eq('id', only.id);
+        if (finishError) {
+          console.error('[combineGalloContractsForEvent] prepare', finishError.message);
+        } else if ('events_approved_at' in approval) {
+          await options.supabase.from('audit_log').insert({
+            contract_id: only.id,
+            actor_email: options.actorEmail,
+            action: 'events_approved',
+            from_status: only.status,
+            to_status: 'approved',
+            metadata: { gallo_ready_to_send: true },
+          });
+        }
+      }
       return {
         contractId: only.id,
         cancelledIds: [],
@@ -153,6 +206,11 @@ export async function combineGalloContractsForEvent(options: {
     fields.covered_wineries?.find((winery) => winery.website_url)?.website_url ??
     survivor?.exhibitor_website_url ??
     null;
+  const party = blankGalloPartyPatch(survivor ?? {}, partyDonors);
+  const approval = options.prepareToSend && survivor ? readyToSendPatch(survivor, options.actorEmail) : {};
+  const insertApproval = options.prepareToSend
+    ? readyToSendPatch({ status: 'draft', events_approved_at: null, approved_at: null, events_submitted_at: null }, options.actorEmail)
+    : {};
 
   let contractId = survivor?.id ?? null;
   if (!survivor) {
@@ -173,11 +231,8 @@ export async function combineGalloContractsForEvent(options: {
         source_sheet_tab: source?.source_sheet_tab ?? null,
         source_row_number: source?.source_row_number ?? null,
         created_by: options.actorEmail,
-        signer_1_name: options.seed?.signer_1_name ?? null,
-        signer_1_email: options.seed?.signer_1_email ?? null,
-        event_contact_name: options.seed?.event_contact_name ?? null,
-        event_contact_email: options.seed?.event_contact_email ?? null,
-        ...(options.seed?.billing ?? {}),
+        ...party,
+        ...insertApproval,
       })
       .select('id')
       .single();
@@ -190,7 +245,7 @@ export async function combineGalloContractsForEvent(options: {
       contract_id: contractId,
       actor_email: options.actorEmail,
       action: 'nywe_gallo_contracts_combined',
-      to_status: 'draft',
+      to_status: 'status' in insertApproval ? insertApproval.status : 'draft',
       metadata: {
         winery_count: fields.booth_count,
         wineries: (fields.covered_wineries ?? []).map((winery) => winery.winery_name),
@@ -211,18 +266,8 @@ export async function combineGalloContractsForEvent(options: {
         source_sheet_id: source?.source_sheet_id ?? survivor.source_sheet_id,
         source_sheet_tab: source?.source_sheet_tab ?? survivor.source_sheet_tab,
         source_row_number: source?.source_row_number ?? survivor.source_row_number,
-        ...(!survivor.signer_1_email && options.seed?.signer_1_email
-          ? {
-              signer_1_name: options.seed.signer_1_name ?? null,
-              signer_1_email: options.seed.signer_1_email,
-            }
-          : {}),
-        ...(!survivor.event_contact_email && options.seed?.event_contact_email
-          ? {
-              event_contact_name: options.seed.event_contact_name ?? null,
-              event_contact_email: options.seed.event_contact_email,
-            }
-          : {}),
+        ...party,
+        ...approval,
       })
       .eq('id', survivor.id);
     if (updateError) {
@@ -239,6 +284,16 @@ export async function combineGalloContractsForEvent(options: {
         total_cents: fields.booth_count * fields.booth_rate_cents,
       },
     });
+    if ('events_approved_at' in approval) {
+      await options.supabase.from('audit_log').insert({
+        contract_id: survivor.id,
+        actor_email: options.actorEmail,
+        action: 'events_approved',
+        from_status: survivor.status,
+        to_status: 'approved',
+        metadata: { gallo_ready_to_send: true },
+      });
+    }
   }
 
   const cancelledIds: string[] = [];

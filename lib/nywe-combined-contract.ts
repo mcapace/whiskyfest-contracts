@@ -302,6 +302,74 @@ export function primarySourceRow(wineries: NyweCoveredWinery[]): NyweCoveredSour
   return null;
 }
 
+/** Signer and Modesto billing used when a Gallo draft does not already have them. */
+export const NYWE_GALLO_ORDER_DEFAULTS = {
+  signer_1_name: 'Lon Gallagher',
+  signer_1_email: 'lon.gallagher@ejgallo.com',
+  event_contact_name: 'Emma Bovberg',
+  event_contact_email: 'emma.bovberg@ejgallo.com',
+  billing_contact_name: 'Emma Bovberg',
+  billing_contact_email: 'emma.bovberg@ejgallo.com',
+  billing_address_line1: '600 Yosemite Blvd',
+  billing_city: 'Modesto',
+  billing_state: 'CA',
+  billing_zip: '95354',
+  exhibitor_address_line1: '600 Yosemite Blvd',
+  exhibitor_city: 'Modesto',
+  exhibitor_state: 'CA',
+  exhibitor_zip: '95354',
+} as const;
+
+const GALLO_ORDER_PARTY_KEYS = [
+  'signer_1_name',
+  'signer_1_email',
+  'event_contact_name',
+  'event_contact_email',
+  'billing_contact_name',
+  'billing_contact_email',
+  'billing_address_line1',
+  'billing_address_line2',
+  'billing_city',
+  'billing_state',
+  'billing_zip',
+  'billing_country',
+  'exhibitor_address_line1',
+  'exhibitor_address_line2',
+  'exhibitor_city',
+  'exhibitor_state',
+  'exhibitor_zip',
+  'exhibitor_country',
+] as const;
+
+export type GalloOrderPartyKey = (typeof GALLO_ORDER_PARTY_KEYS)[number];
+
+type GalloOrderParty = Partial<Record<GalloOrderPartyKey, string | null>>;
+
+function partyValue(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed || null;
+}
+
+/**
+ * Fill only empty signer, event contact, and address fields.
+ * Sibling drafts win; the known Gallo order fills anything still blank.
+ */
+export function blankGalloPartyPatch(
+  current: GalloOrderParty,
+  donors: GalloOrderParty[],
+): Partial<Record<GalloOrderPartyKey, string>> & { billing_same_as_corporate?: false } {
+  const patch: Partial<Record<GalloOrderPartyKey, string>> & { billing_same_as_corporate?: false } = {};
+  for (const key of GALLO_ORDER_PARTY_KEYS) {
+    if (partyValue(current[key])) continue;
+    const donated = donors.map((donor) => partyValue(donor[key])).find((value): value is string => Boolean(value));
+    const fallback = key in NYWE_GALLO_ORDER_DEFAULTS ? NYWE_GALLO_ORDER_DEFAULTS[key as keyof typeof NYWE_GALLO_ORDER_DEFAULTS] : null;
+    const value = donated ?? fallback;
+    if (value) patch[key] = value;
+  }
+  if (patch.billing_address_line1) patch.billing_same_as_corporate = false;
+  return patch;
+}
+
 export function applyRosterRowsToCombinedContract(
   existing: NyweCoveredWinery[],
   rows: CombinedRosterWineryInput[],

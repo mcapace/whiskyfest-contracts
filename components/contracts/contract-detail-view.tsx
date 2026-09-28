@@ -6,7 +6,8 @@ import { ArrowLeft } from 'lucide-react';
 import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { standardBoothRateCentsForEvent } from '@/lib/contracts';
 import { isNyweVendorEvent, isNyweVendorOnlyEvent, nyweLicenseFeeCents } from '@/lib/nywe-pricing';
-import { parseCoveredWineries } from '@/lib/nywe-combined-contract';
+import { canMergeNyweContract, parseCoveredWineries } from '@/lib/nywe-combined-contract';
+import { NyweGalloSendBanner } from '@/components/wine-spectator/nywe-gallo-send-banner';
 import {
   packageSelectionsFromContract,
   pricingFromBigSmokeInput,
@@ -304,6 +305,10 @@ export function ContractDetailView({
                 </p>
               </div>
             )}
+
+            {nyweLicense && canMergeNyweContract(contract) && (isEventsTeam || isAdmin) ? (
+              <NyweGalloSendBanner contract={contract} clientSendEnabled={clientSendEnabled} />
+            ) : null}
 
             <div className="rounded-lg border border-parchment-200/90 bg-parchment-50/80 p-4 shadow-sm">
               <ContractActions
