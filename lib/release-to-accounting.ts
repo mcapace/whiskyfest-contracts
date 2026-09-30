@@ -191,25 +191,31 @@ export async function releaseContractToAccounting(options: {
       return { ok: false, error: msg, status: msg.includes('missing') ? 409 : 502 };
     }
   } else {
-    const envelopeIdRaw = contract.docusign_envelope_id?.trim();
-    if (!envelopeIdRaw) {
-      return { ok: false, error: 'DocuSign contract is missing envelope id.', status: 409 };
+    // A client-signed PDF attached outside DocuSign lives in storage with no envelope at all.
+    const envelopeId = contract.docusign_envelope_id?.trim() || null;
+    const storagePath = contract.pdf_storage_path;
+    const hasStoredSignedPdf = Boolean(storagePath?.endsWith('signed.pdf'));
+    if (!envelopeId && !hasStoredSignedPdf) {
+      return {
+        ok: false,
+        error: 'No signed PDF is on file for this contract (no DocuSign envelope and no uploaded signed copy).',
+        status: 409,
+      };
     }
-    if (!contract.signed_pdf_url && !contract.pdf_storage_path?.endsWith('signed.pdf')) {
+    if (envelopeId && !contract.signed_pdf_url && !hasStoredSignedPdf) {
       return { ok: false, error: 'Signed PDF is not yet available.', status: 409 };
     }
 
-    const envelopeId = envelopeIdRaw;
-    const storagePath = contract.pdf_storage_path;
     async function loadSignedPdfBytes(): Promise<Buffer> {
-      if (storagePath?.endsWith('signed.pdf')) {
+      if (hasStoredSignedPdf) {
         try {
-          return await downloadContractPdfFromStorage(storagePath);
-        } catch {
+          return await downloadContractPdfFromStorage(storagePath!);
+        } catch (err) {
+          if (!envelopeId) throw err;
           return downloadCompletedPdf(envelopeId);
         }
       }
-      return downloadCompletedPdf(envelopeId);
+      return downloadCompletedPdf(envelopeId!);
     }
 
     try {
