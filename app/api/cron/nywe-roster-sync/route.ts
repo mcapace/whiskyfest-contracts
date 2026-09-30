@@ -25,20 +25,39 @@ function tokenMatches(expected: string, provided: string | null): boolean {
   return timingSafeEqual(a, b);
 }
 
+function providedGalloToken(request: Request): string | null {
+  const header = request.headers.get('x-gallo-indemnification-token')?.trim();
+  if (header) return header;
+  try {
+    return new URL(request.url).searchParams.get('gallo_token')?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization');
   const secret = process.env['CRON_SECRET']?.trim();
   const cronOk = Boolean(secret && authHeader === `Bearer ${secret}`);
-  const pendingToken = await pendingGalloIndemnificationToken().catch((err) => {
+  let pendingToken: string | null = null;
+  let lookupFailed = false;
+  try {
+    pendingToken = await pendingGalloIndemnificationToken();
+  } catch (err) {
+    lookupFailed = true;
     console.error('[cron/nywe-roster-sync] gallo token lookup failed', err);
-    return null;
-  });
-  const tokenOk = tokenMatches(
-    pendingToken ?? '',
-    pendingToken ? request.headers.get('x-gallo-indemnification-token') : null,
-  );
+  }
+  const providedToken = providedGalloToken(request);
+  const tokenOk = tokenMatches(pendingToken ?? '', pendingToken ? providedToken : null);
   if (!cronOk && !tokenOk) {
-    return new Response('Unauthorized', { status: 401 });
+    const reason = lookupFailed ? 'lookup-failed' : !pendingToken ? 'no-pending' : !providedToken ? 'no-token' : 'mismatch';
+    return new Response('Unauthorized', {
+      status: 401,
+      headers: {
+        'cache-control': 'private, no-store',
+        'x-gallo-auth': reason,
+      },
+    });
   }
 
   let galloIndemnification: { applied: boolean; reason?: string; envelopeId?: string; error?: string } | null =

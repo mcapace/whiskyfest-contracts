@@ -59,6 +59,15 @@ export default auth((req) => {
     return NextResponse.rewrite(new URL(portalFaviconPath(portalKindFromHost(host)), req.url));
   }
 
+  // Cron calls carry a bearer secret or the one-time Gallo token. Forward the
+  // incoming headers explicitly so the route can read them.
+  if (pathname.startsWith('/api/cron')) {
+    return applyPortalHeader(
+      NextResponse.next({ request: { headers: new Headers(req.headers) } }),
+      host,
+    );
+  }
+
   const nyweHost = isNywePortalHost(host);
   const bigSmokeHost = isBigSmokePortalHost(host);
 

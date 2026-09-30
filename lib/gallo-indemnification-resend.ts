@@ -127,6 +127,25 @@ export async function applyPendingGalloMutualIndemnification(): Promise<{
     throw new Error(ccError);
   }
 
+  const lineItems = await fetchContractLineItemsOrdered(supabase, contract.id);
+  const boothBrands = await fetchContractBoothBrandsOrdered(supabase, contract.id);
+  const mergeMap = buildContractMergeMap(contract, event, 'docusign', boothBrands);
+  const usesOrderTable = contractUsesOrderTable(event, contract);
+  let pdfBytes: Buffer;
+  try {
+    pdfBytes = await renderContractPdfFromTemplate(
+      resolveContractTemplateDocId(contract, event),
+      mergeMap,
+      `${contractPdfBaseName(contract.exhibitor_company_name, event)} (Gallo indemnification)`,
+      usesOrderTable ? lineItems : undefined,
+      { includeBoothRow: usesOrderTable && !isSponsorshipOnlyOrder(contract) },
+    );
+  } catch (err) {
+    await restorePending();
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(formatDocuSignErrorForUser(msg));
+  }
+
   const priorStatus = contract.status;
   const priorEnvelopeId = contract.docusign_envelope_id?.trim() || null;
   if (priorEnvelopeId && (priorStatus === 'sent' || priorStatus === 'partially_signed')) {
@@ -152,22 +171,10 @@ export async function applyPendingGalloMutualIndemnification(): Promise<{
     }
   }
 
-  const lineItems = await fetchContractLineItemsOrdered(supabase, contract.id);
-  const boothBrands = await fetchContractBoothBrandsOrdered(supabase, contract.id);
-  const mergeMap = buildContractMergeMap(contract, event, 'docusign', boothBrands);
-  const usesOrderTable = contractUsesOrderTable(event, contract);
-  let pdfBytes: Buffer;
   let draftStoragePath: string;
   let drafted_at: string;
   let envelopeId: string;
   try {
-    pdfBytes = await renderContractPdfFromTemplate(
-      resolveContractTemplateDocId(contract, event),
-      mergeMap,
-      `${contractPdfBaseName(contract.exhibitor_company_name, event)} (Gallo indemnification)`,
-      usesOrderTable ? lineItems : undefined,
-      { includeBoothRow: usesOrderTable && !isSponsorshipOnlyOrder(contract) },
-    );
     const persisted = await persistContractDraftPdf(contract.id, pdfBytes);
     draftStoragePath = persisted.draftStoragePath;
     drafted_at = persisted.drafted_at;
