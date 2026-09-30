@@ -351,8 +351,11 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
   const { accessToken, accountId, restApiBase } = await getDocuSignSession();
 
   const useCountersignerAnchors = params.signer1TabAnchors === 'countersigner';
-  const signHere1 = anchorOnly(useCountersignerAnchors ? DOCUSIGN_ANCHORS.sig2 : DOCUSIGN_ANCHORS.sig1);
-  const date1 = anchorOnly(useCountersignerAnchors ? DOCUSIGN_ANCHORS.date2 : DOCUSIGN_ANCHORS.date1);
+  // Countersign-only envelopes carry a client-signed (often scanned / flattened) PDF: if the anchor
+  // text cannot be found, let DocuSign fall back to free-form placement instead of rejecting the send.
+  const tolerant = useCountersignerAnchors ? { anchorIgnoreIfNotPresent: 'true' } : {};
+  const signHere1 = { ...anchorOnly(useCountersignerAnchors ? DOCUSIGN_ANCHORS.sig2 : DOCUSIGN_ANCHORS.sig1), ...tolerant };
+  const date1 = { ...anchorOnly(useCountersignerAnchors ? DOCUSIGN_ANCHORS.date2 : DOCUSIGN_ANCHORS.date1), ...tolerant };
   const exhibitorTabs =
     params.skipExhibitorDataTabs || useCountersignerAnchors ? {} : buildExhibitorDataTextTabs();
 

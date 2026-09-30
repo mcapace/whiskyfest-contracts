@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   CircleAlert,
   ExternalLink,
+  FileCheck2,
   FileText,
   Loader2,
   Mail,
@@ -183,6 +184,12 @@ export function ContractActions({
   const [openRecall, setOpenRecall] = useState(false);
   const [openRevise, setOpenRevise] = useState(false);
   const [openApplyAmendments, setOpenApplyAmendments] = useState(false);
+  const [openUploadSigned, setOpenUploadSigned] = useState(false);
+  const [uploadSignedFile, setUploadSignedFile] = useState<File | null>(null);
+  const [uploadSignedCountersign, setUploadSignedCountersign] = useState<'docusign' | 'none'>('docusign');
+  const [uploadSignedNote, setUploadSignedNote] = useState('');
+  const [uploadSignedError, setUploadSignedError] = useState<string | null>(null);
+  const [uploadingSigned, setUploadingSigned] = useState(false);
   const [openResendWithChanges, setOpenResendWithChanges] = useState(false);
   const [openCancel, setOpenCancel] = useState(false);
   const [openVoid, setOpenVoid] = useState(false);
@@ -369,6 +376,10 @@ export function ContractActions({
     Boolean(docusignEnvelopeId);
   const canReviseAndSend =
     canRecall && clientSendEnabled && !discountApprovalPending && Boolean(reviseInitial);
+  /** Client signed outside DocuSign (printed / extra signers) and emailed the PDF back. */
+  const canUploadSigned =
+    (isAdmin || isEventsTeam) &&
+    (status === 'sent' || status === 'partially_signed' || status === 'approved' || status === 'error');
   /** Client amendments that arrive before anything is sent — no DocuSign involvement. */
   const canApplyAmendments =
     (isAdmin || isEventsTeam) &&
@@ -394,6 +405,7 @@ export function ContractActions({
   const hasDocuSignSecondary =
     canPersonalNudge ||
     canReminder ||
+    canUploadSigned ||
     canReviseAndSend ||
     canResendWithChanges ||
     canRecall ||
@@ -970,6 +982,24 @@ export function ContractActions({
                   </Button>
                 </ActionWithHelp>
               )}
+              {canUploadSigned && (
+                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.uploadSigned} className="w-full">
+                  <Button
+                    className={btnSecondary}
+                    onClick={() => {
+                      setUploadSignedError(null);
+                      setUploadSignedFile(null);
+                      setUploadSignedNote('');
+                      setUploadSignedCountersign('docusign');
+                      setOpenUploadSigned(true);
+                    }}
+                    disabled={busy || readOnly}
+                    title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+                  >
+                    <ContractActionButtonLabel icon={FileCheck2} label="Upload Signed Contract" />
+                  </Button>
+                </ActionWithHelp>
+              )}
               {canReviseAndSend && (
                 <ActionWithHelp helpText={CONTRACT_ACTION_HELP.reviseAndSend} className="w-full">
                   <Button
@@ -1169,6 +1199,111 @@ export function ContractActions({
             >
               {pending && action === 'approve-discount' ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Approve Discount
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={openUploadSigned} onOpenChange={setOpenUploadSigned}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Upload signed contract</DialogTitle>
+            <DialogDescription>
+              For a contract the client signed outside DocuSign — printed, or with more signers than the envelope
+              had. The current DocuSign envelope is voided and this PDF becomes the signed copy on the contract.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <div className="space-y-2">
+              <Label htmlFor="upload-signed-file">Signed PDF</Label>
+              <input
+                id="upload-signed-file"
+                type="file"
+                accept="application/pdf,.pdf"
+                className="block w-full text-sm file:mr-3 file:rounded-md file:border file:border-input file:bg-background file:px-3 file:py-1.5 file:text-sm"
+                onChange={(e) => setUploadSignedFile(e.target.files?.[0] ?? null)}
+                disabled={uploadingSigned}
+              />
+            </div>
+            <div className="space-y-2">
+              <p className="font-medium">Whisky Advocate countersignature</p>
+              <label className="flex cursor-pointer items-start gap-2">
+                <input
+                  type="radio"
+                  name="upload-signed-countersign"
+                  className="mt-1"
+                  checked={uploadSignedCountersign === 'docusign'}
+                  onChange={() => setUploadSignedCountersign('docusign')}
+                />
+                <span>
+                  Send this PDF to Whisky Advocate for DocuSign countersignature
+                  <span className="block text-xs text-muted-foreground">
+                    Contract shows as partially signed until the countersignature comes back, then it releases to
+                    accounting as usual.
+                  </span>
+                </span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-2">
+                <input
+                  type="radio"
+                  name="upload-signed-countersign"
+                  className="mt-1"
+                  checked={uploadSignedCountersign === 'none'}
+                  onChange={() => setUploadSignedCountersign('none')}
+                />
+                <span>
+                  Already fully signed — mark executed and release to accounting now
+                  <span className="block text-xs text-muted-foreground">
+                    Use when both parties are on the PDF or Whisky Advocate signs on paper.
+                  </span>
+                </span>
+              </label>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="upload-signed-note">Internal / accounting note (optional)</Label>
+              <Textarea
+                id="upload-signed-note"
+                value={uploadSignedNote}
+                onChange={(e) => setUploadSignedNote(e.target.value)}
+                placeholder="e.g., Do not invoice the parent company directly; each brand team receives its own invoice."
+                rows={3}
+                maxLength={2000}
+              />
+            </div>
+            {uploadSignedError ? <p className="text-xs text-destructive">{uploadSignedError}</p> : null}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenUploadSigned(false)} disabled={uploadingSigned}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!uploadSignedFile) return;
+                setUploadSignedError(null);
+                setUploadingSigned(true);
+                const form = new FormData();
+                form.append('file', uploadSignedFile);
+                form.append('countersign', uploadSignedCountersign);
+                form.append('note', uploadSignedNote.trim());
+                void fetch(`/api/contracts/${contractId}/upload-signed`, { method: 'POST', body: form })
+                  .then(async (res) => {
+                    const j = (await res.json().catch(() => ({}))) as { error?: string };
+                    if (!res.ok) {
+                      setUploadSignedError(j.error ?? `Request failed (${res.status})`);
+                      return;
+                    }
+                    emitContractActionSuccessFeedback(Boolean(session?.user?.sound_enabled));
+                    setOpenUploadSigned(false);
+                    router.refresh();
+                    queueMicrotask(() => router.refresh());
+                  })
+                  .catch(() => setUploadSignedError('Upload failed'))
+                  .finally(() => setUploadingSigned(false));
+              }}
+              disabled={uploadingSigned || !uploadSignedFile || readOnly}
+            >
+              {uploadingSigned ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {uploadSignedCountersign === 'docusign' ? 'Attach and send for countersignature' : 'Attach and mark executed'}
             </Button>
           </DialogFooter>
         </DialogContent>

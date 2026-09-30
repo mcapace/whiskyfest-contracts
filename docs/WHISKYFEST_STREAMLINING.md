@@ -84,6 +84,20 @@ Some exhibitors need two signatures on their side. Contracts now carry `signer_2
 
 Migration: same file as above (`091_signer_2_and_revision_plan.sql`).
 
+## 3b. Client signed outside DocuSign (printed / extra signers)
+
+When a client returns a signed PDF instead of signing the envelope (Bacardi WFNY 2026 is the first
+case: two signers on their side), **Upload Signed Contract** on the contract page (sent, partially
+signed, approved or error) attaches that PDF to the existing contract instead of re-creating it as a
+legacy import (`POST /api/contracts/[id]/upload-signed`, `lib/contract-upload-signed.ts`):
+
+- The DocuSign envelope is voided and the uploaded PDF becomes the contract's signed copy.
+- Choose **countersignature via DocuSign** (a single-recipient envelope to the event's Whisky Advocate
+  signatory; the contract sits in `partially_signed` until it completes, then releases to accounting
+  as usual) or **already fully signed** (marked `signed`, auto-released to accounting → `executed`).
+- An optional note lands in the contract's internal notes and accounting notes, e.g. invoicing
+  instructions for accounting.
+
 ## 4. Katherine Brumley: WhiskyFest admin
 
 `supabase/migrations/090_kate_brumley_whiskyfest_admin.sql` sets `role = admin`, `is_events_team = true`
