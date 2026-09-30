@@ -20,6 +20,7 @@ import { contractUsesOrderTable } from '@/lib/contract-template-profile';
 import {
   countersignerRequiredForEvent,
   countersignCcValidation,
+  countersignerBlockedEmails,
   resolveDocuSignCountersignDelivery,
   toSendEnvelopeCountersignParams,
 } from '@/lib/docusign-envelope-recipients';
@@ -35,14 +36,14 @@ import { insertContractAudit } from '@/lib/audit-log';
 import { syncExhibitorRosterWriteback } from '@/lib/exhibitor-roster-sync-hook';
 import { docusignBrandIdForEvent, sendGridFromForEvent } from '@/lib/product-email';
 import { parseSignerCc } from '@/lib/docusign-signer-cc';
-import {
-  amendmentsTextForPlan,
-  buildContractRevisionPlan,
-  docRequestsForRevisionPlan,
-} from '@/lib/contract-revision-plan-service';
+import { normalizeSecondSignerText, parseSecondSigner, secondSignerValidation } from '@/lib/second-signer';
+import { secondSignerTemplateError } from '@/lib/second-signer-template-guard';
+import { amendmentsTextForPlan, buildContractRevisionPlan } from '@/lib/contract-revision-plan-service';
 import {
   applyRevisionPlanFieldUpdates,
   contractRevisionPlanSchema,
+  mergeRevisionPlans,
+  parseStoredRevisionPlan,
   type ContractRevisionPlan,
 } from '@/lib/contract-revision-plan';
 import type { Contract, ContractStatus, ContractWithTotals, Event } from '@/types/db';
@@ -54,12 +55,17 @@ export const reviseAndSendBodySchema = z.object({
   change_request: z.string().max(50000).optional().nullable(),
   /** Pre-computed plan from POST /revision-plan; generated on submit if omitted. */
   revision_plan: contractRevisionPlanSchema.optional().nullable(),
+  /** Drop inline edits from earlier rounds instead of layering this round on top of them. */
+  replace_existing_edits: z.boolean().optional(),
   revision_amendments: z.string().max(50000).optional().nullable(),
   exhibitor_notes: z.string().max(50000).optional().nullable(),
   signer_1_name: z.string().trim().min(1).optional(),
   signer_1_email: z.string().trim().email().optional(),
   signer_cc_name: z.string().max(200).optional().nullable(),
   signer_cc_email: z.string().email().optional().or(z.literal('')).nullable(),
+  signer_2_name: z.string().max(200).optional().nullable(),
+  signer_2_title: z.string().max(200).optional().nullable(),
+  signer_2_email: z.string().email().optional().or(z.literal('')).nullable(),
   exhibitor_legal_name: z.string().trim().min(1).optional(),
   exhibitor_company_name: z.string().trim().min(1).optional(),
   brands_poured: z.string().max(2000).optional().nullable(),
@@ -135,26 +141,41 @@ function buildRevisionPatch(
     applyRevisionPlanFieldUpdates(plan, patch);
     const planAmendments = amendmentsTextForPlan(plan);
     if (planAmendments) patch.revision_amendments = planAmendments;
+    // Persist so every later render (resend, preview, draft PDF) carries the same inline edits.
+    patch.revision_plan = plan;
   }
 
-  const set = (key: string, value: unknown) => {
-    if (value !== undefined) patch[key] = value;
+  // The wizard only sends fields the user changed. A key that is absent must leave the column
+  // alone; a key sent as '' or null clears it. (Previously `x?.trim() || null` turned "absent"
+  // into null and wiped notes / brands / CC / billing on every revision.)
+  const setText = (key: string, raw: string | null | undefined) => {
+    if (raw === undefined) return;
+    patch[key] = raw?.trim() || null;
+  };
+  const setRequired = (key: string, raw: string | undefined) => {
+    const trimmed = raw?.trim();
+    if (trimmed) patch[key] = trimmed;
   };
 
-  set('revision_amendments', body.revision_amendments?.trim() || patch.revision_amendments || null);
-  set('exhibitor_notes', body.exhibitor_notes?.trim() || null);
-  set('signer_1_name', body.signer_1_name?.trim());
-  set('signer_1_email', body.signer_1_email?.trim());
-  set('signer_cc_name', body.signer_cc_name?.trim() || null);
-  set('signer_cc_email', body.signer_cc_email?.trim() || null);
-  set('exhibitor_legal_name', body.exhibitor_legal_name?.trim());
-  set('exhibitor_company_name', body.exhibitor_company_name?.trim());
-  set('brands_poured', body.brands_poured?.trim() || null);
-  set('billing_address_line1', body.billing_address_line1?.trim() || null);
-  set('billing_city', body.billing_city?.trim() || null);
-  set('billing_state', body.billing_state?.trim() || null);
-  set('billing_zip', body.billing_zip?.trim() || null);
-  set('billing_country', body.billing_country?.trim() || null);
+  if (body.revision_amendments !== undefined) {
+    patch.revision_amendments = body.revision_amendments?.trim() || patch.revision_amendments || null;
+  }
+  setText('exhibitor_notes', body.exhibitor_notes);
+  setRequired('signer_1_name', body.signer_1_name);
+  setRequired('signer_1_email', body.signer_1_email);
+  setText('signer_cc_name', body.signer_cc_name);
+  setText('signer_cc_email', body.signer_cc_email);
+  setText('signer_2_name', body.signer_2_name);
+  setText('signer_2_title', body.signer_2_title);
+  setText('signer_2_email', body.signer_2_email);
+  setRequired('exhibitor_legal_name', body.exhibitor_legal_name);
+  setRequired('exhibitor_company_name', body.exhibitor_company_name);
+  setText('brands_poured', body.brands_poured);
+  setText('billing_address_line1', body.billing_address_line1);
+  setText('billing_city', body.billing_city);
+  setText('billing_state', body.billing_state);
+  setText('billing_zip', body.billing_zip);
+  setText('billing_country', body.billing_country);
 
   return patch;
 }
@@ -174,7 +195,6 @@ async function resolveRevisionPdfBytes(
   const mergeMap = buildContractMergeMap(contract, event, 'docusign', boothBrands);
   const templateDocId = resolveContractTemplateDocId(contract, event);
   const usesOrderTable = contractUsesOrderTable(event, contract);
-  const postMergeRevisionRequests = plan ? docRequestsForRevisionPlan(plan) : undefined;
 
   return renderContractPdfFromTemplate(
     templateDocId,
@@ -183,7 +203,10 @@ async function resolveRevisionPdfBytes(
     usesOrderTable ? lineItems : undefined,
     {
       includeBoothRow: usesOrderTable && !isSponsorshipOnlyOrder(contract),
-      postMergeRevisionRequests,
+      // The plan was persisted on the contract before this render; an edit that no longer matches
+      // must fail the send rather than disappear from a document that is about to be signed.
+      revisionPlan: plan ?? parseStoredRevisionPlan(contract.revision_plan),
+      strictRevision: true,
     },
   );
 }
@@ -224,6 +247,14 @@ export async function reviseAndSendContract(options: {
     });
     revisionPlan = built.plan;
   }
+  // Earlier rounds stay in force unless the caller asks to start over.
+  const existingPlan = parseStoredRevisionPlan(contract.revision_plan);
+  if (revisionPlan && existingPlan && !body.replace_existing_edits) {
+    revisionPlan = mergeRevisionPlans(existingPlan, revisionPlan);
+  }
+  if (!revisionPlan && body.replace_existing_edits && existingPlan) {
+    revisionPlan = null;
+  }
 
   await recallInFlightContract(contract, actorEmail, body.reason);
 
@@ -243,6 +274,15 @@ export async function reviseAndSendContract(options: {
   }
   if (body.signer_cc_email !== undefined) {
     postRosterSignerPatch.signer_cc_email = body.signer_cc_email?.trim() || null;
+  }
+  if (body.signer_2_name !== undefined) {
+    postRosterSignerPatch.signer_2_name = normalizeSecondSignerText(body.signer_2_name);
+  }
+  if (body.signer_2_title !== undefined) {
+    postRosterSignerPatch.signer_2_title = normalizeSecondSignerText(body.signer_2_title);
+  }
+  if (body.signer_2_email !== undefined) {
+    postRosterSignerPatch.signer_2_email = normalizeSecondSignerText(body.signer_2_email);
   }
   if (body.exhibitor_legal_name?.trim()) {
     postRosterSignerPatch.exhibitor_legal_name = body.exhibitor_legal_name.trim();
@@ -288,6 +328,18 @@ export async function reviseAndSendContract(options: {
     cc: carbonCopy,
   });
   if (ccError) throw new Error(ccError);
+  const secondSigner = parseSecondSigner(contract);
+  const secondSignerError = secondSignerValidation({
+    signer1Email: signerEmail,
+    signer2: secondSigner,
+    cc: carbonCopy,
+    countersignerEmails: countersignerBlockedEmails(countersignDelivery),
+  });
+  if (secondSignerError) throw new Error(secondSignerError);
+  if (secondSigner && !contract.revision_use_uploaded_pdf) {
+    const templateError = await secondSignerTemplateError(resolveContractTemplateDocId(contract, event));
+    if (templateError) throw new Error(templateError);
+  }
 
   const pdfBytes = await resolveRevisionPdfBytes(contract, event, revisionPlan);
   const { draftStoragePath, drafted_at } = await persistContractDraftPdf(contract.id, pdfBytes);
@@ -317,6 +369,7 @@ export async function reviseAndSendContract(options: {
       emailSubject: contractDocuSignEmailSubject(contract.exhibitor_company_name, event),
       emailBlurb: contractDocuSignEmailBlurb(contract.exhibitor_company_name, event),
       signer1: { name: signerName, email: signerEmail },
+      signer2: secondSigner,
       ...toSendEnvelopeCountersignParams(countersignDelivery),
       carbonCopy,
       brandId: docusignBrandIdForEvent(event),

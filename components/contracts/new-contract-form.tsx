@@ -87,6 +87,9 @@ export type ContractFormValues = {
   signer_1_email: string;
   signer_cc_name: string;
   signer_cc_email: string;
+  signer_2_name: string;
+  signer_2_title: string;
+  signer_2_email: string;
   sales_rep_id: string;
   exhibitor_notes: string;
   notes: string;
@@ -288,6 +291,9 @@ export function NewContractForm({
     signer_1_email:         initialValues?.signer_1_email ?? '',
     signer_cc_name:         initialValues?.signer_cc_name ?? '',
     signer_cc_email:        initialValues?.signer_cc_email ?? '',
+    signer_2_name:          initialValues?.signer_2_name ?? '',
+    signer_2_title:         initialValues?.signer_2_title ?? '',
+    signer_2_email:         initialValues?.signer_2_email ?? '',
     sales_rep_id:           initialValues?.sales_rep_id ?? '',
     exhibitor_notes:        initialValues?.exhibitor_notes ?? '',
     notes:                  initialValues?.notes ?? '',
@@ -1529,6 +1535,28 @@ export function NewContractForm({
                 </Field>
               </div>
             </div>
+            {!nyweLicenseMode ? (
+              <div className="rounded-md border border-border/60 bg-muted/20 p-4 space-y-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Second signer (optional)</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Some exhibitors need two authorized signatures. The second signer gets their own DocuSign email and
+                    signs alongside the primary signer; Whisky Advocate countersigns after both. Leave blank for one signer.
+                  </p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Name">
+                    <Input value={form.signer_2_name} onChange={e => set('signer_2_name', e.target.value)} placeholder="Second signatory" />
+                  </Field>
+                  <Field label="Title">
+                    <Input value={form.signer_2_title} onChange={e => set('signer_2_title', e.target.value)} placeholder="CFO" />
+                  </Field>
+                </div>
+                <Field label="Email">
+                  <Input type="email" value={form.signer_2_email} onChange={e => set('signer_2_email', e.target.value)} placeholder="cfo@sampledistillery.com" />
+                </Field>
+              </div>
+            ) : null}
             {requiresSalesRep ? (
               <SalesRepSelect
                 currentUserEmail={currentUserEmail}

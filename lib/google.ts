@@ -3,6 +3,10 @@ import {
   applyContractOrderTableDataRowFormatting,
   insertContractLineItemsIntoOrderTable,
 } from '@/lib/google-contract-order-table';
+import { buildAmendmentSectionRequests } from '@/lib/google-doc-amendment-sections';
+import { buildParagraphEditRequests, unmatchedReplaceAllText } from '@/lib/google-doc-paragraph-edits';
+import { buildRevisionDocRequests } from '@/lib/google-doc-revision-requests';
+import type { ContractRevisionPlan } from '@/lib/contract-revision-plan';
 import type { ContractLineItem } from '@/types/db';
 
 /**
@@ -51,9 +55,43 @@ export function getGoogleDrive() {
 export type RenderContractPdfOptions = {
   /** Sponsorship-only Google Doc has no booth row in CONTRACT ORDER table. */
   includeBoothRow?: boolean;
-  /** Inline template edits applied after merge tokens (AI revision plan). */
+  /** Legacy: raw Docs requests applied after merge tokens. Prefer `revisionPlan`. */
   postMergeRevisionRequests?: docs_v1.Schema$Request[];
+  /** Structured inline edits (phrase replacements + clause edits) applied after the merge. */
+  revisionPlan?: ContractRevisionPlan | null;
+  /**
+   * When true, an edit whose find/anchor matches nothing fails the render instead of being
+   * reported — use for real sends so nothing is silently dropped from a signed document.
+   */
+  strictRevision?: boolean;
+  /** Skip the amendments-section finishing pass (heading cleanup / numbering). */
+  skipAmendmentSectionFormatting?: boolean;
 };
+
+export type RenderRevisionReport = {
+  /** Phrase finds that matched nothing in the merged document. */
+  unmatchedText: string[];
+  /** Clause edits whose anchor matched zero or several paragraphs. */
+  unmatchedParagraphs: Array<{ op: string; anchor: string; reason: string }>;
+  appliedParagraphEdits: number;
+  appliedTextEdits: number;
+};
+
+export class RevisionEditsNotAppliedError extends Error {
+  constructor(public readonly report: RenderRevisionReport) {
+    super(describeUnappliedRevision(report));
+    this.name = 'RevisionEditsNotAppliedError';
+  }
+}
+
+export function describeUnappliedRevision(report: RenderRevisionReport): string {
+  const parts: string[] = [];
+  for (const find of report.unmatchedText) parts.push(`“${find.slice(0, 80)}” was not found in the contract`);
+  for (const p of report.unmatchedParagraphs) {
+    parts.push(`${p.op} “${p.anchor.slice(0, 60)}”: ${p.reason}`);
+  }
+  return `Some inline edits could not be applied — ${parts.join('; ')}. Adjust the wording or move the change to Additional Terms.`;
+}
 
 export async function renderContractPdfFromTemplate(
   templateDocId: string,
@@ -62,7 +100,25 @@ export async function renderContractPdfFromTemplate(
   lineItems?: ContractLineItem[],
   options?: RenderContractPdfOptions,
 ): Promise<Buffer> {
+  const { pdf } = await renderContractPdfWithReport(templateDocId, mergeMap, tempDocLabel, lineItems, options);
+  return pdf;
+}
+
+/** Same as renderContractPdfFromTemplate but also reports which revision edits did / did not apply. */
+export async function renderContractPdfWithReport(
+  templateDocId: string,
+  mergeMap: Record<string, string>,
+  tempDocLabel: string,
+  lineItems?: ContractLineItem[],
+  options?: RenderContractPdfOptions,
+): Promise<{ pdf: Buffer; report: RenderRevisionReport }> {
   const includeBoothRow = options?.includeBoothRow !== false;
+  const report: RenderRevisionReport = {
+    unmatchedText: [],
+    unmatchedParagraphs: [],
+    appliedParagraphEdits: 0,
+    appliedTextEdits: 0,
+  };
   const auth = getAuth();
   const drive = google.drive({ version: 'v3', auth });
   const docs = google.docs({ version: 'v1', auth });
@@ -106,12 +162,62 @@ export async function renderContractPdfFromTemplate(
       });
     }
 
-    const revisionRequests = options?.postMergeRevisionRequests ?? [];
-    if (revisionRequests.length > 0) {
+    const legacyRequests = options?.postMergeRevisionRequests ?? [];
+    if (legacyRequests.length > 0) {
       await docs.documents.batchUpdate({
         documentId: tempDocId,
-        requestBody: { requests: revisionRequests },
+        requestBody: { requests: legacyRequests },
       });
+    }
+
+    const plan = options?.revisionPlan ?? null;
+    if (plan) {
+      // 1. Phrase-level replacements — verified through occurrencesChanged.
+      const textRequests = buildRevisionDocRequests(plan);
+      if (textRequests.length > 0) {
+        const res = await docs.documents.batchUpdate({
+          documentId: tempDocId,
+          requestBody: { requests: textRequests },
+        });
+        report.unmatchedText = unmatchedReplaceAllText(textRequests, res.data.replies ?? undefined);
+        report.appliedTextEdits = textRequests.length - report.unmatchedText.length;
+      }
+
+      // 2. Clause-level edits against the merged document structure.
+      if (plan.paragraph_edits.length > 0) {
+        const { data: merged } = await docs.documents.get({ documentId: tempDocId });
+        const edits = buildParagraphEditRequests(merged, plan.paragraph_edits);
+        report.unmatchedParagraphs = edits.unmatched;
+        report.appliedParagraphEdits = edits.applied.length;
+        if (edits.requests.length > 0) {
+          await docs.documents.batchUpdate({
+            documentId: tempDocId,
+            requestBody: { requests: edits.requests },
+          });
+        }
+      }
+
+      if (
+        options?.strictRevision &&
+        (report.unmatchedText.length > 0 || report.unmatchedParagraphs.length > 0)
+      ) {
+        throw new RevisionEditsNotAppliedError(report);
+      }
+    }
+
+    // 3. Amendments / notes sections: number the items, or remove the block when empty.
+    if (!options?.skipAmendmentSectionFormatting) {
+      const { data: current } = await docs.documents.get({ documentId: tempDocId });
+      const sectionRequests = buildAmendmentSectionRequests(current, {
+        hasAmendments: Boolean((mergeMap['{{revision_amendments}}'] ?? '').trim()),
+        hasExhibitorNotes: Boolean((mergeMap['{{exhibitor_notes}}'] ?? '').trim()),
+      });
+      if (sectionRequests.length > 0) {
+        await docs.documents.batchUpdate({
+          documentId: tempDocId,
+          requestBody: { requests: sectionRequests },
+        });
+      }
     }
 
     if (lineItems?.length) {
@@ -133,7 +239,7 @@ export async function renderContractPdfFromTemplate(
 
     const buffer = Buffer.from(pdfResp.data as ArrayBuffer);
     await deleteTempDoc();
-    return buffer;
+    return { pdf: buffer, report };
   } catch (e) {
     await deleteTempDoc();
     throw e;

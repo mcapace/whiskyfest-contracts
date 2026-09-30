@@ -7,6 +7,7 @@ import { resolveContractTemplateDocId } from '@/lib/contract-template';
 import { contractUsesOrderTable } from '@/lib/contract-template-profile';
 import { isNyweVendorEvent } from '@/lib/nywe-pricing';
 import { renderContractPdfFromTemplate } from '@/lib/google';
+import { parseStoredRevisionPlan } from '@/lib/contract-revision-plan';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import { refreshNyweBillingFromRosterForContract } from '@/lib/nywe-roster-billing-sync';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
@@ -59,6 +60,7 @@ export async function renderNyweLiveDraftPdf(
     usesOrderTable ? lineItems : undefined,
     {
       includeBoothRow: usesOrderTable && !isSponsorshipOnlyOrder(contract),
+      revisionPlan: parseStoredRevisionPlan(contract.revision_plan),
     },
   );
 }

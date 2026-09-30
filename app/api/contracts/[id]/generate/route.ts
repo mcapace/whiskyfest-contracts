@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { assertContractAccess } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { renderContractPdfFromTemplate, uploadPdfBufferToFolder } from '@/lib/google';
+import { parseStoredRevisionPlan } from '@/lib/contract-revision-plan';
 import { contractDraftPdfPath, uploadContractPdfToStorage } from '@/lib/contract-pdf-storage';
 import { fetchContractBoothBrandsOrdered } from '@/lib/contract-booth-brands';
 import { fetchContractLineItemsOrdered } from '@/lib/contract-line-items';
@@ -70,6 +71,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       usesOrderTable ? lineItems : undefined,
       {
         includeBoothRow: usesOrderTable && !isSponsorshipOnlyOrder(contract),
+        revisionPlan: parseStoredRevisionPlan(contract.revision_plan),
       },
     );
     const { fileId, webViewLink } = await uploadPdfBufferToFolder(pdfBytes, fileName, draftsFolderId);

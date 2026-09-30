@@ -15,6 +15,7 @@ export function isPublicExhibitorPath(pathname: string): boolean {
   return (
     pathname === '/sign' ||
     pathname === '/sign/continue' ||
+    pathname === '/sign/ping' ||
     pathname === '/signing/complete' ||
     isNyweBoothQrRedirectPath(pathname) ||
     isPublicDocuSignSigningApiPath(pathname)

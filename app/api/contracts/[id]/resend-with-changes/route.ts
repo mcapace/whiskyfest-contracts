@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAdminOrProductContractAdmin } from '@/lib/api-auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { renderContractPdfFromTemplate } from '@/lib/google';
+import { parseStoredRevisionPlan } from '@/lib/contract-revision-plan';
 import { persistContractDraftPdf } from '@/lib/contract-pdf-storage';
 import { fetchContractBoothBrandsOrdered } from '@/lib/contract-booth-brands';
 import { fetchContractLineItemsOrdered } from '@/lib/contract-line-items';
@@ -16,6 +17,7 @@ import { contractUsesOrderTable } from '@/lib/contract-template-profile';
 import {
   countersignerRequiredForEvent,
   countersignCcValidation,
+  countersignerBlockedEmails,
   resolveDocuSignCountersignDelivery,
   toSendEnvelopeCountersignParams,
 } from '@/lib/docusign-envelope-recipients';
@@ -34,8 +36,11 @@ import {
 } from '@/lib/docusign';
 import { syncExhibitorRosterWritebackById } from '@/lib/exhibitor-roster-sync-hook';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
-import { docusignBrandIdForEvent } from '@/lib/product-email';
+import { docusignBrandIdForEvent, sendGridFromForEvent } from '@/lib/product-email';
 import { parseSignerCc } from '@/lib/docusign-signer-cc';
+import { parseSecondSigner, secondSignerValidation } from '@/lib/second-signer';
+import { secondSignerTemplateError } from '@/lib/second-signer-template-guard';
+import { shouldSkipExhibitorDataTabs } from '@/lib/exhibitor-docusign-fields';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
@@ -188,6 +193,20 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       if (ccError) {
         return NextResponse.json({ error: ccError }, { status: 400 });
       }
+      const secondSigner = parseSecondSigner(mergedContract);
+      const secondSignerError = secondSignerValidation({
+        signer1Email: newSignerEmail,
+        signer2: secondSigner,
+        cc: carbonCopy,
+        countersignerEmails: countersignerBlockedEmails(countersignDelivery),
+      });
+      if (secondSignerError) {
+        return NextResponse.json({ error: secondSignerError }, { status: 400 });
+      }
+      if (secondSigner) {
+        const templateError = await secondSignerTemplateError(templateDocId);
+        if (templateError) return NextResponse.json({ error: templateError }, { status: 400 });
+      }
 
       const pdfBytes = await renderContractPdfFromTemplate(
         templateDocId,
@@ -196,6 +215,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         usesOrderTable ? lineItems : undefined,
         {
           includeBoothRow: usesOrderTable && !isSponsorshipOnlyOrder(mergedContract),
+          revisionPlan: parseStoredRevisionPlan(mergedContract.revision_plan),
+          strictRevision: true,
         },
       );
       const { draftStoragePath, drafted_at } = await persistContractDraftPdf(contract.id, pdfBytes);
@@ -206,9 +227,12 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         emailSubject: contractDocuSignEmailSubject(contract.exhibitor_company_name, event),
         emailBlurb: contractDocuSignEmailBlurb(contract.exhibitor_company_name, event),
         signer1: { name: newSignerName, email: newSignerEmail },
+        signer2: parseSecondSigner(mergedContract),
         ...toSendEnvelopeCountersignParams(countersignDelivery),
         carbonCopy,
         brandId: docusignBrandIdForEvent(event),
+        replyTo: sendGridFromForEvent(event),
+        skipExhibitorDataTabs: shouldSkipExhibitorDataTabs(event, mergedContract),
       });
       newEnvelopeId = sent.envelopeId;
 

@@ -65,7 +65,11 @@ export default async function ExhibitorSignLandingPage({
           Your signature line may be on <strong>page 2</strong> — use DocuSign&apos;s <strong>Next</strong> arrow if you
           do not see a sign box right away.
         </li>
-        <li>Open the link once in this browser tab; do not forward it (signing links expire after use).</li>
+        <li>
+          You can come back to this page from your email any time. The DocuSign page it opens is single-use, so if
+          you close it or it times out, return here and click continue again rather than reusing the DocuSign
+          address.
+        </li>
       </ul>
       <form action={continueAction} method="POST" target="_blank" rel="noopener noreferrer" className="mt-6">
         <input type="hidden" name="c" value={contractId} />

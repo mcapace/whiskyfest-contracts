@@ -16,6 +16,8 @@ import { buildNyweVendorMergeMap } from '@/lib/merge-map-nywe';
 import { nyweBillingMergeTokens, nyweExhibitorAddressMergeTokens } from '@/lib/nywe-billing';
 import { usesSingleSignerEnvelope } from '@/lib/single-signer-envelope';
 import { formatBoothBrandsBlock } from '@/lib/contract-booth-brands';
+import { secondSignerMergeTokens } from '@/lib/second-signer';
+import { revisionAmendmentsMergeText } from '@/lib/revision-amendments-text';
 import type { ContractBoothBrand, ContractWithTotals, Event } from '@/types/db';
 
 /** Draft PDFs use blank lines; DocuSign send uses literal anchor strings in the PDF. */
@@ -30,6 +32,9 @@ export const DOCUSIGN_ANCHORS = {
   date1: '\\d1\\',
   sig2: '\\s2\\',
   date2: '\\d2\\',
+  /** Optional second client signatory (see lib/second-signer.ts). */
+  sig3: '\\s3\\',
+  date3: '\\d3\\',
 } as const;
 
 /**
@@ -197,11 +202,12 @@ export function buildContractMergeMap(
     '{{list_subtotal}}': listSubtotalDisplay,
     '{{signer_1_name}}': contract.signer_1_name ?? '',
     '{{signer_1_title}}': contract.signer_1_title ?? '',
+    ...secondSignerMergeTokens(contract, mode),
     '{{shanken_signatory_name}}': event.shanken_signatory_name,
     '{{shanken_signatory_title}}': event.shanken_signatory_title,
     '{{shanken_signatory_email}}': event.shanken_signatory_email,
     '{{exhibitor_notes}}': (contract.exhibitor_notes ?? '').trim(),
-    '{{revision_amendments}}': (contract.revision_amendments ?? '').trim(),
+    '{{revision_amendments}}': revisionAmendmentsMergeText(contract.revision_amendments),
     ...anchors,
     ...exhibitorFieldMergeTokens(mode),
     // NYWE / Big Smoke sponsorship Docs still use billing + fee alias tokens alongside order table.

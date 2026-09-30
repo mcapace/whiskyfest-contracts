@@ -351,6 +351,11 @@ export function ContractDetailView({
                   signerEmail: contract.signer_1_email ?? '',
                   signerCcName: contract.signer_cc_name,
                   signerCcEmail: contract.signer_cc_email,
+                  signer2Name: contract.signer_2_name,
+                  signer2Title: contract.signer_2_title,
+                  signer2Email: contract.signer_2_email,
+                  allowSecondSigner: !isNyweVendorEvent(event),
+                  revisionPlan: contract.revision_plan,
                   exhibitorLegalName: contract.exhibitor_legal_name ?? '',
                   exhibitorCompanyName: contract.exhibitor_company_name ?? '',
                   brandsPoured: contract.brands_poured,
@@ -392,7 +397,11 @@ export function ContractDetailView({
                         initialEmail={contract.signer_1_email}
                         initialCcName={contract.signer_cc_name}
                         initialCcEmail={contract.signer_cc_email}
+                        initialSigner2Name={contract.signer_2_name}
+                        initialSigner2Title={contract.signer_2_title}
+                        initialSigner2Email={contract.signer_2_email}
                         includeTitle={!isNyweVendorEvent(event)}
+                        allowSecondSigner={!isNyweVendorEvent(event)}
                       />
                     )}
                 </div>
@@ -424,6 +433,15 @@ export function ContractDetailView({
                         <Detail
                           label="DocuSign CC"
                           value={`${contract.signer_cc_name?.trim() || 'Assistant'} · ${contract.signer_cc_email.trim()}`}
+                          mono
+                        />
+                      ) : null}
+                      {contract.signer_2_email?.trim() ? (
+                        <Detail
+                          label="Second signer"
+                          value={`${contract.signer_2_name?.trim() || ''}${
+                            contract.signer_2_title?.trim() ? `, ${contract.signer_2_title.trim()}` : ''
+                          } · ${contract.signer_2_email.trim()}`}
                           mono
                         />
                       ) : null}

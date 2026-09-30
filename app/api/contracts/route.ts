@@ -10,6 +10,7 @@ import {
   normalizeSignerCcEmail,
   normalizeSignerCcName,
 } from '@/lib/docusign-signer-cc';
+import { normalizeSecondSignerText } from '@/lib/second-signer';
 import { replaceContractBoothBrandsForContract, clearContractBoothBrandsForContract } from '@/lib/contract-booth-brands';
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
 import { eventTemplateProfile, isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
@@ -235,6 +236,9 @@ export async function POST(req: Request) {
       signer_1_email: p.signer_1_email ?? null,
       signer_cc_name: normalizeSignerCcName(p.signer_cc_name),
       signer_cc_email: normalizeSignerCcEmail(p.signer_cc_email),
+      signer_2_name: normalizeSecondSignerText(p.signer_2_name),
+      signer_2_title: normalizeSecondSignerText(p.signer_2_title),
+      signer_2_email: normalizeSecondSignerText(p.signer_2_email),
       sales_rep_id: isNyweVendorOnlyEvent(eventRow) ? null : effectiveSalesRepId,
       notes: p.notes ?? null,
       exhibitor_notes: p.exhibitor_notes?.trim() || null,

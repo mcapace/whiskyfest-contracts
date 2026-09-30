@@ -40,6 +40,19 @@ function routing1Signer(signers: DocuSignSignerRow[]): DocuSignSignerRow | undef
   return signers.find((s) => s.routingOrder === '1') ?? signers[0];
 }
 
+/**
+ * Every client-side signer (routing order 1) has completed. With an optional second client
+ * signer on the envelope, one signature alone must not flip the contract to partially_signed.
+ */
+export function allRoutingOneSignersCompleted(signers: DocuSignSignerRow[]): boolean {
+  const routingOne = signers.filter((s) => s.routingOrder === '1');
+  if (routingOne.length === 0) {
+    const first = routing1Signer(signers);
+    return first ? signerCompleted(first) : false;
+  }
+  return routingOne.every(signerCompleted);
+}
+
 function routing2Signer(signers: DocuSignSignerRow[]): DocuSignSignerRow | undefined {
   return signers.find((s) => s.routingOrder === '2');
 }
@@ -58,9 +71,8 @@ export function isDocuSignEnvelopeFullySigned(
 ): boolean {
   const envLower = envelopeStatus.toLowerCase();
   if (envLower === 'voided' || envLower === 'declined') return false;
-  const r1 = routing1Signer(signers);
   const r2 = routing2Signer(signers);
-  const r1Done = r1 ? signerCompleted(r1) : false;
+  const r1Done = allRoutingOneSignersCompleted(signers);
   const r2Done = r2 ? signerCompleted(r2) : false;
   const allSignersDone = signers.length > 0 && signers.every(signerCompleted);
   if (options?.exhibitorCompleteIsFull && r1Done) return true;
@@ -482,8 +494,7 @@ export async function syncContractFromDocuSign(
   const signers = await fetchEnvelopeSigners(envelopeId);
   // Touch after a successful DocuSign read so API failures do not burn the cooldown window.
   await touchDocuSignPoll(supabase, contract.id);
-  const r1 = routing1Signer(signers);
-  const r1Done = r1 ? signerCompleted(r1) : false;
+  const r1Done = allRoutingOneSignersCompleted(signers);
 
   if (envLower === 'voided' || envLower === 'declined') {
     await supabase

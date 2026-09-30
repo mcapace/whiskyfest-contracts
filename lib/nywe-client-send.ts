@@ -22,7 +22,9 @@ import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
 import { sendEnvelope } from '@/lib/docusign';
 import { shouldSkipExhibitorDataTabs } from '@/lib/exhibitor-docusign-fields';
 import { parseSignerCc, normalizeSignerCcEmail, normalizeSignerCcName } from '@/lib/docusign-signer-cc';
+import { parseSecondSigner } from '@/lib/second-signer';
 import { renderContractPdfFromTemplate } from '@/lib/google';
+import { parseStoredRevisionPlan } from '@/lib/contract-revision-plan';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import { nyweLicenseAddressError } from '@/lib/nywe-billing';
 import { refreshNyweBillingFromRosterForContract } from '@/lib/nywe-roster-billing-sync';
@@ -175,6 +177,8 @@ export async function nyweClientSendContract(options: {
       usesOrderTable ? lineItems : undefined,
       {
         includeBoothRow: usesOrderTable && !isSponsorshipOnlyOrder(contract),
+        revisionPlan: parseStoredRevisionPlan(contract.revision_plan),
+        strictRevision: true,
       },
     );
     const { draftStoragePath, drafted_at } = await persistContractDraftPdf(contract.id, pdfBytes);
@@ -185,6 +189,7 @@ export async function nyweClientSendContract(options: {
       emailSubject: contractDocuSignEmailSubject(contract.exhibitor_company_name, event),
       emailBlurb: contractDocuSignEmailBlurb(contract.exhibitor_company_name, event),
       signer1: { name: signerName, email: signerEmail },
+      signer2: parseSecondSigner(contract),
       ...toSendEnvelopeCountersignParams(countersignDelivery),
       carbonCopy,
       brandId: docusignBrandIdForEvent(event),

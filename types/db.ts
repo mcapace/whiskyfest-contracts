@@ -1,6 +1,8 @@
 // Database types — mirrors supabase/schema.sql
 // Regenerate with `supabase gen types typescript` when the schema changes.
 
+import type { ContractRevisionPlan } from '@/lib/contract-revision-plan';
+
 export type ContractStatus =
   | 'draft'
   | 'ready_for_review'
@@ -97,6 +99,10 @@ export interface Contract {
   /** Optional DocuSign carbon copy when sending for signature. */
   signer_cc_name: string | null;
   signer_cc_email: string | null;
+  /** Optional second client signatory (DocuSign recipient 4, routing order 1). */
+  signer_2_name: string | null;
+  signer_2_title: string | null;
+  signer_2_email: string | null;
   sales_rep_id: string | null;
   draft_pdf_drive_id: string | null;
   draft_pdf_url: string | null;
@@ -165,6 +171,8 @@ export interface Contract {
   revision_upload_path: string | null;
   revision_use_uploaded_pdf: boolean;
   revision_round: number;
+  /** Structured inline edits applied to the Google Doc on every render (see lib/contract-revision-plan.ts). */
+  revision_plan: ContractRevisionPlan | null;
   /** Legacy / off-system contract keyed in by admin or events team. */
   imported_at: string | null;
   imported_by: string | null;
