@@ -83,6 +83,9 @@ create table if not exists contracts (
   signer_1_email          text,
   signer_cc_name          text,
   signer_cc_email         text,
+  signer_2_name           text,
+  signer_2_title          text,
+  signer_2_email          text,
 
   -- Generated artifacts
   draft_pdf_drive_id      text,

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { fetchEnvelopeSigners, fetchEnvelopeStatus } from '@/lib/docusign';
 import {
+  allRoutingOneSignersCompleted,
   applyEnvelopeFullySigned,
   applyExhibitorPartialSignature,
   isDocuSignEnvelopeFullySigned,
@@ -282,6 +283,16 @@ export async function POST(req: Request) {
     }
 
     if (firstSigner) {
+      // A second client signer (also routing order 1) may still be pending.
+      let clientSignersDone = true;
+      try {
+        clientSignersDone = allRoutingOneSignersCompleted(await fetchEnvelopeSigners(envelopeId));
+      } catch (e) {
+        console.error('[docusign-webhook] fetchEnvelopeSigners for routing-1 completion', e);
+      }
+      if (!clientSignersDone) {
+        return new NextResponse(null, { status: 200 });
+      }
       try {
         await applyExhibitorPartialSignature(supabase, contract, event ?? null, envelopeId);
       } catch (e) {

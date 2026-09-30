@@ -73,6 +73,13 @@ export function countersignCcValidation(params: {
   return null;
 }
 
+/** Emails a client-side signer or CC may not reuse (routing order 2). */
+export function countersignerBlockedEmails(delivery: DocuSignCountersignDelivery | null): string[] {
+  if (delivery?.mode === 'user') return [delivery.email];
+  if (delivery?.mode === 'signing_group') return [...WHISKYFEST_BIG_SMOKE_COUNTERSIGNER_EMAILS];
+  return [];
+}
+
 export function toSendEnvelopeCountersignParams(delivery: DocuSignCountersignDelivery | null): {
   countersigner?: { email: string; name: string } | null;
   countersignerSigningGroupId?: string | null;

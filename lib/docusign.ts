@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { buildExhibitorDataTextTabs } from '@/lib/exhibitor-docusign-fields';
 import { DOCUSIGN_ANCHORS } from '@/lib/merge-map';
+import { SECOND_SIGNER_RECIPIENT_ID } from '@/lib/second-signer';
 import { isWhiskyfestBigSmokeCountersignerEmail, WF_BS_COUNTERSIGN_GROUP_LABEL } from '@/lib/wf-bslv-countersigner';
 
 /**
@@ -12,6 +13,71 @@ import { isWhiskyfestBigSmokeCountersignerEmail, WF_BS_COUNTERSIGN_GROUP_LABEL }
 export const EXHIBITOR_CLIENT_USER_ID = 'exhibitor';
 /** Keep DocuSign's own signing emails for embedded recipients (remote + embedded signing). */
 const EMBEDDED_RECIPIENT_START_URL = 'SIGN_AT_DOCUSIGN';
+
+/** Default envelope lifetime when DOCUSIGN_ENVELOPE_EXPIRE_AFTER_DAYS is unset (DocuSign max is 999). */
+const DEFAULT_ENVELOPE_EXPIRE_AFTER_DAYS = 120;
+/** Days before expiration that DocuSign emails the signer a warning. */
+const DEFAULT_ENVELOPE_EXPIRE_WARN_DAYS = 7;
+/** Seconds between keep-alive pings from the DocuSign signing page (DocuSign minimum is 300). */
+const SIGNING_SESSION_PING_SECONDS = 300;
+
+function envIntDays(name: string, fallback: number, max: number): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) return fallback;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 0) return fallback;
+  return Math.min(n, max);
+}
+
+/**
+ * Per-envelope expiration + reminder settings so signing links stay valid for months instead of
+ * following whatever the DocuSign account default happens to be.
+ *
+ *   DOCUSIGN_ENVELOPE_NOTIFICATION=account            -> send nothing, use account defaults
+ *   DOCUSIGN_ENVELOPE_EXPIRE_AFTER_DAYS (default 120)  -> 0 disables expiration entirely
+ *   DOCUSIGN_ENVELOPE_EXPIRE_WARN_DAYS  (default 7)
+ *   DOCUSIGN_REMINDER_DELAY_DAYS / DOCUSIGN_REMINDER_FREQUENCY_DAYS -> DocuSign reminder emails
+ *       (off unless both are set; the portal has its own reminder / personal-note emails)
+ */
+export function envelopeNotificationSettings(): Record<string, unknown> | null {
+  if ((process.env['DOCUSIGN_ENVELOPE_NOTIFICATION']?.trim() ?? '').toLowerCase() === 'account') {
+    return null;
+  }
+  const expireAfter = envIntDays('DOCUSIGN_ENVELOPE_EXPIRE_AFTER_DAYS', DEFAULT_ENVELOPE_EXPIRE_AFTER_DAYS, 999);
+  const expireWarn = envIntDays('DOCUSIGN_ENVELOPE_EXPIRE_WARN_DAYS', DEFAULT_ENVELOPE_EXPIRE_WARN_DAYS, 999);
+  const reminderDelay = envIntDays('DOCUSIGN_REMINDER_DELAY_DAYS', 0, 999);
+  const reminderFrequency = envIntDays('DOCUSIGN_REMINDER_FREQUENCY_DAYS', 0, 999);
+  const remindersEnabled = reminderDelay > 0 && reminderFrequency > 0;
+
+  return {
+    useAccountDefaults: 'false',
+    expirations: {
+      expireEnabled: expireAfter > 0 ? 'true' : 'false',
+      ...(expireAfter > 0
+        ? {
+            expireAfter: String(expireAfter),
+            expireWarn: String(Math.min(expireWarn, Math.max(expireAfter - 1, 0))),
+          }
+        : {}),
+    },
+    reminders: {
+      reminderEnabled: remindersEnabled ? 'true' : 'false',
+      ...(remindersEnabled
+        ? { reminderDelay: String(reminderDelay), reminderFrequency: String(reminderFrequency) }
+        : {}),
+    },
+  };
+}
+
+/** Keep-alive target the DocuSign signing page pings so an open session does not idle out. */
+function signingSessionPingUrl(returnUrl: string): string | null {
+  try {
+    const origin = new URL(returnUrl).origin;
+    return `${origin}/sign/ping`;
+  } catch {
+    return null;
+  }
+}
 
 function requireEnv(name: string): string {
   const v = process.env[name]?.trim();
@@ -274,14 +340,22 @@ export interface SendEnvelopeParams {
    * Shanken needs to countersign (single-recipient envelope on \\s2\\ / \\d2\\).
    */
   signer1TabAnchors?: 'exhibitor' | 'countersigner';
+  /**
+   * Optional second client signatory — recipient 4, routing order 1 (parallel with signer 1),
+   * Sign/Date tabs on \\s3\\ / \\d3\\ (see lib/second-signer.ts). Signs from DocuSign's own email.
+   */
+  signer2?: { email: string; name: string } | null;
 }
 
 export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelopeId: string }> {
   const { accessToken, accountId, restApiBase } = await getDocuSignSession();
 
   const useCountersignerAnchors = params.signer1TabAnchors === 'countersigner';
-  const signHere1 = anchorOnly(useCountersignerAnchors ? DOCUSIGN_ANCHORS.sig2 : DOCUSIGN_ANCHORS.sig1);
-  const date1 = anchorOnly(useCountersignerAnchors ? DOCUSIGN_ANCHORS.date2 : DOCUSIGN_ANCHORS.date1);
+  // Countersign-only envelopes carry a client-signed (often scanned / flattened) PDF: if the anchor
+  // text cannot be found, let DocuSign fall back to free-form placement instead of rejecting the send.
+  const tolerant = useCountersignerAnchors ? { anchorIgnoreIfNotPresent: 'true' } : {};
+  const signHere1 = { ...anchorOnly(useCountersignerAnchors ? DOCUSIGN_ANCHORS.sig2 : DOCUSIGN_ANCHORS.sig1), ...tolerant };
+  const date1 = { ...anchorOnly(useCountersignerAnchors ? DOCUSIGN_ANCHORS.date2 : DOCUSIGN_ANCHORS.date1), ...tolerant };
   const exhibitorTabs =
     params.skipExhibitorDataTabs || useCountersignerAnchors ? {} : buildExhibitorDataTextTabs();
 
@@ -339,6 +413,21 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
     });
   }
 
+  const signer2Email = params.signer2?.email?.trim();
+  if (signer2Email && !useCountersignerAnchors) {
+    signers.push({
+      email: signer2Email,
+      name: params.signer2!.name.trim() || signer2Email,
+      recipientId: SECOND_SIGNER_RECIPIENT_ID,
+      routingOrder: '1',
+      roleName: 'Second signer',
+      tabs: {
+        signHereTabs: [anchorOnly(DOCUSIGN_ANCHORS.sig3)],
+        dateSignedTabs: [anchorOnly(DOCUSIGN_ANCHORS.date3)],
+      },
+    });
+  }
+
   const envelopeDefinition: Record<string, unknown> = {
     emailSubject: params.emailSubject,
     emailBlurb: params.emailBlurb,
@@ -355,6 +444,11 @@ export async function sendEnvelope(params: SendEnvelopeParams): Promise<{ envelo
       signers,
     },
   };
+
+  const notification = envelopeNotificationSettings();
+  if (notification) {
+    envelopeDefinition.notification = notification;
+  }
 
   const cc = params.carbonCopy?.email?.trim();
   if (cc) {
@@ -719,12 +813,16 @@ export async function createExhibitorSigningViewUrl(options: {
   const email = options.signerEmail.trim();
   const userName = options.signerName.trim() || email;
   const clientUserId = options.clientUserId?.trim();
+  const pingUrl = signingSessionPingUrl(options.returnUrl);
   const baseBody = {
     email,
     userName,
     recipientId,
     returnUrl: options.returnUrl,
     ...(clientUserId ? { clientUserId } : {}),
+    // Keeps the DocuSign session alive while the signer reads; without it DocuSign idles out
+    // after ~20 minutes and bounces back to /signing/complete?event=session_timeout.
+    ...(pingUrl ? { pingUrl, pingFrequency: String(SIGNING_SESSION_PING_SECONDS) } : {}),
   };
 
   const authMethods = options.authenticationMethods ?? (['none', 'email'] as const);
@@ -793,9 +891,12 @@ export async function resolveExhibitorSigningGate(
   if (envLower === 'declined') return { action: 'envelope_declined' };
 
   const signers = await fetchEnvelopeSigners(envelopeId, { bypassRateLimitGuard: bypass });
+  // Prefer the exhibitor recipient (id 1) or the email on the link — a second client signer
+  // also sits at routing order 1, so routing order alone is ambiguous.
   const exhibitor =
-    signers.find((s) => s.routingOrder === '1' && s.email?.trim()) ??
-    signers.find((s) => s.email?.trim().toLowerCase() === normalizedEmail);
+    signers.find((s) => s.recipientId?.trim() === '1' && s.email?.trim()) ??
+    signers.find((s) => s.email?.trim().toLowerCase() === normalizedEmail) ??
+    signers.find((s) => s.routingOrder === '1' && s.email?.trim());
   if (!exhibitor?.recipientId || !exhibitor.email?.trim()) {
     throw new Error('DocuSign exhibitor signer not found on this envelope.');
   }

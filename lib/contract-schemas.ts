@@ -37,6 +37,10 @@ export const newContractBodySchema = z
     signer_1_email: z.string().email().optional().or(z.literal('')).nullable(),
     signer_cc_name: z.string().max(200).optional().nullable(),
     signer_cc_email: z.string().email().optional().or(z.literal('')).nullable(),
+    /** Optional second client signatory — both name and email, or neither. */
+    signer_2_name: z.string().max(200).optional().nullable(),
+    signer_2_title: z.string().max(200).optional().nullable(),
+    signer_2_email: z.string().email().optional().or(z.literal('')).nullable(),
     sales_rep_id: z.preprocess(
       (v) => (v === '' ? null : v),
       z.string().uuid({ message: 'Sales Rep is required' }).optional().nullable(),
@@ -109,6 +113,7 @@ export const newContractBodySchema = z
         path: ['signer_cc_email'],
       });
     }
+    addSecondSignerIssues(data, ctx);
 
     const orderType = data.order_type ?? 'booth';
 
@@ -253,12 +258,53 @@ export function clearedRepEnteredBilling() {
   };
 }
 
+/** Second-signer rules shared by the create and signer-contact schemas. */
+function addSecondSignerIssues(
+  data: {
+    signer_1_email?: string | null;
+    signer_cc_email?: string | null;
+    signer_2_name?: string | null;
+    signer_2_email?: string | null;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  const s2Email = data.signer_2_email?.trim();
+  const s2Name = data.signer_2_name?.trim();
+  if (!s2Email && !s2Name) return;
+  if (!s2Email || !s2Name) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Second signer needs both a name and an email (or leave both blank).',
+      path: [s2Email ? 'signer_2_name' : 'signer_2_email'],
+    });
+    return;
+  }
+  const lower = s2Email.toLowerCase();
+  if (data.signer_1_email?.trim().toLowerCase() === lower) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Second signer email must differ from the exhibitor signer email.',
+      path: ['signer_2_email'],
+    });
+  }
+  if (data.signer_cc_email?.trim().toLowerCase() === lower) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Second signer email must differ from the DocuSign CC email.',
+      path: ['signer_2_email'],
+    });
+  }
+}
+
 export const signerContactPatchSchema = z.object({
   signer_1_name: z.string().min(1),
   signer_1_title: z.string().optional().nullable(),
   signer_1_email: z.string().email(),
   signer_cc_name: z.string().max(200).optional().nullable(),
   signer_cc_email: z.string().email().optional().or(z.literal('')).nullable(),
+  signer_2_name: z.string().max(200).optional().nullable(),
+  signer_2_title: z.string().max(200).optional().nullable(),
+  signer_2_email: z.string().email().optional().or(z.literal('')).nullable(),
   booth_rate_cents: z.number().int().min(0).optional(),
 }).superRefine((data, ctx) => {
   const ccEmail = data.signer_cc_email?.trim();
@@ -270,6 +316,7 @@ export const signerContactPatchSchema = z.object({
       path: ['signer_cc_email'],
     });
   }
+  addSecondSignerIssues(data, ctx);
 });
 
 export function sponsorBrandFromBody(p: Pick<NewContractBody, 'order_type' | 'sponsor_brand' | 'brands_poured'>): string | null {

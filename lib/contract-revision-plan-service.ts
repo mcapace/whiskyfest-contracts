@@ -12,9 +12,11 @@ import { resolveContractTemplateDocId } from '@/lib/contract-template';
 import { workspaceLabelForProduct } from '@/lib/product-email';
 import { productKeyFromEvent } from '@/lib/product-portal';
 import { downloadContractPdfFromStorage } from '@/lib/contract-pdf-storage';
+import { fetchContractBoothBrandsOrdered } from '@/lib/contract-booth-brands';
+import { buildContractMergeMap } from '@/lib/merge-map';
 import type { ContractWithTotals, Event } from '@/types/db';
 
-async function extractPdfText(bytes: Buffer): Promise<string> {
+export async function extractPdfText(bytes: Buffer): Promise<string> {
   try {
     const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
     const loadingTask = pdfjs.getDocument({ data: new Uint8Array(bytes), useSystemFonts: true });
@@ -29,6 +31,21 @@ async function extractPdfText(bytes: Buffer): Promise<string> {
   } catch {
     return '';
   }
+}
+
+/** Fill merge tokens locally (no Docs copy) and number the paragraphs for the prompt. */
+export function mergedTemplateParagraphs(rawTemplate: string, mergeMap: Record<string, string>): string {
+  let text = rawTemplate;
+  for (const [token, value] of Object.entries(mergeMap)) {
+    text = text.split(token).join((value ?? '').replace(/\u000b/g, ' '));
+  }
+  return text
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line, i) => `[P${i + 1}] ${line}`)
+    .join('\n');
 }
 
 function revisionContext(contract: ContractWithTotals, event: Event): ContractRevisionContext {
@@ -56,7 +73,13 @@ export async function buildContractRevisionPlan(options: {
   }
 
   const templateDocId = resolveContractTemplateDocId(options.contract, options.event);
-  const templateExcerpt = await fetchGoogleDocPlainText(templateDocId);
+  // Edits run against the MERGED document, so show the model merged text (tokens filled in),
+  // one numbered paragraph per line, and let it anchor clause edits to real paragraphs.
+  const rawTemplate = await fetchGoogleDocPlainText(templateDocId);
+  const supabase = getSupabaseAdmin();
+  const boothBrands = await fetchContractBoothBrandsOrdered(supabase, options.contract.id);
+  const mergeMap = buildContractMergeMap(options.contract, options.event, 'draft', boothBrands);
+  const templateExcerpt = mergedTemplateParagraphs(rawTemplate, mergeMap);
 
   let uploadedPdfExcerpt: string | undefined;
   if (options.revisionUploadPath?.trim()) {

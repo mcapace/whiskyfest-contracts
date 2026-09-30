@@ -116,7 +116,9 @@ export async function fetchExhibitorCaptureFromEnvelope(
 ): Promise<ExhibitorCaptureDbRow | null> {
   try {
     const rows = signers ?? (await fetchEnvelopeSigners(envelopeId));
-    const exhibitor = rows.find((s) => s.routingOrder === '1') ?? rows[0];
+    // Recipient 1 is the exhibitor; a second client signer shares routing order 1 but has no text tabs.
+    const exhibitor =
+      rows.find((s) => s.recipientId?.trim() === '1') ?? rows.find((s) => s.routingOrder === '1') ?? rows[0];
     const exhibitorRecipientId = exhibitor?.recipientId?.trim() || '1';
     const tabs = await fetchRecipientTextTabs(envelopeId, exhibitorRecipientId);
     return buildExhibitorCaptureDbPatch(textTabsToLabelMap(tabs));

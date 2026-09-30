@@ -5,6 +5,8 @@ import { formatEventDateForDisplayOrMerge } from '@/lib/event-schedule';
 import { usesSingleSignerEnvelope } from '@/lib/single-signer-envelope';
 import { nyweBillingMergeTokens, nyweExhibitorAddressMergeTokens } from '@/lib/nywe-billing';
 import { exhibitorCompanyMergeValue, formatCoveredWineriesList, parseCoveredWineries } from '@/lib/nywe-combined-contract';
+import { secondSignerMergeTokens } from '@/lib/second-signer';
+import { revisionAmendmentsMergeText } from '@/lib/revision-amendments-text';
 import type { ContractWithTotals, Event } from '@/types/db';
 import type { MergePlaceholderMode } from '@/lib/merge-map';
 
@@ -64,13 +66,14 @@ export function buildNyweVendorMergeMap(
     '{{booth_count}}': String(contract.booth_count),
     '{{signer_1_name}}': contract.signer_1_name ?? '',
     '{{signer_1_title}}': '',
+    ...secondSignerMergeTokens(contract, mode),
     '{{shanken_signatory_name}}': event.shanken_signatory_name,
     '{{shanken_signatory_title}}': event.shanken_signatory_title,
     '{{shanken_signatory_email}}': event.shanken_signatory_email,
     ...nyweExhibitorAddressMergeTokens(contract, mode),
     ...nyweBillingMergeTokens(contract, mode),
     '{{exhibitor_notes}}': (contract.exhibitor_notes ?? '').trim(),
-    '{{revision_amendments}}': (contract.revision_amendments ?? '').trim(),
+    '{{revision_amendments}}': revisionAmendmentsMergeText(contract.revision_amendments),
     ...anchors,
   };
 }

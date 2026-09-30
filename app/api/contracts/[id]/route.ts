@@ -18,6 +18,7 @@ import {
   normalizeSignerCcEmail,
   normalizeSignerCcName,
 } from '@/lib/docusign-signer-cc';
+import { normalizeSecondSignerText } from '@/lib/second-signer';
 import type { Contract, ContractStatus, Event } from '@/types/db';
 import { isLegacyImportedContract } from '@/lib/legacy-import';
 import { billingFieldsFromOptionalBody } from '@/lib/nywe-billing';
@@ -218,6 +219,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         signer_1_email: p.signer_1_email ?? null,
         signer_cc_name: normalizeSignerCcName(p.signer_cc_name),
         signer_cc_email: normalizeSignerCcEmail(p.signer_cc_email),
+        signer_2_name: normalizeSecondSignerText(p.signer_2_name),
+        signer_2_title: normalizeSecondSignerText(p.signer_2_title),
+        signer_2_email: normalizeSecondSignerText(p.signer_2_email),
         sales_rep_id: effectiveSalesRepId,
         notes: p.notes ?? null,
         exhibitor_notes: p.exhibitor_notes?.trim() || null,
@@ -393,6 +397,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       signer_1_email: p.signer_1_email,
       signer_cc_name: normalizeSignerCcName(p.signer_cc_name),
       signer_cc_email: normalizeSignerCcEmail(p.signer_cc_email),
+      signer_2_name: normalizeSecondSignerText(p.signer_2_name),
+      signer_2_title: normalizeSecondSignerText(p.signer_2_title),
+      signer_2_email: normalizeSecondSignerText(p.signer_2_email),
       booth_rate_cents: normalizedRate,
       ...(shouldResetDiscountApproval
         ? {
@@ -418,6 +425,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       new_email: p.signer_1_email,
       previous_cc_email: contract.signer_cc_email,
       new_cc_email: normalizeSignerCcEmail(p.signer_cc_email),
+      previous_signer_2_email: contract.signer_2_email,
+      new_signer_2_email: normalizeSecondSignerText(p.signer_2_email),
     },
   });
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Loader2, Upload } from 'lucide-react';
@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input, Label, Textarea } from '@/components/ui/input';
 import { emitContractActionSuccessFeedback } from '@/lib/contract-action-feedback';
-import type { ContractRevisionPlan } from '@/lib/contract-revision-plan';
+import { revisionPlanToDisplayLines, type ContractRevisionPlan } from '@/lib/contract-revision-plan';
 import { useContractLiveOptional } from '@/components/contracts/contract-live-context';
 
 export type ContractReviseInitialValues = {
@@ -23,6 +23,13 @@ export type ContractReviseInitialValues = {
   signerEmail: string;
   signerCcName: string | null;
   signerCcEmail: string | null;
+  signer2Name?: string | null;
+  signer2Title?: string | null;
+  signer2Email?: string | null;
+  /** WhiskyFest / Big Smoke templates carry a second-signature block; NYWE does not. */
+  allowSecondSigner?: boolean;
+  /** Inline edits already on the contract (applied on every render). */
+  revisionPlan?: ContractRevisionPlan | null;
   exhibitorLegalName: string;
   exhibitorCompanyName: string;
   brandsPoured: string | null;
@@ -42,9 +49,24 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   initial: ContractReviseInitialValues;
   readOnly?: boolean;
+  /**
+   * `revise` (default): contract is out for signature — void, apply edits, resend via DocuSign.
+   * `apply`: contract not yet sent — apply edits, regenerate the clean draft, no DocuSign activity.
+   */
+  mode?: 'revise' | 'apply';
 };
 
-export function ContractReviseWizard({ contractId, open, onOpenChange, initial, readOnly = false }: Props) {
+const AMENDMENT_IMPORT_ACCEPT = '.pdf,.docx,.txt,.md,.eml,.rtf,application/pdf,text/plain,message/rfc822';
+
+export function ContractReviseWizard({
+  contractId,
+  open,
+  onOpenChange,
+  initial,
+  readOnly = false,
+  mode = 'revise',
+}: Props) {
+  const applyMode = mode === 'apply';
   const router = useRouter();
   const { data: session } = useSession();
   const contractLive = useContractLiveOptional();
@@ -64,10 +86,25 @@ export function ContractReviseWizard({ contractId, open, onOpenChange, initial, 
 
   const [revisionAmendments, setRevisionAmendments] = useState(initial.revisionAmendments ?? '');
   const [exhibitorNotes, setExhibitorNotes] = useState(initial.exhibitorNotes ?? '');
+  const [replaceExistingEdits, setReplaceExistingEdits] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importedFileName, setImportedFileName] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [previewedOnce, setPreviewedOnce] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewWarnings, setPreviewWarnings] = useState<string | null>(null);
+  const existingEditLines = useMemo(
+    () => (initial.revisionPlan ? revisionPlanToDisplayLines(initial.revisionPlan) : []),
+    [initial.revisionPlan],
+  );
   const [signerName, setSignerName] = useState(initial.signerName);
   const [signerEmail, setSignerEmail] = useState(initial.signerEmail);
   const [signerCcName, setSignerCcName] = useState(initial.signerCcName ?? '');
   const [signerCcEmail, setSignerCcEmail] = useState(initial.signerCcEmail ?? '');
+  const [signer2Name, setSigner2Name] = useState(initial.signer2Name ?? '');
+  const [signer2Title, setSigner2Title] = useState(initial.signer2Title ?? '');
+  const [signer2Email, setSigner2Email] = useState(initial.signer2Email ?? '');
   const [exhibitorLegalName, setExhibitorLegalName] = useState(initial.exhibitorLegalName);
   const [exhibitorCompanyName, setExhibitorCompanyName] = useState(initial.exhibitorCompanyName);
   const [brandsPoured, setBrandsPoured] = useState(initial.brandsPoured ?? '');
@@ -89,10 +126,19 @@ export function ContractReviseWizard({ contractId, open, onOpenChange, initial, 
     setUploadError(null);
     setRevisionAmendments(initial.revisionAmendments ?? '');
     setExhibitorNotes(initial.exhibitorNotes ?? '');
+    setReplaceExistingEdits(false);
+    setImportError(null);
+    setImportedFileName(null);
+    setPreviewedOnce(false);
+    setPreviewError(null);
+    setPreviewWarnings(null);
     setSignerName(initial.signerName);
     setSignerEmail(initial.signerEmail);
     setSignerCcName(initial.signerCcName ?? '');
     setSignerCcEmail(initial.signerCcEmail ?? '');
+    setSigner2Name(initial.signer2Name ?? '');
+    setSigner2Title(initial.signer2Title ?? '');
+    setSigner2Email(initial.signer2Email ?? '');
     setExhibitorLegalName(initial.exhibitorLegalName);
     setExhibitorCompanyName(initial.exhibitorCompanyName);
     setBrandsPoured(initial.brandsPoured ?? '');
@@ -121,6 +167,31 @@ export function ContractReviseWizard({ contractId, open, onOpenChange, initial, 
       setUploadError('Upload failed');
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function importAmendmentsFile(file: File) {
+    setImportError(null);
+    setImporting(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch(`/api/contracts/${contractId}/amendments-import`, { method: 'POST', body: form });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || typeof j.text !== 'string') {
+        setImportError(typeof j.error === 'string' ? j.error : 'Could not read that file');
+        return;
+      }
+      const incoming = String(j.text).trim();
+      setChangeRequest((prev) => (prev.trim() ? `${prev.trim()}\n\n${incoming}` : incoming));
+      setImportedFileName(file.name);
+      setRevisionPlan(null);
+      setPlanPreviewLines([]);
+      setPlanError(null);
+    } catch {
+      setImportError('Could not read that file');
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -158,12 +229,11 @@ export function ContractReviseWizard({ contractId, open, onOpenChange, initial, 
     }
   }
 
-  function submitReviseAndSend() {
-    if (contractLive) contractLive.setOptimisticStatus('sent');
-    startTransition(async () => {
+  function buildRequestBody(): Record<string, unknown> {
       const body: Record<string, unknown> = {
         reason: reason.trim(),
         use_uploaded_pdf: useUploadedPdf,
+        replace_existing_edits: replaceExistingEdits,
       };
 
       if (changeRequest.trim().length >= 10) body.change_request = changeRequest.trim();
@@ -180,6 +250,11 @@ export function ContractReviseWizard({ contractId, open, onOpenChange, initial, 
       setIfChanged('signer_1_email', signerEmail, initial.signerEmail);
       setIfChanged('signer_cc_name', signerCcName, initial.signerCcName ?? '');
       setIfChanged('signer_cc_email', signerCcEmail, initial.signerCcEmail ?? '');
+      if (initial.allowSecondSigner) {
+        setIfChanged('signer_2_name', signer2Name, initial.signer2Name ?? '');
+        setIfChanged('signer_2_title', signer2Title, initial.signer2Title ?? '');
+        setIfChanged('signer_2_email', signer2Email, initial.signer2Email ?? '');
+      }
       setIfChanged('exhibitor_legal_name', exhibitorLegalName, initial.exhibitorLegalName);
       setIfChanged('exhibitor_company_name', exhibitorCompanyName, initial.exhibitorCompanyName);
       setIfChanged('brands_poured', brandsPoured, initial.brandsPoured ?? '');
@@ -188,8 +263,48 @@ export function ContractReviseWizard({ contractId, open, onOpenChange, initial, 
       setIfChanged('billing_state', billingState, initial.billingState ?? '');
       setIfChanged('billing_zip', billingZip, initial.billingZip ?? '');
       setIfChanged('billing_country', billingCountry, initial.billingCountry ?? '');
+      return body;
+  }
 
-      const res = await fetch(`/api/contracts/${contractId}/revise-and-send`, {
+  async function previewRevision() {
+    setPreviewError(null);
+    setPreviewWarnings(null);
+    setPreviewing(true);
+    try {
+      const res = await fetch(`/api/contracts/${contractId}/revision-preview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildRequestBody()),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPreviewError(typeof j.error === 'string' ? j.error : 'Preview failed');
+        return;
+      }
+      if (j.plan && !revisionPlan) {
+        setRevisionPlan(j.plan as ContractRevisionPlan);
+        setPlanPreviewLines(Array.isArray(j.preview_lines) ? j.preview_lines : []);
+      }
+      if (typeof j.warnings === 'string' && j.warnings) setPreviewWarnings(j.warnings);
+      const bytes = Uint8Array.from(atob(String(j.pdf_base64 ?? '')), (c) => c.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+      setPreviewedOnce(true);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      setPreviewError('Preview failed');
+    } finally {
+      setPreviewing(false);
+    }
+  }
+
+  function submitReviseAndSend() {
+    if (contractLive && !applyMode) contractLive.setOptimisticStatus('sent');
+    startTransition(async () => {
+      const body = buildRequestBody();
+      const endpoint = applyMode ? 'apply-revision' : 'revise-and-send';
+
+      const res = await fetch(`/api/contracts/${contractId}/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -203,18 +318,21 @@ export function ContractReviseWizard({ contractId, open, onOpenChange, initial, 
       } else {
         contractLive?.setOptimisticStatus(null);
         const j = await res.json().catch(() => ({}));
-        alert(`Revise and send failed: ${j.error ?? res.status}`);
+        alert(`${applyMode ? 'Applying amendments' : 'Revise and send'} failed: ${j.error ?? res.status}`);
       }
     });
   }
 
+  const hasChanges =
+    changeRequest.trim().length >= 10 ||
+    Boolean(revisionPlan) ||
+    revisionAmendments.trim().length > 0 ||
+    (replaceExistingEdits && existingEditLines.length > 0);
   const canSubmit =
-    reason.trim().length >= 10 &&
+    (applyMode || reason.trim().length >= 10) &&
     signerName.trim().length > 0 &&
     signerEmail.trim().length > 0 &&
-    (useUploadedPdf
-      ? Boolean(uploadPath)
-      : changeRequest.trim().length >= 10 || Boolean(revisionPlan) || revisionAmendments.trim().length > 0);
+    (useUploadedPdf && !applyMode ? Boolean(uploadPath) : hasChanges);
 
   const busyAll = busy || analyzing;
 
@@ -222,17 +340,36 @@ export function ContractReviseWizard({ contractId, open, onOpenChange, initial, 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Revise and send</DialogTitle>
+          <DialogTitle>{applyMode ? 'Apply client amendments' : 'Revise and send'}</DialogTitle>
           <DialogDescription>
-            Describe what the client wants changed. The system analyzes the request, updates the master contract
-            template (names, payment terms, deletions, etc.), and sends a new DocuSign envelope — or send an uploaded
-            PDF as-is.
+            {applyMode
+              ? 'Import or paste the amendments the client sent. The system turns them into inline edits to the contract itself — clauses replaced, removed or added in place, names and terms swapped — plus numbered Additional Terms only for anything that cannot live inline. Preview the clean draft, then save it to the contract; send it whenever you are ready.'
+              : 'Describe what the client wants changed. The system turns the request into inline edits to the contract itself — clauses replaced, removed or added in place, names and terms swapped — plus numbered Additional Terms only for anything that cannot live inline. Preview the PDF, then void and resend via DocuSign.'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 text-sm">
+          {existingEditLines.length > 0 ? (
+            <div className="space-y-2 rounded-lg border border-amber-200/80 bg-amber-50/50 p-4">
+              <p className="font-medium">Inline edits already on this contract</p>
+              <ul className="list-disc space-y-1 pl-5 text-xs text-foreground/90">
+                {existingEditLines.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+              <label className="flex cursor-pointer items-start gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={replaceExistingEdits}
+                  onChange={(e) => setReplaceExistingEdits(e.target.checked)}
+                />
+                <span>Start over: drop these edits and apply only what is entered below.</span>
+              </label>
+            </div>
+          ) : null}
           <div className="space-y-2">
-            <Label htmlFor="revise-reason">Reason for revision (required)</Label>
+            <Label htmlFor="revise-reason">{applyMode ? 'Note for the audit trail (optional)' : 'Reason for revision (required)'}</Label>
             <Textarea
               id="revise-reason"
               value={reason}
@@ -246,9 +383,30 @@ export function ContractReviseWizard({ contractId, open, onOpenChange, initial, 
           <div className="space-y-3 rounded-lg border border-blue-200/80 bg-blue-50/50 p-4">
             <p className="font-medium">Client requested changes</p>
             <p className="text-muted-foreground text-xs">
-              Paste the client&apos;s bullet list or redline summary. Click <strong>Analyze changes</strong> to preview
-              how the contract template will be updated.
+              Paste the client&apos;s email or bullet list, or import the file they sent. Click{' '}
+              <strong>Analyze changes</strong> to see how the contract will be edited.
             </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-muted/50">
+                <Upload className="h-4 w-4" />
+                {importing ? 'Reading…' : 'Import from file (PDF, Word, email, text)'}
+                <input
+                  type="file"
+                  accept={AMENDMENT_IMPORT_ACCEPT}
+                  className="sr-only"
+                  disabled={busy || importing || useUploadedPdf}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void importAmendmentsFile(file);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+              {importedFileName ? (
+                <span className="text-xs text-emerald-800">Imported {importedFileName} — review the text below</span>
+              ) : null}
+            </div>
+            {importError ? <p className="text-xs text-destructive">{importError}</p> : null}
             <Textarea
               id="revise-change-request"
               value={changeRequest}
@@ -287,6 +445,7 @@ export function ContractReviseWizard({ contractId, open, onOpenChange, initial, 
             ) : null}
           </div>
 
+          {applyMode ? null : (
           <div className="space-y-3 rounded-lg border border-parchment-200 bg-parchment-50/60 p-4">
             <p className="font-medium">Client redlined PDF (optional)</p>
             <p className="text-muted-foreground text-xs">
@@ -332,6 +491,7 @@ export function ContractReviseWizard({ contractId, open, onOpenChange, initial, 
               </span>
             </label>
           </div>
+          )}
 
           <div className="space-y-4">
             <p className="font-medium">Manual overrides (optional)</p>
@@ -340,12 +500,12 @@ export function ContractReviseWizard({ contractId, open, onOpenChange, initial, 
             </p>
 
             <div className="space-y-2">
-              <Label htmlFor="revise-amendments">Extra amendment text</Label>
+              <Label htmlFor="revise-amendments">Additional terms (one per line)</Label>
               <Textarea
                 id="revise-amendments"
                 value={revisionAmendments}
                 onChange={(e) => setRevisionAmendments(e.target.value)}
-                placeholder="Paste or summarize client-requested term changes"
+                placeholder={`Each line becomes a numbered item under "Additional Terms and Amendments". Leave empty and the section is omitted from the PDF.`}
                 rows={4}
               />
             </div>
@@ -387,6 +547,27 @@ export function ContractReviseWizard({ contractId, open, onOpenChange, initial, 
                   onChange={(e) => setSignerCcEmail(e.target.value)}
                 />
               </div>
+              {initial.allowSecondSigner ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="revise-signer2-name">Second signer name (optional)</Label>
+                    <Input id="revise-signer2-name" value={signer2Name} onChange={(e) => setSigner2Name(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="revise-signer2-email">Second signer email (optional)</Label>
+                    <Input
+                      id="revise-signer2-email"
+                      type="email"
+                      value={signer2Email}
+                      onChange={(e) => setSigner2Email(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="revise-signer2-title">Second signer title (optional)</Label>
+                    <Input id="revise-signer2-title" value={signer2Title} onChange={(e) => setSigner2Title(e.target.value)} />
+                  </div>
+                </>
+              ) : null}
               <div className="space-y-2">
                 <Label htmlFor="revise-legal-name">Legal name</Label>
                 <Input
@@ -444,14 +625,36 @@ export function ContractReviseWizard({ contractId, open, onOpenChange, initial, 
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busyAll}>
-            Cancel
+        {previewError ? <p className="text-xs text-destructive">{previewError}</p> : null}
+        {previewWarnings ? (
+          <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            {previewWarnings} Sending is blocked until every inline edit matches.
+          </div>
+        ) : null}
+
+        <DialogFooter className="gap-2 sm:justify-between">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => void previewRevision()}
+            disabled={busyAll || previewing || useUploadedPdf}
+          >
+            {previewing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Preview revised contract
           </Button>
-          <Button onClick={() => void submitReviseAndSend()} disabled={busyAll || !canSubmit}>
-            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Void, revise, and send
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busyAll}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void submitReviseAndSend()}
+              disabled={busyAll || !canSubmit || Boolean(previewWarnings)}
+              title={!useUploadedPdf && !previewedOnce ? 'Tip: preview the PDF first' : undefined}
+            >
+              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {applyMode ? 'Apply to contract' : 'Void, revise, and send'}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { assertContractAccess } from '@/lib/auth-contract';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { renderContractPdfFromTemplate } from '@/lib/google';
+import { parseStoredRevisionPlan } from '@/lib/contract-revision-plan';
 import {
   downloadContractPdfFromStorage,
   persistContractDraftPdf,
@@ -20,6 +21,7 @@ import { contractUsesOrderTable } from '@/lib/contract-template-profile';
 import {
   countersignerRequiredForEvent,
   countersignCcValidation,
+  countersignerBlockedEmails,
   resolveDocuSignCountersignDelivery,
   toSendEnvelopeCountersignParams,
 } from '@/lib/docusign-envelope-recipients';
@@ -38,6 +40,8 @@ import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { syncExhibitorRosterWritebackById } from '@/lib/exhibitor-roster-sync-hook';
 import { docusignBrandIdForEvent, sendGridFromForEvent } from '@/lib/product-email';
 import { parseSignerCc } from '@/lib/docusign-signer-cc';
+import { parseSecondSigner, secondSignerValidation } from '@/lib/second-signer';
+import { secondSignerTemplateError } from '@/lib/second-signer-template-guard';
 import type { ContractWithTotals, Event } from '@/types/db';
 
 export const runtime = 'nodejs';
@@ -146,7 +150,21 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   if (ccError) {
     return NextResponse.json({ error: ccError }, { status: 400 });
   }
+  const secondSigner = parseSecondSigner(contract);
+  const secondSignerError = secondSignerValidation({
+    signer1Email: signerEmail,
+    signer2: secondSigner,
+    cc: carbonCopy,
+    countersignerEmails: countersignerBlockedEmails(countersignDelivery),
+  });
+  if (secondSignerError) {
+    return NextResponse.json({ error: secondSignerError }, { status: 400 });
+  }
   const templateDocId = resolveContractTemplateDocId(contract, event);
+  if (secondSigner) {
+    const templateError = await secondSignerTemplateError(templateDocId);
+    if (templateError) return NextResponse.json({ error: templateError }, { status: 400 });
+  }
   const usesOrderTable = contractUsesOrderTable(event, contract);
   const useUploadedRevision =
     Boolean(contract.revision_use_uploaded_pdf) && Boolean(contract.revision_upload_path?.trim());
@@ -169,6 +187,8 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
         usesOrderTable ? lineItems : undefined,
         {
           includeBoothRow: usesOrderTable && !isSponsorshipOnlyOrder(contract),
+          revisionPlan: parseStoredRevisionPlan(contract.revision_plan),
+          strictRevision: true,
         },
       );
     }
@@ -182,6 +202,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       emailSubject: contractDocuSignEmailSubject(contract.exhibitor_company_name, event),
       emailBlurb: contractDocuSignEmailBlurb(contract.exhibitor_company_name, event),
       signer1: { name: signerName, email: signerEmail },
+      signer2: secondSigner,
       ...toSendEnvelopeCountersignParams(countersignDelivery),
       carbonCopy,
       brandId: docusignBrandIdForEvent(event),
@@ -218,6 +239,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
         envelope_id: envelopeId,
         envelope_status: 'sent',
         exhibitor_signer: contract.signer_1_email,
+        signer_2_email: secondSigner?.email ?? null,
         signer_cc_email: carbonCopy?.email ?? null,
         countersigner_email:
           countersignDelivery?.mode === 'user'

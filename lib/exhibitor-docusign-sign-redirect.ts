@@ -51,7 +51,7 @@ export async function handleExhibitorDocuSignSignRedirect(
   if (!verifyDocuSignSigningLinkToken(trimmedId, signerEmail, trimmedToken)) {
     return htmlPage(
       'Signing link invalid',
-      'This signing link is invalid or expired. Ask your event coordinator to send a new personal note from the contracts portal.',
+      'This signing link no longer matches the contract (the signer on file may have changed). Ask your event coordinator to send a new personal note from the contracts portal.',
     );
   }
 
