@@ -15,5 +15,9 @@ export function getSupabaseAdmin() {
 
   return createClient(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },
+    global: {
+      // Route handlers can cache fetch(). Contract reads must see the latest row.
+      fetch: (input, init) => fetch(input, { ...init, cache: 'no-store' }),
+    },
   });
 }
