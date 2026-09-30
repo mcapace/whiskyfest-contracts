@@ -534,6 +534,7 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
       setCreateProgress({ current: 0, total: items.length });
 
       let totalCreated = 0;
+      const createdContractIds = new Set<string>();
       let totalSkipped = 0;
       let totalErrors = 0;
       const errorReasons: string[] = [];
@@ -566,7 +567,11 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
           break;
         }
 
-        totalCreated += (json.created ?? []).length;
+        const createdRows = (json.created ?? []) as { contractId?: string }[];
+        totalCreated += createdRows.length;
+        for (const row of createdRows) {
+          if (row.contractId) createdContractIds.add(row.contractId);
+        }
         totalSkipped += (json.skipped ?? []).length;
         totalErrors += (json.errors ?? []).length;
         for (const err of json.errors ?? []) {
@@ -588,8 +593,13 @@ export function ExhibitorRosterPanel({ initial }: { initial: RosterPayload }) {
           totalErrors > 0
             ? ` Sample issues: ${[...new Set(errorReasons)].join(' · ')}`
             : '';
+        const totalContracts = createdContractIds.size;
+        const draftLabel =
+          totalContracts > 0 && totalContracts < totalCreated
+            ? `Created ${totalContracts} draft${totalContracts === 1 ? '' : 's'} covering ${totalCreated} wineries`
+            : `Created ${totalCreated} draft${totalCreated === 1 ? '' : 's'}`;
         setMessage(
-          `Created ${totalCreated} draft${totalCreated === 1 ? '' : 's'} · skipped ${totalSkipped} · errors ${totalErrors}${
+          `${draftLabel} · skipped ${totalSkipped} · errors ${totalErrors}${
             totalErrors > 0
               ? `${errorHint} — fix those rows in Google Sheets or try smaller batches.`
               : ''

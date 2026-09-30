@@ -6,6 +6,8 @@ import { ArrowLeft } from 'lucide-react';
 import { formatBillingAddressBlock, formatExhibitorAddressBlock } from '@/lib/exhibitor-address';
 import { standardBoothRateCentsForEvent } from '@/lib/contracts';
 import { isNyweVendorEvent, isNyweVendorOnlyEvent, nyweLicenseFeeCents } from '@/lib/nywe-pricing';
+import { canMergeNyweContract, parseCoveredWineries } from '@/lib/nywe-combined-contract';
+import { NyweGalloSendBanner } from '@/components/wine-spectator/nywe-gallo-send-banner';
 import {
   packageSelectionsFromContract,
   pricingFromBigSmokeInput,
@@ -304,6 +306,10 @@ export function ContractDetailView({
               </div>
             )}
 
+            {nyweLicense && canMergeNyweContract(contract) && (isEventsTeam || isAdmin) ? (
+              <NyweGalloSendBanner contract={contract} clientSendEnabled={clientSendEnabled} />
+            ) : null}
+
             <div className="rounded-lg border border-parchment-200/90 bg-parchment-50/80 p-4 shadow-sm">
               <ContractActions
                 contractId={contract.id}
@@ -546,13 +552,30 @@ export function ContractDetailView({
                   ) : nyweLicense ? (
                     <>
                       <p className="wf-label-caps text-[0.6rem] text-muted-foreground">Vendor license</p>
-                      <Detail
-                        label="License fee"
-                        value={formatCurrency(contract.booth_subtotal_cents || nyweLicenseFeeCents(event ?? undefined))}
-                        mono
-                      />
+                      {parseCoveredWineries(contract.covered_wineries).length > 1 ? (
+                        <>
+                          <Detail
+                            label="Wineries"
+                            value={parseCoveredWineries(contract.covered_wineries)
+                              .map((winery) => winery.winery_name)
+                              .join('\n')}
+                            multiline
+                          />
+                          <Detail
+                            label="License fee"
+                            value={`${parseCoveredWineries(contract.covered_wineries).length} × ${formatCurrency(contract.booth_rate_cents)}`}
+                            mono
+                          />
+                        </>
+                      ) : (
+                        <Detail
+                          label="License fee"
+                          value={formatCurrency(contract.booth_subtotal_cents || nyweLicenseFeeCents(event ?? undefined))}
+                          mono
+                        />
+                      )}
                       {contract.brands_poured ? (
-                        <Detail label="Wine / brand" value={contract.brands_poured} />
+                        <Detail label="Wine / brand" value={contract.brands_poured} multiline />
                       ) : null}
                     </>
                   ) : bigSmokePriced ? (

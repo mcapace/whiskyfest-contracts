@@ -27,6 +27,8 @@ import { renderContractPdfFromTemplate } from '@/lib/google';
 import { parseStoredRevisionPlan } from '@/lib/contract-revision-plan';
 import { buildContractMergeMap } from '@/lib/merge-map';
 import { nyweLicenseAddressError } from '@/lib/nywe-billing';
+import { contractQualifiesForGalloCombine } from '@/lib/nywe-combined-contract';
+import { combineGalloContractsForEvent } from '@/lib/nywe-combine-gallo-contracts';
 import { refreshNyweBillingFromRosterForContract } from '@/lib/nywe-roster-billing-sync';
 import { docusignBrandIdForEvent, sendGridFromForEvent } from '@/lib/product-email';
 import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
@@ -38,7 +40,8 @@ import { NYWE_CLIENT_SEND_STATUSES, nyweContractReadyForClientSend } from '@/lib
 export { NYWE_CLIENT_SEND_STATUSES, nyweContractReadyForClientSend };
 
 export type NyweClientSendResult =
-  | { ok: true; envelopeId: string; exhibitorSignerEmail: string }
+  | { ok: true; envelopeId: string; exhibitorSignerEmail: string; absorbed?: false }
+  | { ok: true; absorbed: true; envelopeId: ''; exhibitorSignerEmail: '' }
   | { ok: false; error: string; statusCode?: number };
 
 export type NyweClientSendSignerCc = {
@@ -73,12 +76,33 @@ export async function nyweClientSendContract(options: {
     return { ok: false, error: 'Client send is disabled for this event.', statusCode: 403 };
   }
 
+  if (contract.status === 'cancelled' && /combined into the gallo contract/i.test(contract.cancelled_reason ?? '')) {
+    return { ok: true, absorbed: true, envelopeId: '', exhibitorSignerEmail: '' };
+  }
+
   if (!nyweContractReadyForClientSend(contract.status)) {
     return {
       ok: false,
       error: `License cannot be sent from status "${contract.status}".`,
       statusCode: 409,
     };
+  }
+
+  if (contractQualifiesForGalloCombine(contract)) {
+    await combineGalloContractsForEvent({
+      supabase,
+      event,
+      actorEmail,
+      preferContractId: contract.id,
+    });
+    const reloaded = await fetchContractWithTotalsById(supabase, contract.id);
+    if (!reloaded) {
+      return { ok: false, error: 'License not found', statusCode: 404 };
+    }
+    if (reloaded.status === 'cancelled' && /combined into the gallo contract/i.test(reloaded.cancelled_reason ?? '')) {
+      return { ok: true, absorbed: true, envelopeId: '', exhibitorSignerEmail: '' };
+    }
+    contract = reloaded;
   }
 
   contract = await refreshNyweBillingFromRosterForContract(supabase, contract, event);

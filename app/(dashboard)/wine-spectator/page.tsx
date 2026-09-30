@@ -18,6 +18,7 @@ import { NyweMetricsGrid } from '@/components/wine-spectator/nywe-metrics-grid';
 import { NywePipelinePanel } from '@/components/wine-spectator/nywe-pipeline-panel';
 import { NyweHomeSearch } from '@/components/wine-spectator/nywe-home-search';
 import { NyweQuickNav } from '@/components/wine-spectator/nywe-quick-nav';
+import { NyweGalloCombineCard } from '@/components/wine-spectator/nywe-gallo-combine-card';
 import { NyweBoothQrRowDownload } from '@/components/wine-spectator/nywe-booth-qr-row-download';
 import { buildNyweDashboardMetrics, getNywePipelineData } from '@/lib/nywe-dashboard-metrics';
 import { scheduleNyweBackgroundDocuSignSync } from '@/lib/nywe-background-docusign-sync';
@@ -115,6 +116,8 @@ export default async function WineSpectatorDashboardPage() {
         greetingSubtitle={primaryEvent?.name ?? 'New York Wine Experience'}
         compact
       />
+
+      <NyweGalloCombineCard contracts={activeScoped} event={primaryEvent} />
 
       {sendBlocked ? (
         <div className="rounded-xl border border-amber-300/80 bg-amber-50/95 px-5 py-4 text-amber-950">

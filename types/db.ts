@@ -188,6 +188,20 @@ export interface Contract {
   qr_clicks: number;
   qr_last_click_at: string | null;
   qr_clicks_synced_at: string | null;
+  /**
+   * NYWE wineries on one combined license (Gallo).
+   * booth_count is the winery count; the contract total is count × the license fee.
+   */
+  covered_wineries: {
+    winery_name: string;
+    website_url: string | null;
+    wine_display: string | null;
+    source_rows: {
+      source_sheet_id: string;
+      source_sheet_tab: string;
+      source_row_number: number;
+    }[];
+  }[] | null;
   /** NYWE print art code for booth QR file naming. */
   art_code: string | null;
   /** NYWE tasting booth number from the TOC / art-code sheet. */

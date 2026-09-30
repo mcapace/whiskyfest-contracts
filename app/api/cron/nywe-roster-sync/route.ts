@@ -1,5 +1,10 @@
+import { timingSafeEqual } from 'crypto';
 import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
+import {
+  applyPendingGalloMutualIndemnification,
+  pendingGalloIndemnificationToken,
+} from '@/lib/gallo-indemnification-resend';
 import { syncExhibitorRosterMaster } from '@/lib/exhibitor-roster-sync-job';
 import {
   backfillNyweWebsitesFromRoster,
@@ -12,11 +17,63 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 180;
 
 /** Vercel Cron: refresh NYWE exhibitor master lists from Google Sheets. */
+function tokenMatches(expected: string, provided: string | null): boolean {
+  if (!provided) return false;
+  const a = Buffer.from(expected);
+  const b = Buffer.from(provided);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+function providedGalloToken(request: Request): string | null {
+  const header = request.headers.get('x-gallo-indemnification-token')?.trim();
+  if (header) return header;
+  try {
+    return new URL(request.url).searchParams.get('gallo_token')?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization');
   const secret = process.env['CRON_SECRET']?.trim();
-  if (!secret || authHeader !== `Bearer ${secret}`) {
-    return new Response('Unauthorized', { status: 401 });
+  const cronOk = Boolean(secret && authHeader === `Bearer ${secret}`);
+  let pendingToken: string | null = null;
+  let lookupFailed = false;
+  try {
+    pendingToken = await pendingGalloIndemnificationToken();
+  } catch (err) {
+    lookupFailed = true;
+    console.error('[cron/nywe-roster-sync] gallo token lookup failed', err);
+  }
+  const providedToken = providedGalloToken(request);
+  const tokenOk = tokenMatches(pendingToken ?? '', pendingToken ? providedToken : null);
+  if (!cronOk && !tokenOk) {
+    const reason = lookupFailed ? 'lookup-failed' : !pendingToken ? 'no-pending' : !providedToken ? 'no-token' : 'mismatch';
+    return new Response('Unauthorized', {
+      status: 401,
+      headers: {
+        'cache-control': 'private, no-store',
+        'x-gallo-auth': reason,
+      },
+    });
+  }
+
+  let galloIndemnification: { applied: boolean; reason?: string; envelopeId?: string; error?: string } | null =
+    null;
+  if (pendingToken) {
+    try {
+      galloIndemnification = await applyPendingGalloMutualIndemnification();
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      console.error('[cron/nywe-roster-sync] gallo indemnification failed', error);
+      galloIndemnification = { applied: false, error };
+    }
+  }
+
+  if (!cronOk) {
+    return NextResponse.json({ status: 'gallo_indemnification', galloIndemnification });
   }
 
   const outcome = await syncExhibitorRosterMaster();
@@ -52,6 +109,7 @@ export async function GET(request: Request) {
       websitesUpdated,
       shortLinksCreated,
       qrClicksUpdated,
+      galloIndemnification,
     });
   }
 
@@ -72,5 +130,6 @@ export async function GET(request: Request) {
     websitesUpdated,
     shortLinksCreated,
     qrClicksUpdated,
+    galloIndemnification,
   });
 }

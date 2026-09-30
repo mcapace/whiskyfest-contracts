@@ -17,8 +17,11 @@ import { eventTemplateProfile, isNyweEventsManagedEvent } from '@/lib/contract-t
 import {
   applyNyweLicensePricingIfNeeded,
   isNyweVendorOnlyEvent,
+  nyweLicenseFeeCents,
   signerTitleForContract,
 } from '@/lib/nywe-pricing';
+import { galloWriteFromNames } from '@/lib/nywe-combined-contract';
+import { combineGalloContractsForEvent } from '@/lib/nywe-combine-gallo-contracts';
 import { pricingFromBigSmokeInput, resolveBigSmokeStoredBoothRate } from '@/lib/big-smoke-pricing';
 import { billingFieldsFromOptionalBody } from '@/lib/nywe-billing';
 import { requiresDiscountApproval } from '@/lib/contracts';
@@ -177,18 +180,29 @@ export async function POST(req: Request) {
           package_key: p.package_key,
         })
       : null;
-  const nywePricing = applyNyweLicensePricingIfNeeded(
-    eventRow,
-    {
-      booth_count: bigSmokePricing?.booth_count ?? p.booth_count,
-      booth_rate_cents: noChargeRequested
-        ? 0
-        : bigSmokePricing
-          ? resolveBigSmokeStoredBoothRate(bigSmokePricing, p.booth_rate_cents)
-          : p.booth_rate_cents,
-    },
-    { orderType: p.order_type },
-  );
+  const galloFields =
+    nyweOnly && !sponsorshipOnly && !noChargeRequested
+      ? galloWriteFromNames({
+          legalName: p.exhibitor_legal_name,
+          companyName: p.exhibitor_company_name,
+          covered: p.covered_wineries,
+          feeCents: nyweLicenseFeeCents(eventRow),
+        })
+      : null;
+  const nywePricing = galloFields
+    ? { booth_count: galloFields.booth_count, booth_rate_cents: galloFields.booth_rate_cents }
+    : applyNyweLicensePricingIfNeeded(
+        eventRow,
+        {
+          booth_count: bigSmokePricing?.booth_count ?? p.booth_count,
+          booth_rate_cents: noChargeRequested
+            ? 0
+            : bigSmokePricing
+              ? resolveBigSmokeStoredBoothRate(bigSmokePricing, p.booth_rate_cents)
+              : p.booth_rate_cents,
+        },
+        { orderType: p.order_type },
+      );
   // NYWE vendor licenses are flat — no line items. Sponsorship-only + WF/Big Smoke keep line items.
   const savedLineItems = nyweOnly && !sponsorshipOnly ? [] : (p.line_items ?? []);
   const packageKey = bigSmokePricing?.package_key ?? null;
@@ -217,16 +231,19 @@ export async function POST(req: Request) {
     .from('contracts')
     .insert({
       event_id: p.event_id,
-      exhibitor_legal_name: p.exhibitor_legal_name,
-      exhibitor_company_name: p.exhibitor_company_name,
+      exhibitor_legal_name: galloFields?.exhibitor_legal_name ?? p.exhibitor_legal_name,
+      exhibitor_company_name: galloFields?.exhibitor_company_name ?? p.exhibitor_company_name,
       order_type: p.order_type ?? 'booth',
       brands_poured: sponsorshipOnly
         ? sponsorBrandFromBody(p)
-        : nyweOnly
-          ? (p.brands_poured?.trim() || p.exhibitor_company_name.trim() || null)
-          : isBigSmoke
-            ? p.exhibitor_company_name.trim() || null
-            : null,
+        : galloFields
+          ? galloFields.brands_poured
+          : nyweOnly
+            ? (p.brands_poured?.trim() || p.exhibitor_company_name.trim() || null)
+            : isBigSmoke
+              ? p.exhibitor_company_name.trim() || null
+              : null,
+      covered_wineries: galloFields?.covered_wineries ?? null,
       package_key: packageKey,
       package_selections: noChargeRequested || sponsorshipOnly ? null : packageSelections,
       booth_count: nywePricing.booth_count,
@@ -310,6 +327,15 @@ export async function POST(req: Request) {
         metadata: { pipeline_target_id: p.pipeline_target_id },
       });
     }
+  }
+
+  if (galloFields) {
+    await combineGalloContractsForEvent({
+      supabase,
+      event: eventRow,
+      actorEmail: actor.email,
+      preferContractId: row.id,
+    });
   }
 
   revalidateContractPaths(row.id);
