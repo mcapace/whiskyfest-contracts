@@ -1,4 +1,5 @@
 import { google, type docs_v1 } from 'googleapis';
+import { galloIndemnificationRequestsForMergeMap } from '@/lib/gallo-mutual-indemnification';
 import {
   applyContractOrderTableDataRowFormatting,
   insertContractLineItemsIntoOrderTable,
@@ -106,7 +107,10 @@ export async function renderContractPdfFromTemplate(
       });
     }
 
-    const revisionRequests = options?.postMergeRevisionRequests ?? [];
+    const revisionRequests = [
+      ...(options?.postMergeRevisionRequests ?? []),
+      ...galloIndemnificationRequestsForMergeMap(mergeMap),
+    ];
     if (revisionRequests.length > 0) {
       await docs.documents.batchUpdate({
         documentId: tempDocId,
