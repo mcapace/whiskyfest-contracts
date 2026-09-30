@@ -20,7 +20,7 @@ export const GALLO_COMBINED_CONTRACT_ID = 'd21e327c-c85e-450d-8785-bc0dab9362e6'
 export const GALLO_INDEMNIFICATION_PENDING_PREFIX = 'pending-gallo-indemnification:';
 
 export const GALLO_INDEMNIFICATION_APPLIED_NOTE =
-  'Section 6 indemnification replaced with the mutual clause approved by Lon Gallagher. All other terms unchanged.';
+  'Gallo terms sheet sent with the mutual indemnification Lon Gallagher approved. $70,000 for Jermann, Louis M. Martini, Massican, Pahlmeyer, and Rombauer.';
 
 export function galloIndemnificationDocRequest(): docs_v1.Schema$Request {
   return {

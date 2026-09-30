@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingIncludes: {
+    '*': ['./assets/nywe-gallo-2026-terms.pdf'],
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: '10mb', // for PDF uploads via Server Actions if needed

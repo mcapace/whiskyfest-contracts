@@ -133,7 +133,7 @@ export async function applyPendingGalloMutualIndemnification(): Promise<{
     try {
       await voidEnvelope(
         priorEnvelopeId,
-        'Replacing Section 6 with the mutual indemnification approved by Lon Gallagher',
+        'Replacing the vendor license with the Gallo terms sheet and the mutual indemnification Lon Gallagher approved',
       );
     } catch (err) {
       console.error('[gallo-indemnification] void failed, continuing', err);
@@ -212,7 +212,7 @@ export async function applyPendingGalloMutualIndemnification(): Promise<{
     to_status: 'sent',
     metadata: {
       reason:
-        'Gallo / Lon Gallagher approved mutual indemnification — applied to the combined $70,000 NYWE license. All other terms unchanged.',
+        'Replaced the vendor license with the older-style Gallo terms sheet. Mutual indemnification is the clause Lon Gallagher approved. Fee is $70,000 for the five 2026 wineries.',
       old_envelope_id: priorEnvelopeId,
       new_envelope_id: envelopeId,
       indemnification: 'mutual_gallo_approved',

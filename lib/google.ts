@@ -1,5 +1,6 @@
 import { google, type docs_v1 } from 'googleapis';
 import { galloIndemnificationRequestsForMergeMap } from '@/lib/gallo-mutual-indemnification';
+import { galloUsesApprovedTermsSheet, readGalloTermsSheetPdf } from '@/lib/gallo-terms-sheet';
 import {
   applyContractOrderTableDataRowFormatting,
   insertContractLineItemsIntoOrderTable,
@@ -63,6 +64,12 @@ export async function renderContractPdfFromTemplate(
   lineItems?: ContractLineItem[],
   options?: RenderContractPdfOptions,
 ): Promise<Buffer> {
+  // Gallo's $70,000 NYWE order uses the older terms sheet, with the mutual
+  // indemnification already printed. Other contracts keep the Google template.
+  if (galloUsesApprovedTermsSheet(mergeMap)) {
+    return readGalloTermsSheetPdf();
+  }
+
   const includeBoothRow = options?.includeBoothRow !== false;
   const auth = getAuth();
   const drive = google.drive({ version: 'v3', auth });
