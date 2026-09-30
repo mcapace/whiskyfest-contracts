@@ -89,6 +89,9 @@ export const CONTRACT_ACTION_HELP = {
   resetToDraft:
     'Clears the error state and returns the contract to draft so you can fix issues and try again. Internal notes may be cleared.',
 
+  applyAmendments:
+    'Import the client\'s emailed or attached amendments, turn them into inline edits to this contract (clauses replaced, removed or added in place), preview the clean draft, and save it — before anything is sent.',
+
   reviseAndSend:
     'Void the in-flight DocuSign envelope, analyze client change requests with AI, apply edits throughout the master contract template (names, payment terms, deletions), and send a new envelope — or send an uploaded PDF as-is.',
 } as const;

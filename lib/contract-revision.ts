@@ -127,7 +127,7 @@ async function recallInFlightContract(
   });
 }
 
-function buildRevisionPatch(
+export function buildRevisionPatch(
   body: ReviseAndSendBody,
   contract: Contract,
   plan?: ContractRevisionPlan | null,

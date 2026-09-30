@@ -182,6 +182,7 @@ export function ContractActions({
   const [action, setAction] = useState<string | null>(null);
   const [openRecall, setOpenRecall] = useState(false);
   const [openRevise, setOpenRevise] = useState(false);
+  const [openApplyAmendments, setOpenApplyAmendments] = useState(false);
   const [openResendWithChanges, setOpenResendWithChanges] = useState(false);
   const [openCancel, setOpenCancel] = useState(false);
   const [openVoid, setOpenVoid] = useState(false);
@@ -368,6 +369,11 @@ export function ContractActions({
     Boolean(docusignEnvelopeId);
   const canReviseAndSend =
     canRecall && clientSendEnabled && !discountApprovalPending && Boolean(reviseInitial);
+  /** Client amendments that arrive before anything is sent — no DocuSign involvement. */
+  const canApplyAmendments =
+    (isAdmin || isEventsTeam) &&
+    (status === 'draft' || status === 'ready_for_review' || status === 'pending_events_review' || status === 'approved') &&
+    Boolean(reviseInitial);
   const canResendWithChanges =
     (isAdmin || isEventsTeam) &&
     !discountApprovalPending &&
@@ -465,6 +471,19 @@ export function ContractActions({
             open={sidebarOpen}
             onOpenChange={setSidebarOpen}
           >
+          {canApplyAmendments && (
+            <ActionWithHelp helpText={CONTRACT_ACTION_HELP.applyAmendments}>
+              <Button
+                className={btnSecondary}
+                onClick={() => setOpenApplyAmendments(true)}
+                disabled={busy || readOnly}
+                title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+              >
+                <ContractActionButtonLabel icon={FilePenLine} label="Apply Client Amendments" />
+              </Button>
+            </ActionWithHelp>
+          )}
+
           {status === 'draft' && (
             <>
               {canApproveDiscount && (
@@ -1073,6 +1092,16 @@ export function ContractActions({
           onOpenChange={setOpenRevise}
           initial={reviseInitial}
           readOnly={readOnly}
+        />
+      ) : null}
+      {reviseInitial ? (
+        <ContractReviseWizard
+          contractId={contractId}
+          open={openApplyAmendments}
+          onOpenChange={setOpenApplyAmendments}
+          initial={reviseInitial}
+          readOnly={readOnly}
+          mode="apply"
         />
       ) : null}
 

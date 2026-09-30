@@ -47,6 +47,14 @@ Now (`lib/google-doc-paragraph-edits.ts`, `lib/google-doc-amendment-sections.ts`
 - **Preview before sending.** `POST /api/contracts/[id]/revision-preview` renders the revised PDF
   without voiding or sending. The wizard has a "Preview revised contract" button; sending is blocked
   while any edit does not match.
+- **Amendments that arrive before the contract goes out.** "Apply Client Amendments" on a draft,
+  in-review or approved contract opens the same wizard in apply mode: import or paste the amendments,
+  Analyze, Preview, then **Apply to contract**. The edits are saved on the contract, the stored draft
+  PDF is regenerated clean, and the normal Send picks everything up. No DocuSign activity
+  (`POST /api/contracts/[id]/apply-revision`).
+- **Import from what the client sent.** In either mode, "Import from file" accepts a PDF, Word
+  (.docx), plain text/markdown, or a saved email (.eml) and drops the extracted text into the change
+  request for review (`POST /api/contracts/[id]/amendments-import`; nothing is stored).
 - **AI planning** now sees the merged contract, one numbered paragraph per line, and is told when to
   use a clause edit versus a phrase swap versus Additional Terms.
 - Bug fixes: the wizard no longer wipes notes, brands, CC and billing fields it did not touch; the
