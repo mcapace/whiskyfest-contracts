@@ -65,12 +65,14 @@ Some exhibitors need two signatures on their side. Contracts now carry `signer_2
   Tabs anchor on `\s3\` / `\d3\`.
 - Status sync (`lib/docusign-envelope-sync.ts`, webhook): the contract only moves to
   `partially_signed` when **every** client signer has signed.
-- Template: one master serves both cases. Add `{{signer_2_block}}` on its own line under the exhibitor
-  "Signature … Date" line of the WhiskyFest booth and sponsorship masters, either by running
-  `npx tsx scripts/patch-wf-template-second-signer.mts` or by pasting the token by hand. With a second
-  signer the token expands to an "ADDITIONAL AUTHORIZED SIGNATORY" block (name, title, signature, date);
-  without one it renders as nothing. Sending a contract that has a second signer before the token is in
-  the template is refused with a clear message.
+- Template: one master serves both cases. The portal itself inserts `{{signer_2_block}}` on its own
+  line under the exhibitor "Signature … Date" line of the WhiskyFest master the first time a two-signer
+  contract is sent from it (idempotent, uses the service account that already edits template copies).
+  With a second signer the token expands to an "ADDITIONAL AUTHORIZED SIGNATORY" block (name, title,
+  signature, date); without one it renders as nothing. An admin can also check or run the insertion up
+  front: `GET` / `POST /api/admin/templates/second-signer` (or the standalone
+  `scripts/patch-wf-template-second-signer.mts`). Only if no exhibitor signature line can be found is
+  the send refused with a message saying where to paste the token.
 
 Migration: same file as above (`091_signer_2_and_revision_plan.sql`).
 
@@ -83,9 +85,10 @@ void, cancel, discount approval and signer edits on WhiskyFest contracts. Her em
 
 ## Rollout checklist
 
-1. Run migrations 090 and 091 in Supabase (SQL editor or `supabase db push`).
+1. Run migrations 090 and 091 in Supabase (SQL editor or `supabase db push`). Done 2026-09-30.
 2. Deploy. No env changes are required; set the optional DocuSign variables above if you want different
    expiration or DocuSign-side reminders.
-3. Patch the two WhiskyFest master Docs with `{{signer_2_block}}` (script or by hand) before using a second
-   signer.
+3. Nothing to do for the template: the second-signer block is added automatically on first use.
 4. Try one revision on a test contract: Revise and Send → describe the change → Analyze → Preview → send.
+
+`npm run lint` now runs without prompting (`.eslintrc.json`, next/core-web-vitals).

@@ -66,7 +66,7 @@ export function CancelContractDialog({ contractId, exhibitorName }: Props) {
           <DialogTitle>Cancel this contract?</DialogTitle>
           <DialogDescription>
             This will mark <strong className="text-foreground">{exhibitorName}</strong> as cancelled.
-            Cancelled contracts can't be reactivated — you'd need to create a new one if the deal comes back.
+            Cancelled contracts can&apos;t be reactivated — you&apos;d need to create a new one if the deal comes back.
           </DialogDescription>
         </DialogHeader>
 
