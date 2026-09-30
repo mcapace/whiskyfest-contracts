@@ -21,7 +21,15 @@ import type { ContractStatus, Event } from '@/types/db';
  * the signed copy, then either send it to Whisky Advocate for DocuSign countersignature or
  * mark it fully signed and hand it to accounting.
  */
-export const UPLOAD_SIGNED_STATUSES: ContractStatus[] = ['sent', 'partially_signed', 'approved', 'error'];
+export const UPLOAD_SIGNED_STATUSES: ContractStatus[] = [
+  'draft',
+  'ready_for_review',
+  'pending_events_review',
+  'approved',
+  'sent',
+  'partially_signed',
+  'error',
+];
 
 export type UploadSignedCountersign = 'docusign' | 'none';
 
@@ -41,7 +49,7 @@ export async function attachClientSignedPdf(options: {
   const contract = await fetchContractWithTotalsById(supabase, contractId);
   if (!contract) throw new Error('Contract not found');
   if (!UPLOAD_SIGNED_STATUSES.includes(contract.status)) {
-    throw new Error(`A signed PDF can be attached while the contract is sent, partially signed, approved or in error (current: ${contract.status}).`);
+    throw new Error(`A signed PDF cannot be attached to a ${contract.status} contract.`);
   }
   const { data: event } = await supabase.from('events').select('*').eq('id', contract.event_id).single<Event>();
   if (!event) throw new Error('Event not found');

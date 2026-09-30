@@ -379,7 +379,13 @@ export function ContractActions({
   /** Client signed outside DocuSign (printed / extra signers) and emailed the PDF back. */
   const canUploadSigned =
     (isAdmin || isEventsTeam) &&
-    (status === 'sent' || status === 'partially_signed' || status === 'approved' || status === 'error');
+    (status === 'draft' ||
+      status === 'ready_for_review' ||
+      status === 'pending_events_review' ||
+      status === 'approved' ||
+      status === 'sent' ||
+      status === 'partially_signed' ||
+      status === 'error');
   /** Client amendments that arrive before anything is sent — no DocuSign involvement. */
   const canApplyAmendments =
     (isAdmin || isEventsTeam) &&
@@ -405,7 +411,6 @@ export function ContractActions({
   const hasDocuSignSecondary =
     canPersonalNudge ||
     canReminder ||
-    canUploadSigned ||
     canReviseAndSend ||
     canResendWithChanges ||
     canRecall ||
@@ -483,6 +488,25 @@ export function ContractActions({
             open={sidebarOpen}
             onOpenChange={setSidebarOpen}
           >
+          {canUploadSigned && (
+            <ActionWithHelp helpText={CONTRACT_ACTION_HELP.uploadSigned}>
+              <Button
+                className={btnSecondary}
+                onClick={() => {
+                  setUploadSignedError(null);
+                  setUploadSignedFile(null);
+                  setUploadSignedNote('');
+                  setUploadSignedCountersign('docusign');
+                  setOpenUploadSigned(true);
+                }}
+                disabled={busy || readOnly}
+                title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
+              >
+                <ContractActionButtonLabel icon={FileCheck2} label="Upload Signed Contract" />
+              </Button>
+            </ActionWithHelp>
+          )}
+
           {canApplyAmendments && (
             <ActionWithHelp helpText={CONTRACT_ACTION_HELP.applyAmendments}>
               <Button
@@ -979,24 +1003,6 @@ export function ContractActions({
                       label="Sync from DocuSign"
                       spinning={pending && action === 'sync-docusign'}
                     />
-                  </Button>
-                </ActionWithHelp>
-              )}
-              {canUploadSigned && (
-                <ActionWithHelp helpText={CONTRACT_ACTION_HELP.uploadSigned} className="w-full">
-                  <Button
-                    className={btnSecondary}
-                    onClick={() => {
-                      setUploadSignedError(null);
-                      setUploadSignedFile(null);
-                      setUploadSignedNote('');
-                      setUploadSignedCountersign('docusign');
-                      setOpenUploadSigned(true);
-                    }}
-                    disabled={busy || readOnly}
-                    title={readOnly ? IMPERSONATION_BUTTON_TOOLTIP : undefined}
-                  >
-                    <ContractActionButtonLabel icon={FileCheck2} label="Upload Signed Contract" />
                   </Button>
                 </ActionWithHelp>
               )}
