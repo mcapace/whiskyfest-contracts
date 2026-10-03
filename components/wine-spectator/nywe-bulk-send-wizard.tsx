@@ -110,7 +110,8 @@ export function NyweBulkSendWizard({ open, onOpenChange, sendable, onComplete }:
         }),
       });
       if (res.ok) {
-        sent += 1;
+        const json = await res.json().catch(() => ({}));
+        if (!json.absorbed) sent += 1;
       } else {
         failed += 1;
         const json = await res.json().catch(() => ({}));

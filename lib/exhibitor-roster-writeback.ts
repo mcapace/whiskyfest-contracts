@@ -1,6 +1,7 @@
 import { getSheetsClient } from '@/lib/sheets-tracker';
 import { rosterStatusLabel } from '@/lib/exhibitor-roster';
 import { rosterIdentitiesMatch, normalizeSheetContractId } from '@/lib/nywe-roster-identity';
+import { parseCoveredWineries, type NyweCoveredSourceRow } from '@/lib/nywe-combined-contract';
 import { formatTimestamp } from '@/lib/utils';
 import type { ContractStatus, ContractWithTotals } from '@/types/db';
 import {
@@ -48,17 +49,76 @@ async function ensureStatusHeaders(
   });
 }
 
+function rosterTargetsForContract(
+  contract: Pick<ContractWithTotals, 'source_sheet_id' | 'source_sheet_tab' | 'source_row_number'> &
+    Partial<Pick<ContractWithTotals, 'covered_wineries'>>,
+): NyweCoveredSourceRow[] {
+  const targets: NyweCoveredSourceRow[] = [];
+  const push = (source_sheet_id?: string | null, source_sheet_tab?: string | null, source_row_number?: number | null) => {
+    if (!source_sheet_id?.trim() || !source_sheet_tab?.trim() || !source_row_number || source_row_number < 2) return;
+    const next = {
+      source_sheet_id: source_sheet_id.trim(),
+      source_sheet_tab: source_sheet_tab.trim(),
+      source_row_number,
+    };
+    if (
+      targets.some(
+        (row) =>
+          row.source_sheet_id === next.source_sheet_id &&
+          row.source_sheet_tab === next.source_sheet_tab &&
+          row.source_row_number === next.source_row_number,
+      )
+    ) {
+      return;
+    }
+    targets.push(next);
+  };
+  push(contract.source_sheet_id, contract.source_sheet_tab, contract.source_row_number);
+  for (const winery of parseCoveredWineries(contract.covered_wineries)) {
+    for (const source of winery.source_rows) push(source.source_sheet_id, source.source_sheet_tab, source.source_row_number);
+  }
+  return targets;
+}
+
+function sheetRowMatchesContract(
+  contract: Partial<Pick<ContractWithTotals, 'id' | 'exhibitor_company_name' | 'exhibitor_legal_name' | 'covered_wineries'>>,
+  sheetWinery: string,
+  sheetBilling: string,
+  sheetContractId: string | null,
+): boolean {
+  if (sheetContractId && contract.id && sheetContractId === contract.id.toLowerCase()) return true;
+  if (rosterIdentitiesMatch(sheetWinery, contract.exhibitor_company_name)) return true;
+  if (rosterIdentitiesMatch(sheetWinery, contract.exhibitor_legal_name)) return true;
+  if (rosterIdentitiesMatch(sheetBilling, contract.exhibitor_company_name)) return true;
+  if (rosterIdentitiesMatch(sheetBilling, contract.exhibitor_legal_name)) return true;
+  return parseCoveredWineries(contract.covered_wineries).some((winery) =>
+    rosterIdentitiesMatch(sheetWinery, winery.winery_name),
+  );
+}
+
 export async function writeExhibitorRosterStatusForContract(
   contract: Pick<
     ContractWithTotals,
     'id' | 'status' | 'source_sheet_id' | 'source_sheet_tab' | 'source_row_number' | 'updated_at'
   > &
-    Partial<Pick<ContractWithTotals, 'exhibitor_company_name' | 'exhibitor_legal_name'>>,
+    Partial<Pick<ContractWithTotals, 'exhibitor_company_name' | 'exhibitor_legal_name' | 'covered_wineries'>>,
   options?: { trackerStatus?: ContractStatus; statusLabel?: string },
 ): Promise<void> {
-  const spreadsheetId = contract.source_sheet_id?.trim();
-  const tab = contract.source_sheet_tab?.trim();
-  const rowNumber = contract.source_row_number;
+  const targets = rosterTargetsForContract(contract);
+  for (const target of targets) {
+    await writeExhibitorRosterStatusForSourceRow(contract, target, options);
+  }
+}
+
+async function writeExhibitorRosterStatusForSourceRow(
+  contract: Pick<ContractWithTotals, 'id' | 'status' | 'updated_at'> &
+    Partial<Pick<ContractWithTotals, 'exhibitor_company_name' | 'exhibitor_legal_name' | 'covered_wineries'>>,
+  source: NyweCoveredSourceRow,
+  options?: { trackerStatus?: ContractStatus; statusLabel?: string },
+): Promise<void> {
+  const spreadsheetId = source.source_sheet_id;
+  const tab = source.source_sheet_tab;
+  const rowNumber = source.source_row_number;
   if (!spreadsheetId || !tab || !rowNumber || rowNumber < 2) return;
 
   const status = options?.trackerStatus ?? contract.status;
@@ -84,13 +144,7 @@ export async function writeExhibitorRosterStatusForContract(
     const sheetWinery = wineryIdx >= 0 ? row[wineryIdx] : row[2];
     const sheetBilling = billingIdx >= 0 ? row[billingIdx] : '';
     const sheetContractId = normalizeSheetContractId(row[statusStart + 1]);
-    const idMatches = sheetContractId === contract.id.toLowerCase();
-    const matches =
-      idMatches ||
-      rosterIdentitiesMatch(sheetWinery, contract.exhibitor_company_name) ||
-      rosterIdentitiesMatch(sheetWinery, contract.exhibitor_legal_name) ||
-      rosterIdentitiesMatch(sheetBilling, contract.exhibitor_company_name) ||
-      rosterIdentitiesMatch(sheetBilling, contract.exhibitor_legal_name);
+    const matches = sheetRowMatchesContract(contract, sheetWinery, sheetBilling, sheetContractId);
     if (!matches) {
       console.warn('[nywe-roster] skip writeback — sheet row is a different winery', {
         id: contract.id,

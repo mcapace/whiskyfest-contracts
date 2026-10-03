@@ -27,6 +27,7 @@ import { subscribeToAppContractEvents } from '@/lib/realtime-client';
 import { CONTRACT_DEAL_KINDS, dealKindFromContract, dealKindLabel, listPackageLabel } from '@/lib/contract-deal-kind';
 import { NyweBoothQrRowDownload, downloadNyweBoothQrFile } from '@/components/wine-spectator/nywe-booth-qr-row-download';
 import { NyweDocuSignRefreshButton } from '@/components/wine-spectator/nywe-docusign-refresh-button';
+import { NyweGalloCombineCard } from '@/components/wine-spectator/nywe-gallo-combine-card';
 import { WinePouredChips } from '@/components/contracts/wine-poured-chips';
 import type { BoothBrandRowsByContract } from '@/lib/sponsors';
 import type { ContractWithTotals, Event } from '@/types/db';
@@ -309,6 +310,18 @@ export function ContractsList({
           </div>
         </div>
       </div>
+
+      {winePortal ? (
+        <NyweGalloCombineCard
+          contracts={contracts}
+          event={
+            events.find((event) => event.contract_template_profile === 'nywe_vendor' && event.is_active) ??
+            events.find((event) => event.contract_template_profile === 'nywe_vendor') ??
+            null
+          }
+          portalBasePath={portalBasePath}
+        />
+      ) : null}
 
       <ContractsFilterBar
         filters={filters}

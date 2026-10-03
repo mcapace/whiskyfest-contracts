@@ -16,6 +16,13 @@ import { isEventsManagedWorkflow } from '@/lib/contract-template-profile';
 import { isDiscountedRate, standardBoothRateCentsForEvent } from '@/lib/contracts';
 import { isNyweVendorOnlyEvent, nyweLicenseFeeCents } from '@/lib/nywe-pricing';
 import {
+  emptyCoveredWinery,
+  galloWriteFromNames,
+  isGalloBillingCompany,
+  NYWE_GALLO_CONTRACT_NAME,
+  type NyweCoveredWinery,
+} from '@/lib/nywe-combined-contract';
+import {
   BIG_SMOKE_PACKAGES,
   bigSmokeContractFeeCents,
   bigSmokePackageDisplayName,
@@ -101,6 +108,7 @@ export type ContractFormValues = {
   billing_state: string;
   billing_zip: string;
   billing_country: string;
+  covered_wineries?: NyweCoveredWinery[];
 };
 
 export type InitialContractLineItem = { description: string; amount_cents: number };
@@ -254,6 +262,20 @@ export function NewContractForm({
   const orderType = orderTypeFromDealKind(dealKind);
   const [noChargeBooth, setNoChargeBooth] = useState(initialNoChargeBooth);
   const [sponsorBrand, setSponsorBrand] = useState(initialValues?.sponsor_brand ?? '');
+  const [coveredWineries, setCoveredWineries] = useState<NyweCoveredWinery[]>(() => {
+    const initial = initialValues?.covered_wineries ?? [];
+    if (initial.length > 0) return initial;
+    const company = initialValues?.exhibitor_company_name?.trim() ?? '';
+    const legal = initialValues?.exhibitor_legal_name ?? '';
+    if (
+      company &&
+      !isGalloBillingCompany(company) &&
+      (isGalloBillingCompany(legal) || isGalloBillingCompany(initialValues?.exhibitor_company_name))
+    ) {
+      return [emptyCoveredWinery(company)];
+    }
+    return [];
+  });
   const [packageSelections, setPackageSelections] = useState<PackageSelectionDraft[]>(() =>
     draftSelectionsFromInitial(initialValues),
   );
@@ -386,6 +408,18 @@ export function NewContractForm({
    * Previously all NYWE was "boothOnly"; sponsorship unlocks deal type + line items.
    */
   const nyweLicenseMode = isNyweFlatEvent && dealKind !== 'sponsorship_only';
+  const galloLicense =
+    nyweLicenseMode &&
+    (isGalloBillingCompany(form.exhibitor_legal_name) || isGalloBillingCompany(form.exhibitor_company_name));
+  const galloPreview =
+    galloLicense && selectedEvent
+      ? galloWriteFromNames({
+          legalName: form.exhibitor_legal_name,
+          companyName: form.exhibitor_company_name,
+          covered: coveredWineries,
+          feeCents: nyweLicenseFeeCents(selectedEvent),
+        })
+      : null;
   const hideBoothBrands = isNyweFlatEvent || isBigSmokeEvent;
   const dealKindsForEvent: ContractDealKind[] = isNyweFlatEvent
     ? ['booth', 'sponsorship_only']
@@ -718,6 +752,16 @@ export function NewContractForm({
         setErr('Enter a special package fee greater than $0, or turn off special pricing.');
         return;
       }
+      const galloFields =
+        nyweLicenseMode && selectedEvent
+          ? galloWriteFromNames({
+              legalName: form.exhibitor_legal_name,
+              companyName: form.exhibitor_company_name,
+              covered: coveredWineries,
+              feeCents: nyweLicenseFeeCents(selectedEvent),
+            })
+          : null;
+      const galloWineryCount = galloFields?.booth_count ?? 1;
       const formForSave = {
         ...form,
         event_id: resolvedEventId,
@@ -725,7 +769,7 @@ export function NewContractForm({
         booth_count: bigSmokePriced
           ? bigSmokePriced.booth_count
           : nyweLicenseMode
-            ? 1
+            ? galloWineryCount
             : sponsorshipOnly
               ? 0
               : boothCountNorm,
@@ -764,9 +808,14 @@ export function NewContractForm({
         contract_template_profile: selectedEvent?.contract_template_profile ?? 'whiskyfest',
         brands_poured: sponsorshipOnly
           ? sponsorBrand.trim() || null
-          : hideBoothBrands
-            ? form.exhibitor_company_name.trim() || null
-            : null,
+          : galloFields
+            ? galloFields.brands_poured
+            : hideBoothBrands
+              ? form.exhibitor_company_name.trim() || null
+              : null,
+        covered_wineries: galloFields?.covered_wineries ?? null,
+        exhibitor_company_name: galloFields?.exhibitor_company_name ?? form.exhibitor_company_name,
+        exhibitor_legal_name: galloFields?.exhibitor_legal_name ?? form.exhibitor_legal_name,
         sponsor_brand: sponsorshipOnly ? sponsorBrand.trim() || null : null,
         line_items: nyweLicenseMode ? [] : parsedLines.rows,
         booth_brands,
@@ -948,7 +997,23 @@ export function NewContractForm({
               </p>
             ) : null}
             <Field label="Legal Name" hint="Full legal entity name as it will appear in the agreement line">
-              <Input value={form.exhibitor_legal_name} onChange={e => set('exhibitor_legal_name', e.target.value)} placeholder="Sample Distillery Inc." required />
+              <Input
+                value={form.exhibitor_legal_name}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  set('exhibitor_legal_name', value);
+                  if (
+                    isGalloBillingCompany(value) &&
+                    coveredWineries.length === 0 &&
+                    form.exhibitor_company_name.trim() &&
+                    !isGalloBillingCompany(form.exhibitor_company_name)
+                  ) {
+                    setCoveredWineries([emptyCoveredWinery(form.exhibitor_company_name.trim())]);
+                  }
+                }}
+                placeholder="Sample Distillery Inc."
+                required
+              />
             </Field>
             {(isNyweFlatEvent || isBigSmokeEvent) ? (
               <div className="space-y-3 rounded-md border border-border/70 bg-muted/10 px-3 py-3">
@@ -1231,11 +1296,81 @@ export function NewContractForm({
               <div className="rounded-lg border border-border/60 bg-muted/10 p-4">
                 <p className="text-sm font-medium text-foreground">Vendor license fee</p>
                 <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-fest-900">
-                  {formatCurrency(nyweLicenseFeeCents(selectedEvent))}
+                  {formatCurrency(
+                    (galloPreview?.booth_count ?? 1) * nyweLicenseFeeCents(selectedEvent),
+                  )}
                 </p>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Flat NYWE participation fee. Wine details come from the exhibitor roster.
+                  {galloPreview && galloPreview.booth_count > 1
+                    ? `${galloPreview.booth_count} wineries × ${formatCurrency(nyweLicenseFeeCents(selectedEvent))} — one Gallo contract for the total.`
+                    : 'Flat NYWE participation fee. Wine details come from the exhibitor roster.'}
                 </p>
+                {galloLicense ? (
+                  <div className="mt-4 space-y-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Wineries on this contract</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Gallo brands share one license. Add each winery — Louis M. Martini, Massican, Pahlmeyer, Rombauer, Jermann — and the total is the sum of their fees.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      {(coveredWineries.length > 0 ? coveredWineries : [emptyCoveredWinery('')]).map((winery, index) => (
+                        <div key={index} className="flex gap-2">
+                          <Input
+                            value={winery.winery_name}
+                            placeholder="Winery name"
+                            onChange={(e) => {
+                              const name = e.target.value;
+                              setCoveredWineries((current) => {
+                                const base = current.length > 0 ? [...current] : [emptyCoveredWinery('')];
+                                const row = base[index] ?? emptyCoveredWinery(name);
+                                base[index] = { ...row, winery_name: name };
+                                return base;
+                              });
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Remove winery"
+                            onClick={() =>
+                              setCoveredWineries((current) => current.filter((_, rowIndex) => rowIndex !== index))
+                            }
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCoveredWineries((current) => {
+                          const company = form.exhibitor_company_name.trim();
+                          const base =
+                            current.length > 0
+                              ? current
+                              : company && !isGalloBillingCompany(company)
+                                ? [emptyCoveredWinery(company)]
+                                : [];
+                          return [...base, emptyCoveredWinery('')];
+                        })
+                      }
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add winery
+                    </Button>
+                    {galloPreview && galloPreview.booth_count > 1 ? (
+                      <p className="text-xs text-muted-foreground">
+                        Saves as {NYWE_GALLO_CONTRACT_NAME} — one contract, total{' '}
+                        {formatCurrency(galloPreview.booth_count * galloPreview.booth_rate_cents)}.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             ) : (
             <div className="grid gap-4 sm:grid-cols-2">

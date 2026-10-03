@@ -254,6 +254,9 @@ create table if not exists daily_bubbles (
   remove_token_expires_at timestamptz null
 );
 
+-- NYWE Gallo brands share one vendor license (see migration 090).
+alter table contracts add column if not exists covered_wineries jsonb;
+
 -- Computed-ish helpers (views make more sense than generated columns for totals)
 create or replace view contracts_with_totals as
 select

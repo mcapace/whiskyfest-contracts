@@ -34,17 +34,19 @@ export function nyweLicenseFeeCents(event?: Pick<Event, 'booth_rate_cents'> | nu
   return event?.booth_rate_cents ?? NYWE_VENDOR_LICENSE_FEE_CENTS;
 }
 
-/** Package / license fees are always one flat fee (stored as booth_count=1 × fee). */
+/** One NYWE license fee. Pass wineryCount when several wineries share the contract (Gallo). */
 export function normalizeNyweLicensePricing(
   event: Pick<Event, 'booth_rate_cents'>,
-): { booth_count: 1; booth_rate_cents: number } {
-  return { booth_count: 1, booth_rate_cents: nyweLicenseFeeCents(event) };
+  wineryCount = 1,
+): { booth_count: number; booth_rate_cents: number } {
+  const count = Math.max(1, Math.min(40, Math.floor(wineryCount) || 1));
+  return { booth_count: count, booth_rate_cents: nyweLicenseFeeCents(event) };
 }
 
 export function applyNyweLicensePricingIfNeeded(
   event: Pick<Event, 'contract_template_profile' | 'booth_rate_cents'>,
   pricing: { booth_count: number; booth_rate_cents: number },
-  options?: { orderType?: string | null },
+  options?: { orderType?: string | null; wineryCount?: number },
 ): { booth_count: number; booth_rate_cents: number } {
   // Big Smoke: form supplies package fee + booth count — do not flatten to NYWE single-booth.
   if (eventTemplateProfile(event) === 'big_smoke') {
@@ -55,7 +57,7 @@ export function applyNyweLicensePricingIfNeeded(
     return { booth_count: 0, booth_rate_cents: 0 };
   }
   if (!isNyweVendorOnlyEvent(event)) return pricing;
-  return normalizeNyweLicensePricing(event);
+  return normalizeNyweLicensePricing(event, options?.wineryCount ?? 1);
 }
 
 /** Package-fee agreements typically omit exhibitor job title on the contract. */

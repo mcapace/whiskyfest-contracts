@@ -10,6 +10,7 @@ import {
 } from '@/lib/exhibitor-roster-billing';
 import type { NyweBillingFields } from '@/lib/nywe-billing';
 import { nyweLicenseFeeCents } from '@/lib/nywe-pricing';
+import { parseCoveredWineries } from '@/lib/nywe-combined-contract';
 import { normalizeWineryWebsiteUrl } from '@/lib/winery-website';
 import {
   hasWithdrawnRosterParticipation,
@@ -316,6 +317,23 @@ export function rosterRowKey(spreadsheetId: string, tab: string, rowNumber: numb
   return `${spreadsheetId}|${tab}|${rowNumber}`;
 }
 
+/** Primary roster row plus every winery row on a combined Gallo contract. */
+export function indexContractRosterRows(
+  map: Map<string, ContractWithTotals>,
+  contract: ContractWithTotals,
+): void {
+  const add = (spreadsheetId?: string | null, tab?: string | null, rowNumber?: number | null) => {
+    if (!spreadsheetId || !tab || !rowNumber) return;
+    map.set(rosterRowKey(spreadsheetId, tab, rowNumber), contract);
+  };
+  add(contract.source_sheet_id, contract.source_sheet_tab, contract.source_row_number);
+  for (const winery of parseCoveredWineries(contract.covered_wineries)) {
+    for (const source of winery.source_rows) {
+      add(source.source_sheet_id, source.source_sheet_tab, source.source_row_number);
+    }
+  }
+}
+
 export function parseRosterRowKey(rowKey: string): { spreadsheetId: string; tab: string; rowNumber: number } | null {
   const parts = rowKey.split('|');
   if (parts.length < 3) return null;
@@ -434,7 +452,7 @@ export async function hydrateRosterRowsWithContracts(
   const { data: linkedContracts, error: linkedError } = await supabase
     .from('contracts_with_totals')
     .select(
-      'id, status, updated_at, grand_total_cents, billing_address_line1, billing_city, billing_state, billing_zip, signer_cc_name, signer_cc_email, signer_1_name, signer_1_email, exhibitor_company_name, exhibitor_legal_name, exhibitor_website_url, sent_at, source_sheet_id, source_sheet_tab, source_row_number',
+      'id, status, updated_at, grand_total_cents, billing_address_line1, billing_city, billing_state, billing_zip, signer_cc_name, signer_cc_email, signer_1_name, signer_1_email, exhibitor_company_name, exhibitor_legal_name, exhibitor_website_url, sent_at, source_sheet_id, source_sheet_tab, source_row_number, covered_wineries',
     )
     .eq('event_id', eventId)
     .not('source_sheet_id', 'is', null);
@@ -448,11 +466,7 @@ export async function hydrateRosterRowsWithContracts(
   const contractById = new Map(contracts.map((c) => [c.id.toLowerCase(), c]));
   const contractByRowKey = new Map<string, ContractWithTotals>();
   for (const contract of contracts) {
-    if (!contract.source_sheet_id || !contract.source_sheet_tab || !contract.source_row_number) continue;
-    contractByRowKey.set(
-      rosterRowKey(contract.source_sheet_id, contract.source_sheet_tab, contract.source_row_number),
-      contract,
-    );
+    indexContractRosterRows(contractByRowKey, contract);
   }
 
   const recalledIds = await recalledContractIds(
@@ -671,11 +685,7 @@ export async function fetchExhibitorRoster(event: Event): Promise<{
   const contractByRowKey = new Map<string, ContractWithTotals>();
   for (const contract of (linkedContracts ?? []) as ContractWithTotals[]) {
     contractById.set(contract.id.toLowerCase(), contract);
-    if (!contract.source_sheet_id || !contract.source_sheet_tab || !contract.source_row_number) continue;
-    contractByRowKey.set(
-      rosterRowKey(contract.source_sheet_id, contract.source_sheet_tab, contract.source_row_number),
-      contract,
-    );
+    indexContractRosterRows(contractByRowKey, contract);
   }
 
   const rows: ExhibitorRosterRow[] = [];
