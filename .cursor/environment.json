@@ -1,0 +1,10 @@
+{
+  "name": "WhiskyFest Contracts",
+  "install": "npm ci && bash .cursor/setup-env.sh",
+  "terminals": [
+    {
+      "name": "next-dev",
+      "command": "npm run dev"
+    }
+  ]
+}
