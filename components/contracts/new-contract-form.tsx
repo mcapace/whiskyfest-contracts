@@ -386,7 +386,9 @@ export function NewContractForm({
    * Previously all NYWE was "boothOnly"; sponsorship unlocks deal type + line items.
    */
   const nyweLicenseMode = isNyweFlatEvent && dealKind !== 'sponsorship_only';
-  const hideBoothBrands = isNyweFlatEvent || isBigSmokeEvent;
+  const hideBoothBrands = isNyweFlatEvent;
+  /** Big Smoke lists brands per booth too (merges to {{booth_brands_block}}) but does not require them. */
+  const boothBrandsOptional = isBigSmokeEvent;
   const dealKindsForEvent: ContractDealKind[] = isNyweFlatEvent
     ? ['booth', 'sponsorship_only']
     : [...CONTRACT_DEAL_KINDS];
@@ -690,7 +692,7 @@ export function NewContractForm({
         expressions: [],
       });
 
-      if (!hideBoothBrands) {
+      if (!hideBoothBrands && !boothBrandsOptional) {
         for (let i = 0; i < boothCountNorm; i++) {
           if (!rowsForSave[i].brand_name.trim()) {
             setErr(`Brand name is required for booth ${i + 1}.`);
@@ -1320,7 +1322,9 @@ export function NewContractForm({
               <div>
                 <p className="text-sm font-medium text-foreground">Brands by booth</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  One brand per booth (required). Expressions are optional. Merges to{' '}
+                  {boothBrandsOptional
+                    ? 'One brand per booth (optional — booths left blank are omitted). Expressions are optional. Merges to'
+                    : 'One brand per booth (required). Expressions are optional. Merges to'}{' '}
                   <code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.65rem]">{'{{booth_brands_block}}'}</code>{' '}
                   in the contract template.
                 </p>

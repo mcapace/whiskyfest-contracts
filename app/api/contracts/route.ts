@@ -11,7 +11,11 @@ import {
   normalizeSignerCcName,
 } from '@/lib/docusign-signer-cc';
 import { normalizeSecondSignerText } from '@/lib/second-signer';
-import { replaceContractBoothBrandsForContract, clearContractBoothBrandsForContract } from '@/lib/contract-booth-brands';
+import {
+  replaceContractBoothBrandsForContract,
+  clearContractBoothBrandsForContract,
+  hasNamedBoothBrand,
+} from '@/lib/contract-booth-brands';
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
 import { eventTemplateProfile, isNyweEventsManagedEvent } from '@/lib/contract-template-profile';
 import {
@@ -260,7 +264,9 @@ export async function POST(req: Request) {
 
   try {
     await replaceContractLineItemsForContract(supabase, row.id, savedLineItems);
-    if (nyweOnly || isBigSmoke) {
+    // Big Smoke brands are optional: keep the rows only when at least one booth names a brand.
+    const dropBoothBrands = nyweOnly || (isBigSmoke && (sponsorshipOnly || !hasNamedBoothBrand(p.booth_brands)));
+    if (dropBoothBrands) {
       await clearContractBoothBrandsForContract(supabase, row.id);
     } else {
       await replaceContractBoothBrandsForContract(supabase, row.id, nywePricing.booth_count, p.booth_brands ?? []);

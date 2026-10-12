@@ -57,7 +57,7 @@ App runs at http://localhost:3000
 
 ### Contract PDFs and line items
 
-Optional **line items** (sponsorships, activations, etc.) are stored in Postgres and merged into the existing **CONTRACT ORDER** Google Doc table at PDF time: the app inserts table rows above the **GRAND TOTAL** row via the Google Docs API—no manual template changes are required for line-item layout. Apply migrations through `026_contract_line_items_view_rename.sql` (includes `025` for the `contract_line_items` table).
+Optional **line items** (sponsorships, activations, etc.) are stored in Postgres and merged into the existing **CONTRACT ORDER** Google Doc table at PDF time: the app inserts table rows above the **GRAND TOTAL** row via the Google Docs API—no manual template changes are required for line-item layout. Apply migrations through `026_contract_line_items_view_rename.sql` (includes `025` for the `contract_line_items` table). WhiskyFest and Big Smoke contracts (booth and sponsorship-only) use the order table; NYWE only for sponsorship-only. Big Smoke template tokens are listed in [Template configuration](./docs/TEMPLATE_CONFIGURATION.md#big-smoke-booth-template-brands--contract-order-table).
 
 ### Key contacts
 
