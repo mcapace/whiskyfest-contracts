@@ -12,7 +12,11 @@ import {
   signerContactPatchSchema,
   sponsorBrandFromBody,
 } from '@/lib/contract-schemas';
-import { replaceContractBoothBrandsForContract, clearContractBoothBrandsForContract } from '@/lib/contract-booth-brands';
+import {
+  replaceContractBoothBrandsForContract,
+  clearContractBoothBrandsForContract,
+  hasNamedBoothBrand,
+} from '@/lib/contract-booth-brands';
 import { replaceContractLineItemsForContract } from '@/lib/contract-line-items';
 import {
   normalizeSignerCcEmail,
@@ -244,7 +248,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     try {
       await replaceContractLineItemsForContract(supabase, params.id, savedLineItems);
-      if (nyweOnly || isBigSmoke) {
+      // Big Smoke brands are optional: keep the rows only when at least one booth names a brand.
+      const dropBoothBrands =
+        nyweOnly || (isBigSmoke && (sponsorshipOnly || !hasNamedBoothBrand(p.booth_brands)));
+      if (dropBoothBrands) {
         await clearContractBoothBrandsForContract(supabase, params.id);
       } else {
         await replaceContractBoothBrandsForContract(

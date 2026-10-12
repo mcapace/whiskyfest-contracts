@@ -4,8 +4,41 @@ import {
   pricingFromBigSmokeInput,
 } from '@/lib/big-smoke-pricing';
 import { contractHasExhibitorAddress } from '@/lib/nywe-billing';
-import type { ContractWithTotals, Event } from '@/types/db';
+import { formatBoothBrandsBlock } from '@/lib/contract-booth-brands';
+import { isNoChargeBoothContract } from '@/lib/no-charge-booth';
+import { formatCurrency } from '@/lib/utils';
+import type { ContractBoothBrand, ContractWithTotals, Event } from '@/types/db';
 import type { MergePlaceholderMode } from '@/lib/merge-map';
+import type { BigSmokePricing } from '@/lib/big-smoke-pricing';
+
+function moneyNoDollar(cents: number): string {
+  return formatCurrency(cents).replace('$', '').trim();
+}
+
+/**
+ * Package row for the CONTRACT ORDER table (`{{pricing_description}}` / `{{pricing_qty}}` /
+ * `{{pricing_amount}}`). Line items (sponsorships, add-ons) are inserted as their own rows above
+ * GRAND TOTAL at PDF time, so the package row carries only the booth/package fee.
+ */
+function bigSmokePricingComposition(
+  contract: ContractWithTotals,
+  priced: BigSmokePricing | null,
+  packageFeeCents: number,
+): { pricing_description: string; pricing_qty: string; pricing_amount: string } {
+  const boothCount = priced?.booth_count ?? contract.booth_count ?? 0;
+  if (isNoChargeBoothContract(contract)) {
+    return {
+      pricing_description: 'Complimentary booth (no charge)',
+      pricing_qty: String(boothCount),
+      pricing_amount: formatCurrency(0),
+    };
+  }
+  return {
+    pricing_description: priced?.displayName || 'Exhibitor package',
+    pricing_qty: String(boothCount),
+    pricing_amount: formatCurrency(packageFeeCents),
+  };
+}
 
 /**
  * Festival Sponsor address lines: prefer exhibitor mailing fields, else billing
@@ -38,12 +71,15 @@ function bigSmokeAddressMergeOverlay(contract: ContractWithTotals): Record<strin
 
 /**
  * Big Smoke exhibitor contract merge tokens.
- * Starts from the NYWE vendor map (fee + exhibitor + signatory) and adds package aliases.
+ * Starts from the NYWE vendor map (fee + exhibitor + signatory) and adds package aliases,
+ * per-booth brands (`{{booth_brands_block}}`) and CONTRACT ORDER table tokens
+ * (`{{pricing_*}}` package row, `{{grand_total}}` = package fee + line items).
  */
 export function buildBigSmokeMergeMap(
   contract: ContractWithTotals,
   event: Event,
   mode: MergePlaceholderMode,
+  boothBrands: ContractBoothBrand[] = [],
 ): Record<string, string> {
   const base = buildNyweVendorMergeMap(contract, event, mode);
   const priced = pricingFromBigSmokeInput({
@@ -80,12 +116,33 @@ export function buildBigSmokeMergeMap(
     ? priced.package_selections[0]
     : null;
 
+  // Per-booth brands (optional on Big Smoke). Falls back to the brands_poured summary.
+  const boothBlock = formatBoothBrandsBlock(boothBrands);
+  const brandsPoured = boothBlock.length > 0 ? boothBlock : (contract.brands_poured ?? '');
+
+  // CONTRACT ORDER table: package row + grand total (package fee + sponsorship line items).
+  const packageFeeCents = feeCents ?? 0;
+  const grandTotalCents = contract.grand_total_cents ?? packageFeeCents;
+  const lineItemsSubtotalCents = Math.max(0, grandTotalCents - packageFeeCents);
+  const pricing = bigSmokePricingComposition(contract, priced, packageFeeCents);
+
   return {
     ...base,
     '{{license_fee}}': fee,
     '{{license_fee_balance}}': fee,
     '{{package_fee}}': fee,
     '{{package_fee_balance}}': fee,
+    '{{booth_brands_block}}': boothBlock,
+    '{{booth_brands_detail}}': boothBlock,
+    '{{brands_poured}}': brandsPoured,
+    '{{pricing_description}}': pricing.pricing_description,
+    '{{pricing_qty}}': pricing.pricing_qty,
+    '{{pricing_amount}}': pricing.pricing_amount,
+    '{{line_items_subtotal}}': moneyNoDollar(lineItemsSubtotalCents),
+    '{{grand_total}}': moneyNoDollar(grandTotalCents),
+    '{{contract_total}}': moneyNoDollar(grandTotalCents),
+    '{{TOTAL_AMOUNT}}': moneyNoDollar(grandTotalCents),
+    '{{LINE_ITEMS_SECTION}}': '',
     '{{package_name}}': priced?.displayName ?? '',
     '{{package_booth_label}}': priced
       ? `${priced.booth_count} booth${priced.booth_count === 1 ? '' : 's'}`

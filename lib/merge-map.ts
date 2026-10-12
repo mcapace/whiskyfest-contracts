@@ -116,7 +116,7 @@ export function buildContractMergeMap(
     return buildNyweVendorMergeMap(contract, event, mode);
   }
   if (profile === 'big_smoke' && !isSponsorshipOnlyOrder(contract)) {
-    return buildBigSmokeMergeMap(contract, event, mode);
+    return buildBigSmokeMergeMap(contract, event, mode, boothBrands ?? []);
   }
 
   const agreement = getAgreementDatePartsInDisplayZone();

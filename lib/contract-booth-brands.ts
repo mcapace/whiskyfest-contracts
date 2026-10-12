@@ -67,6 +67,13 @@ export async function replaceContractBoothBrandsForContract(
   await supabase.from('contracts').update({ brands_poured: brandsPoured }).eq('id', contractId);
 }
 
+/** True when at least one submitted booth row names a brand (Big Smoke brands are optional). */
+export function hasNamedBoothBrand(
+  rows: { brand_name?: string | null }[] | null | undefined,
+): boolean {
+  return (rows ?? []).some((r) => (r.brand_name ?? '').trim().length > 0);
+}
+
 /** NYWE vendor licenses do not use per-booth whisky/spirit brand rows. */
 export async function clearContractBoothBrandsForContract(
   supabase: SupabaseClient,
@@ -82,8 +89,11 @@ export async function clearContractBoothBrandsForContract(
  * Brand only: Booth 1: Don Julio
  */
 export function formatBoothBrandsBlock(brands: ContractBoothBrand[]): string {
-  if (!brands.length) return '';
-  const sorted = [...brands].sort((a, b) => a.booth_index - b.booth_index);
+  // Booths without a named brand (optional on Big Smoke) are left off the contract.
+  const sorted = brands
+    .filter((b) => (b.brand_name ?? '').trim().length > 0)
+    .sort((a, b) => a.booth_index - b.booth_index);
+  if (!sorted.length) return '';
   return sorted
     .map((b) => {
       const expr = (b.expressions ?? []).filter(Boolean);

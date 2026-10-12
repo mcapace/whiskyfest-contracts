@@ -108,6 +108,42 @@ The Google Doc ID for this specific event's contract template.
 ### `events.google_sponsorship_template_doc_id`
 Optional: Separate template for sponsorship-only contracts (no booth).
 
+## Big Smoke booth template: brands + CONTRACT ORDER table
+
+Big Smoke booth/package contracts merge through `lib/merge-map-big-smoke.ts`. The master Las
+Vegas doc (`17-kWF...`) only prints `PACKAGE FEE: ${{package_fee}}`, so sponsorship line items
+and per-booth brands do **not** appear until the Google Doc carries the slots below.
+
+**Brands by booth** — place this token where the brands should print (one line per booth,
+`Booth 1: Dewar's`):
+
+```
+Brands by booth:
+{{booth_brands_block}}
+```
+
+`{{brands_poured}}` prints the same block, or the exhibitor company name when no booth has a brand.
+Brands are optional on Big Smoke; booths left blank are omitted.
+
+**CONTRACT ORDER table** — add a 3-column table (Description / Qty / Amount). The app inserts one
+row per line item above the row whose first cell says `GRAND TOTAL`, exactly like WhiskyFest:
+
+| Description | Qty | Amount |
+| --- | --- | --- |
+| `{{pricing_description}}` | `{{pricing_qty}}` | `{{pricing_amount}}` |
+| GRAND TOTAL | | `${{grand_total}}` |
+
+- `{{pricing_description}}` / `{{pricing_qty}}` / `{{pricing_amount}}` — package row
+  (e.g. `4× Drink Exhibitor — Single Booth`, `4`, `$65,000`; uses the negotiated fee under
+  special pricing).
+- Line items (e.g. `Dewar's: All-Access Welcome Party / Exclusive Liquor Sponsor` — `$5,000`)
+  are inserted as their own rows, so each sponsorship fee is listed separately.
+- `{{grand_total}}` — package fee + line items, no `$` (`70,000`).
+- `{{line_items_subtotal}}` — line items only, no `$`. `{{package_fee}}` stays the package fee only.
+
+Without a `GRAND TOTAL` row the line-item insert is a logged no-op, so the template can be
+updated independently of a deploy.
+
 ## Auditing Template Configuration
 
 Run the audit script to check for misconfigured events:
