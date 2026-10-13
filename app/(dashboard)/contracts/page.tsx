@@ -5,6 +5,7 @@ import { ContractsList } from '@/components/contracts/contracts-list';
 import { fetchBoothBrandsByContractIds } from '@/lib/contract-booth-brand-queries';
 import { fetchContractWithTotalsById } from '@/lib/contract-with-totals';
 import { boothBrandRowsRecordFromMap } from '@/lib/sponsors';
+import { fetchAllRows } from '@/lib/supabase-fetch-all';
 import type { ContractWithTotals, ContractStatus, Event } from '@/types/db';
 import {
   PRODUCT_WHISKYFEST,
@@ -56,14 +57,6 @@ export async function loadContracts(
   const allEvents = (events ?? []) as Event[];
   const productEventIds = eventIdsForProduct(allEvents, productKey);
 
-  let query = supabase.from('contracts_with_totals').select('*').order('created_at', { ascending: false }).limit(200);
-
-  if (productEventIds.length === 0) {
-    query = query.limit(0);
-  } else {
-    query = query.in('event_id', productEventIds);
-  }
-
   const { data: appUser } = await supabase
     .from('app_users')
     .select('is_accounting, can_view_all_sales')
@@ -76,28 +69,15 @@ export async function loadContracts(
     can_view_all_sales: Boolean((appUser as { can_view_all_sales?: boolean } | null)?.can_view_all_sales),
     accessibleSalesRepIds: actor.accessibleSalesRepIds,
   });
-  if (visibility.filter === 'own' && visibility.salesRepIds.length > 0) {
-    query = query.in('sales_rep_id', visibility.salesRepIds);
-  } else if (visibility.filter === 'own') {
-    query = query.limit(0);
-  }
 
   const status = searchParams.status;
-  if (status && status !== 'all') {
-    if (status === 'draft') {
-      query = query.or('status.eq.draft,status.eq.ready_for_review');
-    } else if (VALID.has(status)) {
-      query = query.eq('status', status as ContractStatus);
-    }
-  }
-
   const q = searchParams.q?.trim();
-  let boothBrandContractIds: string[] = [];
+  let searchOrFilter: string | null = null;
   if (q) {
     const safe = escapeIlikePattern(q);
     const pattern = `%${safe}%`;
     const { data: boothRows } = await supabase.from('contract_booth_brands').select('contract_id').ilike('brand_name', pattern);
-    boothBrandContractIds = [...new Set((boothRows ?? []).map((r) => r.contract_id as string))];
+    const boothBrandContractIds = [...new Set((boothRows ?? []).map((r) => r.contract_id as string))];
     const parts = [
       `exhibitor_company_name.ilike.${pattern}`,
       `brands_poured.ilike.${pattern}`,
@@ -107,13 +87,41 @@ export async function loadContracts(
     if (boothBrandContractIds.length > 0) {
       parts.push(`id.in.(${boothBrandContractIds.join(',')})`);
     }
-    query = query.or(parts.join(','));
+    searchOrFilter = parts.join(',');
   }
 
-  const [{ data: contracts }] = await Promise.all([query]);
+  // Nothing can match: no events for this product, or a rep-scoped viewer with no reps.
+  const nothingVisible =
+    productEventIds.length === 0 || (visibility.filter === 'own' && visibility.salesRepIds.length === 0);
+
+  // Built fresh per page so the whole product's contracts come back, not just the newest N
+  // (NYWE alone has well over 200 executed licenses).
+  const buildQuery = () => {
+    let query = supabase
+      .from('contracts_with_totals')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .in('event_id', productEventIds);
+    if (visibility.filter === 'own') {
+      query = query.in('sales_rep_id', visibility.salesRepIds);
+    }
+    if (status && status !== 'all') {
+      if (status === 'draft') {
+        query = query.or('status.eq.draft,status.eq.ready_for_review');
+      } else if (VALID.has(status)) {
+        query = query.eq('status', status as ContractStatus);
+      }
+    }
+    if (searchOrFilter) {
+      query = query.or(searchOrFilter);
+    }
+    return query;
+  };
+
+  const contracts = nothingVisible ? [] : await fetchAllRows<ContractWithTotals>(buildQuery);
 
   const scopedEvents = scopeEventsByProduct(allEvents, productKey);
-  let contractRows = scopeContractsByProduct((contracts ?? []) as ContractWithTotals[], allEvents, productKey);
+  let contractRows = scopeContractsByProduct(contracts, allEvents, productKey);
 
   const importedId = searchParams.importedId?.trim();
   if (importedId && !contractRows.some((c) => c.id === importedId)) {

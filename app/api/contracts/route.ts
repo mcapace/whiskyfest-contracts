@@ -5,6 +5,7 @@ import { revalidateContractPaths } from '@/lib/revalidate-contract-paths';
 import { resolveContractActor } from '@/lib/auth-contract';
 import { portalKindFromHost, productKeyForPortalKind } from '@/lib/portal-host';
 import { scopeContractsByProduct } from '@/lib/product-portal';
+import { fetchAllRows } from '@/lib/supabase-fetch-all';
 import { clearedRepEnteredBilling, firstContractBodyValidationError, newContractBodySchema, sponsorBrandFromBody } from '@/lib/contract-schemas';
 import {
   normalizeSignerCcEmail,
@@ -67,21 +68,8 @@ export async function GET(req: Request) {
   const q = url.searchParams.get('q')?.trim();
 
   const supabase = getSupabaseAdmin();
-  let query = supabase.from('contracts_with_totals').select('*').order('created_at', { ascending: false });
 
-  const scopeAll = gate.actor.canViewAllSales;
-  if (!scopeAll && gate.actor.accessibleSalesRepIds.length > 0) {
-    query = query.in('sales_rep_id', gate.actor.accessibleSalesRepIds);
-  }
-
-  if (statusFilter && statusFilter !== 'all') {
-    if (statusFilter === 'draft') {
-      query = query.or('status.eq.draft,status.eq.ready_for_review');
-    } else if (VALID.includes(statusFilter as ContractStatus)) {
-      query = query.eq('status', statusFilter as ContractStatus);
-    }
-  }
-
+  let searchOrFilter: string | null = null;
   if (q) {
     const safe = escapeIlikePattern(q);
     const pattern = `%${safe}%`;
@@ -96,27 +84,55 @@ export async function GET(req: Request) {
     if (boothIds.length > 0) {
       parts.push(`id.in.(${boothIds.join(',')})`);
     }
-    query = query.or(parts.join(','));
-    query = query.limit(5);
-  } else {
-    query = query.limit(200);
+    searchOrFilter = parts.join(',');
   }
 
-  const { data, error } = await query;
+  const buildQuery = () => {
+    let query = supabase.from('contracts_with_totals').select('*').order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('GET contracts:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    const scopeAll = gate.actor.canViewAllSales;
+    if (!scopeAll && gate.actor.accessibleSalesRepIds.length > 0) {
+      query = query.in('sales_rep_id', gate.actor.accessibleSalesRepIds);
+    }
+
+    if (statusFilter && statusFilter !== 'all') {
+      if (statusFilter === 'draft') {
+        query = query.or('status.eq.draft,status.eq.ready_for_review');
+      } else if (VALID.includes(statusFilter as ContractStatus)) {
+        query = query.eq('status', statusFilter as ContractStatus);
+      }
+    }
+
+    if (searchOrFilter) {
+      query = query.or(searchOrFilter);
+    }
+    return query;
+  };
+
+  let rows: ContractWithTotals[];
+  if (searchOrFilter) {
+    // Quick-search: a handful of best matches is enough.
+    const { data, error } = await buildQuery().limit(5);
+    if (error) {
+      console.error('GET contracts:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    rows = (data ?? []) as ContractWithTotals[];
+  } else {
+    // Full list: page through every row so large events (NYWE) are not silently truncated.
+    try {
+      rows = await fetchAllRows<ContractWithTotals>(buildQuery);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('GET contracts:', message);
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
   }
 
   const portalKind = portalKindFromHost(req.headers.get('host'));
   const productKey = productKeyForPortalKind(portalKind);
   const { data: eventsData } = await supabase.from('events').select('*');
-  const scoped = scopeContractsByProduct(
-    (data ?? []) as ContractWithTotals[],
-    (eventsData ?? []) as Event[],
-    productKey,
-  );
+  const scoped = scopeContractsByProduct(rows, (eventsData ?? []) as Event[], productKey);
 
   return NextResponse.json({ contracts: scoped });
 }
