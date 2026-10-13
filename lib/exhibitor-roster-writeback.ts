@@ -48,6 +48,89 @@ async function ensureStatusHeaders(
   });
 }
 
+export const ROSTER_STATUS_HEADERS: [string, string, string] = [
+  ROSTER_STATUS_HEADER,
+  ROSTER_CONTRACT_ID_HEADER,
+  ROSTER_LAST_UPDATED_HEADER,
+];
+
+/** True when the three writeback headers are missing or mislabeled at `statusStart`. */
+export function rosterStatusHeadersNeedWrite(headers: string[], statusStart: number): boolean {
+  return ROSTER_STATUS_HEADERS.some(
+    (label, i) => String(headers[statusStart + i] ?? '').trim().toUpperCase() !== label,
+  );
+}
+
+export type RosterStatusCellWrite = {
+  spreadsheetId: string;
+  tab: string;
+  rowNumber: number;
+  statusStart: number;
+  /** [LICENSE STATUS, CONTRACT ID, LAST UPDATED] */
+  values: [string, string, string];
+};
+
+export type RosterStatusHeaderWrite = { spreadsheetId: string; tab: string; statusStart: number };
+
+/** Google caps a single batchUpdate request; keep each call comfortably below it. */
+const BATCH_UPDATE_MAX_RANGES = 400;
+
+/**
+ * Write status cells for many rows with one `values.batchUpdate` per spreadsheet.
+ *
+ * The cron used to do three reads and one write per linked contract (hundreds of calls every
+ * 30 minutes), which blew the Sheets read quota and timed the function out. Callers diff
+ * against the already-fetched roster and pass only the rows that actually changed.
+ */
+export async function batchWriteExhibitorRosterStatus(
+  writes: RosterStatusCellWrite[],
+  headerWrites: RosterStatusHeaderWrite[] = [],
+): Promise<{ written: number; errors: string[] }> {
+  const bySpreadsheet = new Map<string, { range: string; values: string[][] }[]>();
+  const push = (spreadsheetId: string, entry: { range: string; values: string[][] }) => {
+    const list = bySpreadsheet.get(spreadsheetId) ?? [];
+    list.push(entry);
+    bySpreadsheet.set(spreadsheetId, list);
+  };
+
+  for (const h of headerWrites) {
+    const range = tabRange(h.tab, `${colToLetter(h.statusStart)}1:${colToLetter(h.statusStart + 2)}1`);
+    push(h.spreadsheetId, { range, values: [[...ROSTER_STATUS_HEADERS]] });
+  }
+  for (const w of writes) {
+    if (w.rowNumber < 2) continue;
+    const startCol = colToLetter(w.statusStart);
+    const endCol = colToLetter(w.statusStart + 2);
+    push(w.spreadsheetId, {
+      range: tabRange(w.tab, `${startCol}${w.rowNumber}:${endCol}${w.rowNumber}`),
+      values: [[...w.values]],
+    });
+  }
+
+  if (bySpreadsheet.size === 0) return { written: 0, errors: [] };
+
+  const sheets = getSheetsClient();
+  let written = 0;
+  const errors: string[] = [];
+  for (const [spreadsheetId, data] of bySpreadsheet) {
+    for (let i = 0; i < data.length; i += BATCH_UPDATE_MAX_RANGES) {
+      const chunk = data.slice(i, i + BATCH_UPDATE_MAX_RANGES);
+      try {
+        await sheets.spreadsheets.values.batchUpdate({
+          spreadsheetId,
+          requestBody: { valueInputOption: 'USER_ENTERED', data: chunk },
+        });
+        written += chunk.length;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('[exhibitor-roster] batch writeback failed', { spreadsheetId, ranges: chunk.length, msg });
+        errors.push(`${spreadsheetId}: ${msg}`);
+      }
+    }
+  }
+  return { written, errors };
+}
+
 export async function writeExhibitorRosterStatusForContract(
   contract: Pick<
     ContractWithTotals,
