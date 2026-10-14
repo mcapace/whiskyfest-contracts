@@ -202,7 +202,11 @@ export function ContractDetailView({
             {!canInlinePdf && (
               <section className="space-y-2">
                 <p className="wf-label-caps text-[0.6rem]">Contract PDF</p>
-                <p className="text-sm text-muted-foreground">No PDF available yet. Generate Draft PDF first.</p>
+                <p className="text-sm text-muted-foreground">
+                  {contract.status === 'signed' || contract.status === 'executed' || contract.status === 'imported'
+                    ? 'No signed PDF is on file for this contract.'
+                    : 'No PDF available yet. Generate Draft PDF first.'}
+                </p>
               </section>
             )}
 

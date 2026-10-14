@@ -9,6 +9,7 @@ import {
   scopeContractsByProduct,
 } from '@/lib/product-portal';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { fetchAllRows } from '@/lib/supabase-fetch-all';
 import { formatStatus } from '@/lib/status-display';
 import type { ContractWithTotals, Event } from '@/types/db';
 
@@ -38,21 +39,22 @@ export async function GET(req: Request) {
   const allEvents = (events ?? []) as Event[];
   const productEventIds = eventIdsForProduct(allEvents, productKey);
 
-  let rowQuery = supabase.from('contracts_with_totals').select('*').order('updated_at', { ascending: false }).limit(500);
-
-  if (productEventIds.length === 0) {
-    rowQuery = rowQuery.limit(0);
-  } else {
-    rowQuery = rowQuery.in('event_id', productEventIds);
-  }
-
   const scopeAll = gate.actor.isAdmin || gate.actor.isEventsTeam;
-  if (!scopeAll && gate.actor.accessibleSalesRepIds.length > 0) {
-    rowQuery = rowQuery.in('sales_rep_id', gate.actor.accessibleSalesRepIds);
-  }
+  const buildQuery = () => {
+    let rowQuery = supabase
+      .from('contracts_with_totals')
+      .select('*')
+      .order('updated_at', { ascending: false })
+      .in('event_id', productEventIds);
+    if (!scopeAll && gate.actor.accessibleSalesRepIds.length > 0) {
+      rowQuery = rowQuery.in('sales_rep_id', gate.actor.accessibleSalesRepIds);
+    }
+    return rowQuery;
+  };
 
-  const { data: rows } = await rowQuery;
-  const contracts = scopeContractsByProduct((rows ?? []) as ContractWithTotals[], allEvents, productKey);
+  // Export every contract for the product, not just the most recently updated N.
+  const rows = productEventIds.length === 0 ? [] : await fetchAllRows<ContractWithTotals>(buildQuery);
+  const contracts = scopeContractsByProduct(rows, allEvents, productKey);
   const eventMap = new Map(allEvents.map((e) => [e.id, e]));
 
   const header = [

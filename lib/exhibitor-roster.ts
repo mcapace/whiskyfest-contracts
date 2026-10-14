@@ -643,18 +643,32 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function statusColumnStart(headers: string[]): number {
+/** Index of the LICENSE STATUS column (CONTRACT ID and LAST UPDATED follow it); after the last header when absent. */
+export function statusColumnStart(headers: string[]): number {
   const licenseIdx = headers.findIndex((h) => String(h).trim().toUpperCase() === ROSTER_STATUS_HEADER);
   if (licenseIdx >= 0) return licenseIdx;
   return headers.length;
 }
 
-export async function fetchExhibitorRoster(event: Event): Promise<{
+export function rosterSheetKey(spreadsheetId: string, tab: string): string {
+  return `${spreadsheetId}|${tab}`;
+}
+
+/** Raw status/contract-id/last-updated cells as they are in the sheet (rows are hydrated with portal values). */
+export type RosterStatusCells = { status: string; contractId: string; lastUpdated: string };
+
+export type FetchedExhibitorRoster = {
   syncedAt: string;
   sheets: ExhibitorRosterSheetConfig[];
   rows: ExhibitorRosterRow[];
   warnings: string[];
-}> {
+  /** Header row per loaded sheet, keyed by rosterSheetKey — lets the writeback skip per-row header reads. */
+  headersBySheet: Record<string, string[]>;
+  /** Raw writeback cells per rowKey, so the sync can diff before writing. */
+  statusCells: Record<string, RosterStatusCells>;
+};
+
+export async function fetchExhibitorRoster(event: Event): Promise<FetchedExhibitorRoster> {
   const sheetConfigs = rosterSheetsFromEvent(event);
   if (sheetConfigs.length === 0) {
     throw new Error('No exhibitor roster sheets configured for this event.');
@@ -680,6 +694,8 @@ export async function fetchExhibitorRoster(event: Event): Promise<{
 
   const rows: ExhibitorRosterRow[] = [];
   const warnings: string[] = [];
+  const headersBySheet: Record<string, string[]> = {};
+  const statusCells: Record<string, RosterStatusCells> = {};
 
   for (let i = 0; i < sheetConfigs.length; i++) {
     const config = sheetConfigs[i]!;
@@ -690,6 +706,7 @@ export async function fetchExhibitorRoster(event: Event): Promise<{
       const dataRows = allRows.slice(1) as string[][];
       const statusStart = statusColumnStart(headers);
       const map = buildColumnMapFromHeaders(headers, config.key);
+      headersBySheet[rosterSheetKey(config.spreadsheet_id, config.tab)] = headers;
       let included = 0;
 
       dataRows.forEach((row, index) => {
@@ -698,6 +715,11 @@ export async function fetchExhibitorRoster(event: Event): Promise<{
         const rowNumber = index + 2;
         const rowKey = rosterRowKey(config.spreadsheet_id, config.tab, rowNumber);
         const sheetContractId = cell(row, statusStart + 1) || null;
+        statusCells[rowKey] = {
+          status: cell(row, statusStart),
+          contractId: cell(row, statusStart + 1),
+          lastUpdated: cell(row, statusStart + 2),
+        };
         const sheetId = normalizeSheetContractId(sheetContractId);
         const byId = sheetId ? contractById.get(sheetId) ?? null : null;
         const byRow = contractByRowKey.get(rowKey) ?? null;
@@ -774,5 +796,5 @@ export async function fetchExhibitorRoster(event: Event): Promise<{
 
   rows.sort((a, b) => a.wineryName.localeCompare(b.wineryName, undefined, { sensitivity: 'base' }));
 
-  return { syncedAt: new Date().toISOString(), sheets: sheetConfigs, rows, warnings };
+  return { syncedAt: new Date().toISOString(), sheets: sheetConfigs, rows, warnings, headersBySheet, statusCells };
 }

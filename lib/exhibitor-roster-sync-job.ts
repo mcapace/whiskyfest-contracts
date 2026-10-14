@@ -3,11 +3,22 @@ import {
   hydrateRosterRowsWithContracts,
   recalledContractIds,
   rosterRowKey,
+  rosterSheetKey,
+  rosterStatusLabel,
+  statusColumnStart,
   type ExhibitorRosterRow,
   type ExhibitorRosterSheetConfig,
+  type FetchedExhibitorRoster,
   rosterSheetsFromEvent,
 } from '@/lib/exhibitor-roster';
-import { syncExhibitorRosterWriteback } from '@/lib/exhibitor-roster-sync-hook';
+import {
+  batchWriteExhibitorRosterStatus,
+  rosterStatusHeadersNeedWrite,
+  type RosterStatusCellWrite,
+  type RosterStatusHeaderWrite,
+} from '@/lib/exhibitor-roster-writeback';
+import { formatTimestamp } from '@/lib/datetime';
+import { normalizeSheetContractId, sheetRowBelongsToContract } from '@/lib/nywe-roster-identity';
 import { syncLinkedContractsFromRosterRows } from '@/lib/nywe-roster-contract-sync';
 import {
   formatRosterPullWaitMessage,
@@ -102,7 +113,17 @@ async function persistRosterSnapshot(eventId: string, roster: ExhibitorRosterPay
   if (error) throw new Error(error.message);
 }
 
-async function writebackLinkedContracts(eventId: string): Promise<number> {
+/**
+ * Push license status / contract id / last updated into the sheet for every linked contract.
+ *
+ * Diffs against the roster that was just fetched and writes only changed rows, one batch call
+ * per spreadsheet. No per-contract reads: the old loop (3 reads + 1 write per contract) was
+ * what exhausted the Sheets quota and timed the cron out.
+ */
+async function writebackLinkedContracts(
+  eventId: string,
+  roster: Pick<FetchedExhibitorRoster, 'rows' | 'headersBySheet' | 'statusCells'>,
+): Promise<number> {
   const supabase = getSupabaseAdmin();
   const { data: contracts } = await supabase
     .from('contracts_with_totals')
@@ -110,26 +131,71 @@ async function writebackLinkedContracts(eventId: string): Promise<number> {
     .eq('event_id', eventId)
     .not('source_sheet_id', 'is', null);
 
+  const linked = (contracts ?? []) as ContractWithTotals[];
   const recalledIds = await recalledContractIds(
     eventId,
-    ((contracts ?? []) as ContractWithTotals[])
-      .filter((c) => c.status === 'draft' && !c.sent_at)
-      .map((c) => c.id),
+    linked.filter((c) => c.status === 'draft' && !c.sent_at).map((c) => c.id),
   );
 
-  let count = 0;
-  for (const contract of (contracts ?? []) as ContractWithTotals[]) {
+  const rowByKey = new Map(roster.rows.map((row) => [row.rowKey, row]));
+  const writes: RosterStatusCellWrite[] = [];
+  const headerWrites = new Map<string, RosterStatusHeaderWrite>();
+  let skippedForeignRow = 0;
+  let rowNotInRoster = 0;
+
+  for (const contract of linked) {
     if (!contract.source_sheet_id || !contract.source_sheet_tab || !contract.source_row_number) continue;
     const rowKey = rosterRowKey(contract.source_sheet_id, contract.source_sheet_tab, contract.source_row_number);
-    const recalled = recalledIds.has(contract.id);
+    const row = rowByKey.get(rowKey);
+    const headers = roster.headersBySheet[rosterSheetKey(contract.source_sheet_id, contract.source_sheet_tab)];
+    if (!row || !headers) {
+      // Sheet failed to load, or the row is withdrawn / not a participating winery — nothing to verify against.
+      rowNotInRoster += 1;
+      continue;
+    }
+    if (!sheetRowBelongsToContract(row, contract)) {
+      // Stale row number pointing at another winery; never overwrite their cells.
+      skippedForeignRow += 1;
+      continue;
+    }
 
-    await syncExhibitorRosterWriteback(
-      contract,
-      recalled ? { statusLabel: 'Recalled' } : undefined,
-    );
-    count += 1;
+    const label = rosterStatusLabel(contract.status, { recalled: recalledIds.has(contract.id) });
+    const desired: [string, string, string] = [label, contract.id, formatTimestamp(contract.updated_at)];
+    const current = roster.statusCells[rowKey];
+    if (
+      current &&
+      current.status.trim() === desired[0] &&
+      (normalizeSheetContractId(current.contractId) ?? current.contractId.trim().toLowerCase()) ===
+        contract.id.toLowerCase() &&
+      current.lastUpdated.trim() === desired[2]
+    ) {
+      continue;
+    }
+
+    const statusStart = statusColumnStart(headers);
+    const sheetKey = rosterSheetKey(contract.source_sheet_id, contract.source_sheet_tab);
+    if (rosterStatusHeadersNeedWrite(headers, statusStart) && !headerWrites.has(sheetKey)) {
+      headerWrites.set(sheetKey, { spreadsheetId: contract.source_sheet_id, tab: contract.source_sheet_tab, statusStart });
+    }
+    writes.push({
+      spreadsheetId: contract.source_sheet_id,
+      tab: contract.source_sheet_tab,
+      rowNumber: contract.source_row_number,
+      statusStart,
+      values: desired,
+    });
   }
-  return count;
+
+  if (skippedForeignRow > 0 || rowNotInRoster > 0) {
+    console.warn('[exhibitor-roster] writeback skipped rows', { skippedForeignRow, rowNotInRoster });
+  }
+  if (writes.length === 0) return 0;
+
+  const { written, errors } = await batchWriteExhibitorRosterStatus(writes, [...headerWrites.values()]);
+  if (errors.length > 0) {
+    console.error('[exhibitor-roster] writeback errors', errors);
+  }
+  return written;
 }
 
 /** Pull master Google Sheets roster, reconcile write-back, and cache in Supabase. */
@@ -145,16 +211,18 @@ export async function syncExhibitorRosterMaster(event?: Event | null): Promise<E
   try {
     const roster = await fetchExhibitorRoster(activeEvent);
     const contractsUpdated = await syncLinkedContractsFromRosterRows(activeEvent.id, roster.rows);
-    const writebackCount = await writebackLinkedContracts(activeEvent.id);
     const payload: ExhibitorRosterPayload = {
       syncedAt: roster.syncedAt,
       sheets: roster.sheets,
       rows: roster.rows,
     };
+    // Cache the roster before the Sheets writeback so a slow or failed writeback can never
+    // leave the portal on a weeks-old snapshot again.
     const sheetLoadFailed = roster.warnings.some((w) => w.includes('could not load'));
     if (!sheetLoadFailed) {
       await persistRosterSnapshot(activeEvent.id, payload);
     }
+    const writebackCount = await writebackLinkedContracts(activeEvent.id, roster);
 
     return {
       status: 'synced',

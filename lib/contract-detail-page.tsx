@@ -177,10 +177,13 @@ export async function ContractDetailPage({
     contract.drafted_at || contract.draft_pdf_url || contract.pdf_storage_path
       ? `/api/contracts/${contract.id}/pdf?variant=draft`
       : null;
+  // Only link the signed copy when one can actually be served: a stored signed.pdf, a legacy
+  // signed URL, or a DocuSign envelope the PDF route can pull from. `signed_at` alone is not
+  // enough — QR print stubs are created as executed with no PDF at all.
   const signedPdfHref =
     contract.signed_pdf_url ||
-    contract.signed_at ||
-    contract.pdf_storage_path?.endsWith('signed.pdf')
+    contract.pdf_storage_path?.endsWith('signed.pdf') ||
+    (contract.signed_at && contract.docusign_envelope_id)
       ? `/api/contracts/${contract.id}/pdf?variant=signed`
       : null;
 
@@ -196,12 +199,13 @@ export async function ContractDetailPage({
     }
   }
 
+  // Mirrors what /api/contracts/[id]/pdf can resolve. A signed_at timestamp with no stored
+  // file (QR print stubs) would otherwise render an iframe showing `{"error":"PDF not available"}`.
   const hasPdfSource = Boolean(
     contractForPreview.drafted_at ||
       contractForPreview.draft_pdf_url ||
       contractForPreview.pdf_storage_path ||
       contractForPreview.signed_pdf_url ||
-      contractForPreview.signed_at ||
       contract.docusign_envelope_id,
   );
   const canInlinePdf = hasPdfSource;
