@@ -77,12 +77,17 @@ export function contractPatchFromExhibitorRosterRow(
   }
 
   const patch: Record<string, string | null | boolean> = {
-    exhibitor_legal_name: billingCompany,
-    exhibitor_company_name: winery || billingCompany,
     brands_poured: formatRosterWineDisplay(row.wineName, row.vintage) || null,
     billing_contact_name: row.billingContactName.trim() || null,
     billing_contact_email: row.billingEmail.trim() || null,
   };
+
+  // Once an envelope is out, the signed document fixes who the licensee is. A re-sorted sheet
+  // once rewrote hundreds of executed contracts to other wineries' names; never again.
+  if (!SIGNER_LOCKED_STATUSES.includes(contract.status)) {
+    patch.exhibitor_legal_name = billingCompany;
+    patch.exhibitor_company_name = winery || billingCompany;
+  }
 
   const website = rosterWineryWebsiteUrl(row);
   if (website) {
@@ -165,10 +170,13 @@ function patchFromPayload(
   }
 
   const patch: Record<string, string | null | boolean> = {
-    exhibitor_legal_name: payload.exhibitor_legal_name,
-    exhibitor_company_name: payload.exhibitor_company_name,
     brands_poured: payload.brands_poured,
   };
+  // Names come from the signed document once an envelope is out (see contractPatchFromExhibitorRosterRow).
+  if (!SIGNER_LOCKED_STATUSES.includes(contract.status)) {
+    patch.exhibitor_legal_name = payload.exhibitor_legal_name;
+    patch.exhibitor_company_name = payload.exhibitor_company_name;
+  }
 
   if (payload.exhibitor_website_url) {
     patch.exhibitor_website_url = payload.exhibitor_website_url;
