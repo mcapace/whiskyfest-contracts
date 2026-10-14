@@ -285,9 +285,18 @@ export async function refreshNyweQrClicks(eventId: string): Promise<number> {
   }).slice(0, CLICK_REFRESH_MAX);
 
   let updated = 0;
+  let healed = 0;
   for (const row of rows) {
     try {
       const link = await getRebrandlyLink(row.rebrandly_link_id as string);
+      // The short link must land on this contract's own /b/ page. Identity repairs move links
+      // between contracts, and a stale destination would send a printed booth sign to the
+      // wrong winery, so re-point it here rather than only when someone edits the website.
+      const tracking = nyweBoothQrTrackingUrl(row.id);
+      if (!sameDestination(link.destination, tracking)) {
+        await updateRebrandlyDestination(row.rebrandly_link_id as string, tracking);
+        healed += 1;
+      }
       const { error: updError } = await supabase
         .from('contracts')
         .update({
@@ -301,6 +310,7 @@ export async function refreshNyweQrClicks(eventId: string): Promise<number> {
       console.warn('[nywe-booth-qr] click refresh failed', row.id, err instanceof Error ? err.message : err);
     }
   }
+  if (healed > 0) console.log(`[nywe-booth-qr] re-pointed ${healed} short link(s) to their contract`);
   return updated;
 }
 
