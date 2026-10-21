@@ -89,24 +89,48 @@ export type ParagraphEditPlanResult = {
   requests: docs_v1.Schema$Request[];
   applied: Array<{ op: ParagraphEditOp; anchor: string }>;
   unmatched: Array<{ op: ParagraphEditOp; anchor: string; reason: string }>;
+  /** Earlier replace / delete edits dropped because a later edit rewrites the same paragraph. */
+  superseded: Array<{ op: ParagraphEditOp; anchor: string }>;
+};
+
+export type ParagraphEditOptions = {
+  /**
+   * The same document before phrase-level replacements ran. An anchor copied from the original
+   * wording can stop matching once a phrase inside its paragraph was swapped; it is then located
+   * in this snapshot and applied to the paragraph at the same position in the current document.
+   */
+  fallbackDoc?: docs_v1.Schema$Document;
 };
 
 /**
  * Build batchUpdate requests for a set of paragraph edits against the current document.
  * Requests are ordered by descending paragraph index so indices remain valid within one batch.
+ * When several replace / delete edits land on one paragraph, the last one wins: plans are stored
+ * in round order, so a later round's rewrite of a clause supersedes the earlier round's.
  */
 export function buildParagraphEditRequests(
   doc: docs_v1.Schema$Document,
   edits: ParagraphEdit[],
+  options?: ParagraphEditOptions,
 ): ParagraphEditPlanResult {
   const paragraphs = collectBodyParagraphs(doc);
+  const fallbackParagraphs = options?.fallbackDoc ? collectBodyParagraphs(options.fallbackDoc) : null;
   const lastBodyEnd = doc.body?.content?.at(-1)?.endIndex ?? 0;
-  const planned: Array<{ edit: ParagraphEdit; target: LocatedParagraph }> = [];
+  const candidates: Array<{ edit: ParagraphEdit; target: LocatedParagraph }> = [];
   const unmatched: ParagraphEditPlanResult['unmatched'] = [];
-  const usedParagraphs = new Set<number>();
+  const superseded: ParagraphEditPlanResult['superseded'] = [];
+
+  const locate = (anchor: string): ParagraphMatch => {
+    const direct = findParagraphByAnchor(paragraphs, anchor);
+    if (direct.ok || !fallbackParagraphs) return direct;
+    const before = findParagraphByAnchor(fallbackParagraphs, anchor);
+    if (!before.ok) return direct;
+    const same = paragraphs[before.paragraph.index];
+    return same ? { ok: true, paragraph: same } : direct;
+  };
 
   for (const edit of edits) {
-    const match = findParagraphByAnchor(paragraphs, edit.anchor);
+    const match = locate(edit.anchor);
     if (!match.ok) {
       unmatched.push({
         op: edit.op,
@@ -118,17 +142,23 @@ export function buildParagraphEditRequests(
       });
       continue;
     }
-    if (edit.op !== 'insert_after' && usedParagraphs.has(match.paragraph.index)) {
-      unmatched.push({ op: edit.op, anchor: edit.anchor, reason: 'another edit already targets this paragraph' });
-      continue;
-    }
     if ((edit.op === 'replace' || edit.op === 'insert_after') && !edit.text?.trim()) {
       unmatched.push({ op: edit.op, anchor: edit.anchor, reason: 'no replacement text supplied' });
       continue;
     }
-    if (edit.op !== 'insert_after') usedParagraphs.add(match.paragraph.index);
-    planned.push({ edit, target: match.paragraph });
+    candidates.push({ edit, target: match.paragraph });
   }
+
+  // Last replace / delete per paragraph wins; inserts after a paragraph are all kept.
+  const lastRewrite = new Map<number, number>();
+  candidates.forEach(({ edit, target }, i) => {
+    if (edit.op !== 'insert_after') lastRewrite.set(target.index, i);
+  });
+  const planned = candidates.filter(({ edit, target }, i) => {
+    if (edit.op === 'insert_after' || lastRewrite.get(target.index) === i) return true;
+    superseded.push({ op: edit.op, anchor: edit.anchor });
+    return false;
+  });
 
   // Bottom-up so each request's indices are unaffected by the ones before it.
   planned.sort((a, b) => b.target.startIndex - a.target.startIndex || (a.edit.op === 'insert_after' ? -1 : 1));
@@ -190,7 +220,7 @@ export function buildParagraphEditRequests(
     applied.push({ op: edit.op, anchor: edit.anchor });
   }
 
-  return { requests, applied, unmatched };
+  return { requests, applied, unmatched, superseded };
 }
 
 /** Docs `replaceAllText` replies carry occurrencesChanged; zero means the find string was not in the doc. */
