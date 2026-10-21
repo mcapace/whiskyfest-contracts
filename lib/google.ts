@@ -4,7 +4,11 @@ import {
   insertContractLineItemsIntoOrderTable,
 } from '@/lib/google-contract-order-table';
 import { buildAmendmentSectionRequests } from '@/lib/google-doc-amendment-sections';
-import { buildParagraphEditRequests, unmatchedReplaceAllText } from '@/lib/google-doc-paragraph-edits';
+import {
+  buildParagraphEditRequests,
+  unmatchedReplaceAllText,
+  unsatisfiedReplaceAllText,
+} from '@/lib/google-doc-paragraph-edits';
 import { buildRevisionDocRequests } from '@/lib/google-doc-revision-requests';
 import type { ContractRevisionPlan } from '@/lib/contract-revision-plan';
 import type { ContractLineItem } from '@/types/db';
@@ -183,7 +187,12 @@ export async function renderContractPdfWithReport(
           documentId: tempDocId,
           requestBody: { requests: textRequests },
         });
-        report.unmatchedText = unmatchedReplaceAllText(textRequests, res.data.replies ?? undefined);
+        const unmatched = unmatchedReplaceAllText(textRequests, res.data.replies ?? undefined);
+        if (unmatched.length > 0) {
+          // A find can be gone because an earlier edit already produced the intended wording.
+          const { data: afterText } = await docs.documents.get({ documentId: tempDocId });
+          report.unmatchedText = unsatisfiedReplaceAllText(textRequests, unmatched, afterText);
+        }
         report.appliedTextEdits = textRequests.length - report.unmatchedText.length;
       }
 
