@@ -237,3 +237,39 @@ export function unmatchedReplaceAllText(
   });
   return missing;
 }
+
+/** Every text run in the document, tables included. */
+export function documentPlainText(doc: docs_v1.Schema$Document): string {
+  const walk = (elements: docs_v1.Schema$StructuralElement[] | undefined): string => {
+    let out = '';
+    for (const el of elements ?? []) {
+      for (const run of el.paragraph?.elements ?? []) out += run.textRun?.content ?? '';
+      for (const row of el.table?.tableRows ?? []) {
+        for (const cell of row.tableCells ?? []) out += walk(cell.content);
+      }
+    }
+    return out;
+  };
+  return walk(doc.body?.content);
+}
+
+/**
+ * A phrase edit whose find text is gone can still be satisfied: a deletion of text that is no
+ * longer there, or a replacement whose new wording is already in the document (an earlier round
+ * swapped the same phrase, or a clause rewrite carried it). Only the finds that leave the
+ * document short of the intended wording are returned.
+ */
+export function unsatisfiedReplaceAllText(
+  requests: docs_v1.Schema$Request[],
+  unmatchedFinds: string[],
+  doc: docs_v1.Schema$Document,
+): string[] {
+  if (unmatchedFinds.length === 0) return [];
+  const text = normalizeForMatch(documentPlainText(doc));
+  return unmatchedFinds.filter((find) => {
+    const req = requests.find((r) => r.replaceAllText?.containsText?.text === find);
+    const replacement = normalizeForMatch(req?.replaceAllText?.replaceText ?? '');
+    if (!replacement) return false;
+    return !text.includes(replacement);
+  });
+}
