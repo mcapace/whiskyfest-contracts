@@ -36,10 +36,10 @@ CURRENT CONTRACT DATA:
 - Brands: ${context.brands_poured ?? '(none)'}
 - Event: ${context.event_name}
 
-CLIENT REQUESTED CHANGES:
+CLIENT REQUESTED CHANGES (may be an email, a bullet list, or the client's complete returned contract — in that case compare it with the current text and extract only the substantive changes to contract language):
 ${changeRequest.trim()}
 
-CURRENT CONTRACT TEXT (merged, one paragraph per line, numbered [P#] for reference only — the numbers are not in the document):
+CURRENT CONTRACT TEXT (merged, one paragraph per line, numbered [P#] for reference only — the numbers are not in the document; the CONTRACT ORDER table is generated from the order and is not shown):
 ${templateExcerpt.slice(0, 28000)}
 
 ${uploadedPdfExcerpt ? `UPLOADED REDLINE PDF TEXT (excerpt):\n${uploadedPdfExcerpt.slice(0, 12000)}\n` : ''}
@@ -78,9 +78,15 @@ HOW TO CHOOSE THE EDIT TYPE:
 - A sentence is removed from a longer paragraph → text_deletions with the full sentence.
 - Only when none of the above can place the change → additional_terms.
 
+NOT AMENDMENTS — never produce edits for these, even when the client's copy differs:
+- the agreement date (it is generated when the contract is sent)
+- values the client wrote into blanks: addresses, phone numbers, names, titles, signatures, dates
+- the CONTRACT ORDER table, its line items and totals (generated from the order, not editable here)
+- headings, section titles and field labels such as "Description" or "City:"
+
 RULES:
 1. Anchors and find strings must be copied verbatim from the CURRENT CONTRACT TEXT (case may differ, punctuation may not). Never include the [P#] label.
-2. An anchor must identify exactly ONE paragraph: use 6-15 consecutive words that appear nowhere else.
+2. An anchor must identify exactly ONE body paragraph: use 6-15 consecutive words that appear nowhere else. Never anchor to a heading, a label or a table cell.
 3. Party/name changes: set field_updates AND add text_replacements for every distinct old name string that appears in the contract.
 4. Payment term changes: set field_updates.payment_terms AND add text_replacements for the exact old payment phrase.
 5. Do not target the same paragraph with two paragraph_edits, and do not duplicate a find string across replacements and deletions.

@@ -7,6 +7,7 @@ import {
   type ContractRevisionPlan,
   revisionAmendmentsFromPlan,
   revisionPlanToDisplayLines,
+  sanitizeRevisionPlan,
 } from '@/lib/contract-revision-plan';
 import { resolveContractTemplateDocId } from '@/lib/contract-template';
 import { workspaceLabelForProduct } from '@/lib/product-email';
@@ -33,8 +34,8 @@ export async function extractPdfText(bytes: Buffer): Promise<string> {
   }
 }
 
-/** Fill merge tokens locally (no Docs copy) and number the paragraphs for the prompt. */
-export function mergedTemplateParagraphs(rawTemplate: string, mergeMap: Record<string, string>): string {
+/** Fill merge tokens locally (no Docs copy); one trimmed, non-empty line per paragraph. */
+export function mergedTemplateLines(rawTemplate: string, mergeMap: Record<string, string>): string[] {
   let text = rawTemplate;
   for (const [token, value] of Object.entries(mergeMap)) {
     text = text.split(token).join((value ?? '').replace(/\u000b/g, ' '));
@@ -43,7 +44,12 @@ export function mergedTemplateParagraphs(rawTemplate: string, mergeMap: Record<s
     .replace(/\r\n/g, '\n')
     .split('\n')
     .map((line) => line.trim())
-    .filter(Boolean)
+    .filter(Boolean);
+}
+
+/** Merged paragraphs numbered for the prompt (the numbers are not in the document). */
+export function mergedTemplateParagraphs(rawTemplate: string, mergeMap: Record<string, string>): string {
+  return mergedTemplateLines(rawTemplate, mergeMap)
     .map((line, i) => `[P${i + 1}] ${line}`)
     .join('\n');
 }
@@ -75,11 +81,13 @@ export async function buildContractRevisionPlan(options: {
   const templateDocId = resolveContractTemplateDocId(options.contract, options.event);
   // Edits run against the MERGED document, so show the model merged text (tokens filled in),
   // one numbered paragraph per line, and let it anchor clause edits to real paragraphs.
-  const rawTemplate = await fetchGoogleDocPlainText(templateDocId);
+  // The order table is left out: its rows are generated from line items and cannot be edited.
+  const rawTemplate = await fetchGoogleDocPlainText(templateDocId, { includeTables: false });
   const supabase = getSupabaseAdmin();
   const boothBrands = await fetchContractBoothBrandsOrdered(supabase, options.contract.id);
   const mergeMap = buildContractMergeMap(options.contract, options.event, 'draft', boothBrands);
-  const templateExcerpt = mergedTemplateParagraphs(rawTemplate, mergeMap);
+  const mergedLines = mergedTemplateLines(rawTemplate, mergeMap);
+  const templateExcerpt = mergedLines.map((line, i) => `[P${i + 1}] ${line}`).join('\n');
 
   let uploadedPdfExcerpt: string | undefined;
   if (options.revisionUploadPath?.trim()) {
@@ -88,14 +96,19 @@ export async function buildContractRevisionPlan(options: {
     if (text.trim()) uploadedPdfExcerpt = text;
   }
 
-  const plan = await parseContractRevisionPlan({
+  const parsed = await parseContractRevisionPlan({
     changeRequest,
     context: revisionContext(options.contract, options.event),
     templateExcerpt,
     uploadedPdfExcerpt,
   });
 
-  return { plan, preview_lines: revisionPlanToDisplayLines(plan) };
+  // Every anchor and find string is checked against the merged text now, while the team can still
+  // review the plan. An edit that would fail the strict render is moved to Additional Terms (or
+  // dropped when it is a fill-in field), so applying the plan cannot fail on a phrase mismatch.
+  const { plan, notices } = sanitizeRevisionPlan(parsed, mergedLines);
+
+  return { plan, preview_lines: [...revisionPlanToDisplayLines(plan), ...notices] };
 }
 
 export async function loadContractAndEventForRevision(contractId: string): Promise<{

@@ -73,6 +73,11 @@ export async function applyContractRevision(options: {
   delete patch.revision_use_uploaded_pdf;
   if (!plan && body.replace_existing_edits && existingPlan) patch.revision_plan = null;
 
+  // Remember what the patch overwrites so a failed render can put it back: a plan that cannot be
+  // rendered must not stay on the contract, or every later preview and send fails the same way.
+  const previous: Record<string, unknown> = {};
+  for (const key of Object.keys(patch)) previous[key] = (contract as Record<string, unknown>)[key] ?? null;
+
   const { error: patchError } = await supabase.from('contracts').update(patch).eq('id', contractId);
   if (patchError) throw new Error(patchError.message);
 
@@ -84,17 +89,26 @@ export async function applyContractRevision(options: {
   const mergeMap = buildContractMergeMap(contract, event, 'draft', boothBrands);
   const templateDocId = resolveContractTemplateDocId(contract, event);
   const usesOrderTable = contractUsesOrderTable(event, contract);
-  const pdfBytes = await renderContractPdfFromTemplate(
-    templateDocId,
-    mergeMap,
-    contractPdfBaseName(contract.exhibitor_company_name, event),
-    usesOrderTable ? lineItems : undefined,
-    {
-      includeBoothRow: usesOrderTable && !isSponsorshipOnlyOrder(contract),
-      revisionPlan: parseStoredRevisionPlan(contract.revision_plan),
-      strictRevision: true,
-    },
-  );
+  let pdfBytes: Buffer;
+  try {
+    pdfBytes = await renderContractPdfFromTemplate(
+      templateDocId,
+      mergeMap,
+      contractPdfBaseName(contract.exhibitor_company_name, event),
+      usesOrderTable ? lineItems : undefined,
+      {
+        includeBoothRow: usesOrderTable && !isSponsorshipOnlyOrder(contract),
+        revisionPlan: parseStoredRevisionPlan(contract.revision_plan),
+        strictRevision: true,
+      },
+    );
+  } catch (err) {
+    if (Object.keys(previous).length > 0) {
+      const { error: rollbackError } = await supabase.from('contracts').update(previous).eq('id', contractId);
+      if (rollbackError) console.error('[applyContractRevision] rollback failed', contractId, rollbackError.message);
+    }
+    throw err;
+  }
   const { draftStoragePath, drafted_at } = await persistContractDraftPdf(contract.id, pdfBytes);
   await supabase
     .from('contracts')

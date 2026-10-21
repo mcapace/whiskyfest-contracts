@@ -323,11 +323,13 @@ export function ContractReviseWizard({
     });
   }
 
+  // In apply mode the stored edits alone are enough: submitting re-renders the clean draft from
+  // them (needed after an apply that failed part-way, or when the plan was corrected elsewhere).
   const hasChanges =
     changeRequest.trim().length >= 10 ||
     Boolean(revisionPlan) ||
     revisionAmendments.trim().length > 0 ||
-    (replaceExistingEdits && existingEditLines.length > 0);
+    (existingEditLines.length > 0 && (replaceExistingEdits || applyMode));
   const canSubmit =
     (applyMode || reason.trim().length >= 10) &&
     signerName.trim().length > 0 &&
