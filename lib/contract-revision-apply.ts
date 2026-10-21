@@ -76,7 +76,7 @@ export async function applyContractRevision(options: {
   // Remember what the patch overwrites so a failed render can put it back: a plan that cannot be
   // rendered must not stay on the contract, or every later preview and send fails the same way.
   const previous: Record<string, unknown> = {};
-  for (const key of Object.keys(patch)) previous[key] = (contract as Record<string, unknown>)[key] ?? null;
+  for (const key of Object.keys(patch)) previous[key] = (contract as unknown as Record<string, unknown>)[key] ?? null;
 
   const { error: patchError } = await supabase.from('contracts').update(patch).eq('id', contractId);
   if (patchError) throw new Error(patchError.message);
