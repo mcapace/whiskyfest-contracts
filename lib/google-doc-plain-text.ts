@@ -44,14 +44,22 @@ function collectElementText(el: DocElement): string {
   return out;
 }
 
-/** Read plain text from a Google Doc (template or temp copy). */
-export async function fetchGoogleDocPlainText(documentId: string): Promise<string> {
+/**
+ * Read plain text from a Google Doc (template or temp copy). With `includeTables: false` only
+ * body paragraphs are returned — the CONTRACT ORDER table is generated at render time and clause
+ * edits can never target it, so the revision planner must not see it as editable text.
+ */
+export async function fetchGoogleDocPlainText(
+  documentId: string,
+  options?: { includeTables?: boolean },
+): Promise<string> {
   const auth = getAuth();
   const docs = google.docs({ version: 'v1', auth });
   const { data } = await docs.documents.get({ documentId });
+  const includeTables = options?.includeTables !== false;
   let plain = '';
   for (const el of data.body?.content ?? []) {
-    plain += collectElementText(el as DocElement);
+    plain += includeTables ? collectElementText(el as DocElement) : collectParagraphText(el as DocElement);
   }
   return plain;
 }

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { normalizeForMatch } from '@/lib/google-doc-paragraph-edits';
 
 /**
  * Structured edits the system applies to the contract record and to the merged Google Doc.
@@ -228,4 +229,107 @@ export function parseStoredRevisionPlan(raw: unknown): ContractRevisionPlan | nu
   if (!raw || typeof raw !== 'object') return null;
   const result = contractRevisionPlanSchema.safeParse(raw);
   return result.success ? result.data : null;
+}
+
+/** A short label such as "City:" or "Billing Street Address:" — a blank the client filled in by hand. */
+function isFillInLabel(find: string): boolean {
+  const t = find.trim();
+  return /:$/.test(t) && t.split(/\s+/).length <= 5;
+}
+
+function clauseLabel(anchor: string): string {
+  const words = anchor.replace(/\s+/g, ' ').trim().split(' ');
+  return words.length > 8 ? `${words.slice(0, 8).join(' ')}…` : words.join(' ');
+}
+
+export type SanitizedRevisionPlan = {
+  plan: ContractRevisionPlan;
+  /** Preview lines explaining each edit that was moved to Additional Terms or dropped. */
+  notices: string[];
+};
+
+/**
+ * Check a plan against the merged contract text (one entry per body paragraph, tables excluded)
+ * before it is stored. The strict render later refuses any find / anchor that does not match, and
+ * by then the plan is already saved and the team is stuck. So:
+ *   - a clause edit whose anchor matches zero or several paragraphs becomes an Additional Term
+ *   - a phrase edit whose find text is not in the contract becomes an Additional Term
+ *   - phrase edits on fill-in labels ("City:") or the generated agreement date are dropped — those
+ *     values come from the contract form, not from amendments
+ */
+export function sanitizeRevisionPlan(plan: ContractRevisionPlan, mergedLines: string[]): SanitizedRevisionPlan {
+  const lines = mergedLines.map(normalizeForMatch);
+  const whole = lines.join('\n');
+  const notices: string[] = [];
+  const movedTerms: string[] = [];
+
+  const paragraphEdits: ContractRevisionPlan['paragraph_edits'] = [];
+  for (const edit of plan.paragraph_edits) {
+    const needle = normalizeForMatch(edit.anchor);
+    const hits = needle ? lines.filter((line) => line.includes(needle)).length : 0;
+    if (hits === 1) {
+      paragraphEdits.push(edit);
+      continue;
+    }
+    const label = clauseLabel(edit.anchor);
+    const text = edit.text?.trim() ?? '';
+    if (edit.op === 'delete') {
+      movedTerms.push(`The paragraph beginning “${label}” is deleted.`);
+    } else if (edit.op === 'replace' && text) {
+      movedTerms.push(`The paragraph beginning “${label}” is replaced with: ${text}`);
+    } else if (text) {
+      movedTerms.push(text);
+    } else {
+      notices.push(`Skipped “${label}”: no replacement text was supplied.`);
+      continue;
+    }
+    notices.push(
+      `Moved to Additional Terms — “${label}” ${
+        hits === 0 ? 'is not a paragraph in this contract' : `matches ${hits} paragraphs`
+      }${edit.reason ? ` (${edit.reason.trim()})` : ''}.`,
+    );
+  }
+
+  const keepPhraseEdit = (find: string, reason: string | undefined, describe: () => string): boolean => {
+    const label = `“${find.replace(/\s+/g, ' ').trim().slice(0, 60)}”`;
+    if (isFillInLabel(find)) {
+      notices.push(`Skipped ${label}: fill-in fields are entered on the contract form, not as amendments.`);
+      return false;
+    }
+    if (/agreement made this/i.test(find)) {
+      notices.push(`Skipped ${label}: the agreement date is set when the contract is generated.`);
+      return false;
+    }
+    if (!whole.includes(normalizeForMatch(find))) {
+      movedTerms.push(describe());
+      notices.push(`Moved to Additional Terms — ${label} is not in this contract${reason ? ` (${reason.trim()})` : ''}.`);
+      return false;
+    }
+    return true;
+  };
+
+  const textReplacements = plan.text_replacements.filter((r) =>
+    keepPhraseEdit(r.find, r.reason, () => `“${r.find.trim()}” is replaced with “${r.replace.trim()}”.`),
+  );
+  const textDeletions = plan.text_deletions.filter((d) =>
+    keepPhraseEdit(d.find, d.reason, () => `“${d.find.trim()}” is deleted.`),
+  );
+
+  const fieldUpdates = Object.fromEntries(
+    Object.entries(plan.field_updates ?? {}).filter(([, value]) => typeof value === 'string' && value.trim()),
+  ) as ContractRevisionPlan['field_updates'];
+
+  const additionalTerms = [...splitAdditionalTermsItems(plan.additional_terms), ...movedTerms];
+
+  return {
+    plan: {
+      ...plan,
+      field_updates: fieldUpdates && Object.keys(fieldUpdates).length ? fieldUpdates : undefined,
+      text_replacements: textReplacements,
+      text_deletions: textDeletions,
+      paragraph_edits: paragraphEdits,
+      additional_terms: additionalTerms.length ? additionalTerms.join('\n') : undefined,
+    },
+    notices,
+  };
 }
