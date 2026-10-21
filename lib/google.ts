@@ -172,6 +172,10 @@ export async function renderContractPdfWithReport(
 
     const plan = options?.revisionPlan ?? null;
     if (plan) {
+      // Snapshot before phrase swaps: clause anchors are written against the original wording.
+      const beforeTextEdits =
+        plan.paragraph_edits.length > 0 ? (await docs.documents.get({ documentId: tempDocId })).data : null;
+
       // 1. Phrase-level replacements — verified through occurrencesChanged.
       const textRequests = buildRevisionDocRequests(plan);
       if (textRequests.length > 0) {
@@ -186,8 +190,16 @@ export async function renderContractPdfWithReport(
       // 2. Clause-level edits against the merged document structure.
       if (plan.paragraph_edits.length > 0) {
         const { data: merged } = await docs.documents.get({ documentId: tempDocId });
-        const edits = buildParagraphEditRequests(merged, plan.paragraph_edits);
+        const edits = buildParagraphEditRequests(merged, plan.paragraph_edits, {
+          fallbackDoc: beforeTextEdits ?? undefined,
+        });
         report.unmatchedParagraphs = edits.unmatched;
+        if (edits.superseded.length > 0) {
+          console.log(
+            '[render] clause edits superseded by a later edit on the same paragraph:',
+            edits.superseded.map((e) => e.anchor.slice(0, 50)).join(' | '),
+          );
+        }
         report.appliedParagraphEdits = edits.applied.length;
         if (edits.requests.length > 0) {
           await docs.documents.batchUpdate({
