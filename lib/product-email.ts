@@ -55,7 +55,14 @@ export function sendGridFromForProduct(productKey: ProductKey | null | undefined
 
   if (isBigSmokeProduct(productKey)) {
     return {
-      email: process.env['BIG_SMOKE_FROM_EMAIL']?.trim() || 'bigsmokecontracts@cigaraficionado.com',
+      // SendGrid rejects the Big Smoke address with 403 (not a verified sender), which
+      // silently dropped "contract executed" notices and the status digest. Send from the
+      // verified accounting address (as the AR handoff already does) and keep the Big Smoke
+      // display name. Drop this fallback once the cigaraficionado.com sender is verified.
+      email:
+        process.env['ACCOUNTING_FROM_EMAIL']?.trim() ||
+        process.env['BIG_SMOKE_FROM_EMAIL']?.trim() ||
+        'bigsmokecontracts@cigaraficionado.com',
       name: process.env['BIG_SMOKE_FROM_NAME']?.trim() || 'Big Smoke Contracts',
     };
   }
