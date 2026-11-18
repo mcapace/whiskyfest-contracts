@@ -27,6 +27,9 @@ export default async function BigSmokeDashboardPage() {
   const sentCount = countByStatus(activeScoped, ['sent']);
   const executedCount = countByStatus(activeScoped, ['signed', 'executed']);
   const totalValueCents = activeScoped.reduce((sum, c) => sum + c.grand_total_cents, 0);
+  // Executed = handed to accounting. Voided/cancelled deals are already excluded via activeScoped.
+  const executedOnly = activeScoped.filter((c) => c.status === 'executed');
+  const executedValueCents = executedOnly.reduce((sum, c) => sum + c.grand_total_cents, 0);
 
   const recent = [...activeScoped]
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
@@ -58,16 +61,22 @@ export default async function BigSmokeDashboardPage() {
         greetingSubtitle={primaryEvent?.tagline ?? 'Cigar Aficionado · Big Smoke'}
       />
 
-      <div className="grid gap-4 sm:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {[
           { label: 'In pipeline', value: String(activeScoped.length) },
           { label: 'Draft / review', value: String(draftCount) },
           { label: 'Awaiting signature', value: String(sentCount) },
-          { label: 'Pipeline value', value: formatCurrency(totalValueCents) },
+          {
+            label: 'Executed revenue',
+            value: formatCurrency(executedValueCents),
+            sub: `${executedOnly.length} executed contract${executedOnly.length === 1 ? '' : 's'}`,
+          },
+          { label: 'Pipeline value', value: formatCurrency(totalValueCents), sub: 'All active contracts' },
         ].map((m) => (
           <div key={m.label} className="border-b border-border pb-3">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">{m.label}</p>
             <p className="mt-1 font-display text-2xl text-foreground">{m.value}</p>
+            {'sub' in m && m.sub ? <p className="mt-0.5 text-xs text-muted-foreground">{m.sub}</p> : null}
           </div>
         ))}
       </div>
