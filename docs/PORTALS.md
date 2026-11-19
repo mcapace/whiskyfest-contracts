@@ -189,6 +189,8 @@ Weekday emails at **9:00 AM, 1:00 PM, and 5:00 PM Eastern** summarize each porta
 
 Each digest includes status counts, AR invoice buckets for executed contracts, items needing attention (review / signing / countersign), and contracts updated in the last ~8 hours — plus portal + accounting links. From-address matches the product (WF / Big Smoke / NYWE).
 
+**NYWE digest is paused** (Nov 2026, after the event). To resume it, remove the NYWE key from `PAUSED_DIGEST_PRODUCTS` in `lib/product-status-digest.ts`. WhiskyFest and Big Smoke digests are unaffected.
+
 Override recipients with `PRODUCT_DIGEST_WHISKYFEST_EMAILS`, `PRODUCT_DIGEST_BIG_SMOKE_EMAILS`, `PRODUCT_DIGEST_NYWE_EMAILS`. Optional CC: `PRODUCT_DIGEST_CC_EMAILS`. Cron: `/api/cron/product-status-digest`.
 
 ### Kate / Stephen email quiet mode (WhiskyFest)
