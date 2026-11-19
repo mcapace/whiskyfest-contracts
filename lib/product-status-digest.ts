@@ -24,6 +24,12 @@ export const PRODUCT_DIGEST_DEFAULT_RECIPIENTS: Record<
 
 const DIGEST_PRODUCTS = [PRODUCT_WHISKYFEST, PRODUCT_BIG_SMOKE, PRODUCT_WINE_SPECTATOR] as const;
 
+/**
+ * Portals whose digest is paused (no email is built or sent).
+ * NYWE: paused Nov 2026, after the event. Remove the key to resume for the next cycle.
+ */
+const PAUSED_DIGEST_PRODUCTS: ReadonlySet<ProductKey> = new Set<ProductKey>([PRODUCT_WINE_SPECTATOR]);
+
 function parseEmailList(raw: string | undefined): string[] {
   if (!raw?.trim()) return [];
   return [...new Set(raw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean))];
@@ -354,6 +360,10 @@ export async function runAllProductStatusDigests(options?: {
 }): Promise<{ results: Awaited<ReturnType<typeof sendProductDigest>>[] }> {
   const results: Awaited<ReturnType<typeof sendProductDigest>>[] = [];
   for (const productKey of DIGEST_PRODUCTS) {
+    if (PAUSED_DIGEST_PRODUCTS.has(productKey)) {
+      results.push({ productKey, sent: false, to: [], skippedReason: 'Digest paused' });
+      continue;
+    }
     const payload = await buildProductDigest(productKey, options);
     if (!payload) {
       results.push({ productKey, sent: false, to: [], skippedReason: 'No payload' });
